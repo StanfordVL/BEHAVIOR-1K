@@ -25,7 +25,6 @@ class InteractiveTraversableScene(TraversableScene):
         trav_map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         load_object_categories=None,
@@ -46,7 +45,6 @@ class InteractiveTraversableScene(TraversableScene):
             trav_map_resolution (float): traversability map resolution
             trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             load_object_categories (None or list): if specified, only load these object categories into the scene
@@ -92,7 +90,6 @@ class InteractiveTraversableScene(TraversableScene):
             trav_map_resolution=trav_map_resolution,
             trav_map_erosion=trav_map_erosion,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=False,
@@ -162,8 +159,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Load the traversability map if we have the connectivity graph
         maps_path = os.path.join(self.scene_dir, "layout")
-        if self.has_connectivity_graph:
-            self._trav_map.load_map(maps_path)
+        self._trav_map.load_map(maps_path)
 
     def _should_load_object(self, obj_info, task_metadata):
         name = obj_info["args"]["name"]

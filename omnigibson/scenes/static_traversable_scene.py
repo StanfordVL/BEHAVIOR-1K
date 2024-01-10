@@ -24,7 +24,6 @@ class StaticTraversableScene(TraversableScene):
         trav_map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         floor_plane_visible=False,
@@ -38,7 +37,6 @@ class StaticTraversableScene(TraversableScene):
             trav_map_resolution (float): traversability map resolution
             trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             floor_plane_visible (bool): whether to render the additionally added floor plane
@@ -56,7 +54,6 @@ class StaticTraversableScene(TraversableScene):
             trav_map_resolution=trav_map_resolution,
             trav_map_erosion=trav_map_erosion,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=True,

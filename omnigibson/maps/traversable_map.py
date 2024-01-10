@@ -29,7 +29,6 @@ class TraversableMap(BaseMap):
         map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
     ):
@@ -38,7 +37,6 @@ class TraversableMap(BaseMap):
             map_resolution (float): map resolution
             trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
         """
@@ -46,7 +44,6 @@ class TraversableMap(BaseMap):
         self.map_default_resolution = 0.01  # each pixel represents 0.01m
         self.trav_map_erosion = trav_map_erosion
         self.trav_map_with_objects = trav_map_with_objects
-        self.build_graph = build_graph
         self.num_waypoints = num_waypoints
         self.waypoint_interval = int(waypoint_resolution / map_resolution)
 
@@ -107,13 +104,8 @@ class TraversableMap(BaseMap):
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
 
-            # TODO: do we still need this parameter?
-            """
-            # We search for the largest connected areas
-            if self.build_graph:
-                # Directly set map size
-                self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
-            """
+            # Only keep the largest connected component of the map
+            trav_map = self.keep_largest_connected_component(trav_map)
 
             self.floor_map.append(trav_map)
 
@@ -149,13 +141,32 @@ class TraversableMap(BaseMap):
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
     
+    def keep_largest_connected_component(self, trav_map):
+        """
+        Keep the largest connected component of the map
+        This overwrites the traversability map loaded before
+        Dangerous! if the traversability graph is not computed from the loaded map but from a file, it could overwrite
+        it silently.
+
+        Args:
+            trav_map (np.ndarray): traversibility map
+
+        Returns:
+            np.ndarray: traversibility map with only the largest connected component
+        """
+        # Find the largest connected component
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(trav_map, connectivity=8)
+        largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        trav_map[labels != largest_label] = 0
+        return trav_map
+    
     def astar(self, trav_map, start, goal):
         def heuristic(node):
             # Calculate the Euclidean distance from node to goal
             return np.sqrt((node[0] - goal[0])**2 + (node[1] - goal[1])**2)
         
         def get_neighbors(cell):
-            # Define neighbors of cell
+            # Define neighbors of cell, we use 8-connected grid
             return [(cell[0] + 1, cell[1]), (cell[0] - 1, cell[1]), (cell[0], cell[1] + 1), (cell[0], cell[1] - 1), 
                     (cell[0] + 1, cell[1] + 1), (cell[0] - 1, cell[1] - 1), (cell[0] + 1, cell[1] - 1), (cell[0] - 1, cell[1] + 1)]
         
@@ -207,27 +218,6 @@ class TraversableMap(BaseMap):
         # throw error
         raise ValueError('No path found')
 
-    def get_closest_traversible_point(self, trav_map, point):
-        """
-        Get the closest traversible point to the given point in map frame
-
-        Args:
-            trav_map (np.ndarray): traversibility map
-            point (2-array): (x,y) 2D point in world reference frame (metric)
-
-        Returns:
-            2-array: (x,y) 2D point in world reference frame (metric)
-        """
-        trav_map = trav_map.copy()
-        trav_map[trav_map == 0] = 255
-        trav_map[point[0], point[1]] = 0
-        trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
-        trav_map[trav_map < 255] = 0
-        trav_space = np.where(trav_map == 255)
-        idx = np.argmin(np.linalg.norm(np.array(trav_space).T - point, axis=1))
-        xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
-        return xy_map
-
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
         """
         Get the shortest path from one point to another point.
@@ -245,33 +235,12 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-        real_source_map = tuple(self.world_to_map(source_world))
-        real_target_map = tuple(self.world_to_map(target_world))
-
-        source_map = real_source_map
-        target_map = real_target_map
+        source_map = tuple(self.world_to_map(source_world))
+        target_map = tuple(self.world_to_map(target_world))
 
         trav_map = self.floor_map[floor]
-
-        if trav_map[source_map] == 0:
-            # find the closest 255 cell in the map to the source
-            source_map = self.get_closest_traversible_point(trav_map, source_map)
-        if trav_map[target_map] == 0:
-            # find the closest 255 cell in the map to the target
-            target_map = self.get_closest_traversible_point(trav_map, target_map)
-        
-        def visualize_map(trav_map):
-            plt.imshow(trav_map, cmap='gray')
-            plt.scatter(source_map[1], source_map[0], color='blue')  # Plot source in blue
-            plt.scatter(target_map[1], target_map[0], color='red')  # Plot goal in red
-            plt.colorbar()
-            plt.show()
-        
-        visualize_map(trav_map)
                 
         path_map = self.astar(trav_map, source_map, target_map)
-        # attach the real source and target to the path
-        path_map = np.concatenate((np.array([real_source_map]), path_map, np.array([real_target_map])), axis=0)
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]

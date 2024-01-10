@@ -19,7 +19,6 @@ class TraversableScene(Scene):
         trav_map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         use_floor_plane=True,
@@ -34,7 +33,6 @@ class TraversableScene(Scene):
             trav_map_resolution (float): traversability map resolution
             trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             use_floor_plane (bool): whether to load a flat floor plane into the simulator
@@ -50,7 +48,6 @@ class TraversableScene(Scene):
             map_resolution=trav_map_resolution,
             trav_map_erosion=trav_map_erosion,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
         )
@@ -70,16 +67,10 @@ class TraversableScene(Scene):
         """
         return self._trav_map
 
-    @property
-    def has_connectivity_graph(self):
-        # Connectivity graph is determined by travserable map
-        return self._trav_map.build_graph
-
     def get_random_point(self, floor=None):
         return self._trav_map.get_random_point(floor=floor)
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
-        assert self._trav_map.build_graph, "cannot get shortest path without building the graph"
 
         return self._trav_map.get_shortest_path(
             floor=floor,

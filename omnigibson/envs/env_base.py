@@ -717,7 +717,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Traversibility map kwargs
                 "waypoint_resolution": 0.2,
                 "num_waypoints": 10,
-                "build_graph": True,
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
