@@ -162,12 +162,14 @@ class EntityPrim(XFormPrim):
 
     def remove(self):
         # First remove all joints
-        for joint in self._joints.values():
-            joint.remove()
+        if self._joints is not None:
+            for joint in self._joints.values():
+                joint.remove()
 
         # Then links
-        for link in self._links.values():
-            link.remove()
+        if self._links is not None:
+            for link in self._links.values():
+                link.remove()
 
         # Finally, remove this prim
         super().remove()
