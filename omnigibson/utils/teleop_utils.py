@@ -502,6 +502,7 @@ class OculusReaderSystem(TeleopSystem):
         # update transform data
         for hand in self.robot_arms:
             if hand in self.raw_data["transforms"]:
+                self.teleop_data.is_valid[hand] = True
                 delta_pos, delta_orn = T.relative_pose_transform(*self.raw_data["transforms"][hand],
                                                                  *self.vr_origin[hand])
                 target_rel_pos = self.robot_origin[hand][0] + delta_pos
@@ -509,15 +510,17 @@ class OculusReaderSystem(TeleopSystem):
                 self.teleop_data.transforms[hand] = T.pose_transform(*robot_based_pose, target_rel_pos,
                                                                      target_rel_orn)
             if f"{hand}Trig" in self.raw_data["button_data"]:
-                setattr(self.teleop_data, f"gripper_{hand}", self.raw_data["button_data"][f"{hand}Trig"][0])
+                self.teleop_data.grippers[hand] = self.raw_data["button_data"][f"{hand}Trig"][0]
+            else:
+                self.teleop_data.is_valid[hand] = False
         # update button data
         if "rightJS" in self.raw_data["button_data"]:
             rightJS_data = self.raw_data["button_data"]["rightJS"]
             self.teleop_data.transforms["base"][0] = rightJS_data[1] * self.movement_speed
-            self.teleop_data.transforms["base"][3] = rightJS_data[0] * self.movement_speed
+            self.teleop_data.transforms["base"][3] = -rightJS_data[0] * self.movement_speed
         if "leftJS" in self.raw_data["button_data"]:
-            leftJS_data = self.raw_data["button_data"]["rightJS"]
-            self.teleop_data.transforms["base"][1] = leftJS_data[0] * self.movement_speed
+            leftJS_data = self.raw_data["button_data"]["leftJS"]
+            self.teleop_data.transforms["base"][1] = -leftJS_data[0] * self.movement_speed
             self.teleop_data.transforms["base"][2] = leftJS_data[1] * self.movement_speed
         # update robot attachment info
         if "rightGrip" in self.raw_data["button_data"] and self.raw_data["button_data"]["rightGrip"][0] >= 0.5:
