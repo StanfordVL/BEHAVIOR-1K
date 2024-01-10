@@ -1,6 +1,7 @@
 import os
 import pickle
 import sys
+import heapq
 
 import cv2
 import networkx as nx
@@ -10,6 +11,8 @@ from PIL import Image
 from omnigibson.maps.map_base import BaseMap
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
+
+import matplotlib.pyplot as plt
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -53,7 +56,6 @@ class TraversableMap(BaseMap):
         self.mesh_body_id = None
         self.floor_heights = None
         self.floor_map = None
-        self.floor_graph = None
 
         # Run super method
         super().__init__(map_resolution=map_resolution)
@@ -105,74 +107,17 @@ class TraversableMap(BaseMap):
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
 
+            # TODO: do we still need this parameter?
+            """
             # We search for the largest connected areas
             if self.build_graph:
                 # Directly set map size
                 self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
+            """
 
             self.floor_map.append(trav_map)
 
         return map_size
-
-    # TODO: refactor into C++ for speedup
-    @staticmethod
-    def build_trav_graph(map_size, maps_path, floor, trav_map):
-        """
-        Build traversibility graph and only take the largest connected component
-
-        Args:
-            map_size (int): Size of the map being generated
-            maps_path (str): Path to the folder containing the traversability maps
-            floor (int): floor number
-            trav_map ((H, W)-array): traversability map in image form
-        """
-        floor_graph = []
-        graph_file = os.path.join(
-            maps_path, "floor_trav_{}_py{}{}.p".format(floor, sys.version_info.major, sys.version_info.minor)
-        )
-        if os.path.isfile(graph_file):
-            log.info("Loading traversable graph")
-            with open(graph_file, "rb") as pfile:
-                g = pickle.load(pfile)
-        else:
-            log.info("Building traversable graph")
-            g = nx.Graph()
-            for i in range(map_size):
-                for j in range(map_size):
-                    if trav_map[i, j] == 0:
-                        continue
-                    g.add_node((i, j))
-                    # 8-connected graph
-                    neighbors = [(i - 1, j - 1), (i, j - 1), (i + 1, j - 1), (i - 1, j)]
-                    for n in neighbors:
-                        if (
-                            0 <= n[0] < map_size
-                            and 0 <= n[1] < map_size
-                            and trav_map[n[0], n[1]] > 0
-                        ):
-                            g.add_edge(n, (i, j), weight=T.l2_distance(n, (i, j)))
-
-            # only take the largest connected component
-            largest_cc = max(nx.connected_components(g), key=len)
-            g = g.subgraph(largest_cc).copy()
-            try:
-                with open(graph_file, "wb") as pfile:
-                    pickle.dump(g, pfile)
-            except:
-                log.warning("Cannot cache traversable graph to disk possibly because dataset is read-only. Will have to recompute each time.")
-
-        floor_graph.append(g)
-
-        # update trav_map accordingly
-        # This overwrites the traversability map loaded before
-        # It sets everything to zero, then only sets to one the points where we have graph nodes
-        # Dangerous! if the traversability graph is not computed from the loaded map but from a file, it could overwrite
-        # it silently.
-        trav_map[:, :] = 0
-        for node in g.nodes:
-            trav_map[node[0], node[1]] = 255
-
-        return floor_graph
 
     @property
     def n_floors(self):
@@ -203,17 +148,85 @@ class TraversableMap(BaseMap):
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
+    
+    def astar(self, trav_map, start, goal):
+        def heuristic(node):
+            # Calculate the Euclidean distance from node to goal
+            return np.sqrt((node[0] - goal[0])**2 + (node[1] - goal[1])**2)
+        
+        def get_neighbors(cell):
+            # Define neighbors of cell
+            return [(cell[0] + 1, cell[1]), (cell[0] - 1, cell[1]), (cell[0], cell[1] + 1), (cell[0], cell[1] - 1), 
+                    (cell[0] + 1, cell[1] + 1), (cell[0] - 1, cell[1] - 1), (cell[0] + 1, cell[1] - 1), (cell[0] - 1, cell[1] + 1)]
+        
+        def is_valid(cell):
+            # Check if cell is within the map and traversable
+            return (0 <= cell[0] < trav_map.shape[0] and
+                    0 <= cell[1] < trav_map.shape[1] and
+                    trav_map[cell] != 0)
 
-    def has_node(self, floor, world_xy):
-        """
-        Return whether the traversability graph contains a point
+        def cost(cell1, cell2):
+            # Define the cost of moving from cell1 to cell2
+            # Return 1 for adjacent cells and square root of 2 for diagonal cells in an 8-connected grid.
+            if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
+                return 1
+            else:
+                return np.sqrt(2)
 
-            floor: floor number
-            world_xy: 2D location in world reference frame (metric)
+        open_set = [(0, start)]
+        came_from = {}
+        visited = set()
+        g_score = {cell: float('inf') for cell in np.ndindex(trav_map.shape)}
+        g_score[start] = 0
+
+        while open_set:
+            _, current = heapq.heappop(open_set)
+
+            visited.add(current)
+
+            if current == goal:
+                # Reconstruct path
+                path = []
+                while current in came_from:
+                    path.insert(0, current)
+                    current = came_from[current]
+                path.insert(0, start)
+                return np.array(path)
+
+            for neighbor in get_neighbors(current):
+                # Skip neighbors that are not valid or have already been visited
+                if not is_valid(neighbor) or neighbor in visited:
+                    continue
+                tentative_g_score = g_score[current] + cost(current, neighbor)
+                if tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score = tentative_g_score + heuristic(neighbor)
+                    heapq.heappush(open_set, (f_score, neighbor))
+
+        # throw error
+        raise ValueError('No path found')
+
+    def get_closest_traversible_point(self, trav_map, point):
         """
-        map_xy = tuple(self.world_to_map(world_xy))
-        g = self.floor_graph[floor]
-        return g.has_node(map_xy)
+        Get the closest traversible point to the given point in map frame
+
+        Args:
+            trav_map (np.ndarray): traversibility map
+            point (2-array): (x,y) 2D point in world reference frame (metric)
+
+        Returns:
+            2-array: (x,y) 2D point in world reference frame (metric)
+        """
+        trav_map = trav_map.copy()
+        trav_map[trav_map == 0] = 255
+        trav_map[point[0], point[1]] = 0
+        trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
+        trav_map[trav_map < 255] = 0
+        trav_space = np.where(trav_map == 255)
+        idx = np.argmin(np.linalg.norm(np.array(trav_space).T - point, axis=1))
+        xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
+        return xy_map
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
         """
@@ -232,24 +245,33 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-        assert self.build_graph, "cannot get shortest path without building the graph"
-        source_map = tuple(self.world_to_map(source_world))
-        target_map = tuple(self.world_to_map(target_world))
+        real_source_map = tuple(self.world_to_map(source_world))
+        real_target_map = tuple(self.world_to_map(target_world))
 
-        g = self.floor_graph[floor]
+        source_map = real_source_map
+        target_map = real_target_map
 
-        if not g.has_node(target_map):
-            nodes = np.array(g.nodes)
-            closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - target_map, axis=1))])
-            g.add_edge(closest_node, target_map, weight=T.l2_distance(closest_node, target_map))
+        trav_map = self.floor_map[floor]
 
-        if not g.has_node(source_map):
-            nodes = np.array(g.nodes)
-            closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - source_map, axis=1))])
-            g.add_edge(closest_node, source_map, weight=T.l2_distance(closest_node, source_map))
-
-        path_map = np.array(nx.astar_path(g, source_map, target_map, heuristic=T.l2_distance))
-
+        if trav_map[source_map] == 0:
+            # find the closest 255 cell in the map to the source
+            source_map = self.get_closest_traversible_point(trav_map, source_map)
+        if trav_map[target_map] == 0:
+            # find the closest 255 cell in the map to the target
+            target_map = self.get_closest_traversible_point(trav_map, target_map)
+        
+        def visualize_map(trav_map):
+            plt.imshow(trav_map, cmap='gray')
+            plt.scatter(source_map[1], source_map[0], color='blue')  # Plot source in blue
+            plt.scatter(target_map[1], target_map[0], color='red')  # Plot goal in red
+            plt.colorbar()
+            plt.show()
+        
+        visualize_map(trav_map)
+                
+        path_map = self.astar(trav_map, source_map, target_map)
+        # attach the real source and target to the path
+        path_map = np.concatenate((np.array([real_source_map]), path_map, np.array([real_target_map])), axis=0)
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]
