@@ -1,18 +1,12 @@
 import os
-import pickle
-import sys
 import heapq
 
 import cv2
-import networkx as nx
 import numpy as np
 from PIL import Image
 
 from omnigibson.maps.map_base import BaseMap
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
-
-import matplotlib.pyplot as plt
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
