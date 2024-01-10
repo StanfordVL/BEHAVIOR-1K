@@ -61,8 +61,11 @@ task:
   termination_config:
     max_steps: 400
   reward_config:
-    r_dist_coeff: 1.0
-    r_grasp: 1.0
+    dist_coeff: 1.0
+    grasp_reward: 1.0
+    eef_position_penalty_coef: 0.01
+    eef_orientation_penalty_coef: 0.001
+
 objects:
   - type: DatasetObject
     name: cologne

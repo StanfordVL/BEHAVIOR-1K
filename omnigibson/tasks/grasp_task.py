@@ -58,8 +58,7 @@ class GraspTask(BaseTask):
         rewards = dict()
         rewards["grasp"] = GraspReward(
             self.obj_name,
-            dist_coeff=self._reward_config["r_dist_coeff"],
-            grasp_reward=self._reward_config["r_grasp"]
+            **self._reward_config
         )
         return rewards
     
