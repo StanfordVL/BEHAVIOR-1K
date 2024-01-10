@@ -133,15 +133,15 @@ def main():
 
         config_filename = "omni_grpc.yaml"
         config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-        env = DummyVecEnv([lambda: og.Environment(configs=config)])
+        og_env = og.Environment(configs=config)
+        env = DummyVecEnv([lambda: og_env])
 
     # import IPython; IPython.embed()
 
-    # TODO: None of this stuff works: make it work by running env locally and connecting to it.
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically
     if args.eval:
-        ceiling = env.scene.object_registry("name", "ceilings")
+        ceiling = og_env.scene.object_registry("name", "ceilings")
         ceiling.visible = False
         og.sim.enable_viewer_camera_teleoperation()
 
