@@ -1,5 +1,4 @@
 import os
-import heapq
 
 import cv2
 import numpy as np
@@ -7,6 +6,7 @@ from PIL import Image
 
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.motion_planning_utils import astar
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -47,6 +47,7 @@ class TraversableMap(BaseMap):
         self.mesh_body_id = None
         self.floor_heights = None
         self.floor_map = None
+        self.labeled_floor_map = None
 
         # Run super method
         super().__init__(map_resolution=map_resolution)
@@ -68,6 +69,7 @@ class TraversableMap(BaseMap):
 
         self.floor_heights = floor_heights
         self.floor_map = []
+        self.labeled_floor_map = []
         map_size = None
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
@@ -98,10 +100,10 @@ class TraversableMap(BaseMap):
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
 
-            # Only keep the largest connected component of the map
-            trav_map = self.keep_largest_connected_component(trav_map)
-
             self.floor_map.append(trav_map)
+
+            _, component_labels = cv2.connectedComponents(trav_map, connectivity=8)
+            self.labeled_floor_map.append(component_labels)
 
         return map_size
 
@@ -113,104 +115,42 @@ class TraversableMap(BaseMap):
         """
         return len(self.floor_heights)
 
-    def get_random_point(self, floor=None):
+    def get_random_point(self, floor=None, prev_point=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
+        If @prev_point is given, sample a point in the same connected component as the previous point.
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
+            prev_point (None or 2-tuple): if given, sample a point in the same connected component as the previous point
+                - int: floor number of previous point
+                - 3-array: (x,y,z) previous point
 
         Returns:
             2-tuple:
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
-        if floor is None:
+        # If the given floor and prev_point are not on the same floor, raise an error
+        if floor and prev_point and floor != prev_point[0]:
+            raise ValueError("floor and prev_point are not on the same floor")
+        # If nothing is given, sample a random floor and a random point on that floor
+        if floor is None and prev_point is None:
             floor = np.random.randint(0, self.n_floors)
         trav = self.floor_map[floor]
-        trav_space = np.where(trav == 255)
+        if prev_point:
+            # If previous point is given, sample a point in the same connected component
+            prev_xy_map = self.world_to_map(prev_point[1][:2])
+            component_label = self.labeled_floor_map[floor][prev_xy_map[0]][prev_xy_map[1]]
+            trav_space = np.where(self.labeled_floor_map[floor] == component_label)
+        else:
+            trav_space = np.where(trav == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
+        component_label = self.labeled_floor_map[floor][xy_map[0]][xy_map[1]]
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
-    
-    def keep_largest_connected_component(self, trav_map):
-        """
-        Keep the largest connected component of the map
-        This overwrites the traversability map loaded before
-        Dangerous! if the traversability graph is not computed from the loaded map but from a file, it could overwrite
-        it silently.
-
-        Args:
-            trav_map (np.ndarray): traversibility map
-
-        Returns:
-            np.ndarray: traversibility map with only the largest connected component
-        """
-        # Find the largest connected component
-        _, labels, stats, _ = cv2.connectedComponentsWithStats(trav_map, connectivity=8)
-        largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-        trav_map[labels != largest_label] = 0
-        return trav_map
-    
-    def astar(self, trav_map, start, goal):
-        def heuristic(node):
-            # Calculate the Euclidean distance from node to goal
-            return np.sqrt((node[0] - goal[0])**2 + (node[1] - goal[1])**2)
-        
-        def get_neighbors(cell):
-            # Define neighbors of cell, we use 8-connected grid
-            return [(cell[0] + 1, cell[1]), (cell[0] - 1, cell[1]), (cell[0], cell[1] + 1), (cell[0], cell[1] - 1), 
-                    (cell[0] + 1, cell[1] + 1), (cell[0] - 1, cell[1] - 1), (cell[0] + 1, cell[1] - 1), (cell[0] - 1, cell[1] + 1)]
-        
-        def is_valid(cell):
-            # Check if cell is within the map and traversable
-            return (0 <= cell[0] < trav_map.shape[0] and
-                    0 <= cell[1] < trav_map.shape[1] and
-                    trav_map[cell] != 0)
-
-        def cost(cell1, cell2):
-            # Define the cost of moving from cell1 to cell2
-            # Return 1 for adjacent cells and square root of 2 for diagonal cells in an 8-connected grid.
-            if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
-                return 1
-            else:
-                return np.sqrt(2)
-
-        open_set = [(0, start)]
-        came_from = {}
-        visited = set()
-        g_score = {cell: float('inf') for cell in np.ndindex(trav_map.shape)}
-        g_score[start] = 0
-
-        while open_set:
-            _, current = heapq.heappop(open_set)
-
-            visited.add(current)
-
-            if current == goal:
-                # Reconstruct path
-                path = []
-                while current in came_from:
-                    path.insert(0, current)
-                    current = came_from[current]
-                path.insert(0, start)
-                return np.array(path)
-
-            for neighbor in get_neighbors(current):
-                # Skip neighbors that are not valid or have already been visited
-                if not is_valid(neighbor) or neighbor in visited:
-                    continue
-                tentative_g_score = g_score[current] + cost(current, neighbor)
-                if tentative_g_score < g_score[neighbor]:
-                    came_from[neighbor] = current
-                    g_score[neighbor] = tentative_g_score
-                    f_score = tentative_g_score + heuristic(neighbor)
-                    heapq.heappush(open_set, (f_score, neighbor))
-
-        # throw error
-        raise ValueError('No path found')
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
         """
@@ -233,8 +173,12 @@ class TraversableMap(BaseMap):
         target_map = tuple(self.world_to_map(target_world))
 
         trav_map = self.floor_map[floor]
-                
-        path_map = self.astar(trav_map, source_map, target_map)
+
+        # check if source and target are in the same connected component
+        if self.labeled_floor_map[floor][source_map] != self.labeled_floor_map[floor][target_map]:
+            raise ValueError("source and target are not in the same connected component")
+
+        path_map = astar(trav_map, source_map, target_map)
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]
