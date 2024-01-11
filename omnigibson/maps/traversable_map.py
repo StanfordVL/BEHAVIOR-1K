@@ -107,7 +107,7 @@ class TraversableMap(BaseMap):
         """
         return len(self.floor_heights)
 
-    def get_random_point(self, floor=None, prev_point=None):
+    def get_random_point(self, floor=None, prev_point=None, robot=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
         If @prev_point is given, sample a point in the same connected component as the previous point.
@@ -123,14 +123,6 @@ class TraversableMap(BaseMap):
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
-        
-        # TODO: add erosion
-        """
-            # We then erode the image. This is needed because the code that computes shortest path uses the global map
-            # and a point robot
-            if self.trav_map_erosion != 0:
-                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
-        """
 
         # If the given floor and prev_point are not on the same floor, raise an error
         if floor and prev_point and floor != prev_point[0]:
@@ -138,14 +130,25 @@ class TraversableMap(BaseMap):
         # If nothing is given, sample a random floor and a random point on that floor
         if floor is None and prev_point is None:
             floor = np.random.randint(0, self.n_floors)
-        trav = self.floor_map[floor]
+        trav_map = self.floor_map[floor]
+        
+        # Erode the traversability map to account for the robot's size
+        if robot:
+            robot_aabb_extent = robot.aabb_extent
+            robot_radius = np.linalg.norm(robot_aabb_extent) / 2.0
+            trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
+                                            int(np.ceil(robot_radius / self.map_resolution)))))
+        else:
+            # TODO: think about this default case
+            trav_map = cv2.erode(trav_map, np.ones((2, 2)))
+        
         if prev_point:
             # If previous point is given, sample a point in the same connected component
             prev_xy_map = self.world_to_map(prev_point[1][:2])
             component_label = self.labeled_floor_map[floor][prev_xy_map[0]][prev_xy_map[1]]
             trav_space = np.where(self.labeled_floor_map[floor] == component_label)
         else:
-            trav_space = np.where(trav == 255)
+            trav_space = np.where(trav_map == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
         component_label = self.labeled_floor_map[floor][xy_map[0]][xy_map[1]]
@@ -153,7 +156,7 @@ class TraversableMap(BaseMap):
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
 
-    def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
+    def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         """
         Get the shortest path from one point to another point.
         If any of the given point is not in the graph, add it to the graph and
@@ -170,19 +173,20 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-
-        # TODO: add erosion
-        """
-            # We then erode the image. This is needed because the code that computes shortest path uses the global map
-            # and a point robot
-            if self.trav_map_erosion != 0:
-                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
-        """
-
         source_map = tuple(self.world_to_map(source_world))
         target_map = tuple(self.world_to_map(target_world))
 
         trav_map = self.floor_map[floor]
+
+        # Erode the traversability map to account for the robot's size
+        if robot:
+            robot_aabb_extent = robot.aabb_extent
+            robot_radius = np.linalg.norm(robot_aabb_extent) / 2.0
+            trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
+                                                    int(np.ceil(robot_radius / self.map_resolution)))))
+        else:
+            # TODO: think about this default case
+            trav_map = cv2.erode(trav_map, np.ones((2, 2)))
 
         # check if source and target are in the same connected component
         if self.labeled_floor_map[floor][source_map] != self.labeled_floor_map[floor][target_map]:
