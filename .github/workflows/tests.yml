@@ -34,7 +34,16 @@ jobs:
 
       - name: Run tests
         working-directory: omnigibson-src
-        run: pytest
+        run: pytest --junitxml=results.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        with:
+          name: OmniGibson Tests
+          path: results.xml
+          reporter: java-junit
+          fail-on-error: 'true'
+          fail-on-empty: 'true'
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0
