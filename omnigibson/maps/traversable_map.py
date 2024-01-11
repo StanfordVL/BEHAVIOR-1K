@@ -21,7 +21,6 @@ class TraversableMap(BaseMap):
     def __init__(
         self,
         map_resolution=0.1,
-        trav_map_erosion=2,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
@@ -29,14 +28,12 @@ class TraversableMap(BaseMap):
         """
         Args:
             map_resolution (float): map resolution
-            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
         """
         # Set internal values
         self.map_default_resolution = 0.01  # each pixel represents 0.01m
-        self.trav_map_erosion = trav_map_erosion
         self.trav_map_with_objects = trav_map_with_objects
         self.num_waypoints = num_waypoints
         self.waypoint_interval = int(waypoint_resolution / map_resolution)
@@ -92,11 +89,6 @@ class TraversableMap(BaseMap):
             # We resize the traversability map to the new size computed before
             trav_map = cv2.resize(trav_map, (map_size, map_size))
 
-            # We then erode the image. This is needed because the code that computes shortest path uses the global map
-            # and a point robot
-            if self.trav_map_erosion != 0:
-                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
-
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
 
@@ -131,6 +123,15 @@ class TraversableMap(BaseMap):
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
+        
+        # TODO: add erosion
+        """
+            # We then erode the image. This is needed because the code that computes shortest path uses the global map
+            # and a point robot
+            if self.trav_map_erosion != 0:
+                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
+        """
+
         # If the given floor and prev_point are not on the same floor, raise an error
         if floor and prev_point and floor != prev_point[0]:
             raise ValueError("floor and prev_point are not on the same floor")
@@ -169,6 +170,15 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
+
+        # TODO: add erosion
+        """
+            # We then erode the image. This is needed because the code that computes shortest path uses the global map
+            # and a point robot
+            if self.trav_map_erosion != 0:
+                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
+        """
+
         source_map = tuple(self.world_to_map(source_world))
         target_map = tuple(self.world_to_map(target_world))
 
