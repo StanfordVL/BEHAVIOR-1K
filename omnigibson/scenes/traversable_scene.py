@@ -17,6 +17,7 @@ class TraversableScene(Scene):
         scene_model,
         scene_file=None,
         trav_map_resolution=0.1,
+        default_erosion_radius=0.2,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
@@ -30,6 +31,7 @@ class TraversableScene(Scene):
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
             trav_map_resolution (float): traversability map resolution
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
@@ -44,6 +46,7 @@ class TraversableScene(Scene):
         # Create traversable map
         self._trav_map = TraversableMap(
             map_resolution=trav_map_resolution,
+            default_erosion_radius=default_erosion_radius,
             trav_map_with_objects=trav_map_with_objects,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,

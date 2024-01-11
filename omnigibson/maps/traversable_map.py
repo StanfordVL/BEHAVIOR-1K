@@ -1,4 +1,5 @@
 import os
+import copy
 
 import cv2
 import numpy as np
@@ -7,6 +8,9 @@ from PIL import Image
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.motion_planning_utils import astar
+
+# TODO: remove this
+import matplotlib.pyplot as plt
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -21,6 +25,7 @@ class TraversableMap(BaseMap):
     def __init__(
         self,
         map_resolution=0.1,
+        default_erosion_radius=0.2,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
@@ -28,12 +33,14 @@ class TraversableMap(BaseMap):
         """
         Args:
             map_resolution (float): map resolution
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
         """
         # Set internal values
         self.map_default_resolution = 0.01  # each pixel represents 0.01m
+        self.default_erosion_radius = default_erosion_radius
         self.trav_map_with_objects = trav_map_with_objects
         self.num_waypoints = num_waypoints
         self.waypoint_interval = int(waypoint_resolution / map_resolution)
@@ -44,7 +51,6 @@ class TraversableMap(BaseMap):
         self.mesh_body_id = None
         self.floor_heights = None
         self.floor_map = None
-        self.labeled_floor_map = None
 
         # Run super method
         super().__init__(map_resolution=map_resolution)
@@ -66,7 +72,6 @@ class TraversableMap(BaseMap):
 
         self.floor_heights = floor_heights
         self.floor_map = []
-        self.labeled_floor_map = []
         map_size = None
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
@@ -93,9 +98,6 @@ class TraversableMap(BaseMap):
             trav_map[trav_map < 255] = 0
 
             self.floor_map.append(trav_map)
-
-            _, component_labels = cv2.connectedComponents(trav_map, connectivity=8)
-            self.labeled_floor_map.append(component_labels)
 
         return map_size
 
@@ -130,7 +132,9 @@ class TraversableMap(BaseMap):
         # If nothing is given, sample a random floor and a random point on that floor
         if floor is None and prev_point is None:
             floor = np.random.randint(0, self.n_floors)
-        trav_map = self.floor_map[floor]
+        
+        # create a deep copy so that we don't erode the original map
+        trav_map = copy.deepcopy(self.floor_map[floor])
         
         # Erode the traversability map to account for the robot's size
         if robot:
@@ -139,19 +143,25 @@ class TraversableMap(BaseMap):
             trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
                                             int(np.ceil(robot_radius / self.map_resolution)))))
         else:
-            # TODO: think about this default case
-            trav_map = cv2.erode(trav_map, np.ones((2, 2)))
+            # convert default_erosion_radius from meter to pixel
+            erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
+            trav_map = cv2.erode(trav_map, np.ones((erosion_radius_pixel, erosion_radius_pixel)))
         
         if prev_point:
+            # Find connected component
+            _, component_labels = cv2.connectedComponents(trav_map, connectivity=8)
+
             # If previous point is given, sample a point in the same connected component
             prev_xy_map = self.world_to_map(prev_point[1][:2])
-            component_label = self.labeled_floor_map[floor][prev_xy_map[0]][prev_xy_map[1]]
-            trav_space = np.where(self.labeled_floor_map[floor] == component_label)
+            prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
+            trav_space = np.where(component_labels == prev_label)
+            log.info("Sample target point:")
         else:
             trav_space = np.where(trav_map == 255)
+            log.info("Sample source point:")
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
-        component_label = self.labeled_floor_map[floor][xy_map[0]][xy_map[1]]
+        log.info("Sampled point: {}".format(xy_map))
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
@@ -176,23 +186,23 @@ class TraversableMap(BaseMap):
         source_map = tuple(self.world_to_map(source_world))
         target_map = tuple(self.world_to_map(target_world))
 
-        trav_map = self.floor_map[floor]
+        # create a deep copy so that we don't erode the original map
+        trav_map = copy.deepcopy(self.floor_map[floor])
 
-        # Erode the traversability map to account for the robot's size
+        # erode the traversability map to account for the robot's size
         if robot:
             robot_aabb_extent = robot.aabb_extent
             robot_radius = np.linalg.norm(robot_aabb_extent) / 2.0
             trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
                                                     int(np.ceil(robot_radius / self.map_resolution)))))
         else:
-            # TODO: think about this default case
-            trav_map = cv2.erode(trav_map, np.ones((2, 2)))
-
-        # check if source and target are in the same connected component
-        if self.labeled_floor_map[floor][source_map] != self.labeled_floor_map[floor][target_map]:
-            raise ValueError("source and target are not in the same connected component")
+            # convert default_erosion_radius from meter to pixel
+            erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
+            trav_map = cv2.erode(trav_map, np.ones((erosion_radius_pixel, erosion_radius_pixel)))
 
         path_map = astar(trav_map, source_map, target_map)
+        if path_map is None:
+            raise ValueError("No path found")
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]

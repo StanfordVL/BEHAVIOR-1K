@@ -718,6 +718,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "waypoint_resolution": 0.2,
                 "num_waypoints": 10,
                 "trav_map_resolution": 0.1,
+                "default_erosion_radius": 0.2,
                 "trav_map_with_objects": True,
                 "scene_instance": None,
                 "scene_file": None,
