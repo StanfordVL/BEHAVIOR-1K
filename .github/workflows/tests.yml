@@ -34,7 +34,7 @@ jobs:
 
       - name: Run tests
         working-directory: omnigibson-src
-        run: source /isaac-sim/setup_conda_env.sh && pytest
+        run: pytest
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0
