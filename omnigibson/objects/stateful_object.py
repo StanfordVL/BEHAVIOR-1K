@@ -462,7 +462,8 @@ class StatefulObject(BaseObject):
 
     def remove(self):
         """
-        Removes this prim from omniverse stage
+        Removes this prim from omniverse stage.
+        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
         """
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
