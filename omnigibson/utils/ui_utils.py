@@ -552,6 +552,7 @@ class KeyboardRobotController:
         self.current_keypress = None    # Current key that is being pressed
         self.active_action = None       # Current action information based on the current keypress
         self.toggling_gripper = False   # Whether we should toggle the gripper during the next action
+        self.custom_keymapping = None   # Dictionary mapping custom keys to custom callback functions / info
 
         # Populate the keypress mapping dictionary
         self.populate_keypress_mapping()
@@ -567,6 +568,20 @@ class KeyboardRobotController:
         input_interface = carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+
+    def register_custom_keybinding(self, key, description, callback_fn):
+        """
+        Register a custom keybinding with corresponding callback function for this keyboard controller.
+        Note that this will automatically override any pre-existing callback that existed for that key.
+
+        Args:
+            key (carb.input.KeyboardInput): Key to map to callback function
+            description (str): Description for the callback function
+            callback_fn (function): Callback function, should have signature:
+
+                callback_fn() -> None
+        """
+        self.custom_keymapping[key] = {"description": description, "callback": callback_fn}
 
     def generate_ik_keypress_mapping(self, controller_info):
         """
@@ -637,6 +652,7 @@ class KeyboardRobotController:
         self.joint_control_idx = []
         self.gripper_direction = {}
         self.persistent_gripper_action = {}
+        self.custom_keymapping = {}
 
         # Add mapping for joint control directions (no index because these are inferred at runtime)
         self.keypress_mapping[carb.input.KeyboardInput.RIGHT_BRACKET] = {"idx": None, "val": 0.1}
@@ -706,9 +722,13 @@ class KeyboardRobotController:
                     else min(len(self.binary_grippers) - 1, self.active_gripper_idx + 1)
                 print(f"Now controlling gripper {self.binary_grippers[self.active_gripper_idx]} with binary toggling")
 
-            elif event.input == carb.input.KeyboardInput.R:
-                # Render the sensors from the robot's camera and lidar
+            elif event.input == carb.input.KeyboardInput.M:
+                # Render the sensor modalities from the robot's camera and lidar
                 self.robot.visualize_sensors()
+
+            elif event.input in self.custom_keymapping:
+                # Run custom press
+                self.custom_keymapping[event.input]["callback"]()
 
             elif event.input == carb.input.KeyboardInput.ESCAPE:
                 # Terminate immediately
@@ -789,8 +809,7 @@ class KeyboardRobotController:
         # Return action
         return action
 
-    @staticmethod
-    def print_keyboard_teleop_info():
+    def print_keyboard_teleop_info(self):
         """
         Prints out relevant information for teleop controlling a robot
         """
@@ -826,7 +845,13 @@ class KeyboardRobotController:
         print_command("t", "toggle gripper (open/close)")
         print()
         print("Sensor Rendering")
-        print_command("r", "render the onboard sensors (RGB, Depth, Normals, Instance Segmentation, Occupancy Map")
+        print_command("m", "render the onboard sensor modalities (RGB, Depth, Normals, Instance Segmentation, Occupancy Map)")
         print()
+        if len(self.custom_keymapping) > 0:
+            print("Custom Keymappings")
+            for key, info in self.custom_keymapping.items():
+                key_str = key.__str__().split(".")[-1].lower()
+                print_command(key_str, info["description"])
+            print()
         print("*" * 30)
         print()
