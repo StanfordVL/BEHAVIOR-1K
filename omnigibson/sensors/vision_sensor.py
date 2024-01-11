@@ -257,6 +257,9 @@ class VisionSensor(BaseSensor):
             self.initialize_sensors(names=modality)
 
     def remove(self):
+        """
+        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
+        """
         # Remove from global sensors dictionary
         self.SENSORS.pop(self._prim_path)
 

@@ -28,7 +28,7 @@ setup(
         "networkx~=3.2.1",
         "PyYAML~=6.0.1",
         "addict~=2.4.0",
-        "ipython~=8.19.0",
+        "ipython~=8.20.0",
         "future~=0.18.3",
         "trimesh~=4.0.8",
         "h5py~=3.10.0",

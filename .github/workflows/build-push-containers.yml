@@ -88,6 +88,16 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
       -
+        name: Metadata for vscode Image
+        id: meta-vscode
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            stanfordvl/omnigibson-vscode
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+      -
         name: Build and push dev image
         id: build-dev
         uses: docker/build-push-action@v5
@@ -105,6 +115,7 @@ jobs:
           sed -i "s/omnigibson-dev:latest/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/prod.Dockerfile && cat docker/prod.Dockerfile
       -
         name: Build and push prod image
+        id: build-prod
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -113,4 +124,20 @@ jobs:
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
+
+      - name: Update vscode image Dockerfile with prod image tag
+        run: |
+          sed -i "s/omnigibson:latest/omnigibson@${{ steps.build-prod.outputs.digest }}/g" docker/vscode.Dockerfile && cat docker/vscode.Dockerfile
+      -
+        name: Build and push vscode image
+        id: build-vscode
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta-vscode.outputs.tags }}
+          labels: ${{ steps.meta-vscode.outputs.labels }}
+          file: docker/vscode.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=min

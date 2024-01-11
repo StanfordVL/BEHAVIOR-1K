@@ -15,9 +15,14 @@ import omnigibson.utils.transform_utils as T
 from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
-import omni
-import omni.log
-import carb
+
+# Attempt to import omni, it may not always be necessary here (e.g: when we download datasets) so we catch the import failure explicitly
+try:
+    import omni
+    import omni.log
+    import carb
+except ModuleNotFoundError:
+    print("Could not find omni or carb, skipping import")
 import random
 import imageio
 from IPython import embed
