@@ -102,6 +102,13 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         # Default is True if all kwargs are met
         return True, None
 
+    @classmethod
+    def postprocess_ability_params(cls, params):
+        """
+        Post-processes ability parameters if needed. The default implementation is a simple passthrough.
+        """
+        return params
+
     @property
     def stateful(self):
         """
