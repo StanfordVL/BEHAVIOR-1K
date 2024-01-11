@@ -510,7 +510,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return np.random.randint(0, self.n_floors)
 
-    def get_random_point(self, floor=None, prev_point=None):
+    def get_random_point(self, floor=None, prev_point=None, robot=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
         If @prev_point is given, sample a point in the same connected component as the previous point.
@@ -528,7 +528,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         raise NotImplementedError()
 
-    def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
+    def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         """
         Get the shortest path from one point to another point.
 
@@ -537,6 +537,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             source_world (2-array): (x,y) 2D source location in world reference frame (metric)
             target_world (2-array): (x,y) 2D target location in world reference frame (metric)
             entire_path (bool): whether to return the entire path
+            robot (None or BaseRobot): if given, erode the traversability map to account for the robot's size
 
         Returns:
             2-tuple:

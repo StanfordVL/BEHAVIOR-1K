@@ -249,6 +249,10 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def _create_discrete_action_space(self):
         # Fetch does not support discrete actions
         raise ValueError("Fetch does not support discrete actions!")
+    
+    @property
+    def tucked_aabb_extent(self):
+        return self._tucked_aabb_extent
 
     def tuck(self):
         """
@@ -271,6 +275,10 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             for joint in self.finger_joints[arm]:
                 if joint.joint_type != JointType.JOINT_FIXED:
                     joint.friction = 500
+        
+        # Keep track of tucked chassis footprint
+        self.tuck()
+        self._tucked_aabb_extent = self.aabb_extent
 
     def _actions_to_control(self, action):
         # Run super method first

@@ -222,7 +222,7 @@ class PointNavigationTask(BaseTask):
         """
         # Possibly sample initial pos
         if self._randomize_initial_pos:
-            _, initial_pos = env.scene.get_random_point(floor=self._floor)
+            _, initial_pos = env.scene.get_random_point(floor=self._floor, robot=env.robots[self._robot_idn])
         else:
             initial_pos = self._initial_pos
 
@@ -234,8 +234,10 @@ class PointNavigationTask(BaseTask):
         if self._randomize_goal_pos:
             dist, in_range_dist = 0.0, False
             for _ in range(max_trials):
-                _, goal_pos = env.scene.get_random_point(floor=self._floor, prev_point=(self._floor, initial_pos))
-                _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False)
+                _, goal_pos = env.scene.get_random_point(floor=self._floor, 
+                                                         prev_point=(self._floor, initial_pos),
+                                                         robot=env.robots[self._robot_idn])
+                _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=env.robots[self._robot_idn])
                 # If a path range is specified, make sure distance is valid
                 if self._path_range is None or self._path_range[0] < dist < self._path_range[1]:
                     in_range_dist = True
@@ -420,7 +422,7 @@ class PointNavigationTask(BaseTask):
                 - float: geodesic distance of the path to the goal position
         """
         start_xy_pos = env.robots[self._robot_idn].states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
-        return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path)
+        return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path, robot=env.robots[self._robot_idn])
 
     def _step_visualization(self, env):
         """

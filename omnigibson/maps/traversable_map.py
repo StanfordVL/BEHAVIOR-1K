@@ -9,9 +9,6 @@ from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.motion_planning_utils import astar
 
-# TODO: remove this
-import matplotlib.pyplot as plt
-
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
@@ -32,14 +29,15 @@ class TraversableMap(BaseMap):
     ):
         """
         Args:
-            map_resolution (float): map resolution
+            map_resolution (float): map resolution in meters, each pixel represents this many meters;
+                                    normally, this should be between 0.01 and 0.1
             default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
         """
         # Set internal values
-        self.map_default_resolution = 0.01  # each pixel represents 0.01m
+        self.map_default_resolution = 0.01  # each pixel == 0.01m in the dataset representation
         self.default_erosion_radius = default_erosion_radius
         self.trav_map_with_objects = trav_map_with_objects
         self.num_waypoints = num_waypoints
@@ -138,10 +136,13 @@ class TraversableMap(BaseMap):
         
         # Erode the traversability map to account for the robot's size
         if robot:
-            robot_aabb_extent = robot.aabb_extent
-            robot_radius = np.linalg.norm(robot_aabb_extent) / 2.0
-            trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
-                                            int(np.ceil(robot_radius / self.map_resolution)))))
+            if hasattr(robot, 'tucked_aabb_extent'):
+                robot_chassis_extent = robot.tucked_aabb_extent[:2]
+            else:
+                robot_chassis_extent = robot.aabb_extent[:2]
+            robot_radius = np.linalg.norm(robot_chassis_extent) / 2.0
+            robot_radius_pixel = int(np.ceil(robot_radius / self.map_resolution))
+            trav_map = cv2.erode(trav_map, np.ones((robot_radius_pixel, robot_radius_pixel)))
         else:
             # convert default_erosion_radius from meter to pixel
             erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
@@ -155,13 +156,10 @@ class TraversableMap(BaseMap):
             prev_xy_map = self.world_to_map(prev_point[1][:2])
             prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
             trav_space = np.where(component_labels == prev_label)
-            log.info("Sample target point:")
         else:
             trav_space = np.where(trav_map == 255)
-            log.info("Sample source point:")
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
-        log.info("Sampled point: {}".format(xy_map))
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
@@ -177,6 +175,7 @@ class TraversableMap(BaseMap):
             source_world (2-array): (x,y) 2D source location in world reference frame (metric)
             target_world (2-array): (x,y) 2D target location in world reference frame (metric)
             entire_path (bool): whether to return the entire path
+            robot (None or BaseRobot): if given, erode the traversability map to account for the robot's size
 
         Returns:
             2-tuple:
@@ -191,10 +190,13 @@ class TraversableMap(BaseMap):
 
         # erode the traversability map to account for the robot's size
         if robot:
-            robot_aabb_extent = robot.aabb_extent
-            robot_radius = np.linalg.norm(robot_aabb_extent) / 2.0
-            trav_map = cv2.erode(trav_map, np.ones((int(np.ceil(robot_radius / self.map_resolution)), 
-                                                    int(np.ceil(robot_radius / self.map_resolution)))))
+            if hasattr(robot, 'tucked_aabb_extent'):
+                robot_chassis_extent = robot.tucked_aabb_extent[:2]
+            else:
+                robot_chassis_extent = robot.aabb_extent[:2]
+            robot_radius = np.linalg.norm(robot_chassis_extent) / 2.0
+            robot_radius_pixel = int(np.ceil(robot_radius / self.map_resolution))
+            trav_map = cv2.erode(trav_map, np.ones((robot_radius_pixel, robot_radius_pixel)))
         else:
             # convert default_erosion_radius from meter to pixel
             erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
