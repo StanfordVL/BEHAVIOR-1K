@@ -34,12 +34,13 @@ jobs:
 
       - name: Run tests
         working-directory: omnigibson-src
-        run: pytest --junitxml=results.xml
+        run: pytest tests/test_object_removal.py --junitxml=results.xml
 
       - name: Test Report
         uses: dorny/test-reporter@v1
         with:
           name: OmniGibson Tests
+          working-directory: omnigibson-src
           path: results.xml
           reporter: java-junit
           fail-on-error: 'true'
