@@ -129,7 +129,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     action_generator = KeyboardRobotController(robot=robot)
 
     # Register custom binding to reset the environment
-    action_generator.register_custom_keybinding(
+    action_generator.register_custom_keymapping(
         key=carb.input.KeyboardInput.R,
         description="Reset the robot",
         callback_fn=lambda: env.reset(),

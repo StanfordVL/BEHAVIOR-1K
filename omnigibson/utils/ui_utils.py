@@ -569,9 +569,9 @@ class KeyboardRobotController:
         keyboard = appwindow.get_keyboard()
         sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
 
-    def register_custom_keybinding(self, key, description, callback_fn):
+    def register_custom_keymapping(self, key, description, callback_fn):
         """
-        Register a custom keybinding with corresponding callback function for this keyboard controller.
+        Register a custom keymapping with corresponding callback function for this keyboard controller.
         Note that this will automatically override any pre-existing callback that existed for that key.
 
         Args:
