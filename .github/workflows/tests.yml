@@ -35,7 +35,7 @@ jobs:
 
       - name: Run tests
         working-directory: omnigibson-src
-        run: pytest tests/test_object_removal.py --junitxml=results.xml
+        run: pytest --junitxml=results.xml
 
       - name: Test Report
         uses: dorny/test-reporter@v1
