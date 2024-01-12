@@ -447,14 +447,13 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
-            reset = 0
             hand_data = 0
             if teleop_data.is_valid[part_name]: 
                 part_pos, part_orn = teleop_data.transforms[part_name]
                 # apply eef rotation offset to part transform first
                 des_world_part_pos = part_pos
                 des_world_part_orn = T.quat_multiply(part_orn, eef_part.offset_to_body[1])
-                if part_name in self.arm_names:
+                if eef_part.name in self.arm_names:
                     # compute gripper action
                     if hasattr(teleop_data, "hand_data"):
                         # hand tracking mode, compute joint rotations for each independent hand joint
@@ -463,7 +462,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                     else:
                         # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
                         hand_data = teleop_data.grippers[part_name] * 2 - 1
-                    action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data
+                    action[self.controller_action_idx[f"gripper_{eef_part.name}"]] = hand_data
                     # update ghost hand if necessary
                     if self._use_ghost_hands:
                         self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
@@ -482,7 +481,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             controller_name = "camera" if part_name == "head" else "arm_" + eef_part.name
             action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
             # If we reset, teleop the robot parts to the desired pose
-            if reset:
+            if eef_part.name in self.arm_names and teleop_data.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
         return action
 

@@ -69,27 +69,26 @@ def main():
     vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="OpenXR", use_hand_tracking=True)
     vrsys.start()
     # set headset position to be 1m above ground and facing +x direction
-    head_init_transform = vrsys.og2xr(pos=[0, 0, 1], orn=[0, 0, 0, 1])
-    vrsys.physics_to_virtual_transform_map = (head_init_transform, vrsys.hmd)
+    vrsys.set_initial_transform(pos=[0, 0, 1], orn=[0, 0, 0, 1])
 
     # main simulation loop
     for _ in range(10000):
-        if og.sim.is_playing():
-            vrsys.update()
-            if DEBUG_MODE:
-                # update the 26 markers' position and orientation for each hand
-                if vrsys.teleop_data.is_valid["left"]:
-                    for i in range(26):
-                        pos = vrsys.raw_data["hand_data"]["left"]["pos"][i]
-                        orn = vrsys.raw_data["hand_data"]["left"]["orn"][i]
-                        markers[i].set_position_orientation(pos, orn)
-                if vrsys.teleop_data.is_valid["right"]:
-                    for i in range(26):
-                        pos = vrsys.raw_data["hand_data"]["right"]["pos"][i]
-                        orn = vrsys.raw_data["hand_data"]["right"]["orn"][i]
-                        markers[i + 26].set_position_orientation(pos, orn)
-            action = vrsys.teleop_data_to_action()
-            env.step(action)                
+        # update vr system
+        vrsys.update()
+        if DEBUG_MODE:
+            # update the 26 markers' position and orientation for each hand
+            if vrsys.teleop_data.is_valid["left"]:
+                for i in range(26):
+                    pos = vrsys.raw_data["hand_data"]["left"]["pos"][i]
+                    orn = vrsys.raw_data["hand_data"]["left"]["orn"][i]
+                    markers[i].set_position_orientation(pos, orn)
+            if vrsys.teleop_data.is_valid["right"]:
+                for i in range(26):
+                    pos = vrsys.raw_data["hand_data"]["right"]["pos"][i]
+                    orn = vrsys.raw_data["hand_data"]["right"]["orn"][i]
+                    markers[i + 26].set_position_orientation(pos, orn)
+        action = vrsys.teleop_data_to_action()
+        env.step(action)                
 
     # Shut down the environment cleanly at the end
     vrsys.stop()
