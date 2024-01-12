@@ -33,7 +33,7 @@ setup(
         "trimesh~=4.0.8",
         "h5py~=3.10.0",
         "cryptography~=41.0.7",
-        "bddl~=3.1.0",
+        "bddl~=3.2.0b1",
         "opencv-python~=4.8.1",
         "nest_asyncio~=1.5.8",
         "imageio~=2.33.1",
