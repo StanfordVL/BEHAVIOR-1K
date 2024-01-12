@@ -23,7 +23,7 @@ from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_fu
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.teleop_utils import TeleopData
-
+from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -879,19 +879,13 @@ class ManipulationRobot(BaseRobot):
         raycast_endpoints = []
         for endpoint in endpoints:
             raycast_endpoints += [endpoint] * n_startpoints
-
-        # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         ray_data = set()
-        # Repeat twice, so that we avoid collisions with the fingers of each gripper themself
-        for raycast_startpoint, raycast_endpoint in zip(raycast_startpoints, raycast_endpoints):
-            origin = carb.Float3(raycast_startpoint)
-            dir = carb.Float3(raycast_endpoint - raycast_startpoint)
-            distance = np.linalg.norm(dir)
-            hit = get_physx_scene_query_interface().raycast_closest(origin, dir, distance)
-            if hit["hit"]:
+        # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
+        for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
+            if result["hit"]:
                 # filter out self body parts (we currently assume that the robot cannot grasp itself)
-                if self.prim_path not in hit["rigidBody"]:
-                    ray_data.add(hit["rigidBody"])
+                if self.prim_path not in result["rigidBody"]:
+                    ray_data.add(result["rigidBody"])
         return ray_data
 
 
