@@ -8,6 +8,7 @@ concurrency:
 
 jobs:
   test:
+    name: Run Tests
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
     defaults:
@@ -39,7 +40,7 @@ jobs:
       - name: Test Report
         uses: dorny/test-reporter@v1
         with:
-          name: OmniGibson Tests
+          name: Test Results
           working-directory: omnigibson-src
           path: results.xml
           reporter: java-junit
