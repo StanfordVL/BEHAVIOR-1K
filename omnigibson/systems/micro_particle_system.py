@@ -1612,6 +1612,10 @@ class Cloth(MicroParticleSystem):
             self_collision_filter=True,
         )
 
+        # Disable welding because it can potentially make thin objects non-manifold
+        auto_particle_cloth_api = PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+        auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
+
     @classproperty
     def _pbd_material_kwargs(cls):
         return dict(
