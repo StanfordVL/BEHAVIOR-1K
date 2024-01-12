@@ -16,7 +16,6 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, get_system, \
     is_visual_particle_system, is_physical_particle_system, is_system_active, REGISTERED_SYSTEMS
 from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
-from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, \
     get_particle_positions_in_frame, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import classproperty
@@ -116,6 +115,8 @@ def create_projection_visualization(
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
 
     # Generate the ComputeGraph nodes to render the projection
+    # Import now to avoid too-eager load of Omni classes due to inheritance
+    from omnigibson.utils.deprecated_utils import Core
     core = Core(lambda val: None, particle_system_name=projection_name)
 
     # Scale radius and height by the parent scale -- projection always points in the negative-z direction of the
