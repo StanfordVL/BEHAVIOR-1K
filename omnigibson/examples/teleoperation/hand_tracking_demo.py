@@ -70,7 +70,7 @@ def main():
     vrsys.start()
     # set headset position to be 1m above ground and facing +x direction
     head_init_transform = vrsys.og2xr(pos=[0, 0, 1], orn=[0, 0, 0, 1])
-    vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(head_init_transform, vrsys.hmd)
+    vrsys.physics_to_virtual_transform_map = (head_init_transform, vrsys.hmd)
 
     # main simulation loop
     for _ in range(10000):

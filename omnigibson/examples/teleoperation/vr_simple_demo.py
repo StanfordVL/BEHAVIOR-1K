@@ -21,7 +21,7 @@ def main():
     env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys 
-    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="OpenXR", enable_touchpad_movement=True)
+    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="SteamVR", enable_touchpad_movement=True)
     # We want a lower movement speed for controlling with VR headset
     vrsys.base_movement_speed = 0.03
     vrsys.start()

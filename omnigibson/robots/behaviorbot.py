@@ -479,7 +479,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 eef_part.offset_to_body[0], [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
             )
             des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
-            controller_name = "camera" if part_name == "head" else "arm_" + part_name
+            controller_name = "camera" if part_name == "head" else "arm_" + eef_part.name
             action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
             # If we reset, teleop the robot parts to the desired pose
             if reset:
