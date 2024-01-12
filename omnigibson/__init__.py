@@ -155,8 +155,8 @@ def create_app():
 
 def create_sim():
     global sim
-    from omnigibson.simulator import Simulator
-    sim = Simulator()
+    from omnigibson.simulator import launch_simulator
+    sim = launch_simulator()
     return sim
 
 
