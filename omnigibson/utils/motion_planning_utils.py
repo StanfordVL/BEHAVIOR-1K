@@ -554,9 +554,12 @@ def astar(search_map, start, goal, eight_connected=True):
         search_map (Array): 2D Grid map to search on
         start (Array): Start position on the map
         goal (Array): Goal position on the map
+        eight_connected (bool): Whether we consider the sides and diagonals of a cell as neighbors or just the sides
     
     Returns:
-        Array of arrays: Array of positions that the robot should navigate to (None if no path is found)
+        2D numpy array or None: Array of shape (N, 2) where N is the number of steps in the path. 
+                                Each row represents the (x, y) coordinates of a step on the path. 
+                                If no path is found, returns None.
     """
     def heuristic(node):
         # Calculate the Euclidean distance from node to goal

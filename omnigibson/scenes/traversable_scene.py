@@ -67,11 +67,10 @@ class TraversableScene(Scene):
         """
         return self._trav_map
 
-    def get_random_point(self, floor=None, prev_point=None, robot=None):
-        return self._trav_map.get_random_point(floor=floor, prev_point=prev_point, robot=robot)
+    def get_random_point(self, floor=None, same_connected_component_as=None, robot=None):
+        return self._trav_map.get_random_point(floor=floor, same_connected_component_as=same_connected_component_as, robot=robot)
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
-
         return self._trav_map.get_shortest_path(
             floor=floor,
             source_world=source_world,

@@ -235,7 +235,7 @@ class PointNavigationTask(BaseTask):
             dist, in_range_dist = 0.0, False
             for _ in range(max_trials):
                 _, goal_pos = env.scene.get_random_point(floor=self._floor, 
-                                                         prev_point=(self._floor, initial_pos),
+                                                         same_connected_component_as=(self._floor, initial_pos),
                                                          robot=env.robots[self._robot_idn])
                 _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=env.robots[self._robot_idn])
                 # If a path range is specified, make sure distance is valid

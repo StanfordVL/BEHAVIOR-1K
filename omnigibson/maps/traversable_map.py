@@ -1,5 +1,4 @@
 import os
-import copy
 
 import cv2
 import numpy as np
@@ -106,34 +105,8 @@ class TraversableMap(BaseMap):
             int: Number of floors belonging to this map's associated scene
         """
         return len(self.floor_heights)
-
-    def get_random_point(self, floor=None, prev_point=None, robot=None):
-        """
-        Sample a random point on the given floor number. If not given, sample a random floor number.
-        If @prev_point is given, sample a point in the same connected component as the previous point.
-
-        Args:
-            floor (None or int): floor number. None means the floor is randomly sampled
-            prev_point (None or 2-tuple): if given, sample a point in the same connected component as the previous point
-                - int: floor number of previous point
-                - 3-array: (x,y,z) previous point
-
-        Returns:
-            2-tuple:
-                - int: floor number. This is the sampled floor number if @floor is None
-                - 3-array: (x,y,z) randomly sampled point
-        """
-
-        # If the given floor and prev_point are not on the same floor, raise an error
-        if floor and prev_point and floor != prev_point[0]:
-            raise ValueError("floor and prev_point are not on the same floor")
-        # If nothing is given, sample a random floor and a random point on that floor
-        if floor is None and prev_point is None:
-            floor = np.random.randint(0, self.n_floors)
-        
-        # create a deep copy so that we don't erode the original map
-        trav_map = copy.deepcopy(self.floor_map[floor])
-        
+    
+    def _erode_trav_map(self, trav_map, robot=None):
         # Erode the traversability map to account for the robot's size
         if robot:
             if hasattr(robot, 'tucked_aabb_extent'):
@@ -147,13 +120,43 @@ class TraversableMap(BaseMap):
             # convert default_erosion_radius from meter to pixel
             erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
             trav_map = cv2.erode(trav_map, np.ones((erosion_radius_pixel, erosion_radius_pixel)))
+        return trav_map
+
+    def get_random_point(self, floor=None, same_connected_component_as=None, robot=None):
+        """
+        Sample a random point on the given floor number. If not given, sample a random floor number.
+        If @same_connected_component_as is given, sample a point in the same connected component as the previous point.
+
+        Args:
+            floor (None or int): floor number. None means the floor is randomly sampled
+            same_connected_component_as (None or 2-tuple): if given, sample a point in the same connected component as this point
+                - int: floor number of previous point
+                - 3-array: (x,y,z) previous point
+
+        Returns:
+            2-tuple:
+                - int: floor number. This is the sampled floor number if @floor is None
+                - 3-array: (x,y,z) randomly sampled point
+        """
+
+        # If the given floor and same_connected_component_as are not on the same floor, raise an error
+        if floor and same_connected_component_as and floor != same_connected_component_as[0]:
+            raise ValueError("floor and prev_point are not on the same floor")
+        # If nothing is given, sample a random floor and a random point on that floor
+        if floor is None and same_connected_component_as is None:
+            floor = np.random.randint(0, self.n_floors)
         
-        if prev_point:
+        # create a deep copy so that we don't erode the original map
+        trav_map = self.floor_map[floor].copy()
+        
+        trav_map = self._erode_trav_map(trav_map, robot=robot)
+        
+        if same_connected_component_as:
             # Find connected component
             _, component_labels = cv2.connectedComponents(trav_map, connectivity=8)
 
             # If previous point is given, sample a point in the same connected component
-            prev_xy_map = self.world_to_map(prev_point[1][:2])
+            prev_xy_map = self.world_to_map(same_connected_component_as[1][:2])
             prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
             trav_space = np.where(component_labels == prev_label)
         else:
@@ -186,25 +189,13 @@ class TraversableMap(BaseMap):
         target_map = tuple(self.world_to_map(target_world))
 
         # create a deep copy so that we don't erode the original map
-        trav_map = copy.deepcopy(self.floor_map[floor])
+        trav_map = self.floor_map[floor].copy()
 
-        # erode the traversability map to account for the robot's size
-        if robot:
-            if hasattr(robot, 'tucked_aabb_extent'):
-                robot_chassis_extent = robot.tucked_aabb_extent[:2]
-            else:
-                robot_chassis_extent = robot.aabb_extent[:2]
-            robot_radius = np.linalg.norm(robot_chassis_extent) / 2.0
-            robot_radius_pixel = int(np.ceil(robot_radius / self.map_resolution))
-            trav_map = cv2.erode(trav_map, np.ones((robot_radius_pixel, robot_radius_pixel)))
-        else:
-            # convert default_erosion_radius from meter to pixel
-            erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
-            trav_map = cv2.erode(trav_map, np.ones((erosion_radius_pixel, erosion_radius_pixel)))
+        trav_map = self._erode_trav_map(trav_map, robot=robot)
 
         path_map = astar(trav_map, source_map, target_map)
         if path_map is None:
-            raise ValueError("No path found")
+            raise ValueError(f"No traversable path found from {source_world} to {target_world} on floor {floor}")
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]
