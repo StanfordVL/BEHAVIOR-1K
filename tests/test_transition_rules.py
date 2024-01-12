@@ -6,6 +6,7 @@ from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.objects import DatasetObject
+from omnigibson.transition_rules import REGISTERED_RULES
 import omnigibson as og
 
 from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane
@@ -14,9 +15,9 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.skip(reason="transition tests are broken")
 @og_test
 def test_blender_rule():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
     blender = og.sim.scene.object_registry("name", "blender")
 
     blender.set_orientation([0, 0, 0, 1])
@@ -26,8 +27,8 @@ def test_blender_rule():
     milk = get_system("whole_milk")
     chocolate_sauce = get_system("chocolate_sauce")
     milkshake = get_system("milkshake")
-    milk.generate_particles(positions=np.array([[0, 0.02, 0.47]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.47]]))
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
 
     ice_cream = DatasetObject(
         name="ice_cream",
@@ -36,7 +37,7 @@ def test_blender_rule():
         bounding_box=[0.076, 0.077, 0.065],
     )
     og.sim.import_object(ice_cream)
-    ice_cream.set_position([0, 0, 0.52])
+    ice_cream.set_position([0, 0, 0.54])
 
     for i in range(5):
         og.sim.step()
@@ -56,9 +57,9 @@ def test_blender_rule():
         og.sim.remove_object(obj=ice_cream)
 
 
-@pytest.mark.skip(reason="transition tests are broken")
 @og_test
 def test_cooking_rule():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
     oven = og.sim.scene.object_registry("name", "oven")
     oven.keep_still()
     oven.set_orientation([0, 0, -0.707, 0.707])
