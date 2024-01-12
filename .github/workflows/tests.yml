@@ -1,6 +1,6 @@
 name: Tests
 
-on: [pull_request]
+on: [pull_request, push]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}

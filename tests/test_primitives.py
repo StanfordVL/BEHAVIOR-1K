@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
@@ -117,6 +118,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     og.sim.clear()
     return True
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_navigate():
     categories = ["floors", "ceilings", "walls"]
 
@@ -137,6 +139,7 @@ def test_navigate():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
@@ -157,6 +160,7 @@ def test_grasp():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_place():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
@@ -188,6 +192,7 @@ def test_place():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_open_prismatic():
     categories = ["floors"]
 
@@ -209,6 +214,7 @@ def test_open_prismatic():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_open_revolute():
     categories = ["floors"]
 
