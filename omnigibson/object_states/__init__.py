@@ -23,6 +23,7 @@ from omnigibson.object_states.particle_source_or_sink import ParticleSource, Par
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import IsGrasping
 from omnigibson.object_states.saturated import Saturated
+from omnigibson.object_states.slicer_active import SlicerActive
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.touching import Touching
