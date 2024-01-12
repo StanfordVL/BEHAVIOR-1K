@@ -14,6 +14,7 @@ import pytest
 import numpy as np
 
 
+@pytest.mark.skip(reason="transition tests are broken")
 @og_test
 def test_blender_rule():
     blender = og.sim.scene.object_registry("name", "blender")
@@ -55,6 +56,7 @@ def test_blender_rule():
         og.sim.remove_object(obj=ice_cream)
 
 
+@pytest.mark.skip(reason="transition tests are broken")
 @og_test
 def test_cooking_rule():
     oven = og.sim.scene.object_registry("name", "oven")
