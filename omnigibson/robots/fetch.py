@@ -251,7 +251,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         raise ValueError("Fetch does not support discrete actions!")
     
     @property
-    def tucked_aabb_extent(self):
+    def base_aabb_extent(self):
         return self._tucked_aabb_extent
 
     def tuck(self):

@@ -267,7 +267,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         raise NotImplementedError()
     
     @property
-    def tucked_aabb_extent(self):
+    def base_aabb_extent(self):
         return self._tucked_aabb_extent
 
     def tuck(self):

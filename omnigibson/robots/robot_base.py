@@ -171,6 +171,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Validate this robot configuration
         self._validate_configuration()
 
+        self._base_aabb_extent = self.aabb_extent
+
     def _load_sensors(self):
         """
         Loads sensor(s) to retrieve observations from this object.
@@ -412,6 +414,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Run super
         super().remove()
+    
+    @property
+    def base_aabb_extent(self):
+        """
+        Returns:
+            3-array: Axis-aligned bounding box extent of the robot base
+        """
+        return self._base_aabb_extent
 
     @property
     def sensors(self):

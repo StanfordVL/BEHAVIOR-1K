@@ -109,10 +109,7 @@ class TraversableMap(BaseMap):
     def _erode_trav_map(self, trav_map, robot=None):
         # Erode the traversability map to account for the robot's size
         if robot:
-            if hasattr(robot, 'tucked_aabb_extent'):
-                robot_chassis_extent = robot.tucked_aabb_extent[:2]
-            else:
-                robot_chassis_extent = robot.aabb_extent[:2]
+            robot_chassis_extent = robot.base_aabb_extent[:2]
             robot_radius = np.linalg.norm(robot_chassis_extent) / 2.0
             robot_radius_pixel = int(np.ceil(robot_radius / self.map_resolution))
             trav_map = cv2.erode(trav_map, np.ones((robot_radius_pixel, robot_radius_pixel)))
