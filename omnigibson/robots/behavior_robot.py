@@ -48,7 +48,7 @@ m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
 
 
-class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
+class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     """
     A humanoid robot that can be used in VR as an avatar. It has two hands, a body and a head with two cameras.
     """
@@ -83,18 +83,18 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Unique to ManipulationRobot
             grasping_mode="assisted",
             
-            # unique to Behaviorbot
+            # unique to BehaviorRobot
             use_ghost_hands=True,
 
             **kwargs
     ):
         """
-        Initializes Behaviorbot
+        Initializes BehaviorRobot
         Args:
             use_ghost_hands (bool): whether to show ghost hand when the robot hand is too far away from the controller
         """
 
-        super(Behaviorbot, self).__init__(
+        super(BehaviorRobot, self).__init__(
             prim_path=prim_path,
             name=name,
             class_id=class_id,
@@ -145,11 +145,11 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/behaviorbot/usd/Behaviorbot.usd")
+        return os.path.join(gm.ASSET_PATH, "models/behavior_robot/usd/BehaviorRobot.usd")
 
     @property
     def model_name(self):
-        return "Behaviorbot"
+        return "BehaviorRobot"
     
     @property
     def n_arms(self):
@@ -322,7 +322,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return controllers
 
     def load(self):
-        prim = super(Behaviorbot, self).load()
+        prim = super(BehaviorRobot, self).load()
         for part in self.parts.values():
             part.load()
         return prim
@@ -331,7 +331,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super()._post_load()
 
     def _create_discrete_action_space(self):
-        raise ValueError("Behaviorbot does not support discrete actions!")
+        raise ValueError("BehaviorRobot does not support discrete actions!")
     
     def update_controller_mode(self):
         super().update_controller_mode()
@@ -419,7 +419,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
         """
-        Generates an action for the Behaviorbot to perform based on vr data dict.
+        Generates an action for the BehaviorRobot to perform based on vr data dict.
 
         Action space (all non-normalized values that will be clipped if they are too large)
         Body:
@@ -487,15 +487,15 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
 
 class BRPart(ABC):
-    """This is the interface that all Behaviorbot eef parts must implement."""
+    """This is the interface that all BehaviorRobot eef parts must implement."""
 
-    def __init__(self, name: str, parent: Behaviorbot, prim_path: str, eef_type: str, offset_to_body: List[float]) -> None:
+    def __init__(self, name: str, parent: BehaviorRobot, prim_path: str, eef_type: str, offset_to_body: List[float]) -> None:
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
 
         Args:
             name (str): unique name of this BR part
-            parent (Behaviorbot): the parent BR object
+            parent (BehaviorRobot): the parent BR object
             prim_path (str): prim path to the root link of the eef
             eef_type (str): type of eef. One of hand, head
             offset_to_body (List[float]): relative rotation offset between the shoulder_rz link and the eef link.
@@ -516,7 +516,7 @@ class BRPart(ABC):
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
                 prim_path=f"/World/{gh_name}",
-                usd_path=os.path.join(gm.ASSET_PATH, f"models/behaviorbot/usd/{gh_name}.usd"),
+                usd_path=os.path.join(gm.ASSET_PATH, f"models/behavior_robot/usd/{gh_name}.usd"),
                 name=gh_name,
                 scale=0.001,
                 visible=False,

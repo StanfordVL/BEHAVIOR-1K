@@ -1,5 +1,5 @@
 """
-Example script for interacting with OmniGibson scenes with VR and Behaviorbot.
+Example script for interacting with OmniGibson scenes with VR and BehaviorRobot.
 """
 import omnigibson as og
 from omnigibson.utils.teleop_utils import OVXRSystem
@@ -9,7 +9,7 @@ def main():
     env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
     scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int"}
     robot0_cfg = {
-        "type": "Behaviorbot",
+        "type": "BehaviorRobot",
         "controller_config": {
             "gripper_0": {"command_input_limits": "default"},
             "gripper_1": {"command_input_limits": "default"},

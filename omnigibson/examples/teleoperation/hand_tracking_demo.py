@@ -12,7 +12,7 @@ def main():
     env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
     scene_cfg = {"type": "Scene"}
     robot0_cfg = {
-        "type": "Behaviorbot",
+        "type": "BehaviorRobot",
         "obs_modalities": ["rgb", "depth", "normal", "scan", "occupancy_grid"],
         "action_normalize": False,
         "grasping_mode": "assisted"

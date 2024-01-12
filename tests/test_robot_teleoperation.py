@@ -35,7 +35,7 @@ def test_teleop():
     env = og.Environment(configs=cfg)
     robot = env.robots[0]
     env.reset()
-    teleop_system = TeleopSystem(robot=robot)
+    teleop_system = TeleopSystem(robot=robot, show_control_marker=False)
     start_base_pose = robot.get_position_orientation()
     start_eef_pose = robot.links[robot.eef_link_names[robot.default_arm]].get_position_orientation()
 
