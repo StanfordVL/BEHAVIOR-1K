@@ -1,20 +1,22 @@
 import os
 import numpy as np
+from typing import Dict, Iterable
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 
 
-class FrankaAllegro(ManipulationRobot):
+class FrankaLeap(ManipulationRobot):
     """
-    Franka Robot with Allegro hand
+    Franka Robot with Leap right hand
     """
 
     def __init__(
         self,
         # Shared kwargs in hierarchy
         name,
+        hand="right",
         prim_path=None,
         class_id=None,
         uuid=None,
@@ -48,6 +50,7 @@ class FrankaAllegro(ManipulationRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
+            hand (str): One of {"left", "right"} - which hand to use, default is right
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
@@ -93,6 +96,7 @@ class FrankaAllegro(ManipulationRobot):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
 
+        self.hand = hand
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -121,7 +125,7 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def model_name(self):
-        return "FrankaAllegro"
+        return f"FrankaLeap{self.hand.capitalize()}"
 
     @property
     def discrete_action_list(self):
@@ -142,7 +146,7 @@ class FrankaAllegro(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
+
     @property
     def _default_gripper_multi_finger_controller_configs(self):
         conf = super()._default_gripper_multi_finger_controller_configs
@@ -156,6 +160,22 @@ class FrankaAllegro(ManipulationRobot):
         return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
 
     @property
+    def assisted_grasp_start_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
+            GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
+            GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
+        ]}
+
+    @property
+    def assisted_grasp_end_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+        ]}
+
+    @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 
@@ -166,7 +186,7 @@ class FrankaAllegro(ManipulationRobot):
     @property
     def gripper_control_idx(self):
         # thumb.proximal, ..., thumb.tip, ..., ring.tip
-        return {self.default_arm: np.array([8, 12, 16, 20, 10, 14, 18, 22, 9, 13, 17, 21, 7, 11, 15, 19])}
+        return {self.default_arm: np.array([8, 12, 16, 20, 7, 11, 15, 19, 9, 13, 17, 21, 10, 14, 18, 22])}
 
     @property
     def arm_link_names(self):
@@ -178,51 +198,30 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "base_link"}
+        return {self.default_arm: "palm_center"}
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: [f"link_{i}_0" for i in range(16)]}
+        links = ["mcp_joint", "pip", "dip", "fingertip", "realtip"]
+        return {self.default_arm: [f"{link}_{i}" for i in range(1, 5) for link in links]}
 
     @property
     def finger_joint_names(self):
         # thumb.proximal, ..., thumb.tip, ..., ring.tip
-        return {self.default_arm: [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]}
+        return {self.default_arm: [f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]]}
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.usd")
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro_description.yaml")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.urdf")
-    
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["link_12_0", "part_studio_link"],
-        ]
-    
-    @property
-    def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
-            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
-            GraspingPoint(link_name=f"link_15_0_tip", position=[0, 0.015, 0.007]),
-        ]}
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"link_3_0_tip", position=[0.012, 0, 0.007]),
-            GraspingPoint(link_name=f"link_7_0_tip", position=[0.012, 0, 0.007]),
-            GraspingPoint(link_name=f"link_11_0_tip", position=[0.012, 0, 0.007]),
-        ]}
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.urdf")
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
+        return {self.default_arm: T.euler2quat(np.array([0, np.pi, np.pi / 2]))}

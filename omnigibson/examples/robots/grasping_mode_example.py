@@ -10,6 +10,7 @@ from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotControll
 
 GRASPING_MODES = dict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
+    assisted="Assisted Grasping - Objects are magnetized when they touch the fingers, are within the hand, and a CLOSE command is given",
     physical="Physical Grasping - No additional grasping assistance applied",
 )
 
