@@ -11,7 +11,7 @@ from telegym import GRPCClientVecEnv
 import gymnasium as gym
 import torch as th
 import torch.nn as nn
-# import wandb
+import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
@@ -19,7 +19,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
-# from wandb.integration.sb3 import WandbCallback 
+from wandb.integration.sb3 import WandbCallback 
 
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
@@ -182,13 +182,13 @@ def main():
                 "net_arch": {"pi": [512, 512], "vf": [512, 512]}
             },
         }
-        # run = wandb.init(
-        #     project="sb3",
-        #     config=config,
-        #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        #     monitor_gym=True,  # auto-upload the videos of agents playing the game
-        #     # save_code=True,  # optional
-        # )
+        run = wandb.init(
+            project="sb3",
+            config=config,
+            sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+            monitor_gym=True,  # auto-upload the videos of agents playing the game
+            # save_code=True,  # optional
+        )
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env)
         env = VecVideoRecorder(
