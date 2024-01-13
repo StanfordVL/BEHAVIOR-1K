@@ -1269,6 +1269,7 @@ def launch_simulator(*args, **kwargs):
                 position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
                 orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
             )
+            self.viewer_visibility = gm.RENDER_VIEWER_CAMERA
 
         def close(self):
             """

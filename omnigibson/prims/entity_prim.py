@@ -903,25 +903,27 @@ class EntityPrim(XFormPrim):
         if og.sim.is_stopped():
             return XFormPrim.set_position_orientation(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.set_position_orientation(position=position, orientation=orientation)
-        
-        if position is not None:
-            position = np.asarray(position)[None, :]
-        if orientation is not None:
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-        self._articulation_view.set_world_poses(position, orientation)
-        BoundingBoxAPI.clear()
+        if og.sim.is_stopped():
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation)
+        elif self._articulation_view is None:
+            self.root_link.set_position_orientation(position=position, orientation=orientation)
+        else:
+            if position is not None:
+                position = np.asarray(position)[None, :]
+            if orientation is not None:
+                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            self._articulation_view.set_world_poses(position, orientation)
+            BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
         if og.sim.is_stopped():
             return XFormPrim.get_position_orientation(self)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
+        elif self._articulation_view is None:
             return self.root_link.get_position_orientation()
-
-        positions, orientations = self._articulation_view.get_world_poses()
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        else:
+            positions, orientations = self._articulation_view.get_world_poses()
+            return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
         # If kinematic only, clear cache for the root link
@@ -930,25 +932,25 @@ class EntityPrim(XFormPrim):
         if og.sim.is_stopped():
             return XFormPrim.set_local_pose(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.set_local_pose(position=position, orientation=orientation)
-        
-        if position is not None:
-            position = np.asarray(position)[None, :]
-        if orientation is not None:
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-        self._articulation_view.set_local_poses(position, orientation)
-        BoundingBoxAPI.clear()
+        elif self._articulation_view is None:
+            self.root_link.set_local_pose(position=position, orientation=orientation)
+        else:
+            if position is not None:
+                position = np.asarray(position)[None, :]
+            if orientation is not None:
+                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            self._articulation_view.set_local_poses(position, orientation)
+            BoundingBoxAPI.clear()
 
     def get_local_pose(self):
         if og.sim.is_stopped():
             return XFormPrim.get_local_pose(self)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
+        elif self._articulation_view is None:
             return self.root_link.get_local_pose()
-        
-        positions, orientations = self._articulation_view.get_local_poses()
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        else:
+            positions, orientations = self._articulation_view.get_local_poses()
+            return positions[0], orientations[0][[1, 2, 3, 0]]
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property

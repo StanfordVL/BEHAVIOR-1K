@@ -1231,6 +1231,10 @@ def is_fluid_system(system_name):
 def get_system(system_name, force_active=True):
     # Make sure scene exists
     assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
+    # Make sure prefixes preserve their double underscore
+    for prefix in SYSTEM_PREFIXES:
+        if f"{prefix}__" not in system_name:
+            system_name = system_name.replace(f"{prefix}_", f"{prefix}__")
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
     system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
         else _create_system_from_metadata(system_name=system_name)

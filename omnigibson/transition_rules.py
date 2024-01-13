@@ -975,7 +975,7 @@ class DicingRule(BaseTransitionRule):
     @classmethod
     def transition(cls, object_candidates):
         objs_to_remove = []
-
+        
         for diceable_obj in object_candidates["diceable"]:
             obj_category = diceable_obj.category
             # We expect all diced particle systems to follow the naming convention (cooked__)diced__<category>

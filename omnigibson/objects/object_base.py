@@ -169,7 +169,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
 
-        # First, remove any articulation root API that already exists at the object-level prim
+        # First, remove any articulation root API that already exists at the object-level or root link level prim
         if self._prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
             self._prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
             self._prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
