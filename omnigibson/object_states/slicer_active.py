@@ -32,12 +32,11 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         return True
     
     def _currently_touching_sliceable(self):
-        # TODO: Implement something
-        # Get the contact prim list from ContactBodies, then get objects from prim paths, then check if they are sliceable
-        # Use self.obj.get_state(ContactBodies) to return a set of objects that are currently touching self.obj
-        return False
+        all_touching_objects = self.obj.states[ContactBodies].get_value()
+        return any(hasattr(obj, '_abilities') and "Sliceable" in obj._abilities for obj in all_touching_objects)
 
     def _update(self):
+        breakpoint()
         # If we were slicing in the past step, deactivate now.
         if self._previously_touching_sliceable:
             self.set_value(False)
