@@ -259,7 +259,7 @@ class ManipulationRobot(BaseRobot):
             # Infer from the gripper controller the state
             is_grasping = self._controllers["gripper_{}".format(arm)].is_grasping()
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
-            if is_grasping and candidate_obj is not None:
+            if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
                 is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
 
@@ -901,10 +901,6 @@ class ManipulationRobot(BaseRobot):
         self._ag_release_counter[arm] += 1
         time_since_release = self._ag_release_counter[arm] * og.sim.get_rendering_dt()
         if time_since_release >= m.RELEASE_WINDOW:
-            # TODO: Verify not needed!
-            # Remove filtered collision restraints
-            # for finger_link in self.finger_links[arm]:
-            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
 
@@ -920,7 +916,6 @@ class ManipulationRobot(BaseRobot):
         for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
             joint = self._joints[joint_name]
             joint.set_pos(pos=j_val)
-            joint.set_vel(vel=0.0)
 
     @property
     def robot_arm_descriptor_yamls(self):
@@ -1214,10 +1209,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        # Disable collisions while picking things up
-        # TODO: Verify not needed!
-        # for finger_link in self.finger_links[arm]:
-        #     finger_link.add_filtered_collision_pair(prim=ag_obj)
         for joint in self.finger_joints[arm]:
             j_val = joint.get_state()[0][0]
             self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
@@ -1391,9 +1382,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        # Disable collisions while picking things up
-        # for finger_link in self.finger_links[arm]:
-        #     finger_link.add_filtered_collision_pair(prim=ag_obj)
         for joint in self.finger_joints[arm]:
             j_val = joint.get_state()[0][0]
             self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
