@@ -183,6 +183,12 @@ class LocomotionRobot(BaseRobot):
         self.set_orientation(quat)
 
     @property
+    def base_action_idx(self):
+        controller_idx = self.controller_order.index("base")
+        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+        return np.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
+
+    @property
     @abstractmethod
     def base_control_idx(self):
         """

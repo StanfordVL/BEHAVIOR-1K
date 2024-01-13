@@ -2,7 +2,7 @@ from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import create_module_macros
 from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.objects.controllable_object import ControllableObject
@@ -10,7 +10,6 @@ from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 from omnigibson.utils.constants import PrimType
-from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()
@@ -412,6 +411,16 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Run super
         super().remove()
+
+    def teleop_data_to_action(self, teleop_data):
+        """
+        Generate action data from teleoperation data
+        Args:
+            teleop_data (TeleopData): teleoperation data
+        Returns:
+            np.ndarray: array of action data filled with update value
+        """
+        return np.zeros(self.action_dim)
 
     @property
     def sensors(self):
