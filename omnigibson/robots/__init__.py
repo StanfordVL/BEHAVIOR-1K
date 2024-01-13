@@ -12,4 +12,4 @@ from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.franka import FrankaPanda
 from omnigibson.robots.franka_allegro import FrankaAllegro
 from omnigibson.robots.franka_leap import FrankaLeap
-from robots.behavior_robot import BehaviorRobot
+from omnigibson.robots.behavior_robot import BehaviorRobot
