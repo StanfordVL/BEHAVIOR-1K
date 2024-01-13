@@ -55,9 +55,9 @@ class TeleopSystem:
         self.robot = robot
         self.robot_arms = ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         self.teleop_data = TeleopData(n_arms=self.robot.n_arms)
-        # vr_origin stores the original pose of the VR controller upon calling reset_transform_mapping
-        # This is used to subtract with the current VR controller pose in each frame to get the delta pose
-        self.vr_origin = {arm: T.mat2pose(np.eye(4)) for arm in self.robot_arms}
+        # device_origin stores the original pose of the teleop device (e.g. VR controller) upon calling reset_transform_mapping
+        # This is used to subtract with the current teleop device pose in each frame to get the delta pose
+        self.device_origin = {arm: T.mat2pose(np.eye(4)) for arm in self.robot_arms}
         # robot_origin stores the relative pose of the robot eef w.r.t. to the robot base upon calling reset_transform_mapping
         # This is used to apply the delta offset of the VR controller to get the final target robot eef pose (relative to the robot base) 
         self.robot_origin = {arm: T.mat2pose(np.eye(4)) for arm in self.robot_arms}
@@ -530,7 +530,7 @@ class OculusReaderSystem(TeleopSystem):
             if hand in self.raw_data["transforms"]:
                 self.teleop_data.is_valid[hand] = True
                 delta_pos, delta_orn = T.relative_pose_transform(*self.raw_data["transforms"][hand],
-                                                                 *self.vr_origin[hand])
+                                                                 *self.device_origin[hand])
                 target_rel_pos = self.robot_origin[hand][0] + delta_pos
                 target_rel_orn = T.quat_multiply(delta_orn, self.robot_origin[hand][1])
                 self.teleop_data.transforms[hand] = T.pose_transform(*robot_based_pose, target_rel_pos,
@@ -565,7 +565,7 @@ class OculusReaderSystem(TeleopSystem):
         """
         super().reset_transform_mapping(arm)
         if arm in self.raw_data["transforms"]:
-            self.vr_origin[arm] = self.raw_data["transforms"][arm]
+            self.device_origin[arm] = self.raw_data["transforms"][arm]
 
 
 class SpaceMouseSystem(TeleopSystem):
