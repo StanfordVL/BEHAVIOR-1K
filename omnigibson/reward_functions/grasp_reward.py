@@ -1,4 +1,5 @@
 import math
+import numpy as np
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
 import omnigibson.utils.transform_utils as T
