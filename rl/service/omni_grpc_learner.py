@@ -183,7 +183,7 @@ def main():
             },
         }
         run = wandb.init(
-            entity="behavior-rl"
+            entity="behavior-rl",
             project="sb3",
             config=config,
             sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
