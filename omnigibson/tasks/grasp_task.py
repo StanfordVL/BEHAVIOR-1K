@@ -196,5 +196,6 @@ class GraspTask(BaseTask):
             "grasp_reward": GRASP_REWARD,
             "eef_position_penalty_coef": 0.01,
             "eef_orientation_penalty_coef": 0.001,
+            "regularization_coef": 0.01,
         }
 
