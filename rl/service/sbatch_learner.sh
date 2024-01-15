@@ -22,9 +22,6 @@ for env_var in "${!ENVS[@]}"; do
     ENV_KWARGS="${ENV_KWARGS} --env ${env_var}=${ENVS[${env_var}]}"
 done
 
-RL_PATH="/scr-ssd/${SLURM_JOB_USER}"
-mkdir -p $RL_PATH
-
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
     [/scr-ssd/og-data-0-2-1]=/data
@@ -39,7 +36,6 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
     # Feel free to include lines like the below to mount a workspace or a custom OG version
     [/cvgl2/u/garlanka/OmniGibson]=/omnigibson-src
-    [${RL_PATH}]=/workspace
 )
 
 MOUNT_KWARGS=""
@@ -68,7 +64,7 @@ enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2"
+    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2"
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}
