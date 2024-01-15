@@ -63,8 +63,8 @@ task:
   reward_config:
     dist_coeff: 1.0
     grasp_reward: 1.0
-    eef_position_penalty_coef: 0.01
-    eef_orientation_penalty_coef: 0.001
+    eef_position_penalty_coef: 0.1
+    eef_orientation_penalty_coef: 0.01
 
 objects:
   - type: DatasetObject
