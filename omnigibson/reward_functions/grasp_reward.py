@@ -22,6 +22,7 @@ class GraspReward(BaseRewardFunction):
         self.grasp_reward = grasp_reward
         self.eef_position_penalty_coef = eef_position_penalty_coef
         self.eef_orientation_penalty_coef = eef_orientation_penalty_coef
+        self._regularization_coef = 0.01
 
         # Run super
         super().__init__()
@@ -43,6 +44,9 @@ class GraspReward(BaseRewardFunction):
 
         reward = 0.
 
+        # Penalize large actions
+        reward -= (np.sum(np.abs(action)) * self._regularization_coef)
+        
         # Penalize based on the magnitude of the action
         eef_pos = robot.get_eef_position(robot.default_arm)
         if self.prev_eef_pos is not None:
