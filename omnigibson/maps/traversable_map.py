@@ -115,6 +115,7 @@ class TraversableMap(BaseMap):
             radius = self.default_erosion_radius
         radius_pixel = int(np.ceil(radius / self.map_resolution))
         trav_map = cv2.erode(trav_map, np.ones((radius_pixel, radius_pixel)))
+        return trav_map
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
         """
@@ -132,7 +133,7 @@ class TraversableMap(BaseMap):
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
-        if reference_point:
+        if reference_point is not None:
             assert floor is not None, "floor must be given if reference_point is given"
 
         # If nothing is given, sample a random floor and a random point on that floor
@@ -141,10 +142,9 @@ class TraversableMap(BaseMap):
         
         # create a deep copy so that we don't erode the original map
         trav_map = self.floor_map[floor].copy()
-        
         trav_map = self._erode_trav_map(trav_map, robot=robot)
         
-        if reference_point:
+        if reference_point is not None:
             # Find connected component
             _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)
 
