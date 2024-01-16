@@ -25,7 +25,7 @@ scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
   trav_map_resolution: 0.1
-  default_erosion_radius: 0.2
+  default_erosion_radius: 0.0
   trav_map_with_objects: true
   num_waypoints: 1
   waypoint_resolution: 0.2

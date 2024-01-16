@@ -17,7 +17,7 @@ class TraversableScene(Scene):
         scene_model,
         scene_file=None,
         trav_map_resolution=0.1,
-        default_erosion_radius=0.2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
@@ -67,8 +67,8 @@ class TraversableScene(Scene):
         """
         return self._trav_map
 
-    def get_random_point(self, floor=None, same_connected_component_as=None, robot=None):
-        return self._trav_map.get_random_point(floor=floor, same_connected_component_as=same_connected_component_as, robot=robot)
+    def get_random_point(self, floor=None, reference_point=None, robot=None):
+        return self._trav_map.get_random_point(floor=floor, reference_point=reference_point, robot=robot)
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         return self._trav_map.get_shortest_path(

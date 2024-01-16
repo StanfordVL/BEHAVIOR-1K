@@ -510,16 +510,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return np.random.randint(0, self.n_floors)
 
-    def get_random_point(self, floor=None, same_connected_component_as=None, robot=None):
+    def get_random_point(self, floor=None, reference_point=None, robot=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
-        If @same_connected_component_as is given, sample a point in the same connected component as the previous point.
+        If @reference_point is given, sample a point in the same connected component as the previous point.
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
-            same_connected_component_as (None or 2-tuple): if given, sample a point in the same connected component as this point
-                - int: floor number of previous point
-                - 3-array: (x,y,z) previous point
+                                 Warning: if @reference_point is given, @floor must be given; 
+                                          otherwise, this would lead to undefined behavior
+            reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
         Returns:
             2-tuple:

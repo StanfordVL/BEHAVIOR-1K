@@ -22,7 +22,7 @@ class StaticTraversableScene(TraversableScene):
         scene_model,
         scene_file=None,
         trav_map_resolution=0.1,
-        default_erosion_radius=0.2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,

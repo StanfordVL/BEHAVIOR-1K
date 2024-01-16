@@ -21,7 +21,7 @@ class TraversableMap(BaseMap):
     def __init__(
         self,
         map_resolution=0.1,
-        default_erosion_radius=0.2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
@@ -110,37 +110,33 @@ class TraversableMap(BaseMap):
         # Erode the traversability map to account for the robot's size
         if robot:
             robot_chassis_extent = robot.base_aabb_extent[:2]
-            robot_radius = np.linalg.norm(robot_chassis_extent) / 2.0
-            robot_radius_pixel = int(np.ceil(robot_radius / self.map_resolution))
-            trav_map = cv2.erode(trav_map, np.ones((robot_radius_pixel, robot_radius_pixel)))
+            radius = np.linalg.norm(robot_chassis_extent) / 2.0
         else:
-            # convert default_erosion_radius from meter to pixel
-            erosion_radius_pixel = int(np.ceil(self.default_erosion_radius / self.map_resolution))
-            trav_map = cv2.erode(trav_map, np.ones((erosion_radius_pixel, erosion_radius_pixel)))
-        return trav_map
+            radius = self.default_erosion_radius
+        radius_pixel = int(np.ceil(radius / self.map_resolution))
+        trav_map = cv2.erode(trav_map, np.ones((radius_pixel, radius_pixel)))
 
-    def get_random_point(self, floor=None, same_connected_component_as=None, robot=None):
+    def get_random_point(self, floor=None, reference_point=None, robot=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
-        If @same_connected_component_as is given, sample a point in the same connected component as the previous point.
+        If @reference_point is given, sample a point in the same connected component as the previous point.
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
-            same_connected_component_as (None or 2-tuple): if given, sample a point in the same connected component as this point
-                - int: floor number of previous point
-                - 3-array: (x,y,z) previous point
+                                 Warning: if @reference_point is given, @floor must be given; 
+                                          otherwise, this would lead to undefined behavior
+            reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
         Returns:
             2-tuple:
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
+        if reference_point:
+            assert floor is not None, "floor must be given if reference_point is given"
 
-        # If the given floor and same_connected_component_as are not on the same floor, raise an error
-        if floor and same_connected_component_as and floor != same_connected_component_as[0]:
-            raise ValueError("floor and prev_point are not on the same floor")
         # If nothing is given, sample a random floor and a random point on that floor
-        if floor is None and same_connected_component_as is None:
+        if floor is None and reference_point is None:
             floor = np.random.randint(0, self.n_floors)
         
         # create a deep copy so that we don't erode the original map
@@ -148,12 +144,12 @@ class TraversableMap(BaseMap):
         
         trav_map = self._erode_trav_map(trav_map, robot=robot)
         
-        if same_connected_component_as:
+        if reference_point:
             # Find connected component
-            _, component_labels = cv2.connectedComponents(trav_map, connectivity=8)
+            _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)
 
             # If previous point is given, sample a point in the same connected component
-            prev_xy_map = self.world_to_map(same_connected_component_as[1][:2])
+            prev_xy_map = self.world_to_map(reference_point[:2])
             prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
             trav_space = np.where(component_labels == prev_label)
         else:
@@ -192,7 +188,8 @@ class TraversableMap(BaseMap):
 
         path_map = astar(trav_map, source_map, target_map)
         if path_map is None:
-            raise ValueError(f"No traversable path found from {source_world} to {target_world} on floor {floor}")
+            # No traversable path found
+            return None, None
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]
