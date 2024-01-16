@@ -23,6 +23,8 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
 
         self._previously_touching_sliceable = False
         self.value = True
+        self.delay_counter = 0
+        self.delay_steps = 7
 
     def _get_value(self):
         return self.value
@@ -32,14 +34,22 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         return True
     
     def _currently_touching_sliceable(self):
-        all_touching_objects = self.obj.states[ContactBodies].get_value()
-        return any(hasattr(obj, '_abilities') and "Sliceable" in obj._abilities for obj in all_touching_objects)
+        contact_links = self.obj.states[ContactBodies].get_value()
+        contact_link_prim_paths = {contact_link.prim_path for contact_link in contact_links}
+        for prim_path in contact_link_prim_paths:
+            obj_prim_path, _ = prim_path.rsplit("/", 1)
+            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
+            if candidate_obj is None:
+                continue
+            if hasattr(candidate_obj, '_abilities') and "sliceable" in candidate_obj._abilities:
+                return True
+        return False
 
     def _update(self):
-        breakpoint()
         # If we were slicing in the past step, deactivate now.
         if self._previously_touching_sliceable:
             self.set_value(False)
+            self.delay_counter = 0  # Reset the counter when we stop touching a sliceable object
 
         # Are we currently touching any sliceables?
         currently_touching_sliceable = self._currently_touching_sliceable()
@@ -47,8 +57,10 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         # If our value is False, we need to consider reverting back.
         if not self.value:
             # If we are not touching any sliceable objects, we can revert to True.
-            if currently_touching_sliceable:
-                self.set_value(True)
+            if not currently_touching_sliceable:
+                self.delay_counter += 1  # Increment the counter for each step we're not touching a sliceable object
+                if self.delay_counter >= self.delay_steps:  # Check if the counter has reached the delay
+                    self.set_value(True)
 
         # Record if we were touching anything previously
         self._previously_touching_sliceable = currently_touching_sliceable
