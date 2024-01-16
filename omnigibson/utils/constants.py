@@ -50,17 +50,17 @@ class SemanticClass(IntEnum):
 
 
 # Specific methods for applying / removing particles
-class ParticleModifyMethod(IntEnum):
-    ADJACENCY = 0
-    PROJECTION = 1
+class ParticleModifyMethod(str, Enum):
+    ADJACENCY = "adjacency"
+    PROJECTION = "projection"
 
 
 # Specific condition types for applying / removing particles
-class ParticleModifyCondition(IntEnum):
-    FUNCTION = 0
-    SATURATED = 1
-    TOGGLEDON = 2
-    GRAVITY = 3
+class ParticleModifyCondition(str, Enum):
+    FUNCTION = "function"
+    SATURATED = "saturated"
+    TOGGLEDON = "toggled_on"
+    GRAVITY = "gravity"
 
 
 # Valid omni characters for specifying strings, e.g. prim paths

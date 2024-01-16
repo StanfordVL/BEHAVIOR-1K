@@ -1,20 +1,22 @@
 import os
 import numpy as np
+from typing import Dict, Iterable
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
-from omnigibson.utils.transform_utils import euler2quat
 
 
-class FrankaPanda(ManipulationRobot):
+class FrankaLeap(ManipulationRobot):
     """
-    The Franka Emika Panda robot
+    Franka Robot with Leap right hand
     """
 
     def __init__(
         self,
         # Shared kwargs in hierarchy
         name,
+        hand="right",
         prim_path=None,
         class_id=None,
         uuid=None,
@@ -48,6 +50,7 @@ class FrankaPanda(ManipulationRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
+            hand (str): One of {"left", "right"} - which hand to use, default is right
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
@@ -66,7 +69,7 @@ class FrankaPanda(ManipulationRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -92,6 +95,8 @@ class FrankaPanda(ManipulationRobot):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+
+        self.hand = hand
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -114,12 +119,13 @@ class FrankaPanda(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            grasping_direction="upper",
             **kwargs,
         )
 
     @property
     def model_name(self):
-        return "FrankaPanda"
+        return f"FrankaLeap{self.hand.capitalize()}"
 
     @property
     def discrete_action_list(self):
@@ -129,10 +135,6 @@ class FrankaPanda(ManipulationRobot):
     def _create_discrete_action_space(self):
         # Fetch does not support discrete actions
         raise ValueError("Franka does not support discrete actions!")
-
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params (e.g. damping, stiffess, max_effort) here
 
     @property
     def controller_order(self):
@@ -144,10 +146,34 @@ class FrankaPanda(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
+
+    @property
+    def _default_gripper_multi_finger_controller_configs(self):
+        conf = super()._default_gripper_multi_finger_controller_configs
+        conf[self.default_arm]["mode"] = "independent"
+        conf[self.default_arm]["command_input_limits"] = None
+        return conf
+
     @property
     def default_joint_pos(self):
-        return np.array([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
+        # position where the hand is parallel to the ground
+        return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
+
+    @property
+    def assisted_grasp_start_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
+            GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
+            GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
+        ]}
+
+    @property
+    def assisted_grasp_end_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+        ]}
 
     @property
     def finger_lengths(self):
@@ -159,7 +185,8 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def gripper_control_idx(self):
-        return {self.default_arm: np.arange(7, 9)}
+        # thumb.proximal, ..., thumb.tip, ..., ring.tip
+        return {self.default_arm: np.array([8, 12, 16, 20, 7, 11, 15, 19, 9, 13, 17, 21, 10, 14, 18, 22])}
 
     @property
     def arm_link_names(self):
@@ -171,44 +198,30 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "panda_hand"}
+        return {self.default_arm: "palm_center"}
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: ["panda_leftfinger", "panda_rightfinger"]}
+        links = ["mcp_joint", "pip", "dip", "fingertip", "realtip"]
+        return {self.default_arm: [f"{link}_{i}" for i in range(1, 5) for link in links]}
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: ["panda_finger_joint1", "panda_finger_joint2"]}
+        # thumb.proximal, ..., thumb.tip, ..., ring.tip
+        return {self.default_arm: [f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]]}
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.usd")
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_description.yaml")}
-    
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
-    
-    @property
-    def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
-    
-    @property
-    def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-np.pi, 0, 0])}
-    
-    @property
-    def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
 
     @property
-    def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+    def urdf_path(self):
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.urdf")
+
+    @property
+    def teleop_rotation_offset(self):
+        return {self.default_arm: T.euler2quat(np.array([0, np.pi, np.pi / 2]))}

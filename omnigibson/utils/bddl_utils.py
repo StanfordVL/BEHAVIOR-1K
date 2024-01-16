@@ -103,6 +103,10 @@ def get_binary_predicate_for_state(state_class, state_name):
 def is_substance_synset(synset):
     return "substance" in OBJECT_TAXONOMY.get_abilities(synset)
 
+def get_system_name_by_synset(synset):
+    system_names = OBJECT_TAXONOMY.get_subtree_categories(synset)
+    assert len(system_names) == 1, f"Got multiple systems for {synset}: {system_names}"
+    return system_names[0]
 
 def process_single_condition(condition):
     """

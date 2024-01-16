@@ -9,6 +9,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
+import carb.input
 
 
 CONTROL_MODES = dict(
@@ -126,6 +127,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
+
+    # Register custom binding to reset the environment
+    action_generator.register_custom_keymapping(
+        key=carb.input.KeyboardInput.R,
+        description="Reset the robot",
+        callback_fn=lambda: env.reset(),
+    )
 
     # Print out relevant keyboard info if using keyboard teleop
     if control_mode == "teleop":

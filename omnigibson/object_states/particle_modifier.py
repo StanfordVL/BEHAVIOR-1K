@@ -27,7 +27,6 @@ from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
-
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -255,6 +254,24 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 return False, f"{cls.__name__} requires {state_type.__name__} state!"
 
         return True, None
+
+    @classmethod
+    def postprocess_ability_params(cls, params):
+        """
+        Post-processes ability parameters to ensure the system names (rather than synsets) are used for conditions.
+        """
+        # Import here to avoid circular imports
+        from omnigibson.utils.bddl_utils import get_system_name_by_synset
+
+        for sys in list(params["conditions"].keys()):
+            # The original key can be either a system name or a system synset. If it's a synset, we need to convert it.
+            system_name = sys if sys in REGISTERED_SYSTEMS.keys() else get_system_name_by_synset(sys)
+            params["conditions"][system_name] = params["conditions"].pop(sys)
+            for cond in params["conditions"][system_name]:
+                cond_type, cond_sys = cond
+                if cond_type == ParticleModifyCondition.SATURATED:
+                    cond[1] = cond_sys if cond_sys in REGISTERED_SYSTEMS.keys() else get_system_name_by_synset(cond_sys)
+        return params
 
     def _initialize(self):
         super()._initialize()

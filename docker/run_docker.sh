@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e -o pipefail
 
 BYellow='\033[1;33m'
 Color_Off='\033[0m'

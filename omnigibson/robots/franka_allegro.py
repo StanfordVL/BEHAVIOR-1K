@@ -1,8 +1,9 @@
 import os
 import numpy as np
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 
 
 class FrankaAllegro(ManipulationRobot):
@@ -114,6 +115,7 @@ class FrankaAllegro(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            grasping_direction="upper",
             **kwargs,
         )
 
@@ -130,29 +132,6 @@ class FrankaAllegro(ManipulationRobot):
         # Fetch does not support discrete actions
         raise ValueError("Franka does not support discrete actions!")
 
-    def tuck(self):
-        """
-        Immediately set this robot's configuration to be in tucked mode
-        """
-        self.set_joint_positions(self.tucked_default_joint_pos)
-
-    def untuck(self):
-        """
-        Immediately set this robot's configuration to be in untucked mode
-        """
-        self.set_joint_positions(self.untucked_default_joint_pos)
-
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params here
-        for i in range(7):
-            self.joints[f"panda_joint{i+1}"].damping = 1000
-            self.joints[f"panda_joint{i+1}"].stiffness = 1000
-        for i in range(16):
-            self.joints[f"joint_{i}_0"].damping = 100
-            self.joints[f"joint_{i}_0"].stiffness = 300
-            self.joints[f"joint_{i}_0"].max_effort = 15
-
     @property
     def controller_order(self):
         return ["arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
@@ -161,8 +140,16 @@ class FrankaAllegro(ManipulationRobot):
     def _default_controllers(self):
         controllers = super()._default_controllers
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
+        controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
     
+    @property
+    def _default_gripper_multi_finger_controller_configs(self):
+        conf = super()._default_gripper_multi_finger_controller_configs
+        conf[self.default_arm]["mode"] = "independent"
+        conf[self.default_arm]["command_input_limits"] = None
+        return conf
+
     @property
     def default_joint_pos(self):
         # position where the hand is parallel to the ground
@@ -178,7 +165,8 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def gripper_control_idx(self):
-        return {self.default_arm: np.arange(7, 23)}
+        # thumb.proximal, ..., thumb.tip, ..., ring.tip
+        return {self.default_arm: np.array([8, 12, 16, 20, 10, 14, 18, 22, 9, 13, 17, 21, 7, 11, 15, 19])}
 
     @property
     def arm_link_names(self):
@@ -198,7 +186,8 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: [f"joint_{i}_0" for i in range(16)]}
+        # thumb.proximal, ..., thumb.tip, ..., ring.tip
+        return {self.default_arm: [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]}
 
     @property
     def usd_path(self):
@@ -207,24 +196,33 @@ class FrankaAllegro(ManipulationRobot):
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro_description.yaml")}
-    
-    @property
-    def robot_gripper_descriptor_yamls(self):
-        return {
-            finger: os.path.join(gm.ASSET_PATH, f"models/franka/allegro_{finger}_description.yaml")
-            for finger in ["thumb", "index", "middle", "ring"]
-        }
 
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.urdf")
     
     @property
-    def gripper_urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/allegro_hand.urdf")
-    
-    @property
     def disabled_collision_pairs(self):
         return [
             ["link_12_0", "part_studio_link"],
         ]
+    
+    @property
+    def assisted_grasp_start_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
+            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
+            GraspingPoint(link_name=f"link_15_0_tip", position=[0, 0.015, 0.007]),
+        ]}
+
+    @property
+    def assisted_grasp_end_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"link_3_0_tip", position=[0.012, 0, 0.007]),
+            GraspingPoint(link_name=f"link_7_0_tip", position=[0.012, 0, 0.007]),
+            GraspingPoint(link_name=f"link_11_0_tip", position=[0.012, 0, 0.007]),
+        ]}
+
+    @property
+    def teleop_rotation_offset(self):
+        return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
