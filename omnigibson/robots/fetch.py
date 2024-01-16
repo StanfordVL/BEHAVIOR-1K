@@ -8,6 +8,7 @@ from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobo
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.transform_utils import euler2quat
 from omnigibson.utils.usd_utils import JointType
 
 log = create_module_logger(module_name=__name__)
@@ -364,10 +365,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=[0.04, -0.012, 0.014]),
-                GraspingPoint(link_name="r_gripper_finger_link", position=[0.04, -0.012, -0.014]),
-                GraspingPoint(link_name="r_gripper_finger_link", position=[-0.04, -0.012, 0.014]),
-                GraspingPoint(link_name="r_gripper_finger_link", position=[-0.04, -0.012, -0.014]),
+                GraspingPoint(link_name="r_gripper_finger_link", position=[0.025, -0.012, 0.0]),
+                GraspingPoint(link_name="r_gripper_finger_link", position=[-0.025, -0.012, 0.0]),
             ]
         }
 
@@ -375,10 +374,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=[0.04, 0.012, 0.014]),
-                GraspingPoint(link_name="l_gripper_finger_link", position=[0.04, 0.012, -0.014]),
-                GraspingPoint(link_name="l_gripper_finger_link", position=[-0.04, 0.012, 0.014]),
-                GraspingPoint(link_name="l_gripper_finger_link", position=[-0.04, 0.012, -0.014]),
+                GraspingPoint(link_name="l_gripper_finger_link", position=[0.025, 0.012, 0.0]),
+                GraspingPoint(link_name="l_gripper_finger_link", position=[-0.025, 0.012, 0.0]),
             ]
         }
 
@@ -509,3 +506,11 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return {
             self.default_arm : [np.deg2rad(-45), np.deg2rad(45)]
         }
+    
+    @property
+    def eef_usd_path(self):
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch_eef.usd")}
+
+    @property
+    def teleop_rotation_offset(self):
+        return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}

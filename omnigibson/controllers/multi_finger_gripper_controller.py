@@ -131,7 +131,6 @@ class MultiFingerGripperController(GripperController):
 
         Args:
             command (Array[float]): desired (already preprocessed) command to convert into control signals.
-                This should always be 2D command for each gripper joint
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
