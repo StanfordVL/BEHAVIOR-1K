@@ -196,7 +196,7 @@ def main():
             env,
             f"videos/{run.id}",
             record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
+            video_length=400,
         )
         tensorboard_log_dir = f"runs/{run.id}"
         if args.checkpoint is None:
