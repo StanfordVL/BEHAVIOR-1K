@@ -18,7 +18,7 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement
 from wandb.integration.sb3 import WandbCallback 
 
 
@@ -216,9 +216,11 @@ def main():
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
+            stop_train_callback,
         ])
         print(callback.callbacks)
 
@@ -227,7 +229,7 @@ def main():
 
         log.info("Starting training...")
         model.learn(
-            total_timesteps=1_500_000,
+            total_timesteps=2_000_000,
             callback=callback,
         )
         log.info("Finished training!")
