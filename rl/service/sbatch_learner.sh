@@ -10,6 +10,14 @@ IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
+if netstat -tuln | grep ":$2" > /dev/null; then
+    echo "Port $PORT is in use."
+    exit 1
+else
+    echo "Using unused port $2."
+    # Continue your script here
+fi
+
 # Define env kwargs to pass
 declare -A ENVS=(
     [NVIDIA_DRIVER_CAPABILITIES]=all
