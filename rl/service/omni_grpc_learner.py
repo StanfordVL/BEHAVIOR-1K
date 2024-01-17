@@ -1,6 +1,7 @@
 import argparse
 import logging
 import socket
+import os
 
 import yaml
 
@@ -230,18 +231,18 @@ def main():
 
         log.info("Starting training...")
 
-        policy_save_path = wandb.run.dir.split("/")[:-3]
+        policy_save_path = wandb.run.dir.split("/")[2:-3]
+        policy_save_path.insert(0, f"/cvgl2/u/{USER}/OmniGibson")
         policy_save_path.append("runs")
         policy_save_path.append(wandb.run.id)
         policy_save_path = "/".join(policy_save_path)
-        text =f"Run link: {str(wandb.run.url)}\nPolicy save path: {policy_save_path}"
+        text = f"Saved policy path: {policy_save_path}"
         wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
         model.learn(
             total_timesteps=2_000_000,
             callback=callback,
         )
         log.info("Finished training!")
-        wandb.alert(title="Run ended", text=text, level=AlertLevel.INFO)
 
 
 
