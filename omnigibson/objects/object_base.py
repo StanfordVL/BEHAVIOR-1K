@@ -3,21 +3,19 @@ import numpy as np
 from collections.abc import Iterable
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.constants import (
     DEFAULT_COLLISION_GROUP,
     SPECIAL_COLLISION_GROUPS,
     SemanticClass,
 )
-from pxr import UsdPhysics, PhysxSchema
 from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
-from omnigibson.lazy_omni import get_prim_at_path
-from omnigibson.lazy_omni import add_update_semantics
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -180,15 +178,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.visible = self._load_config["visible"]
 
         # First, remove any articulation root API that already exists at the object-level prim
-        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-            self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
-            self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+        if self._prim.HasAPI(lo.UsdPhysics.ArticulationRootAPI):
+            self._prim.RemoveAPI(lo.UsdPhysics.ArticulationRootAPI)
+            self._prim.RemoveAPI(lo.PhysxSchema.PhysxArticulationAPI)
 
         # Potentially add articulation root APIs and also set self collisions
-        root_prim = None if self.articulation_root_path is None else get_prim_at_path(self.articulation_root_path)
+        root_prim = None if self.articulation_root_path is None else lo.get_prim_at_path(self.articulation_root_path)
         if root_prim is not None:
-            UsdPhysics.ArticulationRootAPI.Apply(root_prim)
-            PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
+            lo.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
+            lo.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
@@ -200,7 +198,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         )
 
         # Update semantics
-        add_update_semantics(
+        lo.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
             type_label="class",

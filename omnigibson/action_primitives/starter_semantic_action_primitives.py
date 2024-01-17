@@ -19,6 +19,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
 from omnigibson.controllers import JointController, DifferentialDriveController
@@ -44,10 +45,7 @@ from omnigibson.utils.grasping_planning_utils import (
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.control_utils import FKSolver
 
-from omnigibson.lazy_omni import CopyPrimCommand, CreatePrimCommand
-from omnigibson.lazy_omni import get_prim_at_path
 from omnigibson.utils.ui_utils import create_module_logger
-from pxr import Gf
 
 from omnigibson.objects.usd_object import USDObject
 
@@ -158,10 +156,10 @@ class PlanningContext(object):
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
     def _set_prim_pose(self, prim, pose):
-        translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
+        translation = lo.Gf.Vec3d(*np.array(pose[0], dtype=float))
         prim.GetAttribute("xformOp:translate").Set(translation)
         orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
-        prim.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
+        prim.GetAttribute("xformOp:orient").Set(lo.Gf.Quatd(*orientation)) 
 
     def _construct_disabled_collision_pairs(self):
         robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
@@ -321,13 +319,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             copy_robot_links_relative_poses = {}
 
             # Create prim under which robot meshes are nested and set position
-            CreatePrimCommand("Xform", rc['copy_path']).do()
-            copy_robot = get_prim_at_path(rc['copy_path'])
+            lo.CreatePrimCommand("Xform", rc['copy_path']).do()
+            copy_robot = lo.get_prim_at_path(rc['copy_path'])
             reset_pose = robot_copy.reset_pose[robot_type]
-            translation = Gf.Vec3d(*np.array(reset_pose[0], dtype=float))
+            translation = lo.Gf.Vec3d(*np.array(reset_pose[0], dtype=float))
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
             orientation = np.array(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
-            copy_robot.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
+            copy_robot.GetAttribute("xformOp:orient").Set(lo.Gf.Quatd(*orientation)) 
 
             robot_to_copy = None
             if robot_type == "simplified":
@@ -347,8 +345,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                     copy_mesh_path = rc['copy_path'] + "/" + link_name
                     copy_mesh_path += f"_{split_path[-1]}" if split_path[-1] != "collisions" else ""
-                    CopyPrimCommand(mesh.prim_path, path_to=copy_mesh_path).do()
-                    copy_mesh = get_prim_at_path(copy_mesh_path)
+                    lo.CopyPrimCommand(mesh.prim_path, path_to=copy_mesh_path).do()
+                    copy_mesh = lo.get_prim_at_path(copy_mesh_path)
                     relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
                     relative_pose = (relative_pose[0], np.array([0, 0, 0, 1]))
                     if link_name not in copy_robot_meshes.keys():

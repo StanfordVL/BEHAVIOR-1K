@@ -1,21 +1,17 @@
 from collections import defaultdict
 import itertools
 import contextlib
+import logging
 import os
+import socket
 from pathlib import Path
+from termcolor import colored
 
 import numpy as np
 import json
-from omnigibson.lazy_omni import omni
-from omnigibson.lazy_omni import carb
-from omnigibson.lazy_omni import physics
-from omnigibson.lazy_omni import get_prim_at_path
-from omnigibson.lazy_omni import open_stage, create_new_stage
-from omnigibson.lazy_omni import ContactEventType, SimulationEvent
-from pxr import Usd, PhysicsSchemaTools, UsdUtils
-from omnigibson.lazy_omni import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
@@ -41,6 +37,133 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+
+# Helper functions for starting omnigibson
+def print_save_usd_warning(_):
+    log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
+
+
+def print_icon():
+    raw_texts = [
+        # Lgrey, grey, lgrey, grey, red, lgrey, red
+        ("                   ___________", "", "", "", "", "", "_"),
+        ("                  /          ", "", "", "", "", "", "/ \\"),
+        ("                 /          ", "", "", "", "/ /", "__", ""),
+        ("                /          ", "", "", "", "", "", "/ /  /\\"),
+        ("               /", "__________", "", "", "/ /", "__", "/  \\"),
+        ("               ", "\\   _____  ", "", "", "\\ \\", "__", "\\  /"),
+        ("                ", "\\  \\  ", "/ ", "\\  ", "", "", "\\ \\_/ /"),
+        ("                 ", "\\  \\", "/", "___\\  ", "", "", "\\   /"),
+        ("                  ", "\\__________", "", "", "", "", "\\_/  "),
+    ]
+    for (lgrey_text0, grey_text0, lgrey_text1, grey_text1, red_text0, lgrey_text2, red_text1) in raw_texts:
+        lgrey_text0 = colored(lgrey_text0, "light_grey", attrs=["bold"])
+        grey_text0 = colored(grey_text0, "light_grey", attrs=["bold", "dark"])
+        lgrey_text1 = colored(lgrey_text1, "light_grey", attrs=["bold"])
+        grey_text1 = colored(grey_text1, "light_grey", attrs=["bold", "dark"])
+        red_text0 = colored(red_text0, "light_red", attrs=["bold"])
+        lgrey_text2 = colored(lgrey_text2, "light_grey", attrs=["bold"])
+        red_text1 = colored(red_text1, "light_red", attrs=["bold"])
+        print(lgrey_text0 + grey_text0 + lgrey_text1 + grey_text1 + red_text0 + lgrey_text2 + red_text1)
+
+
+def print_logo():
+    raw_texts = [
+        ("       ___                  _", "  ____ _ _                     "),
+        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
+        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
+        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
+        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
+    ]
+    for (grey_text, red_text) in raw_texts:
+        grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
+        red_text = colored(red_text, "light_red", attrs=["bold"])
+        print(grey_text + red_text)
+
+
+def logo_small():
+    grey_text = colored("Omni", "light_grey", attrs=["bold", "dark"])
+    red_text = colored("Gibson", "light_red", attrs=["bold"])
+    return grey_text + red_text
+
+
+def launch_app():
+    log.info(f"{'-' * 10} Starting {logo_small()} {'-' * 10}")
+
+    # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
+    # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
+    gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
+    config_kwargs = {"headless":  gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
+    if gpu_id is not None:
+        config_kwargs["active_gpu"] = gpu_id
+        config_kwargs["physics_gpu"] = gpu_id
+    app = lo.SimulationApp(config_kwargs)
+
+    # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
+    # TODO: Remove this once omniverse fixes it
+    logging.getLogger().setLevel(logging.WARNING)
+
+    # Enable additional extensions we need
+    lo.enable_extension("omni.flowusd")
+    lo.enable_extension("omni.particle.system.bundle")
+
+    # Additional import for windows
+    if os.name == "nt":
+        lo.enable_extension("omni.kit.window.viewport")
+
+    # Default Livestream settings
+    if gm.REMOTE_STREAMING:
+        app.set_setting("/app/window/drawMouse", True)
+        app.set_setting("/app/livestream/proto", "ws")
+        app.set_setting("/app/livestream/websocket/framerate_limit", 120)
+        app.set_setting("/ngx/enabled", False)
+
+        # Find our IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+
+        # Note: Only one livestream extension can be enabled at a time
+        if gm.REMOTE_STREAMING == "native":
+            # Enable Native Livestream extension
+            # Default App: Streaming Client from the Omniverse Launcher
+            lo.enable_extension("omni.kit.livestream.native")
+            print(f"Now streaming on {ip} via Omniverse Streaming Client")
+        elif gm.REMOTE_STREAMING == "webrtc":
+            # Enable WebRTC Livestream extension
+            app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
+            app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
+            lo.enable_extension("omni.services.streamclient.webrtc")
+            print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
+        else:
+            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
+
+    # If we're headless, suppress all warnings about GLFW
+    if gm.HEADLESS:
+        log = lo.log.get_log()
+        log.set_channel_enabled("carb.windowing-glfw.plugin", False, lo.log.SettingBehavior.OVERRIDE)
+        
+    # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
+    if not gm.DEBUG:
+        log = lo.log.get_log()
+        for channel in ["omni.hydra.scene_delegate.plugin", "omni.kit.manipulator.prim.model"]:
+            log.set_channel_enabled(channel, False, lo.log.SettingBehavior.OVERRIDE)
+
+    # Possibly hide windows if in debug mode
+    if gm.GUI_VIEWPORT_ONLY:
+        hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
+                             "Flow", "Semantics Schema Editor"]
+        for name in hide_window_names:
+            window = lo.ui.Workspace.get_window(name)
+            if window is not None:
+                window.visible = False
+                app.update()
+
+    lo.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
+
+    return app
+
 
 def launch_simulator(*args, **kwargs):
     # Import now to avoid too-eager load of Omni classes due to inheritance
@@ -157,7 +280,7 @@ def launch_simulator(*args, **kwargs):
             if Simulator._instance is None:
                 Simulator._instance = object.__new__(cls)
             else:
-                carb.log_info("Simulator is defined already, returning the previously defined one")
+                lo.carb.log_info("Simulator is defined already, returning the previously defined one")
             return Simulator._instance
 
         def _set_viewer_camera(self, prim_path="/World/viewer_camera", viewport_name="Viewport"):
@@ -225,11 +348,11 @@ def launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
-            carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
-            carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
-            carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
-            carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
+            lo.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
+            lo.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
+            lo.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            lo.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
+            lo.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
             # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
 
@@ -296,7 +419,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 mode (LightingMode): Lighting mode to set
             """
-            omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
+            lo.omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
 
         def enable_viewer_camera_teleoperation(self):
             """
@@ -365,7 +488,7 @@ def launch_simulator(*args, **kwargs):
 
             # Cache the mapping from link IDs to object
             for link in obj.links.values():
-                self._link_id_to_objects[PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
+                self._link_id_to_objects[lo.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
 
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self.initialize_object_on_next_sim_step(obj=obj)
@@ -383,7 +506,7 @@ def launch_simulator(*args, **kwargs):
 
             # pop all link ids
             for link in obj.links.values():
-                self._link_id_to_objects.pop(PhysicsSchemaTools.sdfPathToInt(link.prim_path))
+                self._link_id_to_objects.pop(lo.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
 
             # If it was queued up to be initialized, remove it from the queue as well
             for i, initialize_obj in enumerate(self._objects_to_initialize):
@@ -424,7 +547,7 @@ def launch_simulator(*args, **kwargs):
                 return
 
             # First, refresh the physics sim view
-            self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
+            self._physics_sim_view = lo.omni.physics.tensors.create_simulation_view(self.backend)
             self._physics_sim_view.set_subspace_roots("/")
 
             # Then update the handles for all objects
@@ -652,8 +775,8 @@ def launch_simulator(*args, **kwargs):
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
             if gm.ENABLE_OBJECT_STATES:
-                if event.type == int(SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
-                    joint_path = str(PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                if event.type == int(lo.SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
+                    joint_path = str(lo.PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
                     obj = None
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
@@ -884,7 +1007,7 @@ def launch_simulator(*args, **kwargs):
             Returns:
                 Usd.Prim: Prim at /World
             """
-            return get_prim_at_path(prim_path="/World")
+            return lo.get_prim_at_path(prim_path="/World")
 
         def clear(self) -> None:
             """
@@ -1043,7 +1166,7 @@ def launch_simulator(*args, **kwargs):
 
             # Open new stage -- suppressing warning that we're opening a new stage
             with suppress_omni_log(None):
-                create_new_stage()
+                lo.create_new_stage()
 
             # Clear physics context
             self._physics_context = None
@@ -1079,7 +1202,7 @@ def launch_simulator(*args, **kwargs):
 
             # Open new stage -- suppressing warning that we're opening a new stage
             with suppress_omni_log(None):
-                open_stage(usd_path=usd_path)
+                lo.open_stage(usd_path=usd_path)
 
             self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
 
@@ -1107,9 +1230,9 @@ def launch_simulator(*args, **kwargs):
             )
 
             # Update internal vars
-            self._physx_interface = get_physx_interface()
-            self._physx_simulation_interface = get_physx_simulation_interface()
-            self._physx_scene_query_interface = get_physx_scene_query_interface()
+            self._physx_interface = lo.get_physx_interface()
+            self._physx_simulation_interface = lo.get_physx_simulation_interface()
+            self._physx_scene_query_interface = lo.get_physx_scene_query_interface()
 
             # Update internal settings
             self._set_physics_engine_settings()
@@ -1118,7 +1241,7 @@ def launch_simulator(*args, **kwargs):
             # Update internal callbacks
             self._setup_default_callback_fns()
             self._stage_open_callback = (
-                omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
+                lo.omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
             )
             self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
             self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
@@ -1145,7 +1268,7 @@ def launch_simulator(*args, **kwargs):
             Returns:
                 int: ID of the current active stage
             """
-            return UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+            return lo.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
         @property
         def device(self):
@@ -1206,4 +1329,16 @@ def launch_simulator(*args, **kwargs):
             # Default state is from the scene
             return self._scene.deserialize(state=state), self._scene.state_size
 
-    return Simulator(*args, **kwargs)
+    if not og.app:
+        og.app = launch_app()
+
+    if not og.sim:
+        og.sim = Simulator(*args, **kwargs)
+
+        print()
+        print_icon()
+        print_logo()
+        print()
+        log.info(f"{'-' * 10} Welcome to {logo_small()}! {'-' * 10}")
+
+    return og.sim

@@ -1,13 +1,9 @@
-from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade
 import numpy as np
 import asyncio
 import os
 
-from omnigibson.lazy_omni import omni
-from omnigibson.lazy_omni import get_prim_at_path
-from omnigibson.lazy_omni import get_shader_from_material
-
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
 
@@ -51,7 +47,7 @@ class MaterialPrim(BasePrim):
     def _load(self):
         # We create a new material at the specified path
         mtl_created = []
-        omni.kit.commands.execute(
+        lo.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
             mdl_name="OmniPBR.mdl" if self._load_config.get("mdl_name", None) is None else self._load_config["mdl_name"],
             mtl_name="OmniPBR" if self._load_config.get("mtl_name", None) is None else self._load_config["mtl_name"],
@@ -60,17 +56,17 @@ class MaterialPrim(BasePrim):
         material_path = mtl_created[0]
 
         # Move prim to desired location
-        omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self._prim_path)
+        lo.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self._prim_path)
 
         # Return generated material
-        return get_prim_at_path(self._prim_path)
+        return lo.get_prim_at_path(self._prim_path)
 
     def _post_load(self):
         # run super first
         super()._post_load()
 
         # Generate shader reference
-        self._shader = get_shader_from_material(self._prim)
+        self._shader = lo.get_shader_from_material(self._prim)
 
     def bind(self, target_prim_path):
         """
@@ -92,7 +88,7 @@ class MaterialPrim(BasePrim):
         """
         if render:
             og.sim.render()
-        await omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
+        await lo.omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
 
     def shader_force_populate(self, render=True):
         """
@@ -201,7 +197,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) color
         """
-        self.set_input(inp="diffuse_color_constant", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_color_constant", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def diffuse_texture(self):
@@ -217,7 +213,7 @@ class MaterialPrim(BasePrim):
         Args:
             str: this material's applied diffuse_texture filepath
         """
-        self.set_input(inp="diffuse_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="diffuse_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def albedo_desaturation(self):
@@ -281,7 +277,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) diffuse_tint
         """
-        self.set_input(inp="diffuse_tint", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_tint", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def reflection_roughness_constant(self):
@@ -331,7 +327,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied reflectionroughness_texture fpath
         """
-        self.set_input(inp="reflectionroughness_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="reflectionroughness_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def metallic_constant(self):
@@ -381,7 +377,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied metallic_texture fpath
         """
-        self.set_input(inp="metallic_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="metallic_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def specular_level(self):
@@ -431,7 +427,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied ORM_texture fpath
         """
-        self.set_input(inp="ORM_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="ORM_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def ao_to_diffuse(self):
@@ -465,7 +461,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied ao_texture fpath
         """
-        self.set_input(inp="ao_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="ao_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def enable_emission(self):
@@ -497,7 +493,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied emissive_color
         """
-        self.set_input(inp="emissive_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="emissive_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def emissive_color_texture(self):
@@ -515,7 +511,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied emissive_color_texture fpath
         """
-        self.set_input(inp="emissive_color_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="emissive_color_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def emissive_mask_texture(self):
@@ -533,7 +529,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied emissive_mask_texture fpath
         """
-        self.set_input(inp="emissive_mask_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="emissive_mask_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def emissive_intensity(self):
@@ -615,7 +611,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied opacity_texture fpath
         """
-        self.set_input(inp="opacity_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="opacity_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def opacity_mode(self):
@@ -681,7 +677,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied normalmap_texture fpath
         """
-        self.set_input(inp="normalmap_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="normalmap_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def detail_bump_factor(self):
@@ -715,7 +711,7 @@ class MaterialPrim(BasePrim):
         Args:
              fpath (str): this material's applied detail_normalmap_texture fpath
         """
-        self.set_input(inp="detail_normalmap_texture", val=Sdf.AssetPath(fpath))
+        self.set_input(inp="detail_normalmap_texture", val=lo.Sdf.AssetPath(fpath))
 
     @property
     def flip_tangent_u(self):
@@ -811,7 +807,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied (x,y) texture_translate
         """
-        self.set_input(inp="texture_translate", val=Gf.Vec2f(*np.array(translate, dtype=float)))
+        self.set_input(inp="texture_translate", val=lo.Gf.Vec2f(*np.array(translate, dtype=float)))
 
     @property
     def texture_rotate(self):
@@ -843,7 +839,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied (x,y) texture_scale
         """
-        self.set_input(inp="texture_scale", val=Gf.Vec2f(*np.array(scale, dtype=float)))
+        self.set_input(inp="texture_scale", val=lo.Gf.Vec2f(*np.array(scale, dtype=float)))
 
     @property
     def detail_texture_translate(self):
@@ -859,7 +855,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied detail_texture_translate
         """
-        self.set_input(inp="detail_texture_translate", val=Gf.Vec2f(*np.array(translate, dtype=float)))
+        self.set_input(inp="detail_texture_translate", val=lo.Gf.Vec2f(*np.array(translate, dtype=float)))
 
     @property
     def detail_texture_rotate(self):
@@ -891,7 +887,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied detail_texture_scale
         """
-        self.set_input(inp="detail_texture_scale", val=Gf.Vec2f(*np.array(scale, dtype=float)))
+        self.set_input(inp="detail_texture_scale", val=lo.Gf.Vec2f(*np.array(scale, dtype=float)))
 
     @property
     def exclude_from_white_mode(self):
@@ -971,7 +967,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's diffuse_reflection_color in (R,G,B)
         """
-        self.set_input(inp="diffuse_reflection_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_reflection_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def specular_reflection_color(self):
@@ -987,7 +983,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_reflection_color in (R,G,B)
         """
-        self.set_input(inp="specular_reflection_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="specular_reflection_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def specular_transmission_color(self):
@@ -1003,7 +999,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_color in (R,G,B)
         """
-        self.set_input(inp="specular_transmission_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="specular_transmission_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def specular_transmission_scattering_color(self):
@@ -1019,7 +1015,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
         """
-        self.set_input(inp="specular_transmission_scattering_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="specular_transmission_scattering_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
     def specular_reflection_ior_preset(self):
@@ -1071,4 +1067,4 @@ class MaterialPrim(BasePrim):
         """
         assert self.is_glass, f"Tried to set glass_color shader input, " \
                               f"but material at {self.prim_path} is not an OmniGlass material!"
-        self.set_input(inp="glass_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="glass_color", val=lo.Gf.Vec3f(*np.array(color, dtype=float)))

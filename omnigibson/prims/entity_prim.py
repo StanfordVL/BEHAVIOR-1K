@@ -1,14 +1,8 @@
 import numpy as np
 import networkx as nx
 
-from omnigibson.lazy_omni import gf_quat_to_np_array
-from omnigibson.lazy_omni import get_current_stage
-from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema, PhysicsSchemaTools
-from omnigibson.lazy_omni import omni
-
-from omnigibson.lazy_omni import get_prim_property, set_prim_property
-
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 import omnigibson.utils.transform_utils as T
 
 from omnigibson.prims.cloth_prim import ClothPrim
@@ -100,7 +94,7 @@ class EntityPrim(XFormPrim):
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
                     for child in prim.GetChildren():
-                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(UsdPhysics.CollisionAPI):
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(lo.UsdPhysics.CollisionAPI):
                             assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
                             cloth_mesh_prim = child
 
@@ -111,8 +105,8 @@ class EntityPrim(XFormPrim):
             # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
             new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
-            omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
-            omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+            lo.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+            lo.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
         # Setup links info FIRST before running any other post loading behavior
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
@@ -312,7 +306,7 @@ class EntityPrim(XFormPrim):
                         _, link_local_orn = link.get_local_pose()
 
                         # Find the joint frame orientation in the parent link frame
-                        joint_local_orn = gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+                        joint_local_orn = lo.gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
 
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
@@ -1061,7 +1055,7 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many position iterations to take per physics step by the physx solver
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
+        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
             self.articulated else self.root_link.solver_position_iteration_count
 
     @solver_position_iteration_count.setter
@@ -1073,7 +1067,7 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
+            lo.set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
         else:
             for link in self._links.values():
                 link.solver_position_iteration_count = count
@@ -1084,7 +1078,7 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many velocity iterations to take per physics step by the physx solver
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
+        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
             self.articulated else self.root_link.solver_velocity_iteration_count
 
     @solver_velocity_iteration_count.setter
@@ -1096,7 +1090,7 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
+            lo.set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
         else:
             for link in self._links.values():
                 link.solver_velocity_iteration_count = count
@@ -1107,7 +1101,7 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for stabilizing this articulation
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
+        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
             self.articulated else self.root_link.stabilization_threshold
 
     @stabilization_threshold.setter
@@ -1119,7 +1113,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Stabilization threshold
         """
         if self.articulated:
-            set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
+            lo.set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
         else:
             for link in self._links.values():
                 link.stabilization_threshold = threshold
@@ -1130,7 +1124,7 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for sleeping this articulation
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
+        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
             self.articulated else self.root_link.sleep_threshold
 
     @sleep_threshold.setter
@@ -1142,7 +1136,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
+            lo.set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
         else:
             for link in self._links.values():
                 link.sleep_threshold = threshold
@@ -1154,7 +1148,7 @@ class EntityPrim(XFormPrim):
             bool: Whether self-collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
-        return get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
+        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
 
     @self_collisions.setter
     def self_collisions(self, flag):
@@ -1165,7 +1159,7 @@ class EntityPrim(XFormPrim):
             flag (bool): Whether self collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
-        set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
+        lo.set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
 
     @property
     def kinematic_only(self):
@@ -1247,7 +1241,7 @@ class EntityPrim(XFormPrim):
         Enable physics for this articulation
         """
         if self.articulated:
-            prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1258,7 +1252,7 @@ class EntityPrim(XFormPrim):
         Disable physics for this articulation
         """
         if self.articulated:
-            prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1286,10 +1280,10 @@ class EntityPrim(XFormPrim):
 
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
-        stage = get_current_stage()
+        stage = lo.get_current_stage()
         link_prim = stage.DefinePrim(f"{self._prim_path}/{link_name}", "Xform")
-        vis_prim = UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
-        col_prim = UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
+        vis_prim = lo.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
+        col_prim = lo.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
 
         # Set the radius to be 0.03m. In theory, we want this radius to be as small as possible. Otherwise, the cloth
         # dynamics will be unrealistic. However, in practice, if the radius is too small, the attachment becomes very
@@ -1299,15 +1293,15 @@ class EntityPrim(XFormPrim):
 
         # Need to sync the extents
         extent = vis_prim.GetAttribute("extent").Get()
-        extent[0] = Gf.Vec3f(-0.03, -0.03, -0.03)
-        extent[1] = Gf.Vec3f(0.03, 0.03, 0.03)
+        extent[0] = lo.Gf.Vec3f(-0.03, -0.03, -0.03)
+        extent[1] = lo.Gf.Vec3f(0.03, 0.03, 0.03)
         vis_prim.GetAttribute("extent").Set(extent)
         col_prim.GetAttribute("extent").Set(extent)
 
         # Add collision API to collision geom
-        UsdPhysics.CollisionAPI.Apply(col_prim)
-        UsdPhysics.MeshCollisionAPI.Apply(col_prim)
-        PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
+        lo.UsdPhysics.CollisionAPI.Apply(col_prim)
+        lo.UsdPhysics.MeshCollisionAPI.Apply(col_prim)
+        lo.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
 
         # Create a attachment point link
         link = RigidPrim(
@@ -1325,7 +1319,7 @@ class EntityPrim(XFormPrim):
 
         # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidPrim)
         attachment_path = self.root_link.prim.GetPath().AppendElementString("attachment")
-        omni.kit.commands.execute("CreatePhysicsAttachment", target_attachment_path=attachment_path,
+        lo.omni.kit.commands.execute("CreatePhysicsAttachment", target_attachment_path=attachment_path,
                                   actor0_path=self.root_link.prim.GetPath(), actor1_path=link.prim.GetPath())
 
     def _dump_state(self):

@@ -1,5 +1,4 @@
-from omnigibson.lazy_omni import carb
-from omnigibson.lazy_omni import SettingType
+import omnigibson.lazy_omni as lo
 
 from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
@@ -27,7 +26,7 @@ class RealTimeSettings(SettingsBase):
         self.global_volumetric_effects_settings = GlobalVolumetricEffectsSettings()
         self.caustics_settings = CausticsSettings()
         self.indirect_diffuse_lighting_settings = IndirectDiffuseLightingSettings()
-        gpu_count = carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount")
+        gpu_count = lo.carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount")
         if gpu_count and gpu_count > 1:
             self.rt_multi_gpu_settings = RTMultiGPUSettings()
 
@@ -42,7 +41,7 @@ class RealTimeSettings(SettingsBase):
         settings.update(self.global_volumetric_effects_settings.settings)
         settings.update(self.caustics_settings.settings)
         settings.update(self.indirect_diffuse_lighting_settings.settings)
-        gpu_count = carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount")
+        gpu_count = lo.carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount")
         if gpu_count and gpu_count > 1:
             settings.update(self.rt_multi_gpu_settings.settings)
         return settings
@@ -50,11 +49,11 @@ class RealTimeSettings(SettingsBase):
 
 class EcoModeSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.max_frames_without_change = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Stop Rendering After This Many Frames Without Changes",
             "/rtx/ecoMode/maxFramesWithoutChange",
             range_from=0,
@@ -74,34 +73,34 @@ class EcoModeSettings(SubSettingsBase):
 
 class AntiAliasingSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         antialiasing_ops = ["Off", "TAA", "FXAA"]
         if self._carb_settings.get("/ngx/enabled") is True:
             antialiasing_ops.append("DLSS")
             antialiasing_ops.append("RTXAA")
-        self.algorithm = SettingItem(self, SettingType.STRING, "Algorithm", "/rtx/post/aa/op", antialiasing_ops)
+        self.algorithm = SettingItem(self, lo.SettingType.STRING, "Algorithm", "/rtx/post/aa/op", antialiasing_ops)
 
         # antialiasing_op_idx == 1
         # TAA
         self.static_ratio = SettingItem(
-            self, SettingType.FLOAT, "Static scaling", "/rtx/post/scaling/staticRatio", range_from=0.33, range_to=1
+            self, lo.SettingType.FLOAT, "Static scaling", "/rtx/post/scaling/staticRatio", range_from=0.33, range_to=1
         )
         self.samples = SettingItem(
-            self, SettingType.INT, "TAA Samples", "/rtx/post/taa/samples", range_from=1, range_to=16
+            self, lo.SettingType.INT, "TAA Samples", "/rtx/post/taa/samples", range_from=1, range_to=16
         )
         self.alpha = SettingItem(
-            self, SettingType.FLOAT, "TAA history scale", "/rtx/post/taa/alpha", range_from=0, range_to=1
+            self, lo.SettingType.FLOAT, "TAA history scale", "/rtx/post/taa/alpha", range_from=0, range_to=1
         )
 
         # antialiasing_op_idx == 2
         # FXAA
         self.quality_sub_pix = SettingItem(
-            self, SettingType.FLOAT, "Subpixel Quality", "/rtx/post/fxaa/qualitySubPix", range_from=0.0, range_to=1.0
+            self, lo.SettingType.FLOAT, "Subpixel Quality", "/rtx/post/fxaa/qualitySubPix", range_from=0.0, range_to=1.0
         )
         self.quality_edge_threshold = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Edge Threshold",
             "/rtx/post/fxaa/qualityEdgeThreshold",
             range_from=0.0,
@@ -109,7 +108,7 @@ class AntiAliasingSettings(SubSettingsBase):
         )
         self.quality_edge_threshold_min = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Edge Threshold Min",
             "/rtx/post/fxaa/qualityEdgeThresholdMin",
             range_from=0.0,
@@ -120,22 +119,22 @@ class AntiAliasingSettings(SubSettingsBase):
         # DLSS and RTXAA
         # if antialiasing_op_idx == 3
         dlss_opts = ["Performance", "Balanced", "Quality"]
-        self.exec_mode = SettingItem(self, SettingType.STRING, "Execution mode", "/rtx/post/dlss/execMode", dlss_opts)
+        self.exec_mode = SettingItem(self, lo.SettingType.STRING, "Execution mode", "/rtx/post/dlss/execMode", dlss_opts)
 
         self.sharpness = SettingItem(
-            self, SettingType.FLOAT, "Sharpness", "/rtx/post/aa/sharpness", range_from=0.0, range_to=1.0
+            self, lo.SettingType.FLOAT, "Sharpness", "/rtx/post/aa/sharpness", range_from=0.0, range_to=1.0
         )
 
         exposure_ops = ["Force self evaluated", "PostProcess Autoexposure", "Fixed"]
         self.auto_exposure_mode = SettingItem(
-            self, SettingType.STRING, "Exposure mode", "/rtx/post/aa/autoExposureMode", exposure_ops
+            self, lo.SettingType.STRING, "Exposure mode", "/rtx/post/aa/autoExposureMode", exposure_ops
         )
 
         # auto_exposure_idx = self._carb_settings.get("/rtx/post/aa/autoExposureMode")
         # if auto_exposure_idx == 1
         self.exposure_multiplier = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Auto Exposure Multiplier",
             "/rtx/post/aa/exposureMultiplier",
             range_from=0.00001,
@@ -143,7 +142,7 @@ class AntiAliasingSettings(SubSettingsBase):
         )
         # if auto_exposure_idx == 2
         self.exposure = SettingItem(
-            self, SettingType.FLOAT, "Fixed Exposure Value", "/rtx/post/aa/exposure", range_from=0.00001, range_to=1.0
+            self, lo.SettingType.FLOAT, "Fixed Exposure Value", "/rtx/post/aa/exposure", range_from=0.00001, range_to=1.0
         )
 
     @property
@@ -195,79 +194,79 @@ class AntiAliasingSettings(SubSettingsBase):
 
 class DirectLightingSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
-        self.shadows_enabled = SettingItem(self, SettingType.BOOL, "Enable Shadows", "/rtx/shadows/enabled")
+        self.shadows_enabled = SettingItem(self, lo.SettingType.BOOL, "Enable Shadows", "/rtx/shadows/enabled")
 
         self.sampled_lighting_enabled = SettingItem(
-            self, SettingType.BOOL, "Enable Sampled Direct Lighting", "/rtx/directLighting/sampledLighting/enabled"
+            self, lo.SettingType.BOOL, "Enable Sampled Direct Lighting", "/rtx/directLighting/sampledLighting/enabled"
         )
         self.sampled_lighting_auto_enable = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Auto-enable Sampled Lighting Above Light Count Threshold",
             "/rtx/directLighting/sampledLighting/autoEnable",
         )
         self.sampled_lighting_auto_enable_light_count_threshold = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Auto-enable Sampled Lighting:   Light Count Threshold",
             "/rtx/directLighting/sampledLighting/autoEnableLightCountThreshold",
         )
 
         # if not self._settings.get("/rtx/directLighting/sampledLighting/enabled"
         self.shadows_sample_count = SettingItem(
-            self, SettingType.INT, "Shadow Samples per Pixel", "/rtx/shadows/sampleCount", range_from=1, range_to=16
+            self, lo.SettingType.INT, "Shadow Samples per Pixel", "/rtx/shadows/sampleCount", range_from=1, range_to=16
         )
         self.shadows_denoiser_quarter_res = SettingItem(
-            self, SettingType.BOOL, "Lower Resolution Shadows Denoiser", "/rtx/shadows/denoiser/quarterRes"
+            self, lo.SettingType.BOOL, "Lower Resolution Shadows Denoiser", "/rtx/shadows/denoiser/quarterRes"
         )
         self.dome_light_enabled = SettingItem(
-            self, SettingType.BOOL, "Dome Lighting", "/rtx/directLighting/domeLight/enabled"
+            self, lo.SettingType.BOOL, "Dome Lighting", "/rtx/directLighting/domeLight/enabled"
         )
         self.dome_light_sample_count = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Dome Light Samples per Pixel",
             "/rtx/directLighting/domeLight/sampleCount",
             range_from=0,
             range_to=32,
         )
         self.dome_light_enabled_in_reflections = SettingItem(
-            self, SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
+            self, lo.SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
         )
 
         # if self._settings.get("/rtx/directLighting/sampledLighting/enabled")
         sampled_lighting_spp_items = {"1": 1, "2": 2, "4": 4, "8": 8}
         self.samples_per_pixel = SettingItem(
             self,
-            SettingType.STRING,
+            lo.SettingType.STRING,
             "Samples per Pixel",
             "/rtx/directLighting/sampledLighting/samplesPerPixel",
             range_dict=sampled_lighting_spp_items,
         )
         self.clamp_samples_per_pixel_to_number_of_lights = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Clamp Sample Count to Light Count",
             "/rtx/directLighting/sampledLighting/clampSamplesPerPixelToNumberOfLights",
         )
         self.reflections_samples_per_pixel = SettingItem(
             self,
-            SettingType.STRING,
+            lo.SettingType.STRING,
             "Reflections: Light Samples per Pixel",
             "/rtx/reflections/sampledLighting/samplesPerPixel",
             range_dict=sampled_lighting_spp_items,
         )
         self.reflections_clamp_samples_per_pixel_to_number_of_lights = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Reflections: Clamp Sample Count to Light Count",
             "/rtx/reflections/sampledLighting/clampSamplesPerPixelToNumberOfLights",
         )
         self.max_ray_intensity = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Max Ray Intensity",
             "/rtx/directLighting/sampledLighting/maxRayIntensity",
             range_from=0.0,
@@ -275,29 +274,29 @@ class DirectLightingSettings(SubSettingsBase):
         )
         self.reflections_max_ray_intensity = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Reflections: Max Ray Intensity",
             "/rtx/reflections/sampledLighting/maxRayIntensity",
             range_from=0.0,
             range_to=1000000,
         )
         self.enabled_in_reflections = SettingItem(
-            self, SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
+            self, lo.SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
         )
         firefly_filter_types = {"None": "None", "Median": "Cross-Bilateral Median", "RCRS": "Cross-Bilateral RCRS"}
         self.firefly_suppression_type = SettingItem(
             self,
-            SettingType.STRING,
+            lo.SettingType.STRING,
             "Firefly Filter",
             "/rtx/lightspeed/ReLAX/fireflySuppressionType",
             range_dict=firefly_filter_types,
         )
         self.history_clamping_enabled = SettingItem(
-            self, SettingType.BOOL, "History Clamping", "/rtx/lightspeed/ReLAX/historyClampingEnabled"
+            self, lo.SettingType.BOOL, "History Clamping", "/rtx/lightspeed/ReLAX/historyClampingEnabled"
         )
         self.denoiser_iterations = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Denoiser Iterations",
             "/rtx/lightspeed/ReLAX/aTrousIterations",
             range_from=1,
@@ -305,13 +304,13 @@ class DirectLightingSettings(SubSettingsBase):
         )
         self.diffuse_backscattering_enabled = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Enable Extended Diffuse Backscattering",
             "/rtx/directLighting/diffuseBackscattering/enabled",
         )
         self.shadow_offset = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Shadow Ray Offset",
             "/rtx/directLighting/diffuseBackscattering/shadowOffset",
             range_from=0.1,
@@ -319,7 +318,7 @@ class DirectLightingSettings(SubSettingsBase):
         )
         self.extinction = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Extinction",
             "/rtx/directLighting/diffuseBackscattering/extinction",
             range_from=0.001,
@@ -371,14 +370,14 @@ class DirectLightingSettings(SubSettingsBase):
 
 class ReflectionsSettings(SettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.max_roughness = SettingItem(
-            self, SettingType.FLOAT, "Max Roughness", "/rtx/reflections/maxRoughness", range_from=0.0, range_to=1.0
+            self, lo.SettingType.FLOAT, "Max Roughness", "/rtx/reflections/maxRoughness", range_from=0.0, range_to=1.0
         )
         self.max_reflection_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Max Reflection Bounces",
             "/rtx/reflections/maxReflectionBounces",
             range_from=0,
@@ -399,11 +398,11 @@ class ReflectionsSettings(SettingsBase):
 
 class TranslucencySettings(SettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.max_refraction_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Max Refraction Bounces",
             "/rtx/translucency/maxRefractionBounces",
             range_from=0,
@@ -411,17 +410,17 @@ class TranslucencySettings(SettingsBase):
         )
         self.reflection_cutoff = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Secondary Bounce Roughness Cutoff",
             "/rtx/translucency/reflectionCutoff",
             range_from=0.0,
             range_to=1.0,
         )
         self.fractional_cutou_opacity = SettingItem(
-            self, SettingType.BOOL, "Enable Fractional Cutout Opacity", "/rtx/raytracing/fractionalCutoutOpacity"
+            self, lo.SettingType.BOOL, "Enable Fractional Cutout Opacity", "/rtx/raytracing/fractionalCutoutOpacity"
         )
         self.virtual_depth = SettingItem(
-            self, SettingType.BOOL, "Enable Depth Correction for DoF", "/rtx/translucency/virtualDepth"
+            self, lo.SettingType.BOOL, "Enable Depth Correction for DoF", "/rtx/translucency/virtualDepth"
         )
 
     @property
@@ -440,11 +439,11 @@ class TranslucencySettings(SettingsBase):
 
 class GlobalVolumetricEffectsSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.max_accumulation_frames = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Accumulation Frames",
             "/rtx/raytracing/inscattering/maxAccumulationFrames",
             range_from=1,
@@ -452,18 +451,18 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.depth_slices = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "# Depth Slices",
             "/rtx/raytracing/inscattering/depthSlices",
             range_from=16,
             range_to=1024,
         )
         self.pixel_ratio = SettingItem(
-            self, SettingType.INT, "Pixel Density", "/rtx/raytracing/inscattering/pixelRatio", range_from=4, range_to=64
+            self, lo.SettingType.INT, "Pixel Density", "/rtx/raytracing/inscattering/pixelRatio", range_from=4, range_to=64
         )
         self.max_distance = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Max inscattering Distance",
             "/rtx/raytracing/inscattering/maxDistance",
             range_from=10,
@@ -471,29 +470,29 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.atmosphere_height = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Atmosphere Height",
             "/rtx/raytracing/inscattering/atmosphereHeight",
             range_from=-100000,
             range_to=100000,
         )
         self.transmittance_color = SettingItem(
-            self, SettingType.COLOR3, "Transmittance Color", "/rtx/raytracing/inscattering/transmittanceColor"
+            self, lo.SettingType.COLOR3, "Transmittance Color", "/rtx/raytracing/inscattering/transmittanceColor"
         )
         self.transmittance_measurement_distance = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Transmittance Measurment Distance",
             "/rtx/raytracing/inscattering/transmittanceMeasurementDistance",
             range_from=0.0001,
             range_to=1000000,
         )
         self.single_scattering_albedo = SettingItem(
-            self, SettingType.COLOR3, "Single Scattering Albedo", "/rtx/raytracing/inscattering/singleScatteringAlbedo",
+            self, lo.SettingType.COLOR3, "Single Scattering Albedo", "/rtx/raytracing/inscattering/singleScatteringAlbedo",
         )
         self.anisotropy_factor = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Anisotropy Factor",
             "/rtx/raytracing/inscattering/anisotropyFactor",
             range_from=-0.999,
@@ -501,7 +500,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.slice_distribution_exponent = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Slice Distribution Exponent",
             "/rtx/raytracing/inscattering/sliceDistributionExponent",
             range_from=1,
@@ -509,7 +508,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.blur_sigma = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Inscatter Blur Sigma",
             "/rtx/raytracing/inscattering/blurSigma",
             0.0,
@@ -517,7 +516,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.dithering_scale = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Inscatter Dithering Scale",
             "/rtx/raytracing/inscattering/ditheringScale",
             range_from=0,
@@ -525,7 +524,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.spatial_jitter_scale = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Spatial Sample Jittering Scale",
             "/rtx/raytracing/inscattering/spatialJitterScale",
             range_from=0.0,
@@ -533,18 +532,18 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.temporal_jitter_scale = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Temporal Reprojection Jittering Scale",
             "/rtx/raytracing/inscattering/temporalJitterScale",
             range_from=0.0,
             range_to=1,
         )
         self.use_detail_noise = SettingItem(
-            self, SettingType.BOOL, "Apply Density Noise", "/rtx/raytracing/inscattering/useDetailNoise"
+            self, lo.SettingType.BOOL, "Apply Density Noise", "/rtx/raytracing/inscattering/useDetailNoise"
         )
         self.detail_noise_scale = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise World Scale",
             "/rtx/raytracing/inscattering/detailNoiseScale",
             range_from=0.0,
@@ -552,7 +551,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_animation_speed_x = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise Animation Speed X",
             "/rtx/raytracing/inscattering/noiseAnimationSpeedX",
             range_from=-1.0,
@@ -560,7 +559,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_animation_speed_y = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise Animation Speed Y",
             "/rtx/raytracing/inscattering/noiseAnimationSpeedY",
             range_from=-1.0,
@@ -568,7 +567,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_animation_speed_z = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise Animation Speed Z",
             "/rtx/raytracing/inscattering/noiseAnimationSpeedZ",
             range_from=-1.0,
@@ -576,7 +575,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_scale_range_min = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise Scale Min",
             "/rtx/raytracing/inscattering/noiseScaleRangeMin",
             range_from=-1.0,
@@ -584,7 +583,7 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_scale_range_max = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Density Noise Scale Max",
             "/rtx/raytracing/inscattering/noiseScaleRangeMax",
             range_from=-1.0,
@@ -592,14 +591,14 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
         )
         self.noise_num_octaves = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Density Noise Octave Count",
             "/rtx/raytracing/inscattering/noiseNumOctaves",
             range_from=1,
             range_to=8,
         )
         self.use_32bit_precision = SettingItem(
-            self, SettingType.BOOL, "Use 32-bit Precision", "/rtx/raytracing/inscattering/use32bitPrecision"
+            self, lo.SettingType.BOOL, "Use 32-bit Precision", "/rtx/raytracing/inscattering/use32bitPrecision"
         )
 
     @property
@@ -637,11 +636,11 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
 
 class CausticsSettings(SettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.photon_count_nultiplier = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Photon Count Multiplier",
             "/rtx/raytracing/caustics/photonCountMultiplier",
             range_from=1,
@@ -649,21 +648,21 @@ class CausticsSettings(SettingsBase):
         )
         self.photon_max_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Photon Max Bounces",
             "/rtx/raytracing/caustics/photonMaxBounces",
             range_from=1,
             range_to=20,
         )
         self.positio_phi = SettingItem(
-            self, SettingType.FLOAT, "Position Phi", "/rtx/raytracing/caustics/positionPhi", range_from=0.1, range_to=50
+            self, lo.SettingType.FLOAT, "Position Phi", "/rtx/raytracing/caustics/positionPhi", range_from=0.1, range_to=50
         )
         self.normal_phi = SettingItem(
-            self, SettingType.FLOAT, "Normal Phi", "/rtx/raytracing/caustics/normalPhi", range_from=0.3, range_to=1
+            self, lo.SettingType.FLOAT, "Normal Phi", "/rtx/raytracing/caustics/normalPhi", range_from=0.3, range_to=1
         )
         self.filtering_iterations = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Filter Iterations",
             "/rtx/raytracing/caustics/eawFilteringSteps",
             range_from=0,
@@ -687,27 +686,27 @@ class CausticsSettings(SettingsBase):
 
 class IndirectDiffuseLightingSettings(SettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.ambient_light_color = SettingItem(
-            self, SettingType.COLOR3, "Ambient Light Color", "/rtx/sceneDb/ambientLightColor"
+            self, lo.SettingType.COLOR3, "Ambient Light Color", "/rtx/sceneDb/ambientLightColor"
         )
         self.ambient_light_intensity = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Ambient Light Intensity",
             "/rtx/sceneDb/ambientLightIntensity",
             range_from=0.0,
             range_to=10.0,
         )
         self.ambient_occlusion_enabled = SettingItem(
-            self, SettingType.BOOL, "Enable Ambient Occlusion (AO)", "/rtx/ambientOcclusion/enabled"
+            self, lo.SettingType.BOOL, "Enable Ambient Occlusion (AO)", "/rtx/ambientOcclusion/enabled"
         )
 
         # if self._carb_settings.get("/rtx/ambientOcclusion/enabled")
         self.ray_length_in_cm = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "AO: Ray Length (cm)",
             "/rtx/ambientOcclusion/rayLengthInCm",
             range_from=0.0,
@@ -715,7 +714,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.min_samples = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "AO: Minimum Samples per Pixel",
             "/rtx/ambientOcclusion/minSamples",
             range_from=1,
@@ -723,39 +722,39 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.max_samples = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "AO: Maximum Samples per Pixel",
             "/rtx/ambientOcclusion/maxSamples",
             range_from=1,
             range_to=16,
         )
         self.aggressive_denoising = SettingItem(
-            self, SettingType.BOOL, "AO: Aggressive denoising", "/rtx/ambientOcclusion/aggressiveDenoising"
+            self, lo.SettingType.BOOL, "AO: Aggressive denoising", "/rtx/ambientOcclusion/aggressiveDenoising"
         )
 
         self.indirect_diffuse_enabled = SettingItem(
-            self, SettingType.BOOL, "Enable Indirect Diffuse GI", "/rtx/indirectDiffuse/enabled"
+            self, lo.SettingType.BOOL, "Enable Indirect Diffuse GI", "/rtx/indirectDiffuse/enabled"
         )
 
         # if self._carb_settings.get("/rtx/indirectDiffuse/enabled")
         gi_denoising_techniques_ops = ["NVRTD", "NRD:Reblur"]
         self.fetch_sample_count = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Samples per Pixel",
             "/rtx/indirectDiffuse/fetchSampleCount",
             range_from=0,
             range_to=4,
         )
         self.max_bounces = SettingItem(
-            self, SettingType.INT, "Max Bounces", "/rtx/indirectDiffuse/maxBounces", range_from=0, range_to=16
+            self, lo.SettingType.INT, "Max Bounces", "/rtx/indirectDiffuse/maxBounces", range_from=0, range_to=16
         )
         self.scaling_factor = SettingItem(
-            self, SettingType.FLOAT, "Intensity", "/rtx/indirectDiffuse/scalingFactor", range_from=0.0, range_to=20.0
+            self, lo.SettingType.FLOAT, "Intensity", "/rtx/indirectDiffuse/scalingFactor", range_from=0.0, range_to=20.0
         )
         self.denoiser_method = SettingItem(
             self,
-            SettingType.STRING,
+            lo.SettingType.STRING,
             "Denoising technique",
             "/rtx/indirectDiffuse/denoiser/method",
             range_list=gi_denoising_techniques_ops,
@@ -763,7 +762,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         # if enabled and self._carb_settings.get("/rtx/indirectDiffuse/denoiser/method") == 0:
         self.kernel_radius = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Kernel radius",
             "/rtx/indirectDiffuse/denoiser/kernelRadius",
             range_from=1,
@@ -771,7 +770,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.iterations = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Iteration count",
             "/rtx/indirectDiffuse/denoiser/iterations",
             range_from=1,
@@ -779,7 +778,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.max_history = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Max History Length",
             "/rtx/indirectDiffuse/denoiser/temporal/maxHistory",
             range_from=1,
@@ -788,7 +787,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         # if enabled and self._carb_settings.get("/rtx/indirectDiffuse/denoiser/method") == 1:
         self.max_accumulated_frame_num = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Frames in History",
             "/rtx/lightspeed/NRD_ReblurDiffuse/maxAccumulatedFrameNum",
             range_from=0,
@@ -796,7 +795,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.max_fast_accumulated_frame_num = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Frames in Fast History",
             "/rtx/lightspeed/NRD_ReblurDiffuse/maxFastAccumulatedFrameNum",
             range_from=0,
@@ -804,7 +803,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.plane_distance_sensitivity = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Plane Distance Sensitivity",
             "/rtx/lightspeed/NRD_ReblurDiffuse/planeDistanceSensitivity",
             range_from=0,
@@ -812,7 +811,7 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         )
         self.blur_radius = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Blur Radius",
             "/rtx/lightspeed/NRD_ReblurDiffuse/blurRadius",
             range_from=0,
@@ -867,21 +866,21 @@ class IndirectDiffuseLightingSettings(SettingsBase):
 
 class RTMultiGPUSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         currentGpuCount = self._carb_settings.get("/renderer/multiGpu/currentGpuCount")
         self.tile_count = SettingItem(
-            self, SettingType.INT, "Tile Count", "/rtx/realtime/mgpu/tileCount", range_from=2, range_to=currentGpuCount
+            self, lo.SettingType.INT, "Tile Count", "/rtx/realtime/mgpu/tileCount", range_from=2, range_to=currentGpuCount
         )
         self.master_post_processOnly = SettingItem(
-            self, SettingType.BOOL, "GPU 0 Post Process Only", "/rtx/realtime/mgpu/masterPostProcessOnly"
+            self, lo.SettingType.BOOL, "GPU 0 Post Process Only", "/rtx/realtime/mgpu/masterPostProcessOnly"
         )
         self.tile_overlap = SettingItem(
-            self, SettingType.INT, "Tile Overlap (Pixels)", "/rtx/realtime/mgpu/tileOverlap", range_from=0, range_to=256
+            self, lo.SettingType.INT, "Tile Overlap (Pixels)", "/rtx/realtime/mgpu/tileOverlap", range_from=0, range_to=256
         )
         self.tile_overlap_blend_fraction = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Fraction of Overlap Pixels to Blend",
             "/rtx/realtime/mgpu/tileOverlapBlendFraction",
             range_from=0.0,

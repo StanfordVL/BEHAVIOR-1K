@@ -7,9 +7,7 @@ from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.lazy_omni import get_physx_simulation_interface
-from omnigibson.lazy_omni import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
-from omnigibson.lazy_omni import get_version
+import omnigibson.lazy_omni as lo
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -66,11 +64,11 @@ def check_deletable_prim(prim_path):
     Returns:
         bool: Whether the prim can be deleted or not
     """
-    if is_prim_no_delete(prim_path):
+    if lo.is_prim_no_delete(prim_path):
         return False
-    if is_prim_ancestral(prim_path):
+    if lo.is_prim_ancestral(prim_path):
         return False
-    if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+    if lo.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
         return False
     if prim_path == "/World":
         return False
@@ -357,4 +355,4 @@ def land_object(obj, pos, quat=None, z_offset=None):
 
 
 def meets_minimum_isaac_version(minimum_version):
-    return python_utils.meets_minimum_version(get_version()[0], minimum_version)
+    return python_utils.meets_minimum_version(lo.get_version()[0], minimum_version)

@@ -81,6 +81,21 @@ _import_structure = {
     "omni.kit.primitive.mesh.command": ["CreateMeshPrimWithDefaultXformCommand"],
     "omni.isaac.core.articulations": ["ArticulationView"],
     "omni.isaac.core.prims": ["RigidPrimView"],
+    "pxr": [
+        "Gf",
+        "PhysicsSchemaTools",
+        "PhysxSchema",
+        "Sdf",
+        "Usd",
+        "UsdGeom",
+        "UsdLux",
+        "UsdPhysics",
+        "UsdShade",
+        "UsdUtils",
+        "Vt",
+    ],
+    "pxr.Sdf": ["ValueTypeNames"],
+    "omni.isaac.kit": ["SimulationApp"],
 }
 
 sys.modules[__name__] = LazyImporter(__name__, globals()["__file__"], _import_structure)

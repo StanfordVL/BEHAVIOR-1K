@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import omnigibson as og
-from omnigibson.lazy_omni import colorize_bboxes
+import omnigibson.lazy_omni as lo
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -75,7 +75,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:
-            colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
+            colorized_img = lo.colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
             fpath = f"{bbox_modality}_img.png"
             plt.imsave(fpath, colorized_img)
             og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")

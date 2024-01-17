@@ -1,5 +1,4 @@
-from omnigibson.lazy_omni import carb
-from omnigibson.lazy_omni import SettingType
+import omnigibson.lazy_omni as lo
 
 from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
@@ -41,7 +40,7 @@ class CommonSettings(SettingsBase):
 class RenderSettings(SubSettingsBase):
     def __init__(self):
         self.multi_threading_enabled = SettingItem(
-            self, SettingType.BOOL, "Multi-Threading", "/rtx/multiThreading/enabled"
+            self, lo.SettingType.BOOL, "Multi-Threading", "/rtx/multiThreading/enabled"
         )
 
     @property
@@ -57,33 +56,33 @@ class GeometrySettings(SubSettingsBase):
         tbnMode = ["AUTO", "CPU", "GPU", "Force GPU"]
         self.tbn_frame_mode = SettingItem(
             self,
-            SettingType.STRING,
+            lo.SettingType.STRING,
             "Normal & Tangent Space Generation Mode",
             "/rtx/hydra/TBNFrameMode",
             range_list=tbnMode,
         )
         self.face_culling_enabled = SettingItem(
-            self, SettingType.BOOL, "Back Face Culling", "/rtx/hydra/faceCulling/enabled"
+            self, lo.SettingType.BOOL, "Back Face Culling", "/rtx/hydra/faceCulling/enabled"
         )
         # Wireframe settings.
         self.wireframe_thickness = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Wireframe Thickness",
             "/rtx/wireframe/wireframeThickness",
             range_from=0.1,
             range_to=100,
         )
         self.wireframe_thickness_world_space = SettingItem(
-            self, SettingType.BOOL, "Wireframe World Space Thickness", "/rtx/wireframe/wireframeThicknessWorldSpace"
+            self, lo.SettingType.BOOL, "Wireframe World Space Thickness", "/rtx/wireframe/wireframeThicknessWorldSpace"
         )
         self.wireframe_shading_enabled = SettingItem(
-            self, SettingType.BOOL, "Shaded Wireframe", "/rtx/wireframe/shading/enabled"
+            self, lo.SettingType.BOOL, "Shaded Wireframe", "/rtx/wireframe/shading/enabled"
         )
         # Subdivision settings.
         self.subdivision_refinement_level = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Subdivision Global Refinement Level",
             "/rtx/hydra/subdivision/refinementLevel",
             range_from=0,
@@ -91,17 +90,17 @@ class GeometrySettings(SubSettingsBase):
         )
         self.subdivision_adaptive_refinement = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Subdivision Feature-adaptive Refinement",
             "/rtx/hydra/subdivision/adaptiveRefinement",
         )
 
         # if set to zero, override to scene unit, which means the scale factor would be 1
         self.renderMeterPerUnit = SettingItem(
-            self, SettingType.FLOAT, "Renderer-internal meters per unit ", "/rtx/scene/renderMeterPerUnit"
+            self, lo.SettingType.FLOAT, "Renderer-internal meters per unit ", "/rtx/scene/renderMeterPerUnit"
         )
         self.only_opaque_ray_flags = SettingItem(
-            self, SettingType.BOOL, "Hide geometry that uses opacity (debug)", "/rtx/debug/onlyOpaqueRayFlags"
+            self, lo.SettingType.BOOL, "Hide geometry that uses opacity (debug)", "/rtx/debug/onlyOpaqueRayFlags"
         )
 
     @property
@@ -122,11 +121,11 @@ class GeometrySettings(SubSettingsBase):
 class MaterialsSettings(SubSettingsBase):
     def __init__(self):
         self.skip_material_loading = SettingItem(
-            self, SettingType.BOOL, "Disable Material Loading", "/app/renderer/skipMaterialLoading"
+            self, lo.SettingType.BOOL, "Disable Material Loading", "/app/renderer/skipMaterialLoading"
         )
         self.max_mip_count = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Textures: Mipmap Levels to Load",
             "/rtx-transient/resourcemanager/maxMipCount",
             range_from=2,
@@ -134,7 +133,7 @@ class MaterialsSettings(SubSettingsBase):
         )
         self.compression_mip_size_threshold = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Textures: Compression Mipmap Size Threshold (0 to disable) ",
             "/rtx-transient/resourcemanager/compressionMipSizeThreshold",
             0,
@@ -142,21 +141,21 @@ class MaterialsSettings(SubSettingsBase):
         )
         self.enable_texture_streaming = SettingItem(
             self,
-            SettingType.BOOL,
+            lo.SettingType.BOOL,
             "Textures: on-demand streaming (toggling requires scene reload)",
             "/rtx-transient/resourcemanager/enableTextureStreaming",
         )
         self.memory_budget = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Texture streaming memory budget (fraction of GPU memory)",
             "/rtx-transient/resourcemanager/texturestreaming/memoryBudget",
             0.01,
             1,
         )
-        self.animation_time = SettingItem(self, SettingType.FLOAT, "MDL Animation Time Override", "/rtx/animationTime")
+        self.animation_time = SettingItem(self, lo.SettingType.FLOAT, "MDL Animation Time Override", "/rtx/animationTime")
         self.animation_time_use_wallclock = SettingItem(
-            self, SettingType.BOOL, "MDL Animation Time Use Wallclock", "/rtx/animationTimeUseWallclock"
+            self, lo.SettingType.BOOL, "MDL Animation Time Use Wallclock", "/rtx/animationTimeUseWallclock"
         )
 
     @property
@@ -178,16 +177,16 @@ class LightingSettings(SubSettingsBase):
         show_lights_settings = {"Per-Light Enable": 0, "Force Enable": 1, "Force Disable": 2}
         self.show_lights = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Show Area Lights In Primary Rays",
             "/rtx/raytracing/showLights",
             range_dict=show_lights_settings,
         )
         self.shadow_bias = SettingItem(
-            self, SettingType.FLOAT, "Shadow Bias", "/rtx/raytracing/shadowBias", range_from=0.0, range_to=5.0
+            self, lo.SettingType.FLOAT, "Shadow Bias", "/rtx/raytracing/shadowBias", range_from=0.0, range_to=5.0
         )
         self.skip_most_lights = SettingItem(
-            self, SettingType.BOOL, "Use First Distant Light & First Dome Light Only", "/rtx/scenedb/skipMostLights"
+            self, lo.SettingType.BOOL, "Use First Distant Light & First Dome Light Only", "/rtx/scenedb/skipMostLights"
         )
         # Demo light.
         dome_lighting_sampling_type = {
@@ -198,7 +197,7 @@ class LightingSettings(SubSettingsBase):
         }
         self.upper_lower_strategy = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Hemisphere Sampling",
             "/rtx/domeLight/upperLowerStrategy",
             range_dict=dome_lighting_sampling_type,
@@ -217,14 +216,14 @@ class LightingSettings(SubSettingsBase):
         }
         self.baking_resolution = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Baking Resolution",
             "/rtx/domeLight/baking/resolution",
             range_dict=dome_texture_resolution_items,
         )
         self.resolution_factor = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Dome Light Texture Resolution Factor",
             "/rtx/domeLight/resolutionFactor",
             range_from=0.01,
@@ -232,7 +231,7 @@ class LightingSettings(SubSettingsBase):
         )
         self.baking_spp = SettingItem(
             self,
-            SettingType.INT,
+            lo.SettingType.INT,
             "Dome Light Material Baking SPP",
             "/rtx/domeLight/baking/spp",
             range_from=1,
@@ -254,37 +253,37 @@ class LightingSettings(SubSettingsBase):
 
 class SimpleFogSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
-        self.fog_color = SettingItem(self, SettingType.COLOR3, "Color", "/rtx/fog/fogColor")
+        self.fog_color = SettingItem(self, lo.SettingType.COLOR3, "Color", "/rtx/fog/fogColor")
         self.fog_color_intensity = SettingItem(
-            self, SettingType.FLOAT, "Intensity", "/rtx/fog/fogColorIntensity", range_from=1, range_to=1000000
+            self, lo.SettingType.FLOAT, "Intensity", "/rtx/fog/fogColorIntensity", range_from=1, range_to=1000000
         )
         self.fog_z_up_enabled = SettingItem(
-            self, SettingType.BOOL, "Height-based Fog - Use +Z Axis", "/rtx/fog/fogZup/enabled"
+            self, lo.SettingType.BOOL, "Height-based Fog - Use +Z Axis", "/rtx/fog/fogZup/enabled"
         )
         self.fog_start_height = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Height-based Fog - Plane Height",
             "/rtx/fog/fogStartHeight",
             range_from=-1000000,
             range_to=1000000,
         )
         self.fog_height_density = SettingItem(
-            self, SettingType.FLOAT, "Height Density", "/rtx/fog/fogHeightDensity", range_from=0, range_to=1
+            self, lo.SettingType.FLOAT, "Height Density", "/rtx/fog/fogHeightDensity", range_from=0, range_to=1
         )
         self.fog_height_falloff = SettingItem(
-            self, SettingType.FLOAT, "Height Falloff", "/rtx/fog/fogHeightFalloff", range_from=0, range_to=1000
+            self, lo.SettingType.FLOAT, "Height Falloff", "/rtx/fog/fogHeightFalloff", range_from=0, range_to=1000
         )
         self.fog_distance_density = SettingItem(
-            self, SettingType.FLOAT, "Distance Density", "/rtx/fog/fogDistanceDensity", range_from=0, range_to=1
+            self, lo.SettingType.FLOAT, "Distance Density", "/rtx/fog/fogDistanceDensity", range_from=0, range_to=1
         )
         self.fog_start_dist = SettingItem(
-            self, SettingType.FLOAT, "Start Distance to Camera", "/rtx/fog/fogStartDist", range_from=0, range_to=1000000
+            self, lo.SettingType.FLOAT, "Start Distance to Camera", "/rtx/fog/fogStartDist", range_from=0, range_to=1000000
         )
         self.fog_end_dist = SettingItem(
-            self, SettingType.FLOAT, "End Distance to Camera", "/rtx/fog/fogEndDist", range_from=0, range_to=1000000
+            self, lo.SettingType.FLOAT, "End Distance to Camera", "/rtx/fog/fogEndDist", range_from=0, range_to=1000000
         )
 
     @property
@@ -308,27 +307,27 @@ class SimpleFogSettings(SubSettingsBase):
 
 class FlowSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lo.carb.settings.get_settings()
 
         self.ray_traced_shadows_enabled = SettingItem(
-            self, SettingType.BOOL, "Flow in Real-Time Ray Traced Shadows", "/rtx/flow/rayTracedShadowsEnabled"
+            self, lo.SettingType.BOOL, "Flow in Real-Time Ray Traced Shadows", "/rtx/flow/rayTracedShadowsEnabled"
         )
         self.ray_traced_reflections_enabled = SettingItem(
-            self, SettingType.BOOL, "Flow in Real-Time Ray Traced Reflections", "/rtx/flow/rayTracedReflectionsEnabled"
+            self, lo.SettingType.BOOL, "Flow in Real-Time Ray Traced Reflections", "/rtx/flow/rayTracedReflectionsEnabled"
         )
         self.path_tracing_enabled = SettingItem(
-            self, SettingType.BOOL, "Flow in Path-Traced Mode", "/rtx/flow/pathTracingEnabled"
+            self, lo.SettingType.BOOL, "Flow in Path-Traced Mode", "/rtx/flow/pathTracingEnabled"
         )
         self.path_tracing_shadows_enabled = SettingItem(
-            self, SettingType.BOOL, "Flow in Path-Traced Mode Shadows", "/rtx/flow/pathTracingShadowsEnabled"
+            self, lo.SettingType.BOOL, "Flow in Path-Traced Mode Shadows", "/rtx/flow/pathTracingShadowsEnabled"
         )
         self.composite_enabled = SettingItem(
-            self, SettingType.BOOL, "Composite with Flow Library Renderer", "/rtx/flow/compositeEnabled"
+            self, lo.SettingType.BOOL, "Composite with Flow Library Renderer", "/rtx/flow/compositeEnabled"
         )
         self.use_flow_library_self_shadow = SettingItem(
-            self, SettingType.BOOL, "Use Flow Library Self Shadow", "/rtx/flow/useFlowLibrarySelfShadow"
+            self, lo.SettingType.BOOL, "Use Flow Library Self Shadow", "/rtx/flow/useFlowLibrarySelfShadow"
         )
-        self.max_blocks = SettingItem(self, SettingType.INT, "Max Blocks", "/rtx/flow/maxBlocks")
+        self.max_blocks = SettingItem(self, lo.SettingType.INT, "Max Blocks", "/rtx/flow/maxBlocks")
 
     @property
     def settings(self):
@@ -398,11 +397,11 @@ class DebugViewSettings(SubSettingsBase):
             "Diffuse GI (Not Accumulated)": "indirectDiffuseNonAccum",
         }
         self.target = SettingItem(
-            self, SettingType.STRING, "Render Target", "/rtx/debugView/target", range_dict=debug_view_items
+            self, lo.SettingType.STRING, "Render Target", "/rtx/debugView/target", range_dict=debug_view_items
         )
         self.scaling = SettingItem(
             self,
-            SettingType.FLOAT,
+            lo.SettingType.FLOAT,
             "Output Value Scaling",
             "/rtx/debugView/scaling",
             range_from=-1000000,

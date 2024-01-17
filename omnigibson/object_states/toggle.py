@@ -1,16 +1,14 @@
 import numpy as np
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.lazy_omni import recompute_extents
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import create_primitive_mesh
-from omnigibson.lazy_omni import get_prim_at_path
-from pxr import PhysicsSchemaTools, UsdGeom, Sdf, Gf, Vt
 
 
 # Create settings for this module
@@ -49,7 +47,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         super()._initialize()
         self.initialize_link_mixin()
         mesh_prim_path = f"{self.link.prim_path}/mesh_0"
-        pre_existing_mesh = get_prim_at_path(mesh_prim_path)
+        pre_existing_mesh = lo.get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
         if not pre_existing_mesh:
             self.scale = m.DEFAULT_SCALE if self.scale is None else self.scale
@@ -62,7 +60,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             )
         else:
             # Infer radius from mesh if not specified as an input
-            recompute_extents(prim=pre_existing_mesh)
+            lo.recompute_extents(prim=pre_existing_mesh)
             self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
@@ -75,7 +73,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker.set_local_pose(position=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
         # Store the projection mesh's IDs
-        projection_mesh_ids = PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
+        projection_mesh_ids = lo.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
 
         # Define function for checking overlap
         valid_hit = False

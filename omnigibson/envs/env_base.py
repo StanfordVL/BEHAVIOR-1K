@@ -6,6 +6,7 @@ import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
+from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import create_sensor
@@ -34,6 +35,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Call super first
         super().__init__()
+
+        # Launch Isaac Sim
+        launch_simulator()
 
         # Initialize other placeholders that will be filled in later
         self._task = None

@@ -965,8 +965,8 @@ class PhysicalParticleSystem(BaseSystem):
         assert np.all(n_particles_per_axis), f"link {link.name} is too small to sample any particle of radius {cls.particle_radius}."
 
         # 1e-10 is added because the extent might be an exact multiple of particle radius
-        arrs = [np.arange(lo + cls.particle_radius, hi - cls.particle_radius + 1e-10, cls.particle_radius * 2)
-                for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        arrs = [np.arange(l + cls.particle_radius, h - cls.particle_radius + 1e-10, cls.particle_radius * 2)
+                for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those

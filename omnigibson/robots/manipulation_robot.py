@@ -20,8 +20,7 @@ from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_fu
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.ui_utils import suppress_omni_log
-
-from pxr import Gf
+import omnigibson.lazy_omni as lo
 
 
 # Create settings for this module
@@ -1184,7 +1183,7 @@ class ManipulationRobot(BaseRobot):
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos, _ = T.pose_transform(eef_link_pos, eef_link_orn, attachment_point_pos_local, [0, 0, 0, 1])
         joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos.astype(float)))
+        joint_prim.GetAttribute("physics:localPos1").Set(lo.Gf.Vec3f(*attachment_point_pos.astype(float)))
 
     def _calculate_in_hand_object(self, arm="default"):
         if gm.AG_CLOTH:

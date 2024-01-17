@@ -3,6 +3,7 @@ import time
 import gym
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -11,20 +12,9 @@ from omnigibson.utils.ui_utils import dock_window, suppress_omni_log
 from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
-from omnigibson.lazy_omni import ui
-from omnigibson.lazy_omni import get_current_stage
-from pxr import Gf, UsdGeom
-from omnigibson.lazy_omni import get_viewport_window_instances
-from omnigibson.lazy_omni import create_viewport_window
-
 # Make sure synthetic data extension is enabled
 ext_manager = og.app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
-
-# Continue with omni synethic data imports afterwards
-from omnigibson.lazy_omni import sensors as sensors_util
-from omnigibson.lazy_omni import _syntheticdata as sd
-sensor_types = sd.SensorType
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -70,31 +60,31 @@ class VisionSensor(BaseSensor):
             current camera. Otherwise, creates a new viewport
     """
     _SENSOR_HELPERS = dict(
-        rgb=sensors_util.get_rgb,
-        depth=sensors_util.get_depth,
-        depth_linear=sensors_util.get_depth_linear,
-        normal=sensors_util.get_normals,
-        seg_semantic=sensors_util.get_semantic_segmentation,
-        seg_instance=sensors_util.get_instance_segmentation,
-        flow=sensors_util.get_motion_vector,
-        bbox_2d_tight=sensors_util.get_bounding_box_2d_tight,
-        bbox_2d_loose=sensors_util.get_bounding_box_2d_loose,
-        bbox_3d=sensors_util.get_bounding_box_3d,
+        rgb=lo.sensors.get_rgb,
+        depth=lo.sensors.get_depth,
+        depth_linear=lo.sensors.get_depth_linear,
+        normal=lo.sensors.get_normals,
+        seg_semantic=lo.sensors.get_semantic_segmentation,
+        seg_instance=lo.sensors.get_instance_segmentation,
+        flow=lo.sensors.get_motion_vector,
+        bbox_2d_tight=lo.sensors.get_bounding_box_2d_tight,
+        bbox_2d_loose=lo.sensors.get_bounding_box_2d_loose,
+        bbox_3d=lo.sensors.get_bounding_box_3d,
         camera=get_camera_params,
     )
 
     # Define raw sensor types
     _RAW_SENSOR_TYPES = dict(
-        rgb=sensor_types.Rgb,
-        depth=sensor_types.Depth,
-        depth_linear=sensor_types.DepthLinear,
-        normal=sensor_types.Normal,
-        seg_semantic=sensor_types.SemanticSegmentation,
-        seg_instance=sensor_types.InstanceSegmentation,
-        flow=sensor_types.MotionVector,
-        bbox_2d_tight=sensor_types.BoundingBox2DTight,
-        bbox_2d_loose=sensor_types.BoundingBox2DLoose,
-        bbox_3d=sensor_types.BoundingBox3D,
+        rgb=lo._syntheticdata.SensorType.Rgb,
+        depth=lo._syntheticdata.SensorType.Depth,
+        depth_linear=lo._syntheticdata.SensorType.DepthLinear,
+        normal=lo._syntheticdata.SensorType.Normal,
+        seg_semantic=lo._syntheticdata.SensorType.SemanticSegmentation,
+        seg_instance=lo._syntheticdata.SensorType.InstanceSegmentation,
+        flow=lo._syntheticdata.SensorType.MotionVector,
+        bbox_2d_tight=lo._syntheticdata.SensorType.BoundingBox2DTight,
+        bbox_2d_loose=lo._syntheticdata.SensorType.BoundingBox2DLoose,
+        bbox_3d=lo._syntheticdata.SensorType.BoundingBox3D,
     )
 
     # Persistent dictionary of sensors, mapped from prim_path to sensor
@@ -139,7 +129,7 @@ class VisionSensor(BaseSensor):
     def _load(self):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
-        return UsdGeom.Camera.Define(get_current_stage(), self._prim_path).GetPrim()
+        return lo.UsdGeom.Camera.Define(lo.get_current_stage(), self._prim_path).GetPrim()
 
     def _post_load(self):
         # run super first
@@ -149,16 +139,16 @@ class VisionSensor(BaseSensor):
         self.SENSORS[self._prim_path] = self
 
         # Get synthetic data interface
-        self._sd = sd.acquire_syntheticdata_interface()
+        self._sd = lo._syntheticdata.acquire_syntheticdata_interface()
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
         if viewport_name is not None:
-            vp_names_to_handles = {vp.name: vp for vp in get_viewport_window_instances()}
+            vp_names_to_handles = {vp.name: vp for vp in lo.get_viewport_window_instances()}
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
             viewport = vp_names_to_handles[viewport_name]
         else:
-            viewport = create_viewport_window()
+            viewport = lo.create_viewport_window()
             # Take a render step to make sure the viewport is generated before docking it
             render()
             # Grab the newly created viewport and dock it to the GUI
@@ -169,14 +159,14 @@ class VisionSensor(BaseSensor):
             n_auxiliary_sensors = len(self.SENSORS) - 1
             if n_auxiliary_sensors == 1:
                 # This is the first auxiliary viewport, dock to the left of the main dockspace
-                dock_window(space=ui.Workspace.get_window("DockSpace"), name=viewport.name,
-                            location=ui.DockPosition.LEFT, ratio=0.25)
+                dock_window(space=lo.ui.Workspace.get_window("DockSpace"), name=viewport.name,
+                            location=lo.ui.DockPosition.LEFT, ratio=0.25)
             elif n_auxiliary_sensors > 1:
                 # This is any additional auxiliary viewports, dock equally-spaced in the auxiliary column
                 # We also need to re-dock any prior viewports!
                 for i in range(2, n_auxiliary_sensors + 1):
-                    dock_window(space=ui.Workspace.get_window(f"Viewport {i - 1}"), name=f"Viewport {i}",
-                                location=ui.DockPosition.BOTTOM, ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i))
+                    dock_window(space=lo.ui.Workspace.get_window(f"Viewport {i - 1}"), name=f"Viewport {i}",
+                                location=lo.ui.DockPosition.BOTTOM, ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i))
 
         self._viewport = viewport
 
@@ -219,7 +209,7 @@ class VisionSensor(BaseSensor):
         # Initialize sensors
         sensors = []
         for name in names:
-            sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport.viewport_api, self._RAW_SENSOR_TYPES[name]))
+            sensors.append(lo.sensors.create_or_retrieve_sensor(self._viewport.viewport_api, self._RAW_SENSOR_TYPES[name]))
 
         # Suppress syntheticdata warning here because we know the first render is invalid
         with suppress_omni_log(channels=["omni.syntheticdata.plugin"]):
@@ -349,7 +339,7 @@ class VisionSensor(BaseSensor):
         Args:
             limits (2-tuple): [min, max] value of the sensor's clipping range, in meters
         """
-        self.set_attribute(attr="clippingRange", val=Gf.Vec2f(*limits))
+        self.set_attribute(attr="clippingRange", val=lo.Gf.Vec2f(*limits))
         # In order for sensor changes to propagate, we must toggle its visibility
         self.visible = False
         # A single update step has to happen here before we toggle visibility for changes to propagate

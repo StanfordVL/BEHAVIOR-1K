@@ -1,11 +1,7 @@
-from omnigibson.lazy_omni import get_prim_at_path, get_prim_parent
-from omnigibson.lazy_omni import tf_matrix_from_pose
-from omnigibson.lazy_omni import gf_quat_to_np_array
-from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema, PhysicsSchemaTools
 import numpy as np
-from omnigibson.lazy_omni import _dynamic_control
 
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
@@ -14,9 +10,6 @@ from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import BoundingBoxAPI, get_mesh_volume_and_com
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
-
-# Import omni sensor based on type
-from omnigibson.lazy_omni import _sensor as _s
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -91,18 +84,18 @@ class RigidPrim(XFormPrim):
         super()._post_load()
 
         # Apply rigid body and mass APIs
-        if not self._prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI):
-            PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(UsdPhysics.MassAPI):
-            UsdPhysics.MassAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lo.UsdPhysics.RigidBodyAPI):
+            lo.UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lo.PhysxSchema.PhysxRigidBodyAPI):
+            lo.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lo.UsdPhysics.MassAPI):
+            lo.UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
         if not self._visual_only:
-            PhysxSchema.PhysxContactReportAPI(self._prim) if \
-                self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
-                PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
+            lo.PhysxSchema.PhysxContactReportAPI(self._prim) if \
+                self._prim.HasAPI(lo.PhysxSchema.PhysxContactReportAPI) else \
+                lo.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -125,7 +118,7 @@ class RigidPrim(XFormPrim):
             "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Create contact sensor
-        self._cs = _s.acquire_contact_sensor_interface()
+        self._cs = lo._sensor.acquire_contact_sensor_interface()
         # self._create_contact_sensor()
 
     def _initialize(self):
@@ -184,8 +177,8 @@ class RigidPrim(XFormPrim):
         for prim in prims_to_check:
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = get_prim_at_path(prim_path=mesh_path)
-                is_collision = mesh_prim.HasAPI(UsdPhysics.CollisionAPI)
+                mesh_prim = lo.get_prim_at_path(prim_path=mesh_path)
+                is_collision = mesh_prim.HasAPI(lo.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}"}
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
@@ -211,7 +204,7 @@ class RigidPrim(XFormPrim):
         # for this link
         if len(coms) > 0:
             com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
-            self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
+            self.set_attribute("physics:centerOfMass", lo.Gf.Vec3f(*com))
 
     def enable_collisions(self):
         """
@@ -571,7 +564,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: Whether contact reporting is enabled for this rigid prim or not
         """
-        return self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
+        return self._prim.HasAPI(lo.PhysxSchema.PhysxContactReportAPI)
 
     def enable_gravity(self):
         """
@@ -589,14 +582,14 @@ class RigidPrim(XFormPrim):
         """
         Enable physics for this rigid body
         """
-        prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.wake_up(og.sim.stage_id, prim_id)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
 
     def _dump_state(self):

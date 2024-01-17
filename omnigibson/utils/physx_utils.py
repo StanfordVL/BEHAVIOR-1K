@@ -1,13 +1,9 @@
 import numpy as np
 
-from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema, PhysicsSchemaTools
-from omnigibson.lazy_omni import omni
-from omnigibson.lazy_omni import get_prim_at_path
-from omnigibson.lazy_omni import get_current_stage
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.lazy_omni import physicsUtils, particleUtils
 from omnigibson.utils.ui_utils import suppress_omni_log
 import omnigibson as og
+import omnigibson.lazy_omni as lo
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -46,8 +42,8 @@ def create_physx_particle_system(
     """
     # TODO: Add sanity check to make sure GPU dynamics are enabled
     # Create particle system
-    stage = get_current_stage()
-    particle_system = PhysxSchema.PhysxParticleSystem.Define(stage, prim_path)
+    stage = lo.get_current_stage()
+    particle_system = lo.PhysxSchema.PhysxParticleSystem.Define(stage, prim_path)
     particle_system.CreateSimulationOwnerRel().SetTargets([physics_scene_path])
 
     # Use a smaller particle size for nicer fluid, and let the sim figure out the other offsets
@@ -60,21 +56,21 @@ def create_physx_particle_system(
 
     if anisotropy:
         # apply api and use all defaults
-        PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
+        lo.PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
 
     if smoothing:
         # apply api and use all defaults
-        PhysxSchema.PhysxParticleSmoothingAPI.Apply(particle_system.GetPrim())
+        lo.PhysxSchema.PhysxParticleSmoothingAPI.Apply(particle_system.GetPrim())
 
     if isosurface:
         # apply api and use all defaults
-        PhysxSchema.PhysxParticleIsosurfaceAPI.Apply(particle_system.GetPrim())
+        lo.PhysxSchema.PhysxParticleIsosurfaceAPI.Apply(particle_system.GetPrim())
         # Make sure we're not casting shadows
-        primVarsApi = UsdGeom.PrimvarsAPI(particle_system.GetPrim())
-        primVarsApi.CreatePrimvar("doNotCastShadows", Sdf.ValueTypeNames.Bool).Set(True)
+        primVarsApi = lo.UsdGeom.PrimvarsAPI(particle_system.GetPrim())
+        primVarsApi.CreatePrimvar("doNotCastShadows", lo.Sdf.ValueTypeNames.Bool).Set(True)
         # tweak anisotropy min, max, and scale to work better with isosurface:
         if anisotropy:
-            ani_api = PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
+            ani_api = lo.PhysxSchema.PhysxParticleAnisotropyAPI.Apply(particle_system.GetPrim())
             ani_api.CreateScaleAttr().Set(5.0)
             ani_api.CreateMinAttr().Set(1.0)  # avoids gaps in surface
             ani_api.CreateMaxAttr().Set(2.0)
@@ -90,7 +86,7 @@ def bind_material(prim_path, material_path):
         prim_path (str): Stage path to prim to bind material to
         material_path (str): Stage path to material to be bound
     """
-    omni.kit.commands.execute(
+    lo.omni.kit.commands.execute(
         "BindMaterialCommand",
         prim_path=prim_path,
         material_path=material_path,
@@ -115,7 +111,7 @@ def create_physx_particleset_pointinstancer(
     scales=None,
     prototype_indices=None,
     enabled=True,
-) -> Usd.Prim:
+) -> lo.Usd.Prim:
     """
     Creates a particle set instancer based on a UsdGeom.PointInstancer at @prim_path on the current stage, with
     the specified parameters.
@@ -153,7 +149,7 @@ def create_physx_particleset_pointinstancer(
     """
     stage = og.sim.stage
     n_particles = len(positions)
-    particle_system = get_prim_at_path(physx_particle_system_path)
+    particle_system = lo.get_prim_at_path(physx_particle_system_path)
 
     # Create point instancer scope
     prim_path = f"{particle_system_path}/{name}"
@@ -163,9 +159,9 @@ def create_physx_particleset_pointinstancer(
     # Create point instancer
     instancer_prim_path = f"{prim_path}/instancer"
     assert not stage.GetPrimAtPath(instancer_prim_path), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
-    instancer = UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
+    instancer = lo.UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
 
-    is_isosurface = particle_system.HasAPI(PhysxSchema.PhysxParticleIsosurfaceAPI) and \
+    is_isosurface = particle_system.HasAPI(lo.PhysxSchema.PhysxParticleIsosurfaceAPI) and \
                     particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
 
     # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
@@ -175,10 +171,10 @@ def create_physx_particleset_pointinstancer(
     prototype_prims = []
     for i, original_path in enumerate(prototype_prim_paths):
         prototype_prim_path = f"{prim_path}/prototype{i}"
-        omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
-        prototype_prim = get_prim_at_path(prototype_prim_path)
+        lo.omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
+        prototype_prim = lo.get_prim_at_path(prototype_prim_path)
         # Make sure this prim is invisible if we're using isosurface, and vice versa.
-        imageable = UsdGeom.Imageable(prototype_prim)
+        imageable = lo.UsdGeom.Imageable(prototype_prim)
         if is_isosurface:
             imageable.MakeInvisible()
         else:
@@ -188,7 +184,7 @@ def create_physx_particleset_pointinstancer(
         # We can't directly hide the prototype because it will also hide all the generated particles (if not isosurface)
         prototype_prim.GetAttribute("xformOp:translate").Set(m.PROTOTYPE_GRAVEYARD_POS)
 
-        mesh_list.AddTarget(Sdf.Path(prototype_prim_path))
+        mesh_list.AddTarget(lo.Sdf.Path(prototype_prim_path))
         prototype_prims.append(prototype_prim)
 
     # Set particle instance default data
@@ -207,11 +203,11 @@ def create_physx_particleset_pointinstancer(
 
     # Set particle states
     instancer.GetProtoIndicesAttr().Set(prototype_indices)
-    instancer.GetPositionsAttr().Set(Vt.Vec3fArray.FromNumpy(positions))
-    instancer.GetOrientationsAttr().Set(Vt.QuathArray.FromNumpy(orientations))
-    instancer.GetVelocitiesAttr().Set(Vt.Vec3fArray.FromNumpy(velocities))
-    instancer.GetAngularVelocitiesAttr().Set(Vt.Vec3fArray.FromNumpy(angular_velocities))
-    instancer.GetScalesAttr().Set(Vt.Vec3fArray.FromNumpy(scales))
+    instancer.GetPositionsAttr().Set(lo.Vt.Vec3fArray.FromNumpy(positions))
+    instancer.GetOrientationsAttr().Set(lo.Vt.QuathArray.FromNumpy(orientations))
+    instancer.GetVelocitiesAttr().Set(lo.Vt.Vec3fArray.FromNumpy(velocities))
+    instancer.GetAngularVelocitiesAttr().Set(lo.Vt.Vec3fArray.FromNumpy(angular_velocities))
+    instancer.GetScalesAttr().Set(lo.Vt.Vec3fArray.FromNumpy(scales))
 
     # Take a render step to "lock" the visuals of the prototypes at the graveyard position
     # This needs to happen AFTER setting particle states
@@ -228,7 +224,7 @@ def create_physx_particleset_pointinstancer(
 
     instancer_prim = instancer.GetPrim()
 
-    particleUtils.configure_particle_set(
+    lo.particleUtils.configure_particle_set(
         instancer_prim,
         physx_particle_system_path,
         self_collision,
@@ -256,9 +252,9 @@ def create_physx_particleset_pointinstancer(
     return instancer_prim
 
 def apply_force_at_pos(prim, force, pos):
-    prim_id = PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
+    prim_id = lo.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
     og.sim.psi.apply_force_at_pos(og.sim.stage_id, prim_id, force, pos)
 
 def apply_torque(prim, foward_vect, roll_torque_scalar):
-    prim_id = PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
+    prim_id = lo.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
     og.sim.psi.apply_torque(og.sim.stage_id, prim_id, foward_vect * roll_torque_scalar)

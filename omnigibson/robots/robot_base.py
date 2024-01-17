@@ -10,7 +10,6 @@ from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 from omnigibson.utils.constants import PrimType
-from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()

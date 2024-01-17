@@ -11,8 +11,8 @@ ext_manager = app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
 # Continue with omni synethic data imports afterwards
-from omnigibson.lazy_omni import _syntheticdata as sd
-sensor_types = sd.SensorType
+import omnigibson.lazy_omni as lo
+sensor_types = lo._syntheticdata.SensorType
 
 try:
     import accimage
