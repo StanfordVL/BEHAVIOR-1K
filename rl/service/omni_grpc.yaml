@@ -44,6 +44,7 @@ robots:
       arm_0:
         name: JointController
         motor_type: position
+        use_delta_commands: true
         command_input_limits: default
         command_output_limits: null
       gripper_0:
