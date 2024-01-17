@@ -517,18 +517,21 @@ def detect_robot_collision(context):
         
     return valid_hit
 
-def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True):
+def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=True):
     """
     Detects robot collisions with the environment, but not with itself using the ContactBodies API
 
     Args:
         robot (BaseRobot): Robot object to detect collisions for
-        filter_objs (Array of StatefulObject): Objects to ignore collisions with
+        filter_objs (Array of StatefulObject or None): Objects to ignore collisions with
         ignore_obj_in_hand (bool): Whether to ignore collisions with the object in the robot's hand
     
     Returns:
         bool: Whether the robot is in collision
     """
+    if filter_objs is None:
+        filter_objs = []
+
     filter_categories = ["floors"]
     
     obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
