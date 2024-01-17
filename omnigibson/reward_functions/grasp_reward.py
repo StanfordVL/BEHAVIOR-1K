@@ -12,7 +12,7 @@ class GraspReward(BaseRewardFunction):
     Grasp reward
     """
 
-    def __init__(self, obj_name, dist_coeff, grasp_reward, eef_position_penalty_coef, eef_orientation_penalty_coef, regularization_coef):
+    def __init__(self, obj_name, dist_coeff, grasp_reward, collision_penalty, eef_position_penalty_coef, eef_orientation_penalty_coef, regularization_coef):
         # Store internal vars
         self.prev_grasping = False
         self.prev_eef_pos = None
@@ -21,6 +21,7 @@ class GraspReward(BaseRewardFunction):
         self.obj = None
         self.dist_coeff = dist_coeff
         self.grasp_reward = grasp_reward
+        self.collision_penalty = collision_penalty
         self.eef_position_penalty_coef = eef_position_penalty_coef
         self.eef_orientation_penalty_coef = eef_orientation_penalty_coef
         self.regularization_coef = regularization_coef
@@ -46,7 +47,7 @@ class GraspReward(BaseRewardFunction):
         reward = 0.
 
         # Penalize large actions
-        reward -= (np.sum(np.abs(action)) * self.regularization_coef)
+        reward += -(np.sum(np.abs(action)) * self.regularization_coef)
     
         # Penalize based on the magnitude of the action
         eef_pos = robot.get_eef_position(robot.default_arm)
@@ -61,34 +62,26 @@ class GraspReward(BaseRewardFunction):
             reward += delta_rot.magnitude() * self.eef_orientation_penalty_coef
         self.prev_eef_rot = eef_rot
 
-        if not self.prev_grasping and not current_grasping:
-            obj_center = self.obj.aabb_center
+        # Penalize robot for colliding with an object
+        if detect_robot_collision_in_sim(robot, filter_objs=[self.obj]):
+            reward += self.collision_penalty
+
+        # If we're not currently grasping
+        if not current_grasping:
+            # TODO: If we dropped the object recently, penalize for that
+            obj_center = self.obj.get_position()
             dist = T.l2_distance(eef_pos, obj_center)
             reward += math.exp(-dist) * self.dist_coeff
 
-        elif not self.prev_grasping and current_grasping:
-            robot_center = robot.aabb_center
-            obj_center = self.obj.aabb_center
-            dist = T.l2_distance(robot_center, obj_center)
-            dist_reward =  math.exp(-dist) * self.dist_coeff
-            reward += dist_reward + self.grasp_reward
-        
-        elif self.prev_grasping and not current_grasping:
-            obj_center = self.obj.aabb_center
-            dist = T.l2_distance(eef_pos, obj_center)
-            reward +=  math.exp(-dist) * self.dist_coeff
-        
-        elif self.prev_grasping and current_grasping:
-            robot_center = robot.aabb_center
-            obj_center = self.obj.aabb_center
-            dist = T.l2_distance(robot_center, obj_center)
-            dist_reward =  math.exp(-dist) * self.dist_coeff
-            reward += dist_reward + self.grasp_reward
+        else:
+            # We are currently grasping - first apply a grasp reward 
+            reward += self.grasp_reward
 
-        # Overwrite reward if robot is in collision
-        # The one step where it grasps the object, it is in collision and this triggers
-        if detect_robot_collision_in_sim(robot, ignore_obj_in_hand=True):
-            reward += -1.
+            # Then apply a distance reward to take us to a tucked position
+            robot_center = robot.links["torso_lift_link"].get_position()
+            obj_center = self.obj.get_position()
+            dist = T.l2_distance(robot_center, obj_center)
+            reward += math.exp(-dist) * self.dist_coeff
 
         self.prev_grasping = current_grasping
         return reward, {}

@@ -194,6 +194,7 @@ class GraspTask(BaseTask):
         return {
             "dist_coeff": DIST_COEFF,
             "grasp_reward": GRASP_REWARD,
+            "collision_penalty": 1.0,
             "eef_position_penalty_coef": 0.01,
             "eef_orientation_penalty_coef": 0.001,
             "regularization_coef": 0.01,

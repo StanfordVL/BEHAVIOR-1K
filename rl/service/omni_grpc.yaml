@@ -64,9 +64,10 @@ task:
   reward_config:
     dist_coeff: 1.0
     grasp_reward: 1.0
+    collision_penalty: 1.0
     eef_position_penalty_coef: 0.1
     eef_orientation_penalty_coef: 0.01
-
+    regularization_coef: 0.1
 objects:
   - type: DatasetObject
     name: cologne
