@@ -20,7 +20,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement
 from wandb.integration.sb3 import WandbCallback 
-
+from wandb import AlertLevel
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict):
@@ -136,6 +136,7 @@ def main():
         config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
         og_env = og.Environment(configs=config)
         env = DummyVecEnv([lambda: og_env])
+        env = VecFrameStack(env, n_stack=5)
         n_envs = 1
 
     # import IPython; IPython.embed()
@@ -228,11 +229,20 @@ def main():
         log.info(f"model: {model}")
 
         log.info("Starting training...")
+
+        policy_save_path = wandb.run.dir.split("/")[:-3]
+        policy_save_path.append("runs")
+        policy_save_path.append(wandb.run.id)
+        policy_save_path = "/".join(policy_save_path)
+        text =f"Run link: {str(wandb.run.url)}\nPolicy save path: {policy_save_path}"
+        wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
         model.learn(
             total_timesteps=2_000_000,
             callback=callback,
         )
         log.info("Finished training!")
+        wandb.alert(title="Run ended", text=text, level=AlertLevel.INFO)
+
 
 
 if __name__ == "__main__":
