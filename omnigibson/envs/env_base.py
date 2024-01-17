@@ -531,7 +531,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             )
 
             # Run simulation step
-            og.sim.step(render=True)
+            og.sim.step(render=should_render)
 
             # Grab observations
             obs = self.get_obs()
