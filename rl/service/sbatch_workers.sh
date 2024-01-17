@@ -11,6 +11,15 @@ IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
+# Pick a port using the array index
+BASE_PORT=$2
+WORKER_PORT=$((BASE_PORT + SLURM_ARRAY_TASK_ID))
+
+if netstat -tuln | grep ":$WORKER_PORT" > /dev/null; then
+    echo "Port $PORT is in use."
+    exit 1
+fi
+
 # Define env kwargs to pass
 declare -A ENVS=(
     [NVIDIA_DRIVER_CAPABILITIES]=all
@@ -57,10 +66,6 @@ enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
 # Remove leading space in string
 ENV_KWARGS="${ENV_KWARGS:1}"
 MOUNT_KWARGS="${MOUNT_KWARGS:1}"
-
-# Pick a port using the array index
-BASE_PORT=$2
-WORKER_PORT=$((BASE_PORT + SLURM_ARRAY_TASK_ID))
 
 # The last line here is the command you want to run inside the container.
 # Here I'm running some unit tests.
