@@ -2,6 +2,9 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 import networkx as nx
+from omni.physx import get_physx_scene_query_interface
+from pxr import Gf
+from real_tiago.user_interfaces.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -20,7 +23,6 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.teleop_utils import TeleopData
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -1474,38 +1476,31 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         """
-        Generate action data from teleoperation data
+        Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
         Overwrite this function if the robot is using a different controller.
         Args:
-            teleop_data (TeleopData): teleoperation data
+            teleop_action (TeleopAction): teleoperation action data
         Returns:
             np.ndarray: array of action data for arm and gripper
         """
-        action = super().teleop_data_to_action(teleop_data)
+        action = super().teleop_data_to_action(teleop_action)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            if teleop_data.is_valid[hand]:
-                # arm action
-                assert \
-                    isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
-                    isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
-                    f"Only IK and OSC controllers are supported for arm {arm_name}!"
-                cur_eef_pos, cur_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
-                if teleop_data.robot_attached:
-                    target_pos, target_orn = teleop_data.transforms[hand]
-                else:
-                    target_pos, target_orn = cur_eef_pos, cur_eef_orn
-                # get orientation relative to robot base
-                base_pos, base_orn = self.get_position_orientation()
-                rel_des_pos, rel_des_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
-                rel_cur_pos, _ = T.relative_pose_transform(cur_eef_pos, cur_eef_orn, base_pos, base_orn)
-                action[self.arm_action_idx[arm_name]] = np.r_[rel_des_pos - rel_cur_pos, T.quat2axisangle(rel_des_orn)]
-                # gripper action
-                assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
-                    f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
-                action[self.gripper_action_idx[arm_name]] = teleop_data.grippers[hand]
+            arm_action = getattr(teleop_action, hand)
+            # arm action
+            assert \
+                isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
+                isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
+                f"Only IK and OSC controllers are supported for arm {arm_name}!"
+            target_pos, target_rpy = arm_action[:3], arm_action[3:6]
+            target_orn = T.quat2axisangle(T.euler2quat(target_rpy))
+            action[self.arm_action_idx[arm_name]] = np.r_[target_pos, target_orn]
+            # gripper action
+            assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
+                f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+            action[self.gripper_action_idx[arm_name]] = arm_action[6]
         return action

@@ -5,6 +5,7 @@ import numpy as np
 import os
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
+from real_tiago.user_interfaces.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -14,7 +15,6 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.teleop_utils import TeleopData
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
@@ -415,9 +415,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 \
                or np.any([len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]])
 
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         """
-        Generates an action for the BehaviorRobot to perform based on vr data dict.
+        Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 
         Action space (all non-normalized values that will be clipped if they are too large)
         Body:
@@ -433,8 +433,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Actions are stored as 1D numpy array
         action = np.zeros(self.action_dim)
         # Update body action space
-        if teleop_data.is_valid["head"]:
-            head_pos, head_orn = teleop_data.transforms["head"]
+        if teleop_action.is_valid["head"]:
+            head_pos, head_orn = teleop_action.transforms["head"]
             des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
             des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
@@ -446,20 +446,20 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
             hand_data = 0
-            if teleop_data.is_valid[part_name]: 
-                part_pos, part_orn = teleop_data.transforms[part_name]
+            if teleop_action.is_valid[part_name]: 
+                part_pos, part_orn = teleop_action.transforms[part_name]
                 # apply eef rotation offset to part transform first
                 des_world_part_pos = part_pos
                 des_world_part_orn = T.quat_multiply(part_orn, eef_part.offset_to_body[1])
                 if eef_part.name in self.arm_names:
                     # compute gripper action
-                    if hasattr(teleop_data, "hand_data"):
+                    if hasattr(teleop_action, "hand_data"):
                         # hand tracking mode, compute joint rotations for each independent hand joint
-                        hand_data = teleop_data.hand_data[part_name]
+                        hand_data = teleop_action.hand_data[part_name]
                         hand_data = hand_data[:, :2].T.reshape(-1)
                     else:
                         # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
-                        hand_data = teleop_data.grippers[part_name] * 2 - 1
+                        hand_data = teleop_action.grippers[part_name] * 2 - 1
                     action[self.controller_action_idx[f"gripper_{eef_part.name}"]] = hand_data
                     # update ghost hand if necessary
                     if self._use_ghost_hands:
@@ -479,7 +479,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             controller_name = "camera" if part_name == "head" else "arm_" + eef_part.name
             action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
             # If we reset, teleop the robot parts to the desired pose
-            if eef_part.name in self.arm_names and teleop_data.reset[part_name]:
+            if eef_part.name in self.arm_names and teleop_action.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
         return action
 

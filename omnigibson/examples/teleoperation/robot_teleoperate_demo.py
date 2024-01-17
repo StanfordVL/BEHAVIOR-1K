@@ -3,26 +3,33 @@ Example script for using external devices to teleoperate a robot.
 """
 import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
+from omnigibson.utils.teleop_utils import TeleopSystem
+from real_tiago.utils.general_utils import AttrDict
 
+teleop_config = AttrDict(
+    arm_left_controller='keyboard',
+    arm_right_controller='keyboard',
+    base_controller='keyboard',
+    torso_controller='keyboard',
+
+    interface_kwargs=AttrDict(
+        vr={},
+        human_kpt={},
+        keyboard={},
+        spacemouse={}
+    )
+)
 ROBOTS = {
     "FrankaPanda": "Franka Emika Panda (default)",
     "Fetch": "Mobile robot with one arm",
     "Tiago": "Mobile robot with two arms",
 }
 
-SYSTEMS = {
-    "Keyboard": "Keyboard (default)",
-    "SteamVR": "SteamVR with HTC VIVE through OmniverseXR plugin",
-    "Oculus": "Oculus Reader with Quest 2",
-    "SpaceMouse": "Space Mouse",
-}
-
 
 def main():
-    teleop_system = choose_from_options(options=SYSTEMS, name="system")
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 300.}
+    env_cfg = {"action_timestep": 1 / 50., "physics_timestep": 1 / 200.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot_cfg = {
@@ -36,7 +43,7 @@ def main():
     for arm in arms:
         robot_cfg["controller_config"][f"arm_{arm}"] = {
             "name": "InverseKinematicsController",
-            "mode": "pose_absolute_ori",
+            "mode": "pose_delta_ori",
             "motor_type": "position"
         }
         robot_cfg["controller_config"][f"gripper_{arm}"] = {
@@ -123,30 +130,13 @@ def main():
     robot = env.robots[0]
 
     # Initialize teleoperation system
-    if teleop_system == "SteamVR":
-        from omnigibson.utils.teleop_utils import OVXRSystem as TeleopSystem
-    elif teleop_system == "Oculus":
-        from omnigibson.utils.teleop_utils import OculusReaderSystem as TeleopSystem
-    elif teleop_system == "SpaceMouse":
-        from omnigibson.utils.teleop_utils import SpaceMouseSystem as TeleopSystem
-    elif teleop_system == "Keyboard":
-        from omnigibson.utils.teleop_utils import KeyboardSystem as TeleopSystem
-    teleop_sys = TeleopSystem(robot=robot, disable_display_output=True, align_anchor_to_robot_base=True)
+    teleop_sys = TeleopSystem(config=teleop_config, robot=robot, disable_display_output=True, align_anchor_to_robot_base=True)
     teleop_sys.start()
-    # tracker variable of whether the robot is attached to the VR system
-    prev_robot_attached = False
     # main simulation loop
     for _ in range(10000):
         if og.sim.is_playing():
-            teleop_sys.update()
-            if teleop_sys.teleop_data.robot_attached and not prev_robot_attached:
-                teleop_sys.reset_transform_mapping()
-                if robot_name == "Tiago":
-                    teleop_sys.reset_transform_mapping("left")
-            else:
-                action = teleop_sys.teleop_data_to_action()
-                env.step(action) 
-            prev_robot_attached = teleop_sys.teleop_data.robot_attached
+            action = teleop_sys.get_action()
+            env.step(action) 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
     env.close()
