@@ -45,8 +45,7 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/data]=/root/.local/share/ov/data
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
     # Feel free to include lines like the below to mount a workspace or a custom OG version
-    [/cvgl2/u/garlanka/OmniGibson]=/omnigibson-src
-    # [/cvgl2/u/cgokmen/my-project]=/my-project
+    [/cvgl2/u/${USER}/OmniGibson]=/omnigibson-src
 )
 
 MOUNT_KWARGS=""
