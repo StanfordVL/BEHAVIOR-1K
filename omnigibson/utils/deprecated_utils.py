@@ -604,6 +604,11 @@ class ArticulationView(_ArticulationView):
         if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+
+            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND USE ACTUATION FORCES INSTEAD
+            # new_dof_efforts = self._backend_utils.create_zeros_tensor(
+            #     shape=[self.count, self.num_dof], dtype="float32", device=self._device
+            # )
             new_dof_efforts = self._physics_view.get_dof_actuation_forces()
             new_dof_efforts = self._backend_utils.assign(
                 self._backend_utils.move_data(efforts, device=self._device),
