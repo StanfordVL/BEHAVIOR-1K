@@ -231,6 +231,7 @@ def main():
 
         log.info("Starting training...")
 
+        USER = os.environ['USER']
         policy_save_path = wandb.run.dir.split("/")[2:-3]
         policy_save_path.insert(0, f"/cvgl2/u/{USER}/OmniGibson")
         policy_save_path.append("runs")
