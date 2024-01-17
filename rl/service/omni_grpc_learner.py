@@ -115,7 +115,8 @@ def main():
     seed = 0
 
     # Decide whether to use a local environment or remote
-    if args.n_envs > 0:
+    n_envs = args.n_envs
+    if n_envs > 0:
         if args.port is not None:
             local_port = int(args.port)
         else:
@@ -124,7 +125,7 @@ def main():
             local_port = s.getsockname()[1]
             s.close()
         print(f"Listening on port {local_port}")
-        env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", args.n_envs)
+        env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
     else:
         import omnigibson as og
         from omnigibson.macros import gm
@@ -135,6 +136,7 @@ def main():
         config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
         og_env = og.Environment(configs=config)
         env = DummyVecEnv([lambda: og_env])
+        n_envs = 1
 
     # import IPython; IPython.embed()
 
@@ -225,7 +227,7 @@ def main():
 
         log.info("Starting training...")
         model.learn(
-            total_timesteps=10000000,
+            total_timesteps=1_500_000,
             callback=callback,
         )
         log.info("Finished training!")
