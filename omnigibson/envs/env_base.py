@@ -141,7 +141,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * ((1 / self.action_frequency) ** 2)
+        drop_distance = 0.5 * 9.8 * ((1. / self.action_frequency) ** 2)
         assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
     def _load_task(self, task_config=None):
