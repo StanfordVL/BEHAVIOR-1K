@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
-from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.prims import (
+from omnigibson.lazy_omni import _dynamic_control
+from omnigibson.lazy_omni import gf_quat_to_np_array
+from omnigibson.lazy_omni import (
     get_prim_at_path,
     move_prim,
     query_parent_path,
@@ -13,7 +13,7 @@ from omni.isaac.core.utils.prims import (
 )
 import numpy as np
 import omnigibson as og
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import get_current_stage
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.usd_utils import create_joint

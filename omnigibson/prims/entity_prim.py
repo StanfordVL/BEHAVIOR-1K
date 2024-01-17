@@ -1,12 +1,12 @@
 import numpy as np
 import networkx as nx
 
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import gf_quat_to_np_array
+from omnigibson.lazy_omni import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema, PhysicsSchemaTools
 import omni
 
-from omni.isaac.core.utils.prims import get_prim_property, set_prim_property
+from omnigibson.lazy_omni import get_prim_property, set_prim_property
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T

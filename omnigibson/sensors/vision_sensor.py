@@ -12,17 +12,17 @@ from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
 import omni.ui
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import get_current_stage
 from pxr import Gf, UsdGeom
-from omni.kit.viewport.window import get_viewport_window_instances
-from omni.kit.viewport.utility import create_viewport_window
+from omnigibson.lazy_omni import get_viewport_window_instances
+from omnigibson.lazy_omni import create_viewport_window
 
 # Make sure synthetic data extension is enabled
 ext_manager = og.app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
 # Continue with omni synethic data imports afterwards
-from omni.syntheticdata import sensors as sensors_util
+from omnigibson.lazy_omni import sensors as sensors_util
 import omni.syntheticdata._syntheticdata as sd
 sensor_types = sd.SensorType
 

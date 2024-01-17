@@ -3,10 +3,10 @@ from collections.abc import Iterable
 import os
 
 import omni.usd
-from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
-from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage, add_reference_to_stage
-from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
-from omni.syntheticdata import helpers
+from omnigibson.lazy_omni import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
+from omnigibson.lazy_omni import get_current_stage, get_stage_units, traverse_stage, add_reference_to_stage
+from omnigibson.lazy_omni import compute_aabb, create_bbox_cache, compute_combined_aabb
+from omnigibson.lazy_omni import helpers
 from omni.kit.primitive.mesh.evaluators.sphere import SphereEvaluator
 from omni.kit.primitive.mesh.evaluators.disk import DiskEvaluator
 from omni.kit.primitive.mesh.evaluators.plane import PlaneEvaluator

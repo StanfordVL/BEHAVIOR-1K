@@ -9,12 +9,12 @@ import json
 import omni
 import carb
 import omni.physics
-from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.isaac.core.utils.stage import open_stage, create_new_stage
+from omnigibson.lazy_omni import get_prim_at_path
+from omnigibson.lazy_omni import open_stage, create_new_stage
 from omni.physx.bindings._physx import ContactEventType, SimulationEvent
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, PhysicsSchemaTools, UsdUtils
-from omni.physx import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
+from omnigibson.lazy_omni import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros

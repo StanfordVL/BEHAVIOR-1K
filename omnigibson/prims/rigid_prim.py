@@ -1,9 +1,9 @@
-from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omnigibson.lazy_omni import get_prim_at_path, get_prim_parent
+from omnigibson.lazy_omni import tf_matrix_from_pose
+from omnigibson.lazy_omni import gf_quat_to_np_array
 from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema, PhysicsSchemaTools
 import numpy as np
-from omni.isaac.dynamic_control import _dynamic_control
+from omnigibson.lazy_omni import _dynamic_control
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -16,7 +16,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Import omni sensor based on type
-from omni.isaac.sensor import _sensor as _s
+from omnigibson.lazy_omni import _sensor as _s
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

@@ -7,7 +7,7 @@ from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.open_state import _get_relevant_joints
 from omnigibson.utils.constants import JointType, JointAxis
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omnigibson.lazy_omni import gf_quat_to_np_array
 
 
 m = create_module_macros(module_path=__file__)

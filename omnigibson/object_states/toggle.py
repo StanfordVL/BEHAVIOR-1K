@@ -6,10 +6,10 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omni.isaac.core.utils.bounds import recompute_extents
+from omnigibson.lazy_omni import recompute_extents
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import create_primitive_mesh
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.lazy_omni import get_prim_at_path
 from pxr import PhysicsSchemaTools, UsdGeom, Sdf, Gf, Vt
 
 

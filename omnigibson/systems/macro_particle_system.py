@@ -1,7 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.lazy_omni import get_prim_at_path
 from pxr import UsdPhysics
 import trimesh
 

@@ -4,8 +4,8 @@ import asyncio
 import os
 
 import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.usd import get_shader_from_material
+from omnigibson.lazy_omni import get_prim_at_path
+from omnigibson.lazy_omni import get_shader_from_material
 
 import omnigibson as og
 from omnigibson.utils.physx_utils import bind_material

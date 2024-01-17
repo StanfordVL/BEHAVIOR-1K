@@ -23,7 +23,7 @@ from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
-from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, is_prim_path_valid
+from omnigibson.lazy_omni import get_prim_at_path, delete_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
 # Create settings for this module

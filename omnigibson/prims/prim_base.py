@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
-from omni.isaac.core.utils.prims import (
+from omnigibson.lazy_omni import (
     get_prim_at_path,
     move_prim,
     query_parent_path,
@@ -10,7 +10,7 @@ from omni.isaac.core.utils.prims import (
     get_prim_object_type,
 )
 import omnigibson as og
-from omni.isaac.core.utils.prims import delete_prim
+from omnigibson.lazy_omni import delete_prim
 from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 from omnigibson.utils.sim_utils import check_deletable_prim
 from omnigibson.utils.ui_utils import create_module_logger

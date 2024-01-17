@@ -7,7 +7,7 @@ import numpy as np
 
 import trimesh
 from scipy.spatial.transform import Rotation
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omnigibson.lazy_omni import gf_quat_to_np_array
 
 import omnigibson as og
 from omnigibson.macros import gm

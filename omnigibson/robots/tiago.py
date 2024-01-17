@@ -13,7 +13,7 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import JointType
 
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.lazy_omni import get_prim_at_path
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

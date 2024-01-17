@@ -9,7 +9,7 @@
 from pxr import UsdPhysics, Gf, Vt, PhysxSchema
 from pxr.Sdf import ValueTypeNames as VT
 
-from omni.physx.scripts import particleUtils
+from omnigibson.lazy_omni import particleUtils
 
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim

@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.prims import (
+from omnigibson.lazy_omni import gf_quat_to_np_array
+from omnigibson.lazy_omni import (
     get_prim_at_path,
     is_prim_path_valid,
     get_prim_parent,
@@ -9,7 +9,7 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 import omnigibson as og
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import get_current_stage
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler

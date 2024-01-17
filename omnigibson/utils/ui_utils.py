@@ -292,7 +292,7 @@ class CameraMover:
         self.set_lights(self.light_val)
 
     def set_lights(self, intensity):
-        from omni.isaac.core.utils.prims import get_prim_at_path
+        from omnigibson.lazy_omni import get_prim_at_path
         world = get_prim_at_path("/World")
         for prim in world.GetChildren():
             for prim_child in prim.GetChildren():

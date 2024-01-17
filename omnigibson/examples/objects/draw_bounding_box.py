@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import omnigibson as og
-from omni.isaac.synthetic_utils.visualization import colorize_bboxes
+from omnigibson.lazy_omni import colorize_bboxes
 
 
 def main(random_selection=False, headless=False, short_exec=False):

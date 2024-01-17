@@ -1,7 +1,7 @@
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from pxr import UsdLux, Sdf, Gf
 import omnigibson as og
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import get_current_stage
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key

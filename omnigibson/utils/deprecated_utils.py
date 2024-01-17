@@ -9,10 +9,10 @@ from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from pxr import Sdf, UsdShade, PhysxSchema, Usd, UsdGeom, UsdPhysics
 import omni
 import omni.graph.core as ogc
-from omni.kit.primitive.mesh.command import _get_all_evaluators
+from omnigibson.lazy_omni import _get_all_evaluators
 from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
 import omni.timeline
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.lazy_omni import get_prim_at_path
 import numpy as np
 import torch
 import warp as wp

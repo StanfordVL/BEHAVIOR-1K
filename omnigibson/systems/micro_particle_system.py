@@ -19,8 +19,8 @@ import datetime
 import trimesh
 import pymeshlab
 import omni
-from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
-from omni.physx.scripts import particleUtils
+from omnigibson.lazy_omni import get_prim_at_path, is_prim_path_valid
+from omnigibson.lazy_omni import particleUtils
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from collections import defaultdict

@@ -89,7 +89,7 @@ def create_app():
     import omni
 
     # Enable additional extensions we need
-    from omni.isaac.core.utils.extensions import enable_extension
+    from omnigibson.lazy_omni import enable_extension
     enable_extension("omni.flowusd")
     enable_extension("omni.particle.system.bundle")
 

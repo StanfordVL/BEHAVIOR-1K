@@ -45,7 +45,7 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.control_utils import FKSolver
 
 from omni.usd.commands import CopyPrimCommand, CreatePrimCommand
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.lazy_omni import get_prim_at_path
 from omnigibson.utils.ui_utils import create_module_logger
 from pxr import Gf
 

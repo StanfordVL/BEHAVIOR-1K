@@ -7,9 +7,9 @@ from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omni.physx import get_physx_simulation_interface
-from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
-from omni.isaac.version import get_version
+from omnigibson.lazy_omni import get_physx_simulation_interface
+from omnigibson.lazy_omni import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
+from omnigibson.lazy_omni import get_version
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

@@ -16,8 +16,8 @@ from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
-from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.isaac.core.utils.semantics import add_update_semantics
+from omnigibson.lazy_omni import get_prim_at_path
+from omnigibson.lazy_omni import add_update_semantics
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()

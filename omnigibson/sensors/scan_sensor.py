@@ -4,8 +4,8 @@ from collections.abc import Iterable
 
 from transforms3d.quaternions import quat2mat
 
-from omni.kit.commands import execute
-from omni.isaac.range_sensor import _range_sensor
+from omnigibson.lazy_omni import execute
+from omnigibson.lazy_omni import _range_sensor
 
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import OccupancyGridState

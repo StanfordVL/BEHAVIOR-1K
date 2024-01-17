@@ -2,10 +2,10 @@ import numpy as np
 
 from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema, PhysicsSchemaTools
 import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.lazy_omni import get_prim_at_path
+from omnigibson.lazy_omni import get_current_stage
 from omnigibson.macros import gm, create_module_macros
-from omni.physx.scripts import physicsUtils, particleUtils
+from omnigibson.lazy_omni import physicsUtils, particleUtils
 from omnigibson.utils.ui_utils import suppress_omni_log
 import omnigibson as og
 
