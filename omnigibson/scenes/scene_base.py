@@ -1,7 +1,7 @@
 import json
 from abc import ABC
 from itertools import combinations
-from omni.isaac.core.objects.ground_plane import GroundPlane
+from omnigibson.lazy_omni import GroundPlane
 import numpy as np
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm

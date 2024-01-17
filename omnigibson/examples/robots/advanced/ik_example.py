@@ -9,8 +9,8 @@ from omnigibson.robots import Fetch
 from omnigibson.scenes import Scene
 from omnigibson.utils.control_utils import IKSolver
 
-import carb
-import omni
+from omnigibson.lazy_omni import carb
+from omnigibson.lazy_omni import omni
 
 
 def main(random_selection=False, headless=False, short_exec=False):

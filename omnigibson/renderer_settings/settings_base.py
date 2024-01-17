@@ -1,8 +1,8 @@
 from abc import ABCMeta
 
-import carb
+from omnigibson.lazy_omni import carb
 import numpy as np
-from omni.kit.widget.settings import SettingType
+from omnigibson.lazy_omni import SettingType
 
 
 class SettingsBase(metaclass=ABCMeta):

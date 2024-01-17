@@ -1,6 +1,6 @@
 import os
 import matplotlib.pyplot as plt
-import omni
+from omnigibson.lazy_omni import omni
 from omnigibson.lazy_omni import get_prim_at_path
 from pxr import UsdPhysics
 import trimesh

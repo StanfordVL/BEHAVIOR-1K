@@ -1,4 +1,4 @@
-from omni.physx.bindings._physx import ContactEventType
+from omnigibson.lazy_omni import ContactEventType
 
 import numpy as np
 from collections import defaultdict

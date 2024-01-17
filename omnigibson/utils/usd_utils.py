@@ -2,21 +2,21 @@ import math
 from collections.abc import Iterable
 import os
 
-import omni.usd
+from omnigibson.lazy_omni import usd
 from omnigibson.lazy_omni import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omnigibson.lazy_omni import get_current_stage, get_stage_units, traverse_stage, add_reference_to_stage
 from omnigibson.lazy_omni import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omnigibson.lazy_omni import helpers
-from omni.kit.primitive.mesh.evaluators.sphere import SphereEvaluator
-from omni.kit.primitive.mesh.evaluators.disk import DiskEvaluator
-from omni.kit.primitive.mesh.evaluators.plane import PlaneEvaluator
-from omni.kit.primitive.mesh.evaluators.cylinder import CylinderEvaluator
-from omni.kit.primitive.mesh.evaluators.torus import TorusEvaluator
-from omni.kit.primitive.mesh.evaluators.cone import ConeEvaluator
-from omni.kit.primitive.mesh.evaluators.cube import CubeEvaluator
+from omnigibson.lazy_omni import SphereEvaluator
+from omnigibson.lazy_omni import DiskEvaluator
+from omnigibson.lazy_omni import PlaneEvaluator
+from omnigibson.lazy_omni import CylinderEvaluator
+from omnigibson.lazy_omni import TorusEvaluator
+from omnigibson.lazy_omni import ConeEvaluator
+from omnigibson.lazy_omni import CubeEvaluator
 
 from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
-import carb
+from omnigibson.lazy_omni import carb
 import numpy as np
 import trimesh
 
@@ -115,9 +115,9 @@ def get_camera_params(viewport):
             resolution (dict): resolution as a dict with 'width' and 'height'.
             clipping_range (tuple(float, float)): Near and Far clipping values.
     """
-    stage = omni.usd.get_context().get_stage()
+    stage = usd.get_context().get_stage()
     prim = stage.GetPrimAtPath(viewport.get_active_camera())
-    prim_tf = omni.usd.get_world_transform_matrix(prim)
+    prim_tf = usd.get_world_transform_matrix(prim)
     view_params = helpers.get_view_params(viewport)
     fov = 2 * math.atan(view_params["horizontal_aperture"] / (2 * view_params["focal_length"]))
     view_proj_mat = helpers.get_view_proj_mat(view_params)
@@ -137,13 +137,13 @@ def get_semantic_objects_pose():
     """
     Get pose of all objects with a semantic label.
     """
-    stage = omni.usd.get_context().get_stage()
+    stage = usd.get_context().get_stage()
     mappings = helpers.get_instance_mappings()
     pose = []
     for m in mappings:
         prim_path = m[1]
         prim = stage.GetPrimAtPath(prim_path)
-        prim_tf = omni.usd.get_world_transform_matrix(prim)
+        prim_tf = usd.get_world_transform_matrix(prim)
         pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
     return pose
 

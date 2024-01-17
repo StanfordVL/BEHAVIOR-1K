@@ -1,5 +1,5 @@
 import numpy as np
-import carb.input
+from omnigibson.lazy_omni import carb
 
 import omnigibson as og
 from omnigibson.macros import gm

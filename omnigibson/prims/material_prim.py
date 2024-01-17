@@ -3,7 +3,7 @@ import numpy as np
 import asyncio
 import os
 
-import omni
+from omnigibson.lazy_omni import omni
 from omnigibson.lazy_omni import get_prim_at_path
 from omnigibson.lazy_omni import get_shader_from_material
 

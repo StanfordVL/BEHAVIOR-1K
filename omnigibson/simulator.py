@@ -6,13 +6,12 @@ from pathlib import Path
 
 import numpy as np
 import json
-import omni
-import carb
-import omni.physics
+from omnigibson.lazy_omni import omni
+from omnigibson.lazy_omni import carb
+from omnigibson.lazy_omni import physics
 from omnigibson.lazy_omni import get_prim_at_path
 from omnigibson.lazy_omni import open_stage, create_new_stage
-from omni.physx.bindings._physx import ContactEventType, SimulationEvent
-import omni.kit.loop._loop as omni_loop
+from omnigibson.lazy_omni import ContactEventType, SimulationEvent
 from pxr import Usd, PhysicsSchemaTools, UsdUtils
 from omnigibson.lazy_omni import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
 

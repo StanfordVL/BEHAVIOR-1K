@@ -7,7 +7,7 @@ from omnigibson.lazy_omni import (
     get_prim_parent,
 )
 import numpy as np
-import carb
+from omnigibson.lazy_omni import carb
 import omnigibson as og
 from omnigibson.lazy_omni import get_current_stage
 from omnigibson.prims.prim_base import BasePrim

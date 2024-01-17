@@ -1,5 +1,5 @@
-import carb
-from omni.kit.widget.settings import SettingType
+from omnigibson.lazy_omni import carb
+from omnigibson.lazy_omni import SettingType
 
 from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 

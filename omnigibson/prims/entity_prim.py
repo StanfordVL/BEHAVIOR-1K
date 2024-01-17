@@ -4,7 +4,7 @@ import networkx as nx
 from omnigibson.lazy_omni import gf_quat_to_np_array
 from omnigibson.lazy_omni import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema, PhysicsSchemaTools
-import omni
+from omnigibson.lazy_omni import omni
 
 from omnigibson.lazy_omni import get_prim_property, set_prim_property
 

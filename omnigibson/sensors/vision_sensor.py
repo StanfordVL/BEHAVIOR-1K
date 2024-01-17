@@ -11,7 +11,7 @@ from omnigibson.utils.ui_utils import dock_window, suppress_omni_log
 from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
-import omni.ui
+from omnigibson.lazy_omni import ui
 from omnigibson.lazy_omni import get_current_stage
 from pxr import Gf, UsdGeom
 from omnigibson.lazy_omni import get_viewport_window_instances
@@ -23,7 +23,7 @@ ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
 # Continue with omni synethic data imports afterwards
 from omnigibson.lazy_omni import sensors as sensors_util
-import omni.syntheticdata._syntheticdata as sd
+from omnigibson.lazy_omni import _syntheticdata as sd
 sensor_types = sd.SensorType
 
 
@@ -169,14 +169,14 @@ class VisionSensor(BaseSensor):
             n_auxiliary_sensors = len(self.SENSORS) - 1
             if n_auxiliary_sensors == 1:
                 # This is the first auxiliary viewport, dock to the left of the main dockspace
-                dock_window(space=omni.ui.Workspace.get_window("DockSpace"), name=viewport.name,
-                            location=omni.ui.DockPosition.LEFT, ratio=0.25)
+                dock_window(space=ui.Workspace.get_window("DockSpace"), name=viewport.name,
+                            location=ui.DockPosition.LEFT, ratio=0.25)
             elif n_auxiliary_sensors > 1:
                 # This is any additional auxiliary viewports, dock equally-spaced in the auxiliary column
                 # We also need to re-dock any prior viewports!
                 for i in range(2, n_auxiliary_sensors + 1):
-                    dock_window(space=omni.ui.Workspace.get_window(f"Viewport {i - 1}"), name=f"Viewport {i}",
-                                location=omni.ui.DockPosition.BOTTOM, ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i))
+                    dock_window(space=ui.Workspace.get_window(f"Viewport {i - 1}"), name=f"Viewport {i}",
+                                location=ui.DockPosition.BOTTOM, ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i))
 
         self._viewport = viewport
 

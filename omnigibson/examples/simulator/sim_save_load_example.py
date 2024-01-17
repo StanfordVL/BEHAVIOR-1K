@@ -3,7 +3,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.utils.ui_utils import KeyboardEventHandler
-import carb
+from omnigibson.lazy_omni import carb
 
 TEST_OUT_PATH = ""  # Define output directory here.
 

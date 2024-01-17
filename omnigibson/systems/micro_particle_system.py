@@ -18,7 +18,7 @@ import tempfile
 import datetime
 import trimesh
 import pymeshlab
-import omni
+from omnigibson.lazy_omni import omni
 from omnigibson.lazy_omni import get_prim_at_path, is_prim_path_valid
 from omnigibson.lazy_omni import particleUtils
 import numpy as np
@@ -27,13 +27,13 @@ from collections import defaultdict
 
 
 # physics settins
-from omni.physx.bindings._physx import (
+from omnigibson.lazy_omni import (
     SETTING_UPDATE_TO_USD,
     SETTING_UPDATE_VELOCITIES_TO_USD,
     SETTING_NUM_THREADS,
     SETTING_UPDATE_PARTICLES_TO_USD,
 )
-import carb
+from omnigibson.lazy_omni import carb
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

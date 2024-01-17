@@ -1,7 +1,7 @@
 import numpy as np
 
 from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema, PhysicsSchemaTools
-import omni
+from omnigibson.lazy_omni import omni
 from omnigibson.lazy_omni import get_prim_at_path
 from omnigibson.lazy_omni import get_current_stage
 from omnigibson.macros import gm, create_module_macros

@@ -1,5 +1,5 @@
-import carb
-from omni.rtx.window.settings import RendererSettingsFactory
+from omnigibson.lazy_omni import carb
+from omnigibson.lazy_omni import RendererSettingsFactory
 
 from omnigibson.renderer_settings.common_settings import CommonSettings
 from omnigibson.renderer_settings.path_tracing_settings import PathTracingSettings

@@ -9,7 +9,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
-import carb.input
+from omnigibson.lazy_omni import carb
 
 
 CONTROL_MODES = dict(

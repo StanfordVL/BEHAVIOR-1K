@@ -1,24 +1,24 @@
 """
 A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
-import carb
+from omnigibson.lazy_omni import carb
 from typing import List, Optional, Tuple, Union, Callable
-import omni.usd as ou
-from omni.particle.system.core.scripts.core import Core as OmniCore
-from omni.particle.system.core.scripts.utils import Utils as OmniUtils
+from omnigibson.lazy_omni import usd as ou
+from omnigibson.lazy_omni import Core as OmniCore
+from omnigibson.lazy_omni import Utils as OmniUtils
 from pxr import Sdf, UsdShade, PhysxSchema, Usd, UsdGeom, UsdPhysics
-import omni
-import omni.graph.core as ogc
-from omnigibson.lazy_omni import _get_all_evaluators
-from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
-import omni.timeline
+from omnigibson.lazy_omni import omni
+from omnigibson.lazy_omni import core as ogc
+from omnigibson.lazy_omni import command as mesh_cmd
+from omnigibson.lazy_omni import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
+from omnigibson.lazy_omni import timeline
 from omnigibson.lazy_omni import get_prim_at_path
 import numpy as np
 import torch
 import warp as wp
 import math
-from omni.isaac.core.articulations import ArticulationView as _ArticulationView
-from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
+from omnigibson.lazy_omni import ArticulationView as _ArticulationView
+from omnigibson.lazy_omni import RigidPrimView as _RigidPrimView
 
 DEG2RAD = math.pi / 180.0
 
@@ -71,7 +71,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
 
         self._attributes = {**kwargs}
         # Supported mesh types should have an associated evaluator class
-        self._evaluator_class = _get_all_evaluators()[prim_type]
+        self._evaluator_class = mesh_cmd._get_all_evaluators()[prim_type]
         assert isinstance(self._evaluator_class, type)
 
 
@@ -222,7 +222,7 @@ class ArticulationView(_ArticulationView):
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_limits()
@@ -281,7 +281,7 @@ class ArticulationView(_ArticulationView):
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             values = self._backend_utils.move_data(self._physics_view.get_dof_limits(), self._device)
@@ -334,7 +334,7 @@ class ArticulationView(_ArticulationView):
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_max_velocities()
@@ -388,7 +388,7 @@ class ArticulationView(_ArticulationView):
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             max_velocities = self._physics_view.get_dof_max_velocities()
@@ -429,7 +429,7 @@ class RigidPrimView(_RigidPrimView):
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
         """
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
@@ -458,7 +458,7 @@ class RigidPrimView(_RigidPrimView):
                                                                                  Defaults to None (i.e: all prims in the view).
         """
         indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
                 self._backend_utils.create_tensor_from_list([True] * len(indices), dtype="uint8"), data, indices

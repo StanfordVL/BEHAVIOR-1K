@@ -1,6 +1,6 @@
 from pxr import UsdShade, UsdPhysics, PhysxSchema
 import numpy as np
-from omni.isaac.core.materials import PhysicsMaterial
+from omnigibson.lazy_omni import PhysicsMaterial
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim

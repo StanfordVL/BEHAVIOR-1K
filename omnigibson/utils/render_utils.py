@@ -3,7 +3,7 @@ Set of rendering utility functions when working with Omni
 """
 import numpy as np
 from pxr import Gf
-import omni
+from omnigibson.lazy_omni import omni
 from omnigibson.lazy_omni import get_prim_at_path
 import omnigibson as og
 from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim

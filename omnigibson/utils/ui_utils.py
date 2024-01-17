@@ -18,9 +18,8 @@ from scipy.integrate import quad
 
 # Attempt to import omni, it may not always be necessary here (e.g: when we download datasets) so we catch the import failure explicitly
 try:
-    import omni
-    import omni.log
-    import carb
+    from omnigibson.lazy_omni import omni
+    from omnigibson.lazy_omni import carb
 except ModuleNotFoundError:
     print("Could not find omni or carb, skipping import")
 import random
