@@ -16,7 +16,7 @@ BASE_PORT=$2
 WORKER_PORT=$((BASE_PORT + SLURM_ARRAY_TASK_ID))
 
 if netstat -tuln | grep ":$WORKER_PORT" > /dev/null; then
-    echo "Port $PORT is in use."
+    echo "Port $WORKER_PORT is in use."
     exit 1
 else
     echo "Using unused port $WORKER_PORT."
