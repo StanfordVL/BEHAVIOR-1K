@@ -962,7 +962,7 @@ class RecipeRule(BaseTransitionRule):
         """
         for system_name in recipe["input_systems"]:
             system = get_system(system_name=system_name)
-            if not container.states[Contains].get_value(system=get_system(system_name=system_name)):
+            if not container.states[Contains].get_value(system=system):
                 return False
         return True
 
