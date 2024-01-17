@@ -418,6 +418,202 @@ class ArticulationView(_ArticulationView):
             max_velocities = self._backend_utils.convert(max_velocities, dtype="float32", device=self._device, indexed=True)
             return max_velocities
         
+    def set_joint_positions(
+        self,
+        positions: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+    ) -> None:
+        """Set the joint positions of articulations in the view
+
+        .. warning::
+
+            This method will immediately set (teleport) the affected joints to the indicated value.
+            Use the ``set_joint_position_targets`` or the ``apply_action`` methods to control the articulation joints.
+
+        Args:
+            positions (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): joint positions of articulations in the view to be set to in the next frame.
+                                                                    shape is (M, K).
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to manipulate. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+                                                                                 to manipulate. Shape (K,).
+                                                                                 Where K <= num of dofs.
+                                                                                 Defaults to None (i.e: all dofs).
+
+        .. hint::
+
+            This method belongs to the methods used to set the articulation kinematic states:
+
+            ``set_velocities`` (``set_linear_velocities``, ``set_angular_velocities``),
+            ``set_joint_positions``, ``set_joint_velocities``, ``set_joint_efforts``
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # set all the articulation joints.
+            >>> # Since there are 5 envs, the joint positions are repeated 5 times
+            >>> positions = np.tile(np.array([0.0, -1.0, 0.0, -2.2, 0.0, 2.4, 0.8, 0.04, 0.04]), (num_envs, 1))
+            >>> prims.set_joint_positions(positions)
+            >>>
+            >>> # set only the fingers in closed position: panda_finger_joint1 (7) and panda_finger_joint2 (8) to 0.0
+            >>> # for the first, middle and last of the 5 envs
+            >>> positions = np.tile(np.array([0.0, 0.0]), (3, 1))
+            >>> prims.set_joint_positions(positions, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+        """
+        if not self._is_initialized:
+            carb.log_warn("ArticulationView needs to be initialized.")
+            return
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+            new_dof_pos = self._physics_view.get_dof_positions()
+            new_dof_pos = self._backend_utils.assign(
+                self._backend_utils.move_data(positions, device=self._device),
+                new_dof_pos,
+                [self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, joint_indices],
+            )
+            self._physics_view.set_dof_positions(new_dof_pos, indices)
+            
+            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # self._physics_view.set_dof_position_targets(new_dof_pos, indices)
+            self.set_joint_position_targets(positions, indices, joint_indices)
+        else:
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
+
+    def set_joint_velocities(
+        self,
+        velocities: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+    ) -> None:
+        """Set the joint velocities of articulations in the view
+
+        .. warning::
+
+            This method will immediately set the affected joints to the indicated value.
+            Use the ``set_joint_velocity_targets`` or the ``apply_action`` methods to control the articulation joints.
+
+        Args:
+            velocities (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): joint velocities of articulations in the view to be set to in the next frame.
+                                                                    shape is (M, K).
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to manipulate. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+                                                                                 to manipulate. Shape (K,).
+                                                                                 Where K <= num of dofs.
+                                                                                 Defaults to None (i.e: all dofs).
+
+        .. hint::
+
+            This method belongs to the methods used to set the articulation kinematic states:
+
+            ``set_velocities`` (``set_linear_velocities``, ``set_angular_velocities``),
+            ``set_joint_positions``, ``set_joint_velocities``, ``set_joint_efforts``
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # set the velocities for all the articulation joints to the indicated values.
+            >>> # Since there are 5 envs, the joint velocities are repeated 5 times
+            >>> velocities = np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]), (num_envs, 1))
+            >>> prims.set_joint_velocities(velocities)
+            >>>
+            >>> # set the fingers velocities: panda_finger_joint1 (7) and panda_finger_joint2 (8) to -0.1
+            >>> # for the first, middle and last of the 5 envs
+            >>> velocities = np.tile(np.array([-0.1, -0.1]), (3, 1))
+            >>> prims.set_joint_velocities(velocities, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+        """
+        if not self._is_initialized:
+            carb.log_warn("ArticulationView needs to be initialized.")
+            return
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+            new_dof_vel = self._physics_view.get_dof_velocities()
+            new_dof_vel = self._backend_utils.assign(
+                self._backend_utils.move_data(velocities, device=self._device),
+                new_dof_vel,
+                [self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, joint_indices],
+            )
+            self._physics_view.set_dof_velocities(new_dof_vel, indices)
+
+            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # self._physics_view.set_dof_velocity_targets(new_dof_vel, indices)
+            self.set_joint_velocity_targets(velocities, indices, joint_indices)
+        else:
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
+        return
+
+    def set_joint_efforts(
+        self,
+        efforts: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+    ) -> None:
+        """Set the joint efforts of articulations in the view
+
+        .. note::
+
+            This method can be used for effort control. For this purpose, there must be no joint drive
+            or the stiffness and damping must be set to zero.
+
+        Args:
+            efforts (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): efforts of articulations in the view to be set to in the next frame.
+                                                                    shape is (M, K).
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to manipulate. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+                                                                                 to manipulate. Shape (K,).
+                                                                                 Where K <= num of dofs.
+                                                                                 Defaults to None (i.e: all dofs).
+
+        .. hint::
+
+            This method belongs to the methods used to set the articulation kinematic states:
+
+            ``set_velocities`` (``set_linear_velocities``, ``set_angular_velocities``),
+            ``set_joint_positions``, ``set_joint_velocities``, ``set_joint_efforts``
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # set the efforts for all the articulation joints to the indicated values.
+            >>> # Since there are 5 envs, the joint efforts are repeated 5 times
+            >>> efforts = np.tile(np.array([10, 20, 30, 40, 50, 60, 70, 80, 90]), (num_envs, 1))
+            >>> prims.set_joint_efforts(efforts)
+            >>>
+            >>> # set the fingers efforts: panda_finger_joint1 (7) and panda_finger_joint2 (8) to 10
+            >>> # for the first, middle and last of the 5 envs
+            >>> efforts = np.tile(np.array([10, 10]), (3, 1))
+            >>> prims.set_joint_efforts(efforts, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+        """
+        if not self._is_initialized:
+            carb.log_warn("ArticulationView needs to be initialized.")
+            return
+
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+            new_dof_efforts = self._physics_view.get_dof_actuation_forces()
+            new_dof_efforts = self._backend_utils.assign(
+                self._backend_utils.move_data(efforts, device=self._device),
+                new_dof_efforts,
+                [self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, joint_indices],
+            )
+            self._physics_view.set_dof_actuation_forces(new_dof_efforts, indices)
+        else:
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
+        return
 
 class RigidPrimView(_RigidPrimView):
     def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
