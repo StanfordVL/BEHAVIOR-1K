@@ -1,5 +1,5 @@
 import numpy as np
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import gm, create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -15,6 +15,8 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 m.IK_POS_TOLERANCE = 0.002
 m.IK_POS_WEIGHT = 20.0
+m.IK_ORN_TOLERANCE = 0.01
+m.IK_ORN_WEIGHT = 0.05
 m.IK_MAX_ITERATIONS = 100
 
 # Different modes
@@ -92,6 +94,8 @@ class InverseKinematicsController(ManipulationController):
                 using @motor_type = velocity
             mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
                 cartesian values, relative to the robot base frame. Valid options are:
+                    - "absolute_pose": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
+                        where both the position and the orientation is given in absolute axis-angle coordinates
                     - "pose_absolute_ori": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
                         where the orientation is given in absolute axis-angle coordinates
                     - "pose_delta_ori": 6DOF (dx,dy,dz,dax,day,daz) control over pose
@@ -122,7 +126,7 @@ class InverseKinematicsController(ManipulationController):
             if smoothing_filter_size in {None, 0}
             else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
         )
-        assert mode in IK_MODES, "Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
+        assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
         self.mode = mode
         self.kv = kv
         self.workspace_pose_limiter = workspace_pose_limiter
@@ -320,7 +324,9 @@ class InverseKinematicsController(ManipulationController):
                     target_pos=target_pos,
                     target_quat=target_quat,
                     tolerance_pos=m.IK_POS_TOLERANCE,
+                    tolerance_quat=m.IK_ORN_TOLERANCE,
                     weight_pos=m.IK_POS_WEIGHT,
+                    weight_quat=m.IK_ORN_WEIGHT,
                     max_iterations=m.IK_MAX_ITERATIONS,
                     initial_joint_pos=current_joint_pos,
                 )
@@ -329,14 +335,17 @@ class InverseKinematicsController(ManipulationController):
                     target_pos=target_pos,
                     target_quat=target_quat,
                     tolerance_pos=m.IK_POS_TOLERANCE,
+                    tolerance_quat=m.IK_ORN_TOLERANCE,
                     weight_pos=m.IK_POS_WEIGHT,
+                    weight_quat=m.IK_ORN_WEIGHT,
                     max_iterations=m.IK_MAX_ITERATIONS,
                 )
 
             if target_joint_pos is None:
                 # Print warning that we couldn't find a valid solution, and return the current joint configuration
                 # instead so that we execute a no-op control
-                log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+                if gm.DEBUG:
+                    log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
                 target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability

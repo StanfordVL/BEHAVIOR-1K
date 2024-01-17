@@ -354,11 +354,7 @@ class UniquelyNamed:
             f"UniquelyNamed object with name {self.name} already exists!"
         NAMES.add(self.name)
 
-    # def __del__(self):
-    #     # Remove this object name from the registry if it's still there
-    #     self.remove_names(include_all_owned=True)
-
-    def remove_names(self, include_all_owned=True, skip_ids=None):
+    def remove_names(self):
         """
         Checks if self.name exists in the global NAMES registry, and deletes it if so. Possibly also iterates through
         all owned member variables and checks for their corresponding names if @include_all_owned is True.
@@ -370,45 +366,10 @@ class UniquelyNamed:
             skip_ids (None or set of int): If specified, will skip over any ids in the specified set that are matched
                 to any attributes found (this compares id(attr) to @skip_ids).
         """
-        # Make sure skip_ids is a set so we can pass this into the method, and add the dictionary so we don't
-        # get infinite recursive loops
-        skip_ids = set() if skip_ids is None else skip_ids
-        skip_ids.add(id(self))
-
         # Check for this name, possibly remove it if it exists
         if self.name in NAMES:
             NAMES.remove(self.name)
-            
-        # Also possibly iterate through all owned members and check if those are instances of UniquelyNamed
-        if include_all_owned:
-            self._remove_names_recursively_from_dict(dic=self.__dict__, skip_ids=skip_ids)
 
-    def _remove_names_recursively_from_dict(self, dic, skip_ids=None):
-        """
-        Checks if self.name exists in the global NAMES registry, and deletes it if so
-
-        Args:
-            skip_ids (None or set): If specified, will skip over any objects in the specified set that are matched
-                to any attributes found.
-        """
-        # Make sure skip_ids is a set so we can pass this into the method, and add the dictionary so we don't
-        # get infinite recursive loops
-        skip_ids = set() if skip_ids is None else skip_ids
-        skip_ids.add(id(dic))
-
-        # Loop through all values in the inputted dictionary, and check if any of the values are UniquelyNamed
-        while any(id(x) not in skip_ids for x in dic.values()):
-            val = next(x for x in dic.values() if id(x) not in skip_ids)
-            skip_ids.add(id(val))
-            
-            if isinstance(val, UniquelyNamed):
-                val.remove_names(include_all_owned=True, skip_ids=skip_ids)
-            elif isinstance(val, dict):
-                # Recursively iterate
-                self._remove_names_recursively_from_dict(dic=val, skip_ids=skip_ids)
-            elif hasattr(val, "__dict__"):
-                # Add the attribute and recursively iterate
-                self._remove_names_recursively_from_dict(dic=val.__dict__, skip_ids=skip_ids)
     @property
     def name(self):
         """

@@ -5,6 +5,8 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
+from bddl.object_taxonomy import ObjectTaxonomy
+
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
@@ -32,16 +34,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
-
-# Optionally import bddl for object taxonomy.
-try:
-    from bddl.object_taxonomy import ObjectTaxonomy
-
-    OBJECT_TAXONOMY = ObjectTaxonomy()
-except ImportError:
-    print("BDDL could not be imported - object taxonomy / abilities will be unavailable.", file=sys.stderr)
-    OBJECT_TAXONOMY = None
-
+OBJECT_TAXONOMY = ObjectTaxonomy()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -114,11 +107,9 @@ class StatefulObject(BaseObject):
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
             abilities = {}
-            if OBJECT_TAXONOMY is not None:
-                # TODO! Update!!
-                taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
-                if taxonomy_class is not None:
-                    abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
+            taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
+            if taxonomy_class is not None:
+                abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
         self._abilities = abilities
 
@@ -213,7 +204,7 @@ class StatefulObject(BaseObject):
         if gm.ENABLE_OBJECT_STATES:
             for ability, params in self._abilities.items():
                 for state_type in get_states_for_ability(ability):
-                    states_info[state_type] = {"ability": ability, "params": params}
+                    states_info[state_type] = {"ability": ability, "params": state_type.postprocess_ability_params(params)}
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -462,7 +453,8 @@ class StatefulObject(BaseObject):
 
     def remove(self):
         """
-        Removes this prim from omniverse stage
+        Removes this prim from omniverse stage.
+        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
         """
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():

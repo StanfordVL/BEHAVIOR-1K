@@ -2,7 +2,8 @@ import os
 import numpy as np
 
 from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
+from omnigibson.utils.transform_utils import euler2quat
 
 
 class FrankaPanda(ManipulationRobot):
@@ -129,18 +130,6 @@ class FrankaPanda(ManipulationRobot):
         # Fetch does not support discrete actions
         raise ValueError("Franka does not support discrete actions!")
 
-    def tuck(self):
-        """
-        Immediately set this robot's configuration to be in tucked mode
-        """
-        self.set_joint_positions(self.tucked_default_joint_pos)
-
-    def untuck(self):
-        """
-        Immediately set this robot's configuration to be in untucked mode
-        """
-        self.set_joint_positions(self.untucked_default_joint_pos)
-
     def update_controller_mode(self):
         super().update_controller_mode()
         # overwrite joint params (e.g. damping, stiffess, max_effort) here
@@ -204,3 +193,22 @@ class FrankaPanda(ManipulationRobot):
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
     
+    @property
+    def eef_usd_path(self):
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
+    
+    @property
+    def teleop_rotation_offset(self):
+        return {self.default_arm: euler2quat([-np.pi, 0, 0])}
+    
+    @property
+    def assisted_grasp_start_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
+        ]}
+
+    @property
+    def assisted_grasp_end_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
+        ]}

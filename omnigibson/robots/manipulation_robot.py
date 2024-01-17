@@ -1,9 +1,13 @@
 from abc import abstractmethod
+import carb
 from collections import namedtuple
 import numpy as np
 import networkx as nx
+from omni.physx import get_physx_scene_query_interface
+from pxr import Gf
 
 import omnigibson as og
+from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController, OperationalSpaceController
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
@@ -13,16 +17,13 @@ from omnigibson.controllers import (
     ManipulationController,
     GripperController,
 )
-from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.ui_utils import suppress_omni_log
-
-from pxr import Gf
-
+from omnigibson.utils.teleop_utils import TeleopData
+from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -90,6 +91,7 @@ class ManipulationRobot(BaseRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        grasping_direction="lower",
         disable_grasp_handling=False,
 
         **kwargs,
@@ -141,6 +143,8 @@ class ManipulationRobot(BaseRobot):
                     at least two "fingers" need to touch the object.
                 If "sticky", will magnetize any object touching the gripper's fingers. In this mode, only one finger
                     needs to touch the object.
+            grasping_direction (str): One of {"lower", "upper"}. If "lower", lower limit represents a closed grasp, 
+                otherwise upper limit represents a closed grasp.
             disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
                 Instead, you will need to call the grasp handling methods yourself.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -148,7 +152,9 @@ class ManipulationRobot(BaseRobot):
         """
         # Store relevant internal vars
         assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
+        assert_valid_key(key=grasping_direction, valid_keys=["lower", "upper"], name="grasping direction")
         self._grasping_mode = grasping_mode
+        self._grasping_direction = grasping_direction
         self._disable_grasp_handling = disable_grasp_handling
 
         # Initialize other variables used for assistive grasping
@@ -253,7 +259,7 @@ class ManipulationRobot(BaseRobot):
             # Infer from the gripper controller the state
             is_grasping = self._controllers["gripper_{}".format(arm)].is_grasping()
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
-            if is_grasping and candidate_obj is not None:
+            if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
                 is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
 
@@ -485,6 +491,24 @@ class ManipulationRobot(BaseRobot):
             str: Default arm name for this robot, corresponds to the first entry in @arm_names by default
         """
         return self.arm_names[0]
+
+    @property
+    def arm_action_idx(self):
+        arm_action_idx = {}
+        for arm_name in self.arm_names:
+            controller_idx = self.controller_order.index(f"arm_{arm_name}")
+            action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+            arm_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"arm_{arm_name}"].command_dim)
+        return arm_action_idx
+
+    @property
+    def gripper_action_idx(self):
+        gripper_action_idx = {}
+        for arm_name in self.arm_names:
+            controller_idx = self.controller_order.index(f"gripper_{arm_name}")
+            action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+            gripper_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"gripper_{arm_name}"].command_dim)
+        return gripper_action_idx
 
     @property
     @abstractmethod
@@ -759,7 +783,8 @@ class ManipulationRobot(BaseRobot):
             candidates_set, robot_contact_links = self._find_gripper_contacts(arm=arm)
             # If we're using assisted grasping, we further filter candidates via ray-casting
             if self.grasping_mode == "assisted":
-                raise NotImplementedError("Assisted grasp not yet available in OmniGibson!")
+                candidates_set_raycast = self._find_gripper_raycast_collisions(arm=arm)
+                candidates_set = candidates_set.intersection(candidates_set_raycast)
         else:
             raise ValueError("Invalid grasping mode for calculating in hand object: {}".format(self.grasping_mode))
 
@@ -802,9 +827,67 @@ class ManipulationRobot(BaseRobot):
         # Return None if object cannot be assisted grasped or not touching at least two fingers
         if ag_obj is None or not touching_at_least_two_fingers:
             return None
-
+        
         # Get object and its contacted link
         return ag_obj, ag_obj.links[ag_obj_link_name]
+
+    def _find_gripper_raycast_collisions(self, arm="default"):
+        """
+        For arm @arm, calculate any prims that are not part of the robot
+        itself that intersect with rays cast between any of the gripper's start and end points
+
+        Args:
+            arm (str): specific arm whose gripper will be checked for raycast collisions. Default is "default"
+            which corresponds to the first entry in self.arm_names
+
+        Returns:
+            set[str]: set of prim path of detected raycast intersections that
+            are not the robot itself. Note: if no objects that are not the robot itself are intersecting,
+            the set will be empty.
+        """
+        arm = self.default_arm if arm == "default" else arm
+        # First, make sure start and end grasp points exist (i.e.: aren't None)
+        assert (
+            self.assisted_grasp_start_points[arm] is not None
+        ), "In order to use assisted grasping, assisted_grasp_start_points must not be None!"
+        assert (
+            self.assisted_grasp_end_points[arm] is not None
+        ), "In order to use assisted grasping, assisted_grasp_end_points must not be None!"
+
+        # Iterate over all start and end grasp points and calculate their x,y,z positions in the world frame
+        # (per arm appendage)
+        # Since we'll be calculating the cartesian cross product between start and end points, we stack the start points
+        # by the number of end points and repeat the individual elements of the end points by the number of start points
+        startpoints = []
+        endpoints = []
+        for grasp_start_point in self.assisted_grasp_start_points[arm]:
+            # Get world coordinates of link base frame
+            link_pos, link_orn = self.links[grasp_start_point.link_name].get_position_orientation()
+            # Calculate grasp start point in world frame and add to startpoints
+            start_point, _ = T.pose_transform(link_pos, link_orn, grasp_start_point.position, [0, 0, 0, 1])
+            startpoints.append(start_point)
+        # Repeat for end points
+        for grasp_end_point in self.assisted_grasp_end_points[arm]:
+            # Get world coordinates of link base frame
+            link_pos, link_orn = self.links[grasp_end_point.link_name].get_position_orientation()
+            # Calculate grasp start point in world frame and add to endpoints
+            end_point, _ = T.pose_transform(link_pos, link_orn, grasp_end_point.position, [0, 0, 0, 1])
+            endpoints.append(end_point)
+        # Stack the start points and repeat the end points, and add these values to the raycast dicts
+        n_startpoints, n_endpoints = len(startpoints), len(endpoints)
+        raycast_startpoints = startpoints * n_endpoints
+        raycast_endpoints = []
+        for endpoint in endpoints:
+            raycast_endpoints += [endpoint] * n_startpoints
+        ray_data = set()
+        # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
+        for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
+            if result["hit"]:
+                # filter out self body parts (we currently assume that the robot cannot grasp itself)
+                if self.prim_path not in result["rigidBody"]:
+                    ray_data.add(result["rigidBody"])
+        return ray_data
+
 
     def _handle_release_window(self, arm="default"):
         """
@@ -818,10 +901,6 @@ class ManipulationRobot(BaseRobot):
         self._ag_release_counter[arm] += 1
         time_since_release = self._ag_release_counter[arm] * og.sim.get_rendering_dt()
         if time_since_release >= m.RELEASE_WINDOW:
-            # TODO: Verify not needed!
-            # Remove filtered collision restraints
-            # for finger_link in self.finger_links[arm]:
-            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
 
@@ -837,7 +916,6 @@ class ManipulationRobot(BaseRobot):
         for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
             joint = self._joints[joint_name]
             joint.set_pos(pos=j_val)
-            # joint.set_vel(vel=0.0)
 
     @property
     def robot_arm_descriptor_yamls(self):
@@ -1075,7 +1153,6 @@ class ManipulationRobot(BaseRobot):
         if ag_data is None:
             return
         ag_obj, ag_link = ag_data
-
         # Get the appropriate joint type
         joint_type = self._get_assisted_grasp_joint_type(ag_obj, ag_link)
         if joint_type is None:
@@ -1132,10 +1209,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        # Disable collisions while picking things up
-        # TODO: Verify not needed!
-        # for finger_link in self.finger_links[arm]:
-        #     finger_link.add_filtered_collision_pair(prim=ag_obj)
         for joint in self.finger_joints[arm]:
             j_val = joint.get_state()[0][0]
             self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
@@ -1149,13 +1222,15 @@ class ManipulationRobot(BaseRobot):
             # We apply a threshold based on the control rather than the command here so that the behavior
             # stays the same across different controllers and control modes (absolute / delta). This way,
             # a zero action will actually keep the AG setting where it already is.
-            # TODO: Compare this to the iG2 implementation to see if there could be a benefit to using
-            # a combination of control and existing position.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
-            applying_grasp = np.any(controller.control < threshold)
-
+            if controller.control is None:
+                applying_grasp = False
+            elif self._grasping_direction == "lower":
+                applying_grasp = np.any(controller.control < threshold)
+            else:
+                applying_grasp = np.any(controller.control > threshold)
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
                 if self._ag_release_counter[arm] is not None:
@@ -1307,9 +1382,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        # Disable collisions while picking things up
-        # for finger_link in self.finger_links[arm]:
-        #     finger_link.add_filtered_collision_pair(prim=ag_obj)
         for joint in self.finger_joints[arm]:
             j_val = joint.get_state()[0][0]
             self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
@@ -1375,3 +1447,55 @@ class ManipulationRobot(BaseRobot):
         classes = super()._do_not_register_classes
         classes.add("ManipulationRobot")
         return classes
+    
+    @property
+    def eef_usd_path(self):
+        """
+        Returns:
+            dict(str, str): dict mapping arm name to the path to the eef usd file
+        """
+        raise NotImplementedError
+
+    @property
+    def teleop_rotation_offset(self):
+        """
+        Rotational offset that will be applied for teleoperation
+        such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
+        """
+        return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
+
+    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+        """
+        Generate action data from teleoperation data
+        NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
+        Overwrite this function if the robot is using a different controller.
+        Args:
+            teleop_data (TeleopData): teleoperation data
+        Returns:
+            np.ndarray: array of action data for arm and gripper
+        """
+        action = super().teleop_data_to_action(teleop_data)
+        hands = ["left", "right"] if self.n_arms == 2 else ["right"]
+        for i, hand in enumerate(hands):
+            arm_name = self.arm_names[i]
+            if teleop_data.is_valid[hand]:
+                # arm action
+                assert \
+                    isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
+                    isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
+                    f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                cur_eef_pos, cur_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
+                if teleop_data.robot_attached:
+                    target_pos, target_orn = teleop_data.transforms[hand]
+                else:
+                    target_pos, target_orn = cur_eef_pos, cur_eef_orn
+                # get orientation relative to robot base
+                base_pos, base_orn = self.get_position_orientation()
+                rel_des_pos, rel_des_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
+                rel_cur_pos, _ = T.relative_pose_transform(cur_eef_pos, cur_eef_orn, base_pos, base_orn)
+                action[self.arm_action_idx[arm_name]] = np.r_[rel_des_pos - rel_cur_pos, T.quat2axisangle(rel_des_orn)]
+                # gripper action
+                assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
+                    f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+                action[self.gripper_action_idx[arm_name]] = teleop_data.grippers[hand]
+        return action

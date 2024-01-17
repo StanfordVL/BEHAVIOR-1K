@@ -639,8 +639,8 @@ def test_toggled_on():
     assert not stove.states[ToggledOn].get_value()
 
     robot.joints["torso_lift_joint"].set_pos(0.0)
-    robot.joints["shoulder_pan_joint"].set_pos(0.0)
-    robot.joints["shoulder_lift_joint"].set_pos(np.pi / 15)
+    robot.joints["shoulder_pan_joint"].set_pos(np.deg2rad(90.0))
+    robot.joints["shoulder_lift_joint"].set_pos(np.deg2rad(8.0))
     robot.joints["upperarm_roll_joint"].set_pos(0.0)
     robot.joints["elbow_flex_joint"].set_pos(0.0)
     robot.joints["forearm_roll_joint"].set_pos(0.0)
