@@ -4,6 +4,7 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 import numpy as np
+import yaml
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -63,62 +64,43 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
-    # Choose scene to load
-    scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
-
-    # Choose robot to create
-    robot_name = choose_from_options(
-        options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
-    )
-
     # Create the config for generating the environment we want
-    env_cfg = dict()
-    env_cfg["action_timestep"] = 1 / 10.
-    env_cfg["physics_timestep"] = 1 / 60.
+    cfg = yaml.safe_load(open("omni_grpc.yaml", "r"))
 
-    scene_cfg = dict()
-    if scene_model == "empty":
-        scene_cfg["type"] = "Scene"
-    else:
-        scene_cfg["type"] = "InteractiveTraversableScene"
-        scene_cfg["scene_model"] = scene_model
+    # # Add the robot we want to load
+    # robot0_cfg = dict()
+    # robot0_cfg["type"] = robot_name
+    # robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
+    # robot0_cfg["action_type"] = "continuous"
+    # robot0_cfg["action_normalize"] = True
 
-    # Add the robot we want to load
-    robot0_cfg = dict()
-    robot0_cfg["type"] = robot_name
-    robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
-    robot0_cfg["action_type"] = "continuous"
-    robot0_cfg["action_normalize"] = True
-
-    # Compile config
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
-
-    # Create the environment
+    # # Create the environment
     env = og.Environment(configs=cfg)
 
-    # Choose robot controller to use
+    # # Choose robot controller to use
     robot = env.robots[0]
-    controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
+    # controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
-    # Choose control mode
-    if random_selection:
-        control_mode = "random"
-    else:
-        control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
+    # # Choose control mode
+    control_mode = "teleop"
+    # if random_selection:
+    #     control_mode = "random"
+    # else:
+    #     control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
 
-    # Update the control mode of the robot
-    controller_config = {component: {"name": name} for component, name in controller_choices.items()}
-    robot.reload_controllers(controller_config=controller_config)
+    # # Update the control mode of the robot
+    # controller_config = {component: {"name": name} for component, name in controller_choices.items()}
+    # robot.reload_controllers(controller_config=controller_config)
 
-    # Because the controllers have been updated, we need to update the initial state so the correct controller state
-    # is preserved
-    env.scene.update_initial_state()
+    # # Because the controllers have been updated, we need to update the initial state so the correct controller state
+    # # is preserved
+    # env.scene.update_initial_state()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=np.array([1.46949, -3.97358, 2.21529]),
-        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
-    )
+    # og.sim.viewer_camera.set_position_orientation(
+    #     position=np.array([1.46949, -3.97358, 2.21529]),
+    #     orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+    # )
 
     # Reset environment and robot
     env.reset()
@@ -140,7 +122,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     step = 0
     while step != max_steps:
         action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        env.step(action=action)
+        _, reward, _, _, _ = env.step(action=action)
+        print(reward)
         step += 1
 
     # Always shut down the environment cleanly at the end
