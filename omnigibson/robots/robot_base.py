@@ -170,7 +170,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Validate this robot configuration
         self._validate_configuration()
 
-        self._base_aabb_extent = self.aabb_extent
+        self._reset_joint_pos_aabb_extent = self.aabb_extent
 
     def _load_sensors(self):
         """
@@ -415,12 +415,13 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         super().remove()
     
     @property
-    def base_aabb_extent(self):
+    def reset_joint_pos_aabb_extent(self):
         """
+        This is the aabb extent of the robot in the robot frame after resetting the joints.
         Returns:
             3-array: Axis-aligned bounding box extent of the robot base
         """
-        return self._base_aabb_extent
+        return self._reset_joint_pos_aabb_extent
 
     def teleop_data_to_action(self, teleop_data):
         """
