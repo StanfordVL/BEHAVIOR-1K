@@ -1,10 +1,7 @@
 from abc import abstractmethod
-import carb
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from omni.physx import get_physx_scene_query_interface
-from pxr import Gf
 
 import omnigibson as og
 import omnigibson.lazy_omni as lo

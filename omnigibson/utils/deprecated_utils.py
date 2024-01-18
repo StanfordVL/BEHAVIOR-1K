@@ -453,9 +453,9 @@ class ArticulationView(lo.ArticulationView):
             >>> prims.set_joint_positions(positions, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            carb.log_warn("ArticulationView needs to be initialized.")
+            lo.carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             new_dof_pos = self._physics_view.get_dof_positions()
@@ -470,7 +470,7 @@ class ArticulationView(lo.ArticulationView):
             # self._physics_view.set_dof_position_targets(new_dof_pos, indices)
             self.set_joint_position_targets(positions, indices, joint_indices)
         else:
-            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
+            lo.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
 
     def set_joint_velocities(
         self,
@@ -519,9 +519,9 @@ class ArticulationView(lo.ArticulationView):
             >>> prims.set_joint_velocities(velocities, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            carb.log_warn("ArticulationView needs to be initialized.")
+            lo.carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             new_dof_vel = self._physics_view.get_dof_velocities()
@@ -536,7 +536,7 @@ class ArticulationView(lo.ArticulationView):
             # self._physics_view.set_dof_velocity_targets(new_dof_vel, indices)
             self.set_joint_velocity_targets(velocities, indices, joint_indices)
         else:
-            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
+            lo.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
         return
 
     def set_joint_efforts(
@@ -586,10 +586,10 @@ class ArticulationView(lo.ArticulationView):
             >>> prims.set_joint_efforts(efforts, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            carb.log_warn("ArticulationView needs to be initialized.")
+            lo.carb.log_warn("ArticulationView needs to be initialized.")
             return
 
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
 
@@ -605,7 +605,7 @@ class ArticulationView(lo.ArticulationView):
             )
             self._physics_view.set_dof_actuation_forces(new_dof_efforts, indices)
         else:
-            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
+            lo.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
         return
 
 class RigidPrimView(lo.RigidPrimView):

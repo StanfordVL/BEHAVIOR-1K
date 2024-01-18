@@ -48,6 +48,8 @@ _import_structure = {
     "omni.kit.viewport.window": ["get_viewport_window_instances"],
     "omni.kit.widget.settings": ["SettingType"],
     "omni.kit.widget.stage.context_menu": ["ContextMenu"],
+    "omni.kit.xr.core": ["XRDeviceClass", "XRCore", "XRCoreEventType"],
+    "omni.kit.xr.ui.stage.common": ["XRAvatarManager"],
     "omni.log": ["get_log", "SettingBehavior"],
     "omni.particle.system.core.scripts.core": ["Core"],
     "omni.particle.system.core.scripts.utils": ["Utils"],
