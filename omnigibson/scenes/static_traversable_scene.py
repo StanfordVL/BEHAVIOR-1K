@@ -22,9 +22,8 @@ class StaticTraversableScene(TraversableScene):
         scene_model,
         scene_file=None,
         trav_map_resolution=0.1,
-        trav_map_erosion=2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         floor_plane_visible=False,
@@ -36,9 +35,8 @@ class StaticTraversableScene(TraversableScene):
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
             trav_map_resolution (float): traversability map resolution
-            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             floor_plane_visible (bool): whether to render the additionally added floor plane
@@ -54,9 +52,8 @@ class StaticTraversableScene(TraversableScene):
             scene_model=scene_model,
             scene_file=scene_file,
             trav_map_resolution=trav_map_resolution,
-            trav_map_erosion=trav_map_erosion,
+            default_erosion_radius=default_erosion_radius,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=True,

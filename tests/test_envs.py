@@ -32,7 +32,7 @@ def task_tester(task_type):
     # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
     gm.ENABLE_OBJECT_STATES = True
     gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_FLATCACHE = False
+    gm.ENABLE_FLATCACHE = True
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -59,3 +59,40 @@ def test_point_navigation_task():
 
 def test_behavior_task():
     task_tester("BehaviorTask")
+
+
+def test_rs_int_full_load():
+    cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+        },
+        "robots": [
+            {
+                "type": "Fetch",
+                "obs_modalities": [],
+            }
+        ],
+        # Task kwargs
+        "task": {
+            "type": "DummyTask",
+        },
+    }
+
+    # Make sure sim is stopped
+    og.sim.stop()
+
+    # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
+    gm.ENABLE_OBJECT_STATES = True
+    gm.USE_GPU_DYNAMICS = True
+    gm.ENABLE_FLATCACHE = True
+
+    # Create the environment
+    env = og.Environment(configs=cfg)
+
+    env.reset()
+    for _ in range(5):
+        env.step(env.robots[0].action_space.sample())
+
+    # Clear the sim
+    og.sim.clear()
