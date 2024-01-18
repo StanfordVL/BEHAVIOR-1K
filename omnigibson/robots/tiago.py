@@ -81,7 +81,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         variant="default",
         rigid_trunk=False,
         default_trunk_offset=0.365,
-        default_arm_pose="vertical",
+        default_reset_mode="untuck",
+        default_arm_pose="horizontal",
 
         **kwargs,
     ):
@@ -146,20 +147,13 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self._variant = variant
         self.rigid_trunk = rigid_trunk
         self.default_trunk_offset = default_trunk_offset
+        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+        self.default_reset_mode = default_reset_mode
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
         self.default_arm_pose = default_arm_pose
 
         # Other args that will be created at runtime
         self._world_base_fixed_joint_prim = None
-
-        # Parse reset joint pos if specifying special string
-        if isinstance(reset_joint_pos, str):
-            assert (
-                reset_joint_pos in RESET_JOINT_OPTIONS
-            ), "reset_joint_pos should be one of {} if using a string!".format(RESET_JOINT_OPTIONS)
-            reset_joint_pos = (
-                self.tucked_default_joint_pos if reset_joint_pos == "tuck" else self.untucked_default_joint_pos
-            )
 
         # Run super init
         super().__init__(
@@ -229,31 +223,31 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
         pos[self.camera_control_idx] = np.array([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.045, 0.045])  # open gripper
-
-        # Choose arm based on setting
-        if self.default_arm_pose == "vertical":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal15":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal30":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal45":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "horizontal":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        else:
-            raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
+        # Choose arm joint pos based on setting
+        for arm in self.arm_names:
+            pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
+            if self.default_arm_pose == "vertical":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
+                )
+            elif self.default_arm_pose == "diagonal15":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]
+                )
+            elif self.default_arm_pose == "diagonal30":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
+                )
+            elif self.default_arm_pose == "diagonal45"  :
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
+                )
+            elif self.default_arm_pose == "horizontal":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
+                )
+            else:
+                raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
 
     def _create_discrete_action_space(self):
@@ -441,7 +435,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def default_joint_pos(self):
-        return self.tucked_default_joint_pos
+        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     def assisted_grasp_start_points(self):
