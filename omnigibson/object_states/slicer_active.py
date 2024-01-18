@@ -1,7 +1,6 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 import omnigibson as og
@@ -9,12 +8,12 @@ import omnigibson as og
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
+m.REACTIVATION_DELAY = 0.5 # number of seconds to wait before reactivating the slicer
 
 class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.add(AABB)
         deps.add(ContactBodies)
         return deps
 
@@ -24,7 +23,6 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         self._previously_touching_sliceable = False
         self.value = True
         self.delay_counter = 0
-        self.delay_steps = 7
 
     def _get_value(self):
         return self.value
@@ -41,7 +39,8 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
             candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
             if candidate_obj is None:
                 continue
-            if hasattr(candidate_obj, '_abilities') and "sliceable" in candidate_obj._abilities:
+            from omnigibson.objects.stateful_object import StatefulObject
+            if isinstance(candidate_obj, StatefulObject) and "sliceable" in candidate_obj.abilities:
                 return True
         return False
 
@@ -59,8 +58,12 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
             # If we are not touching any sliceable objects, we can revert to True.
             if not currently_touching_sliceable:
                 self.delay_counter += 1  # Increment the counter for each step we're not touching a sliceable object
-                if self.delay_counter >= self.delay_steps:  # Check if the counter has reached the delay
+                steps_to_wait = max(1, m.REACTIVATION_DELAY / og.sim.get_rendering_dt())
+                if self.delay_counter >= steps_to_wait:  # Check if the counter has reached the delay
                     self.set_value(True)
+            else:
+                # If we are touching a sliceable object, reset the counter.
+                self.delay_counter = 0
 
         # Record if we were touching anything previously
         self._previously_touching_sliceable = currently_touching_sliceable
