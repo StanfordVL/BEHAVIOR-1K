@@ -381,21 +381,21 @@ class ManipulationRobot(BaseRobot):
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
-        dic = super().get_control_dict()
+        fcns = super().get_control_dict()
 
         for arm in self.arm_names:
-            rel_eef_pos, rel_eef_quat = self.get_relative_eef_pose(arm)
-            dic[f"eef_{arm}_pos_relative"] = rel_eef_pos
-            dic[f"eef_{arm}_quat_relative"] = rel_eef_quat
-            dic[f"eef_{arm}_lin_vel_relative"] = self.get_relative_eef_lin_vel(arm)
-            dic[f"eef_{arm}_ang_vel_relative"] = self.get_relative_eef_ang_vel(arm)
+            fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
+            fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
+            fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
+            fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
+            fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
             # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
             # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
             # see self.get_relative_jacobian() for more info
             eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
+            fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
 
-        return dic
+        return fcns
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
@@ -969,7 +969,6 @@ class ManipulationRobot(BaseRobot):
                     np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
                     np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
-                "kv": 2.0,
                 "mode": "pose_delta_ori",
                 "smoothing_filter_size": 2,
                 "workspace_pose_limiter": None,

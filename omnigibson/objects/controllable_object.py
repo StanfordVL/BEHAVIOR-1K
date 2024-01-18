@@ -2,12 +2,11 @@ from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
 import gym
-from collections.abc import Iterable
 import omnigibson as og
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts
+from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, CachedFunctions
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -462,11 +461,12 @@ class ControllableObject(BaseObject):
 
     def get_control_dict(self):
         """
-        Grabs all relevant information that should be passed to each controller during each controller step.
+        Grabs all relevant information that should be passed to each controller during each controller step. This
+        automatically caches information
 
         Returns:
-            dict: Keyword-mapped control values for this object, mapping names to n-arrays.
-                By default, returns the following:
+            CachedFunctions: Keyword-mapped control values for this object, mapping names to n-arrays.
+                By default, returns the following (can be queried via [] or get()):
 
                 - joint_position: (n_dof,) joint positions
                 - joint_velocity: (n_dof,) joint velocities
@@ -477,17 +477,18 @@ class ControllableObject(BaseObject):
                 - gravity_force: (n_dof,) per-joint generalized gravity forces
                 - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
-        pos, ori = self.get_position_orientation()
-        return dict(
-            joint_position=self.get_joint_positions(normalized=False),
-            joint_velocity=self.get_joint_velocities(normalized=False),
-            joint_effort=self.get_joint_efforts(normalized=False),
-            root_pos=pos,
-            root_quat=ori,
-            mass_matrix=self.get_mass_matrix(),
-            gravity_force=self.get_generalized_gravity_forces(),
-            cc_force=self.get_coriolis_and_centrifugal_forces(),
-        )
+        fcns = CachedFunctions()
+        fcns["_root_pos_quat"] = self.get_position_orientation
+        fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
+        fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
+        fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
+        fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
+        fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
+        fcns["mass_matrix"] = self.get_mass_matrix
+        fcns["gravity_force"] = self.get_generalized_gravity_forces
+        fcns["cc_force"] = self.get_coriolis_and_centrifugal_forces
+
+        return fcns
 
     def dump_action(self):
         """

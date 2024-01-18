@@ -6,7 +6,7 @@ import re
 from abc import ABCMeta
 from copy import deepcopy
 from collections.abc import Iterable
-from functools import wraps
+from functools import wraps, cache
 from importlib import import_module
 
 import numpy as np
@@ -707,6 +707,76 @@ class SerializableNonInstance:
                                       f"values to be deserialized, only {idx} were."
 
         return state_dict
+
+
+class CachedFunctions:
+    """
+    Thin object which owns a dictionary in which each entry should be a function -- when a key is queried via get()
+    and it exists, it will call the function exactly once, and cache the value so that subsequent calls will refer
+    to the cached value.
+
+    This allows the dictionary to be created with potentially expensive operations, but only queried up to exaclty once
+    as needed.
+    """
+    def __init__(self, **kwargs):
+        # Create internal dict to store functions
+        self._fcns = dict()
+        for kwarg in kwargs:
+            self._fcns[kwarg] = kwargs[kwarg]
+
+    def __getitem__(self, item):
+        return self.get(name=item)
+
+    def __setitem__(self, key, value):
+        return self.add_fcn(name=key, fcn=value)
+
+    @cache
+    def get(self, name, *args, **kwargs):
+        """
+        Computes the function referenced by @name with the corresponding @args and @kwargs. Note that for a unique
+        set of arguments, this value will be internally cached
+
+        Args:
+            name (str): The name of the function to call
+            *args (tuple): Positional arguments to pass into the function call
+            **kwargs (tuple): Keyword arguments to pass into the function call
+
+        Returns:
+            any: Output of the function referenced by @name
+        """
+        return self._fcns[name](*args, **kwargs)
+
+    def get_fcn(self, name):
+        """
+        Gets the raw stored function referenced by @name
+
+        Args:
+            name (str): The name of the function to grab
+
+        Returns:
+            function: The stored function
+        """
+        return self._fcns[name]
+
+    def get_fcn_names(self):
+        """
+        Get all stored function names
+
+        Returns:
+            tuple of str: Names of stored functions
+        """
+        return tuple(self._fcns.keys())
+
+    def add_fcn(self, name, fcn):
+        """
+        Adds a function to the internal registry.
+
+        Args:
+            name (str): Name of the function. This is the name that should be queried with self.get()
+            fcn (function): Function to add. Can be an arbitrary signature
+        """
+        assert callable(fcn), "Only functions can be added via add_fcn!"
+        self._fcns[name] = fcn
 
 
 class Wrapper:

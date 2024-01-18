@@ -371,10 +371,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Modify the right hand's pos_relative in the z-direction based on the trunk's value
         # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
         # hand, which does not control the trunk
-        dic = super().get_control_dict()
-        dic["eef_right_pos_relative"][2] = dic["eef_right_pos_relative"][2] - self.get_joint_positions()[self.trunk_control_idx]
+        fcns = super().get_control_dict()
+        fcns["eef_right_pos_relative"] = lambda: (fcns["eef_right_pos_relative"] +
+                                                  np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx]]))
 
-        return dic
+        return fcns
 
     @property
     def default_proprio_obs(self):
