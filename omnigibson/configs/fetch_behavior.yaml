@@ -1,6 +1,6 @@
 env:
-  action_timestep: 0.01666              # (float): environment executes action per action_timestep second
-  physics_timestep: 0.01666             # (float): physics timestep for physx
+  action_frequency: 60                  # (int): environment executes action at the action_frequency rate
+  physics_frequency: 60                 # (int): physics frequency (1 / physics_timestep for physx)
   device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
   automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
@@ -25,9 +25,8 @@ scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
   trav_map_resolution: 0.1
-  trav_map_erosion: 2
+  default_erosion_radius: 0.0
   trav_map_with_objects: true
-  build_graph: true
   num_waypoints: 1
   waypoint_resolution: 0.2
   not_load_object_categories: null
