@@ -36,7 +36,7 @@ ROBOTS = {
 def main():
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 50., "physics_timestep": 1 / 200.}
+    env_cfg = {"action_timestep": 1 / 50., "physics_timestep": 1 / 300.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot_cfg = {
@@ -51,7 +51,7 @@ def main():
         robot_cfg["controller_config"][f"arm_{arm}"] = {
             "name": "InverseKinematicsController",
             "mode": "pose_delta_ori",
-            "motor_type": "position",
+            "kv": 5.0,
             "command_input_limits": None,
         }
         robot_cfg["controller_config"][f"gripper_{arm}"] = {
