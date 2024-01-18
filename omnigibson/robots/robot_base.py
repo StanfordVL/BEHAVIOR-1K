@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 from omnigibson.macros import create_module_macros
 from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.usd_utils import add_asset_to_stage
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 from omnigibson.utils.constants import PrimType
@@ -117,7 +119,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         abilities = robot_abilities if abilities is None else robot_abilities.update(abilities)
 
         # Initialize internal attributes that will be loaded later
-        self._sensors = None                     # e.g.: scan sensor, vision sensor
+        self._sensors = None                    # e.g.: scan sensor, vision sensor
+        self._dummy = None                      # Dummy version of the robot w/ fixed base for computing generalized gravity forces
 
         # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
         # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
@@ -149,6 +152,25 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             **kwargs,
         )
 
+    def _load(self):
+        # Run super first
+        prim = super()._load()
+
+        # Also import dummy object if this robot is not fixed base
+        if not self.fixed_base:
+            dummy_path = f"{self._prim_path}_dummy"
+            dummy_prim = add_asset_to_stage(asset_path=self.usd_path, prim_path=dummy_path)
+            self._dummy = BaseObject(
+                name=f"{self.name}_dummy",
+                prim_path=dummy_path,
+                scale=self._load_config.get("scale", None),
+                visible=False,
+                fixed_base=True,
+                visual_only=True,
+            )
+
+        return prim
+
     def _post_load(self):
         # Run super post load first
         super()._post_load()
@@ -157,7 +179,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self._load_sensors()
 
     def _initialize(self):
-        # Run super first
+        # Initialize the dummy first if it exists
+        if self._dummy is not None:
+            self._dummy.initialize()
+
+        # Run super
         super()._initialize()
 
         # Initialize all sensors
@@ -401,6 +427,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # One final plot show so all the figures get rendered
         plt.show()
 
+    def update_handles(self):
+        # Call super first
+        super().update_handles()
+
+        # If we have a dummy robot, also update its handles too
+        if self._dummy is not None:
+            self._dummy.update_handles()
+
     def remove(self):
         """
         Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
@@ -421,6 +455,17 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             np.ndarray: array of action data filled with update value
         """
         return np.zeros(self.action_dim)
+
+    def get_generalized_gravity_forces(self):
+        # Override method based on whether we're fixed or not
+        if not self.fixed_base:
+            # Update dummy pose and calculate values
+            self._dummy.set_joint_positions(self.get_joint_positions())
+            self._dummy.set_joint_velocities(self.get_joint_velocities())
+            self._dummy.set_orientation(self.get_orientation())
+            return self._dummy.get_generalized_gravity_forces()
+        else:
+            return super().get_generalized_gravity_forces()
 
     @property
     def sensors(self):

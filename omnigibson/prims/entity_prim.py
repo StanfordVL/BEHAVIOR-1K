@@ -229,7 +229,8 @@ class EntityPrim(XFormPrim):
         self._links = dict()
         for link_name, (link_cls, prim) in links_to_create.items():
             link_load_config = {
-                "kinematic_only": self._load_config["kinematic_only"] if link_name == self._root_link_name else False,
+                "kinematic_only": self._load_config.get("kinematic_only", False)
+                if link_name == self._root_link_name else False,
             }
             link_load_config.update(load_config)
             self._links[link_name] = link_cls(
