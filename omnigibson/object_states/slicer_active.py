@@ -23,6 +23,7 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         self._previously_touching_sliceable = False
         self.value = True
         self.delay_counter = 0
+        self.steps_to_wait = max(1, m.REACTIVATION_DELAY / og.sim.get_rendering_dt())
 
     def _get_value(self):
         return self.value
@@ -58,8 +59,7 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
             # If we are not touching any sliceable objects, we can revert to True.
             if not currently_touching_sliceable:
                 self.delay_counter += 1  # Increment the counter for each step we're not touching a sliceable object
-                steps_to_wait = max(1, m.REACTIVATION_DELAY / og.sim.get_rendering_dt())
-                if self.delay_counter >= steps_to_wait:  # Check if the counter has reached the delay
+                if self.delay_counter >= self.steps_to_wait:  # Check if the counter has reached the delay
                     self.set_value(True)
             else:
                 # If we are touching a sliceable object, reset the counter.
@@ -70,18 +70,21 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
 
     @property
     def state_size(self):
-        return 2
+        return 3
 
     # For this state, we simply store its value.
     def _dump_state(self):
-        return dict(value=self.value, previously_touching_sliceable=self._previously_touching_sliceable)
+        return dict(value=self.value,
+                    previously_touching_sliceable=self._previously_touching_sliceable,
+                    delay_counter=self.delay_counter)
 
     def _load_state(self, state):
         self.value = state["value"]
         self._previously_touching_sliceable = state["previously_touching_sliceable"]
+        self.delay_counter = state["delay_counter"]
 
     def _serialize(self, state):
-        return np.array([state["value"], state["previously_touching_sliceable"]], dtype=float)
+        return np.array([state["value"], state["previously_touching_sliceable"], state["delay_counter"]], dtype=float)
 
     def _deserialize(self, state):
-        return dict(value=state[0], previously_touching_sliceable=state[1]), 2
+        return dict(value=state[0], previously_touching_sliceable=state[1], delay_counter=state[2]), 3
