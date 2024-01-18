@@ -68,7 +68,6 @@ class SlicerActive(AbsoluteObjectState, UpdateStateMixin):
         # Record if we were touching anything previously
         self._previously_touching_sliceable = currently_touching_sliceable
 
-
     @property
     def state_size(self):
         return 2
