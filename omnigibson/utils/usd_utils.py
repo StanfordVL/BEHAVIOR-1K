@@ -235,7 +235,8 @@ class RigidContactAPI:
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
     # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
-    _PATH_TO_IDX = None
+    _PATH_TO_ROW_IDX = None
+    _PATH_TO_COL_IDX = None
 
     # Contact view for generating contact matrices at each timestep
     _CONTACT_VIEW = None
@@ -258,12 +259,12 @@ class RigidContactAPI:
         # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
         # mapping aligns with omni's ordering!
         i = 0
-        cls._PATH_TO_IDX = dict()
+        cls._PATH_TO_COL_IDX = dict()
         for obj in og.sim.scene.objects:
             if obj.prim_type == PrimType.RIGID:
                 for link in obj.links.values():
                     if not link.kinematic_only:
-                        cls._PATH_TO_IDX[link.prim_path] = i
+                        cls._PATH_TO_COL_IDX[link.prim_path] = i
                         i += 1
 
         # If there are no valid objects, clear the view and terminate early
@@ -278,23 +279,33 @@ class RigidContactAPI:
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
                 pattern="/World/*/*",
-                filter_patterns=list(cls._PATH_TO_IDX.keys()),
+                filter_patterns=list(cls._PATH_TO_COL_IDX.keys()),
             )
 
+        # Create deterministic mapping from path to row index
+        cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
+
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
-        n_bodies = len(cls._PATH_TO_IDX)
-        # from IPython import embed; embed()
-        assert cls._CONTACT_VIEW.sensor_count == n_bodies and cls._CONTACT_VIEW.filter_count == n_bodies, \
-            f"Got unexpected contact view shape. Expected: ({n_bodies}, {n_bodies}); " \
-            f"got: ({cls._CONTACT_VIEW.sensor_count}, {cls._CONTACT_VIEW.filter_count})"
+        n_bodies = len(cls._PATH_TO_COL_IDX)
+        assert cls._CONTACT_VIEW.filter_count == n_bodies, \
+            f"Got unexpected contact view shape. Expected: (N, {n_bodies}); " \
+            f"got: (N, {cls._CONTACT_VIEW.filter_count})"
 
     @classmethod
-    def get_body_idx(cls, prim_path):
+    def get_body_row_idx(cls, prim_path):
         """
         Returns:
-            int: idx assigned to the rigid body defined by @prim_path
+            int: row idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_IDX[prim_path]
+        return cls._PATH_TO_ROW_IDX[prim_path]
+
+    @classmethod
+    def get_body_col_idx(cls, prim_path):
+        """
+        Returns:
+            int: col idx assigned to the rigid body defined by @prim_path
+        """
+        return cls._PATH_TO_COL_IDX[prim_path]
 
     @classmethod
     def get_all_impulses(cls):
@@ -302,8 +313,8 @@ class RigidContactAPI:
         Grab all impulses at the current timestep
 
         Returns:
-            n-array: (N, N, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
-                in the simulator
+            n-array: (N, M, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
+                in the simulator and M tracked rigid bodies
         """
         # Generate the contact matrix if it doesn't already exist
         if cls._CONTACT_MATRIX is None:
@@ -328,8 +339,8 @@ class RigidContactAPI:
                 from @prim_paths_b
         """
         # Compute subset of matrix and return
-        idxs_a = [cls._PATH_TO_IDX[path] for path in prim_paths_a]
-        idxs_b = [cls._PATH_TO_IDX[path] for path in prim_paths_b]
+        idxs_a = [cls._PATH_TO_ROW_IDX[path] for path in prim_paths_a]
+        idxs_b = [cls._PATH_TO_COL_IDX[path] for path in prim_paths_b]
         return cls.get_all_impulses()[idxs_a][:, idxs_b]
 
     @classmethod
