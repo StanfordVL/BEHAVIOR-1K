@@ -121,8 +121,12 @@ def main(iterations):
                 "max_steps": 400,
             },
             "reward_config": {
-                "r_dist_coeff": DIST_COEFF,
-                "r_grasp": GRASP_REWARD
+                "dist_coeff": 1.0,
+                "grasp_reward": 1.0,
+                "collision_penalty": 1.0,
+                "eef_position_penalty_coef": 0.1,
+                "eef_orientation_penalty_coef": 0.01,
+                "regularization_coef": 0.01
             }
         },
         "objects": [
@@ -139,6 +143,7 @@ def main(iterations):
     gm.USE_GPU_DYNAMICS = True
 
     env = og.Environment(configs=cfg)
+    breakpoint()
         
     # Testing primitives with env
     #############################

@@ -25,6 +25,7 @@ class GraspReward(BaseRewardFunction):
         self.eef_position_penalty_coef = eef_position_penalty_coef
         self.eef_orientation_penalty_coef = eef_orientation_penalty_coef
         self.regularization_coef = regularization_coef
+        self.num_grasp_frames = 0
 
         # Run super
         super().__init__()
@@ -83,5 +84,9 @@ class GraspReward(BaseRewardFunction):
             dist = T.l2_distance(robot_center, obj_center)
             reward += math.exp(-dist) * self.dist_coeff
 
+        if self.prev_grasping:
+            self.num_grasp_frames += 1
+
         self.prev_grasping = current_grasping
-        return reward, {}
+
+        return reward, {"num_grasp_frames": self.num_grasp_frames}

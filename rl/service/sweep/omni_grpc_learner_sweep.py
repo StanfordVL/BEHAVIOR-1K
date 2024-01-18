@@ -4,6 +4,7 @@ import socket
 import os
 
 import yaml
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -19,9 +20,45 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
+
+class MetricsCallback(BaseCallback):
+    """
+    A custom metrics callback that derives from ``BaseCallback``.
+
+    :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
+    """
+    def __init__(self, verbose: int = 0):
+        super().__init__(verbose)
+        # Those variables will be accessible in the callback
+        # (they are defined in the base class)
+        # The RL model
+        # self.model = None  # type: BaseAlgorithm
+        # An alias for self.model.get_env(), the environment used for training
+        # self.training_env # type: VecEnv
+        # Number of time the callback was called
+        # self.n_calls = 0  # type: int
+        # num_timesteps = n_envs * n times env.step() was called
+        # self.num_timesteps = 0  # type: int
+        # local and global variables
+        self.locals = {}  # type: Dict[str, Any]
+        # self.globals = {}  # type: Dict[str, Any]
+        # The logger object, used to report things in the terminal
+        # self.logger # type: stable_baselines3.common.logger.Logger
+        # Sometimes, for event callback, it is useful
+        # to have access to the parent object
+        # self.parent = None  # type: Optional[BaseCallback]
+
+    def _on_rollout_end(self) -> None:
+        """
+        This event is triggered before updating the policy.
+        """
+        envs_num_grasps = list(map(lambda x: x['reward']['grasp']['num_grasp_frames'], self.locals['infos']))
+        mean_grasps = np.mean(envs_num_grasps)
+        wandb.log({"mean_grasps": mean_grasps})
+
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -42,7 +79,7 @@ def train():
     seed = 0
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
-    config_filename = "omni_grpc.yaml"
+    config_filename = "../omni_grpc.yaml"
     env_config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     if n_envs > 0:
         if args.port is not None:
@@ -150,10 +187,13 @@ def train():
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
+        metrics_callback = MetricsCallback()
+        # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
+            metrics_callback,
             # stop_train_callback,
         ])
         print(callback.callbacks)
