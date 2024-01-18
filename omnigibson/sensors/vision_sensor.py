@@ -56,8 +56,19 @@ class VisionSensor(BaseSensor):
             current camera. Otherwise, creates a new viewport
     """
 
-    _SENSOR_HELPERS = dict()
-    _RAW_SENSOR_TYPES = dict()
+    ALL_MODALITIES = (
+        "rgb",
+        "depth",
+        "depth_linear",
+        "normal",
+        "seg_semantic",
+        "seg_instance",
+        "flow",
+        "bbox_2d_tight",
+        "bbox_2d_loose",
+        "bbox_3d",
+        "camera",
+    )
 
     # Persistent dictionary of sensors, mapped from prim_path to sensor
     SENSORS = dict()
@@ -88,35 +99,35 @@ class VisionSensor(BaseSensor):
         self._sd = None             # synthetic data interface
         self._viewport = None       # Viewport from which to grab data
 
-        if self._SENSOR_HELPERS == dict():
-            self._SENSOR_HELPERS = dict(
-                rgb=lo.sensors.get_rgb,
-                depth=lo.sensors.get_depth,
-                depth_linear=lo.sensors.get_depth_linear,
-                normal=lo.sensors.get_normals,
-                seg_semantic=lo.sensors.get_semantic_segmentation,
-                seg_instance=lo.sensors.get_instance_segmentation,
-                flow=lo.sensors.get_motion_vector,
-                bbox_2d_tight=lo.sensors.get_bounding_box_2d_tight,
-                bbox_2d_loose=lo.sensors.get_bounding_box_2d_loose,
-                bbox_3d=lo.sensors.get_bounding_box_3d,
-                camera=get_camera_params,
-            )
+        self._SENSOR_HELPERS = dict(
+            rgb=lo.sensors.get_rgb,
+            depth=lo.sensors.get_depth,
+            depth_linear=lo.sensors.get_depth_linear,
+            normal=lo.sensors.get_normals,
+            seg_semantic=lo.sensors.get_semantic_segmentation,
+            seg_instance=lo.sensors.get_instance_segmentation,
+            flow=lo.sensors.get_motion_vector,
+            bbox_2d_tight=lo.sensors.get_bounding_box_2d_tight,
+            bbox_2d_loose=lo.sensors.get_bounding_box_2d_loose,
+            bbox_3d=lo.sensors.get_bounding_box_3d,
+            camera=get_camera_params,
+        )
+        assert set(self._SENSOR_HELPERS.keys()) == set(self.all_modalities), \
+            "VisionSensor._SENSOR_HELPERS must have the same keys as VisionSensor.all_modalities!"
         
-        if self._RAW_SENSOR_TYPES == dict():
-            # Define raw sensor types
-            self._RAW_SENSOR_TYPES = dict(
-                rgb=lo._syntheticdata.SensorType.Rgb,
-                depth=lo._syntheticdata.SensorType.Depth,
-                depth_linear=lo._syntheticdata.SensorType.DepthLinear,
-                normal=lo._syntheticdata.SensorType.Normal,
-                seg_semantic=lo._syntheticdata.SensorType.SemanticSegmentation,
-                seg_instance=lo._syntheticdata.SensorType.InstanceSegmentation,
-                flow=lo._syntheticdata.SensorType.MotionVector,
-                bbox_2d_tight=lo._syntheticdata.SensorType.BoundingBox2DTight,
-                bbox_2d_loose=lo._syntheticdata.SensorType.BoundingBox2DLoose,
-                bbox_3d=lo._syntheticdata.SensorType.BoundingBox3D,
-            )
+        # Define raw sensor types
+        self._RAW_SENSOR_TYPES = dict(
+            rgb=lo._syntheticdata.SensorType.Rgb,
+            depth=lo._syntheticdata.SensorType.Depth,
+            depth_linear=lo._syntheticdata.SensorType.DepthLinear,
+            normal=lo._syntheticdata.SensorType.Normal,
+            seg_semantic=lo._syntheticdata.SensorType.SemanticSegmentation,
+            seg_instance=lo._syntheticdata.SensorType.InstanceSegmentation,
+            flow=lo._syntheticdata.SensorType.MotionVector,
+            bbox_2d_tight=lo._syntheticdata.SensorType.BoundingBox2DTight,
+            bbox_2d_loose=lo._syntheticdata.SensorType.BoundingBox2DLoose,
+            bbox_3d=lo._syntheticdata.SensorType.BoundingBox3D,
+        )
 
         # Run super method
         super().__init__(
@@ -488,7 +499,7 @@ class VisionSensor(BaseSensor):
 
     @classproperty
     def all_modalities(cls):
-        return {k for k in cls._SENSOR_HELPERS.keys()}
+        return set(cls.ALL_MODALITIES)
 
     @classproperty
     def no_noise_modalities(cls):

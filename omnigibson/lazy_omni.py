@@ -72,8 +72,9 @@ _import_structure = {
              "physics",
              "ui",
              "usd",
-             "log",
              "timeline"],
+    "omni.log": ["get_log",
+                 "SettingBehavior"],
     "carb": ["carb"],
     "omni.particle.system.core.scripts.core": ["Core"],
     "omni.particle.system.core.scripts.utils": ["Utils"],
@@ -81,6 +82,7 @@ _import_structure = {
     "omni.kit.primitive.mesh.command": ["CreateMeshPrimWithDefaultXformCommand"],
     "omni.isaac.core.articulations": ["ArticulationView"],
     "omni.isaac.core.prims": ["RigidPrimView"],
+    "omni.isaac.core.simulation_context": ["SimulationContext"],
     "pxr": [
         "Gf",
         "PhysicsSchemaTools",
@@ -96,6 +98,7 @@ _import_structure = {
     ],
     "pxr.Sdf": ["ValueTypeNames"],
     "omni.isaac.kit": ["SimulationApp"],
+    "omni.kit.widget.stage.context_menu": ["ContextMenu"],
 }
 
 sys.modules[__name__] = LazyImporter(__name__, globals()["__file__"], _import_structure)

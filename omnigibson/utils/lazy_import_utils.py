@@ -66,6 +66,8 @@ class LazyImporter(ModuleType):
         return value
 
     def _get_module(self, module_name: str):
+        import omnigibson as og
+        # assert og.app is not None, "Please call `launch_simulator()` before importing any Omniverse modules."
         return importlib.import_module(module_name, self.__name__)
 
     def __reduce__(self):

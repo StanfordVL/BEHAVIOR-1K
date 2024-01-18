@@ -142,14 +142,14 @@ def launch_app():
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
-        log = lo.log.get_log()
-        log.set_channel_enabled("carb.windowing-glfw.plugin", False, lo.log.SettingBehavior.OVERRIDE)
+        og_log = lo.get_log()
+        og_log.set_channel_enabled("carb.windowing-glfw.plugin", False, lo.SettingBehavior.OVERRIDE)
         
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
-        log = lo.log.get_log()
+        og_log = lo.get_log()
         for channel in ["omni.hydra.scene_delegate.plugin", "omni.kit.manipulator.prim.model"]:
-            log.set_channel_enabled(channel, False, lo.log.SettingBehavior.OVERRIDE)
+            og_log.set_channel_enabled(channel, False, lo.SettingBehavior.OVERRIDE)
 
     # Possibly hide windows if in debug mode
     if gm.GUI_VIEWPORT_ONLY:
@@ -161,16 +161,16 @@ def launch_app():
                 window.visible = False
                 app.update()
 
-    lo.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
+    lo.ContextMenu.save_prim = print_save_usd_warning
 
     return app
 
 
 def launch_simulator(*args, **kwargs):
-    # Import now to avoid too-eager load of Omni classes due to inheritance
-    from omni.isaac.core.simulation_context import SimulationContext
+    if not og.app:
+        og.app = launch_app()
 
-    class Simulator(SimulationContext, Serializable):
+    class Simulator(lo.SimulationContext, Serializable):
         """
         Simulator class for directly interfacing with the physx physics engine.
 
@@ -945,12 +945,12 @@ def launch_simulator(*args, **kwargs):
 
         @classmethod
         def clear_instance(cls):
-            SimulationContext.clear_instance()
+            lo.SimulationContext.clear_instance()
             Simulator._world_initialized = None
             return
 
         def __del__(self):
-            SimulationContext.__del__(self)
+            lo.SimulationContext.__del__(self)
             Simulator._world_initialized = None
             return
 
@@ -1329,9 +1329,6 @@ def launch_simulator(*args, **kwargs):
         def _deserialize(self, state):
             # Default state is from the scene
             return self._scene.deserialize(state=state), self._scene.state_size
-
-    if not og.app:
-        og.app = launch_app()
 
     if not og.sim:
         og.sim = Simulator(*args, **kwargs)
