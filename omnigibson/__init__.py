@@ -50,7 +50,6 @@ tempdir = tempfile.mkdtemp()
 def shutdown():
     global app
     global sim
-    sim.clear()
     # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
     try:
         shutil.rmtree(tempdir)
@@ -60,8 +59,9 @@ def shutdown():
     log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
 
     # Suppress carb warning here that we have no control over -- it's expected
-    with suppress_omni_log(channels=["carb"]):
-        app.close()
+    if app is not None:
+        with suppress_omni_log(channels=["carb"]):
+            app.close()
 
     exit(0)
 
