@@ -1,4 +1,3 @@
-import atexit
 import logging
 import os
 import shutil
@@ -47,9 +46,8 @@ sim = None  # (this is a singleton so it's okay that it's global)
 # shutdown by the shutdown function.
 tempdir = tempfile.mkdtemp()
 
-def cleanup():
+def cleanup(*args, **kwargs):
     # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
-    log.info("WE ARE AT CLEANUP")
     try:
         shutil.rmtree(tempdir)
     except PermissionError:
@@ -57,6 +55,24 @@ def cleanup():
     from omnigibson.utils.ui_utils import suppress_omni_log
     log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
 
-
+def shutdown(due_to_signal=False):
+    if app is not None:
+        # If Isaac is running, we do the cleanup in its shutdown callback to avoid open handles.
+        # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
+        # Manually call cleanup for now.
+        cleanup()
+        app.close()
+    else:
+        # Otherwise, we do the cleanup here.
+        cleanup()
+        
+        # If we're not shutting down due to a signal, we need to manually exit
+        if not due_to_signal:
+            exit(0)
+        
+def shutdown_handler(*args, **kwargs):
+    shutdown(due_to_signal=True)
+    return signal.default_int_handler(*args, **kwargs)
+    
 # Something somewhere disables the default SIGINT handler, so we need to re-enable it
-signal.signal(signal.SIGINT, signal.SIG_DFL)
+signal.signal(signal.SIGINT, shutdown_handler)

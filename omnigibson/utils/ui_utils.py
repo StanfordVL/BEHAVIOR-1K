@@ -238,7 +238,7 @@ def choose_from_options(options, name, random_selection=False):
             s = input("Choose a {} (enter a number from 1 to {}): ".format(name, len(options)))
             # parse input into a number within range
             k = min(max(int(s), 1), len(options)) - 1
-        except:
+        except ValueError:
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
