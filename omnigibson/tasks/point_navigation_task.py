@@ -186,7 +186,7 @@ class PointNavigationTask(BaseTask):
             og.sim.import_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
-        if env.scene.trav_map.build_graph and self._visualize_path:
+        if self._visualize_path:
             waypoints = []
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
@@ -222,7 +222,7 @@ class PointNavigationTask(BaseTask):
         """
         # Possibly sample initial pos
         if self._randomize_initial_pos:
-            _, initial_pos = env.scene.get_random_point(floor=self._floor)
+            _, initial_pos = env.scene.get_random_point(floor=self._floor, robot=env.robots[self._robot_idn])
         else:
             initial_pos = self._initial_pos
 
@@ -234,11 +234,10 @@ class PointNavigationTask(BaseTask):
         if self._randomize_goal_pos:
             dist, in_range_dist = 0.0, False
             for _ in range(max_trials):
-                _, goal_pos = env.scene.get_random_point(floor=self._floor)
-                if env.scene.trav_map.build_graph:
-                    _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False)
-                else:
-                    dist = T.l2_distance(initial_pos, goal_pos)
+                _, goal_pos = env.scene.get_random_point(floor=self._floor, 
+                                                         reference_point=initial_pos,
+                                                         robot=env.robots[self._robot_idn])
+                _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False, robot=env.robots[self._robot_idn])
                 # If a path range is specified, make sure distance is valid
                 if self._path_range is None or self._path_range[0] < dist < self._path_range[1]:
                     in_range_dist = True
@@ -423,7 +422,7 @@ class PointNavigationTask(BaseTask):
                 - float: geodesic distance of the path to the goal position
         """
         start_xy_pos = env.robots[self._robot_idn].states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
-        return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path)
+        return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path, robot=env.robots[self._robot_idn])
 
     def _step_visualization(self, env):
         """
@@ -432,7 +431,7 @@ class PointNavigationTask(BaseTask):
         Args:
             env (Environment): Environment instance
         """
-        if env.scene.trav_map.build_graph and self._visualize_path:
+        if self._visualize_path:
             shortest_path, _ = self.get_shortest_path_to_goal(env=env, entire_path=True)
             floor_height = env.scene.get_floor_height(self._floor)
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])

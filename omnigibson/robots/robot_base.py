@@ -86,7 +86,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -195,6 +195,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Validate this robot configuration
         self._validate_configuration()
+
+        self._reset_joint_pos_aabb_extent = self.aabb_extent
 
     def _load_sensors(self):
         """
@@ -445,6 +447,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Run super
         super().remove()
+    
+    @property
+    def reset_joint_pos_aabb_extent(self):
+        """
+        This is the aabb extent of the robot in the robot frame after resetting the joints.
+        Returns:
+            3-array: Axis-aligned bounding box extent of the robot base
+        """
+        return self._reset_joint_pos_aabb_extent
 
     def teleop_data_to_action(self, teleop_data):
         """
