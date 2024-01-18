@@ -23,9 +23,8 @@ class InteractiveTraversableScene(TraversableScene):
         scene_instance=None,
         scene_file=None,
         trav_map_resolution=0.1,
-        trav_map_erosion=2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         load_object_categories=None,
@@ -44,9 +43,8 @@ class InteractiveTraversableScene(TraversableScene):
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 This will override scene_instance and scene_model!
             trav_map_resolution (float): traversability map resolution
-            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             load_object_categories (None or list): if specified, only load these object categories into the scene
@@ -90,9 +88,8 @@ class InteractiveTraversableScene(TraversableScene):
             scene_model=scene_model,
             scene_file=scene_file,
             trav_map_resolution=trav_map_resolution,
-            trav_map_erosion=trav_map_erosion,
+            default_erosion_radius=default_erosion_radius,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=False,
@@ -162,8 +159,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Load the traversability map if we have the connectivity graph
         maps_path = os.path.join(self.scene_dir, "layout")
-        if self.has_connectivity_graph:
-            self._trav_map.load_map(maps_path)
+        self._trav_map.load_map(maps_path)
 
     def _should_load_object(self, obj_info, task_metadata):
         name = obj_info["args"]["name"]

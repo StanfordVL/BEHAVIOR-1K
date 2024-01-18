@@ -17,9 +17,8 @@ class TraversableScene(Scene):
         scene_model,
         scene_file=None,
         trav_map_resolution=0.1,
-        trav_map_erosion=2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
         use_floor_plane=True,
@@ -32,9 +31,8 @@ class TraversableScene(Scene):
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
             trav_map_resolution (float): traversability map resolution
-            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
             use_floor_plane (bool): whether to load a flat floor plane into the simulator
@@ -48,9 +46,8 @@ class TraversableScene(Scene):
         # Create traversable map
         self._trav_map = TraversableMap(
             map_resolution=trav_map_resolution,
-            trav_map_erosion=trav_map_erosion,
+            default_erosion_radius=default_erosion_radius,
             trav_map_with_objects=trav_map_with_objects,
-            build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
         )
@@ -70,20 +67,14 @@ class TraversableScene(Scene):
         """
         return self._trav_map
 
-    @property
-    def has_connectivity_graph(self):
-        # Connectivity graph is determined by travserable map
-        return self._trav_map.build_graph
+    def get_random_point(self, floor=None, reference_point=None, robot=None):
+        return self._trav_map.get_random_point(floor=floor, reference_point=reference_point, robot=robot)
 
-    def get_random_point(self, floor=None):
-        return self._trav_map.get_random_point(floor=floor)
-
-    def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
-        assert self._trav_map.build_graph, "cannot get shortest path without building the graph"
-
+    def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         return self._trav_map.get_shortest_path(
             floor=floor,
             source_world=source_world,
             target_world=target_world,
             entire_path=entire_path,
+            robot=robot,
         )
