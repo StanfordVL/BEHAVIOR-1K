@@ -111,7 +111,7 @@ def create_physx_particleset_pointinstancer(
     scales=None,
     prototype_indices=None,
     enabled=True,
-) -> lo.Usd.Prim:
+):
     """
     Creates a particle set instancer based on a UsdGeom.PointInstancer at @prim_path on the current stage, with
     the specified parameters.

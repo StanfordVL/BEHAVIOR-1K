@@ -82,7 +82,7 @@ class SettingItem:
     def __init__(
         self,
         owner,
-        setting_type: lo.SettingType,
+        setting_type,
         name,
         path,
         range_from=-float("inf"),

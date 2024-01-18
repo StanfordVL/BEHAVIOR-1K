@@ -15,30 +15,6 @@ from omnigibson.utils.ui_utils import suppress_omni_log
 
 import omnigibson.utils.transform_utils as T
 
-GF_TO_VT_MAPPING = {
-    lo.Gf.Vec3d: lo.Vt.Vec3dArray,
-    lo.Gf.Vec3f: lo.Vt.Vec3fArray,
-    lo.Gf.Vec3h: lo.Vt.Vec3hArray,
-    lo.Gf.Quatd: lo.Vt.QuatdArray,
-    lo.Gf.Quatf: lo.Vt.QuatfArray,
-    lo.Gf.Quath: lo.Vt.QuathArray,
-    int: lo.Vt.IntArray,
-    float: lo.Vt.FloatArray,
-    bool: lo.Vt.BoolArray,
-    str: lo.Vt.StringArray,
-    chr: lo.Vt.CharArray,
-}
-
-MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-    "Sphere": lo.SphereEvaluator,
-    "Disk": lo.DiskEvaluator,
-    "Plane": lo.PlaneEvaluator,
-    "Cylinder": lo.CylinderEvaluator,
-    "Torus": lo.TorusEvaluator,
-    "Cone": lo.ConeEvaluator,
-    "Cube": lo.CubeEvaluator,
-}
-
 
 def array_to_vtarray(arr, element_type):
     """
@@ -52,6 +28,20 @@ def array_to_vtarray(arr, element_type):
     Returns:
         Vt.Array: Vt-typed array, of specified type corresponding to @element_type
     """
+    GF_TO_VT_MAPPING = {
+        lo.Gf.Vec3d: lo.Vt.Vec3dArray,
+        lo.Gf.Vec3f: lo.Vt.Vec3fArray,
+        lo.Gf.Vec3h: lo.Vt.Vec3hArray,
+        lo.Gf.Quatd: lo.Vt.QuatdArray,
+        lo.Gf.Quatf: lo.Vt.QuatfArray,
+        lo.Gf.Quath: lo.Vt.QuathArray,
+        int: lo.Vt.IntArray,
+        float: lo.Vt.FloatArray,
+        bool: lo.Vt.BoolArray,
+        str: lo.Vt.StringArray,
+        chr: lo.Vt.CharArray,
+    }
+
     # Make sure array type is valid
     assert_valid_key(key=element_type, valid_keys=GF_TO_VT_MAPPING, name="array element type")
 
@@ -663,6 +653,15 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
             use og.sim.stage
     """
+    MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
+        "Sphere": lo.SphereEvaluator,
+        "Disk": lo.DiskEvaluator,
+        "Plane": lo.PlaneEvaluator,
+        "Cylinder": lo.CylinderEvaluator,
+        "Torus": lo.TorusEvaluator,
+        "Cone": lo.ConeEvaluator,
+        "Cube": lo.CubeEvaluator,
+    }
 
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
     evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]

@@ -4,16 +4,6 @@ import random
 import numpy as np
 from PIL import Image
 
-from omnigibson import app
-
-# Make sure synthetic data extension is enabled
-ext_manager = app.app.get_extension_manager()
-ext_manager.set_extension_enabled("omni.syntheticdata", True)
-
-# Continue with omni synethic data imports afterwards
-import omnigibson.lazy_omni as lo
-sensor_types = lo._syntheticdata.SensorType
-
 try:
     import accimage
 except ImportError:

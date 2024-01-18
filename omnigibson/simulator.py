@@ -106,6 +106,7 @@ def launch_app():
     # Enable additional extensions we need
     lo.enable_extension("omni.flowusd")
     lo.enable_extension("omni.particle.system.bundle")
+    lo.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":

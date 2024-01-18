@@ -12,10 +12,6 @@ from omnigibson.utils.ui_utils import dock_window, suppress_omni_log
 from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
-# Make sure synthetic data extension is enabled
-ext_manager = og.app.app.get_extension_manager()
-ext_manager.set_extension_enabled("omni.syntheticdata", True)
-
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
 def render():
@@ -59,33 +55,9 @@ class VisionSensor(BaseSensor):
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
             current camera. Otherwise, creates a new viewport
     """
-    _SENSOR_HELPERS = dict(
-        rgb=lo.sensors.get_rgb,
-        depth=lo.sensors.get_depth,
-        depth_linear=lo.sensors.get_depth_linear,
-        normal=lo.sensors.get_normals,
-        seg_semantic=lo.sensors.get_semantic_segmentation,
-        seg_instance=lo.sensors.get_instance_segmentation,
-        flow=lo.sensors.get_motion_vector,
-        bbox_2d_tight=lo.sensors.get_bounding_box_2d_tight,
-        bbox_2d_loose=lo.sensors.get_bounding_box_2d_loose,
-        bbox_3d=lo.sensors.get_bounding_box_3d,
-        camera=get_camera_params,
-    )
 
-    # Define raw sensor types
-    _RAW_SENSOR_TYPES = dict(
-        rgb=lo._syntheticdata.SensorType.Rgb,
-        depth=lo._syntheticdata.SensorType.Depth,
-        depth_linear=lo._syntheticdata.SensorType.DepthLinear,
-        normal=lo._syntheticdata.SensorType.Normal,
-        seg_semantic=lo._syntheticdata.SensorType.SemanticSegmentation,
-        seg_instance=lo._syntheticdata.SensorType.InstanceSegmentation,
-        flow=lo._syntheticdata.SensorType.MotionVector,
-        bbox_2d_tight=lo._syntheticdata.SensorType.BoundingBox2DTight,
-        bbox_2d_loose=lo._syntheticdata.SensorType.BoundingBox2DLoose,
-        bbox_3d=lo._syntheticdata.SensorType.BoundingBox3D,
-    )
+    _SENSOR_HELPERS = dict()
+    _RAW_SENSOR_TYPES = dict()
 
     # Persistent dictionary of sensors, mapped from prim_path to sensor
     SENSORS = dict()
@@ -115,6 +87,36 @@ class VisionSensor(BaseSensor):
         # Create variables that will be filled in later at runtime
         self._sd = None             # synthetic data interface
         self._viewport = None       # Viewport from which to grab data
+
+        if self._SENSOR_HELPERS == dict():
+            self._SENSOR_HELPERS = dict(
+                rgb=lo.sensors.get_rgb,
+                depth=lo.sensors.get_depth,
+                depth_linear=lo.sensors.get_depth_linear,
+                normal=lo.sensors.get_normals,
+                seg_semantic=lo.sensors.get_semantic_segmentation,
+                seg_instance=lo.sensors.get_instance_segmentation,
+                flow=lo.sensors.get_motion_vector,
+                bbox_2d_tight=lo.sensors.get_bounding_box_2d_tight,
+                bbox_2d_loose=lo.sensors.get_bounding_box_2d_loose,
+                bbox_3d=lo.sensors.get_bounding_box_3d,
+                camera=get_camera_params,
+            )
+        
+        if self._RAW_SENSOR_TYPES == dict():
+            # Define raw sensor types
+            self._RAW_SENSOR_TYPES = dict(
+                rgb=lo._syntheticdata.SensorType.Rgb,
+                depth=lo._syntheticdata.SensorType.Depth,
+                depth_linear=lo._syntheticdata.SensorType.DepthLinear,
+                normal=lo._syntheticdata.SensorType.Normal,
+                seg_semantic=lo._syntheticdata.SensorType.SemanticSegmentation,
+                seg_instance=lo._syntheticdata.SensorType.InstanceSegmentation,
+                flow=lo._syntheticdata.SensorType.MotionVector,
+                bbox_2d_tight=lo._syntheticdata.SensorType.BoundingBox2DTight,
+                bbox_2d_loose=lo._syntheticdata.SensorType.BoundingBox2DLoose,
+                bbox_3d=lo._syntheticdata.SensorType.BoundingBox3D,
+            )
 
         # Run super method
         super().__init__(
