@@ -1,20 +1,27 @@
 """
 Example script for using external devices to teleoperate a robot.
 """
+try:
+    from mediapipe import solutions
+except ModuleNotFoundError:
+    pass
+
 import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.teleop_utils import TeleopSystem
+
 from real_tiago.utils.general_utils import AttrDict
+from real_tiago.utils.camera_utils import RealSenseCamera
 
 teleop_config = AttrDict(
-    arm_left_controller='keyboard',
-    arm_right_controller='keyboard',
-    base_controller='keyboard',
-    torso_controller='keyboard',
+    arm_left_controller='human_kpt',
+    arm_right_controller='human_kpt',
+    base_controller='human_kpt',
+    torso_controller='human_kpt',
 
     interface_kwargs=AttrDict(
-        vr={},
-        human_kpt={},
+        oculus={},
+        human_kpt={"camera": RealSenseCamera()},
         keyboard={},
         spacemouse={}
     )
@@ -44,13 +51,13 @@ def main():
         robot_cfg["controller_config"][f"arm_{arm}"] = {
             "name": "InverseKinematicsController",
             "mode": "pose_delta_ori",
-            "motor_type": "position"
+            "motor_type": "position",
+            "command_input_limits": None,
         }
         robot_cfg["controller_config"][f"gripper_{arm}"] = {
             "name": "MultiFingerGripperController",
             "command_input_limits": (0.0, 1.0),
             "mode": "smooth",
-            "inverted": True
         }
     object_cfg = [
         {
@@ -134,9 +141,8 @@ def main():
     teleop_sys.start()
     # main simulation loop
     for _ in range(10000):
-        if og.sim.is_playing():
-            action = teleop_sys.get_action()
-            env.step(action) 
+        action = teleop_sys.get_action()
+        env.step(action) 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
     env.close()

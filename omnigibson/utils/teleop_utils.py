@@ -9,7 +9,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from real_tiago.user_interfaces.teleop_core import TeleopObservation
+from real_tiago.user_interfaces.teleop_core import TeleopData
 from real_tiago.user_interfaces.teleop_policy import TeleopPolicy
 
 m = create_module_macros(module_path=__file__)
@@ -48,14 +48,23 @@ class TeleopSystem(TeleopPolicy):
             np.ndarray: array of action data
         """
         # construct robot observation
-        robot_obs = TeleopObservation()
+        robot_obs = TeleopData()
+        base_pos, base_orn = self.robot.get_position_orientation()
+        robot_obs.base_delta_pose = np.r_[base_pos, base_orn]
+        for arm in self.robot_arms:
+            abs_cur_pos, abs_cur_orn = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
+            rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
+            robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, [1]]
         # get teleop action
         teleop_actions = super().get_action(robot_obs)
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                arm_pos, arm_orn = self.actions.arms[arm_name][:3], T.euler2quat(self.actions.arms[arm_name][3:6])
-                self.control_markers[arm_name].set_position_orientation(arm_pos, arm_orn)
+                delta_pos, delta_orn = teleop_actions[arm_name][:3], teleop_actions[arm_name][3:7]
+                rel_target_pos = robot_obs[arm_name][:3] + delta_pos
+                rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
+                target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
+                self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
         return self.robot.teleop_data_to_action(teleop_actions)
 
 

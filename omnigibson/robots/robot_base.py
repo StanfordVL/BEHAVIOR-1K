@@ -2,7 +2,7 @@ from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
-from real_tiago.user_interfaces.teleop_core import TeleopAction
+from real_tiago.user_interfaces.teleop_core import TeleopData
 
 from omnigibson.macros import create_module_macros
 from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
@@ -480,7 +480,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return self._reset_joint_pos_aabb_extent
 
-    def teleop_data_to_action(self, teleop_action: TeleopAction):
+    def teleop_data_to_action(self, teleop_action: TeleopData) -> np.ndarray:
         """
         Generate action data from teleoperation action data
         Args:
