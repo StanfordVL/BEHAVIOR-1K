@@ -120,9 +120,9 @@ class OperationalSpaceController(ManipulationController):
                 range (i.e.: this can be unique to each robot, and implemented by each embodiment).
                 Function signature should be:
 
-                    def limiter(command_pos: Array[float], command_quat: Array[float], control_dict: Dict[str, Any]) --> Tuple[Array[float], Array[float]]
+                    def limiter(target_pos: Array[float], target_quat: Array[float], control_dict: Dict[str, Any]) --> Tuple[Array[float], Array[float]]
 
-                where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
+                where target_pos is (x,y,z) cartesian position values, target_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
         """
         # Store arguments
@@ -141,6 +141,10 @@ class OperationalSpaceController(ManipulationController):
         self.variable_kp = self.kp is None
         self.variable_damping_ratio = self.damping_ratio is None
         self.variable_kp_null = self.kp_null is None
+
+        # TODO: Add support for variable gains -- for now, just raise an error
+        assert True not in {self.variable_kp, self.variable_damping_ratio, self.variable_kp_null}, \
+            "Variable gains with OSC is not supported yet!"
 
         # If the mode is set as absolute orientation and using default config,
         # change input and output limits accordingly.
@@ -196,8 +200,6 @@ class OperationalSpaceController(ManipulationController):
         self.default_joint_pos = default_joint_pos[dof_idx].astype(np.float32)
 
         # Other variables that will be filled in at runtime
-        self.goal_pos = None
-        self.goal_ori_mat = None
         self._fixed_quat_target = None
 
         # Run super init
@@ -214,16 +216,16 @@ class OperationalSpaceController(ManipulationController):
         super().reset()
 
         # Clear internal variables
-        self.goal_pos = None
-        self.goal_ori_mat = None
         self._fixed_quat_target = None
         self._clear_variable_gains()
 
-    @property
-    def state_size(self):
-        # Add 3 for goal pos + 4 for goal quat + 1 for goal validity + 4 for fixed quat target
-        # TODO: Store gains, etc.
-        return super().state_size + 12
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
+
+        # If self._goal is populated, then set fixed_quat_target as well if the mode uses it
+        if self.mode == "position_fixed_ori" and self._goal is not None:
+            self._fixed_quat_target = self._goal["target_quat"]
 
     def _clear_variable_gains(self):
         """
@@ -256,58 +258,12 @@ class OperationalSpaceController(ManipulationController):
             self.kd_null = 2 * np.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
-    def _dump_state(self):
-        # Run super first
-        state = super()._dump_state()
-
-        # Add internal goal targets
-        state["goal_is_valid"] = self.goal_pos is not None
-        state["goal_pos"] = self.goal_pos
-        state["goal_ori_mat"] = self.goal_ori_mat
-        state["fixed_quat_target"] = self._fixed_quat_target
-
-        return state
-
-    def _load_state(self, state):
-        # Run super first
-        super()._load_state(state=state)
-
-        # Load relevant info for this controller
-        self.goal_pos = state["goal_pos"]
-        self.goal_ori_mat = state["goal_ori_mat"]
-        self._fixed_quat_target = state["fixed_quat_target"]
-
-    def _serialize(self, state):
-        # Run super first
-        state_flat = super()._serialize(state=state)
-
-        # Serialize state for this controller
-        return np.concatenate([
-            state_flat,
-            [state["goal_is_valid"]],
-            state["goal_pos"] if state["goal_is_valid"] else np.zeros(3),
-            T.mat2quat(state["goal_ori_mat"]) if state["goal_is_valid"] else np.zeros(4),
-            np.zeros(4) if state["fixed_quat_target"] is None else state["fixed_quat_target"],
-        ]).astype(float)
-
-    def _deserialize(self, state):
-        # Run super first
-        state_dict, idx = super()._deserialize(state=state)
-
-        # Deserialize state for this controller
-        goal_is_valid = bool(state[idx])
-        state_dict["goal_is_valid"] = goal_is_valid
-        state_dict["goal_pos"] = state[idx + 1: idx + 4] if goal_is_valid else None
-        state_dict["goal_ori_mat"] = T.quat2mat(state[idx + 4: idx + 8]) if goal_is_valid else None
-        state_dict["fixed_quat_target"] = None if np.all(state[idx + 8: idx + 12] == 0.0) else state[idx + 8: idx + 12]
-
-        return state_dict, idx + 12
-
-    def update_goal(self, control_dict, target_pos, target_quat, gains=None):
+    def _update_goal(self, command, control_dict):
         """
         Updates the internal goal (ee pos and ee ori mat) based on the inputted delta command
 
         Args:
+            command (n-array): Preprocessed command
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -319,26 +275,59 @@ class OperationalSpaceController(ManipulationController):
                         control, computed in its local frame (e.g.: robot base frame)
                     <@self.task_name>_ang_vel_relative: (ax, ay, az) relative angular velocity of the desired task
                         frame to control, computed in its local frame (e.g.: robot base frame)
-
-            target_pos (3-array): (x,y,z) desired position of the target frame with respect to the robot frame.
-                These should be the DE-NORMALIZED commands (i.e.: already processed wrt to the input / output command
-                limits)
-            target_quat (4-array): (x,y,z,w) desired quaternion orientation of the target frame with respect to the
-                robot frame. These should be the DE-NORMALIZED commands (i.e.: already processed wrt to the input
-                / output command limits)
-            gains (n-array): If specified, gains to update internally (will only be used if variable_kp / etc. is used)
         """
-        # Set goals
-        self.goal_pos = target_pos.astype(np.float32)
-        self.goal_ori_mat = T.quat2mat(target_quat).astype(np.float32)
+        # Grab important info from control dict
+        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
+
+        # Convert position command to absolute values if needed
+        if self.mode == "absolute_pose":
+            target_pos = command[:3]
+        else:
+            dpos = command[:3]
+            target_pos = pos_relative + dpos
+
+        # Compute orientation
+        if self.mode == "position_fixed_ori":
+            # We need to grab the current robot orientation as the commanded orientation if there is none saved
+            if self._fixed_quat_target is None:
+                self._fixed_quat_target = quat_relative.astype(np.float32) \
+                    if (self._goal is None) else self._goal["target_quat"]
+            target_quat = self._fixed_quat_target
+        elif self.mode == "position_compliant_ori":
+            # Target quat is simply the current robot orientation
+            target_quat = quat_relative
+        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
+            # Received "delta" ori is in fact the desired absolute orientation
+            target_quat = T.axisangle2quat(command[3:6])
+        else:  # pose_delta_ori control
+            # Grab dori and compute target ori
+            dori = T.quat2mat(T.axisangle2quat(command[3:6]))
+            target_quat = T.mat2quat(dori @ T.quat2mat(quat_relative))
+
+        # Possibly limit to workspace if specified
+        if self.workspace_pose_limiter is not None:
+            target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
+
+        gains = None    # TODO! command[OSC_MODE_COMMAND_DIMS[self.mode]:]
         if gains is not None:
             self._update_variable_gains(gains=gains)
 
-    def compute_control(self, control_dict):
+        # Set goals and return
+        return dict(
+            target_pos=target_pos.astype(np.float32),
+            target_ori_mat=T.quat2mat(target_quat).astype(np.float32),
+        )
+
+    def compute_control(self, goal_dict, control_dict):
         """
         Computes low-level torque controls using internal eef goal pos / ori.
 
         Args:
+            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                goals necessary for controller computation. Must include the following keys:
+                    target_pos: robot-frame (x,y,z) desired end effector position
+                    target_quat: robot-frame (x,y,z,w) desired end effector quaternion orientation
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -384,8 +373,8 @@ class OperationalSpaceController(ManipulationController):
             ee_pos=ee_pos.astype(np.float32),
             ee_mat=T.quat2mat(ee_quat).astype(np.float32),
             ee_vel=ee_vel.astype(np.float32),
-            goal_pos=self.goal_pos,
-            goal_ori_mat=self.goal_ori_mat,
+            goal_pos=goal_dict["target_pos"],
+            goal_ori_mat=goal_dict["target_ori_mat"],
             kp=kp,
             kd=kd,
             kp_null=self.kp_null,
@@ -393,109 +382,30 @@ class OperationalSpaceController(ManipulationController):
             rest_qpos=self.default_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
-        )
-
-        # Return the control torques
-        return u
-
-    def compute_no_op_command(self, control_dict):
-        # Compute based on mode
-        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
-
-        if self.mode == "absolute_pose":
-            # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
-            cmd = np.concatenate([pos_relative, T.quat2axisangle(quat_relative)])
-        elif self.mode == "pose_absolute_ori":
-            # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
-            cmd = np.concatenate([np.zeros(3), T.quat2axisangle(quat_relative)])
-        elif self.mode == "pose_delta_ori":
-            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
-            cmd = np.zeros(6)
-        elif self.mode == "position_fixed_ori" or self.mode == "position_compliant_ori":
-            # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation, OR
-            # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
-            cmd = np.zeros(3)
-        else:
-            raise ValueError(f"Got invalid command mode type: {self.mode}!")
-
-        return cmd
-
-    def _command_to_control(self, command, control_dict):
-        """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
-        This processes the command based on self.mode, possibly clips the command based on self.workspace_pose_limiter,
-
-        Args:
-            command (Array[float]): desired (already preprocessed) command to convert into control signals
-                Is one of:
-                    (dx,dy,dz,...) - desired delta cartesian position
-                    (dx,dy,dz,dax,day,daz,...) - desired delta cartesian position and delta axis-angle orientation
-                    (dx,dy,dz,ax,ay,az,...) - desired delta cartesian position and global axis-angle orientation
-                    where ... represents potential additional gain values specified
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation. Must include the following keys:
-                    joint_position: Array of current joint positions
-                    joint_velocity: Array of current joint velocities
-                    mass_matrix: (N_dof, N_dof) Current mass matrix
-                    gravity_force: (N_dof,) Gravity compensation efforts to offset for
-                    cc_force: (N_dof,) Coriolis and centrifugal efforts to offset for
-                    <@self.task_name>_pos_relative: (x,y,z) relative cartesian position of the desired task frame to
-                        control, computed in its local frame (e.g.: robot base frame)
-                    <@self.task_name>_quat_relative: (x,y,z,w) relative quaternion orientation of the desired task
-                        frame to control, computed in its local frame (e.g.: robot base frame)
-                    <@self.task_name>_lin_vel_relative: (x,y,z) relative linear velocity of the desired task frame to
-                        control, computed in its local frame (e.g.: robot base frame)
-                    <@self.task_name>_ang_vel_relative: (ax, ay, az) relative angular velocity of the desired task
-                        frame to control, computed in its local frame (e.g.: robot base frame)
-
-        Returns:
-            Array[float]: outputted (non-clipped!) velocity control signal to deploy
-        """
-        # Grab important info from control dict
-        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
-
-        # Convert position command to absolute values if needed
-        if self.mode == "absolute_pose":
-            target_pos = command[:3]
-        else:
-            dpos = command[:3]
-            target_pos = pos_relative + dpos
-
-        # Compute orientation
-        if self.mode == "position_fixed_ori":
-            # We need to grab the current robot orientation as the commanded orientation if there is none saved
-            if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative.astype(np.float32)
-            target_quat = self._fixed_quat_target
-        elif self.mode == "position_compliant_ori":
-            # Target quat is simply the current robot orientation
-            target_quat = quat_relative
-        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
-            # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = T.axisangle2quat(command[3:6])
-        else:  # pose_delta_ori control
-            # Grab dori and compute target ori
-            dori = T.quat2mat(T.axisangle2quat(command[3:6]))
-            target_quat = T.mat2quat(dori @ T.quat2mat(quat_relative))
-
-        # Possibly limit to workspace if specified
-        if self.workspace_pose_limiter is not None:
-            target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
-
-        # Update goal
-        gains = command[OSC_MODE_COMMAND_DIMS[self.mode]:]
-        self.update_goal(control_dict=control_dict, target_pos=target_pos, target_quat=target_quat, gains=gains)
-
-        # Calculate and return OSC-backed out joint efforts
-        u = self.compute_control(control_dict=control_dict).flatten()
+        ).flatten()
 
         # Apply gravity compensation from the control dict
         u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
 
-        # Return these commanded velocities (this only includes the relevant dof idx)
+        # Return the control torques
         return u
+
+    def compute_no_op_goal(self, control_dict):
+        # No-op is maintaining current pose
+        target_pos = np.array(control_dict[f"{self.task_name}_pos_relative"])
+        target_quat = np.array(control_dict[f"{self.task_name}_quat_relative"])
+
+        # Convert quat into eef ori mat
+        return dict(
+            target_pos=target_pos.astype(np.float32),
+            target_ori_mat=T.quat2mat(target_quat).astype(np.float32),
+        )
+
+    def _get_goal_shapes(self):
+        return dict(
+            target_pos=(3,),
+            target_ori_mat=(3, 3),
+        )
 
     @property
     def control_type(self):

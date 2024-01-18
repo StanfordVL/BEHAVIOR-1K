@@ -58,23 +58,23 @@ class NullJointController(JointController):
             command_output_limits=command_output_limits,
         )
 
-    def compute_no_op_command(self, control_dict):
-        # Set the command to be internal stored default value
-        return self._default_command
+    def compute_no_op_goal(self, control_dict):
+        # Set the goal to be internal stored default value
+        return dict(target=self._default_command)
 
     def _preprocess_command(self, command):
-        # Set the command to be internal stored default value
+        # Override super and force the processed command to be internal stored default value
         return np.array(self._default_command)
 
-    def update_default_command(self, command):
+    def update_default_goal(self, target):
         """
         Updates the internal default command value.
 
         Args:
-            command (n-array): New default command values to set for this controller.
+            target (n-array): New default command values to set for this controller.
                 Should be of dimension @command_dim
         """
-        assert len(command) == self.command_dim, \
-            f"Default control must be length: {self.command_dim}, got length: {len(command)}"
+        assert len(target) == self.control_dim, \
+            f"Default control must be length: {self.control_dim}, got length: {len(target)}"
 
-        self._default_command = np.array(command)
+        self._default_command = np.array(target)

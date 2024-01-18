@@ -5,6 +5,14 @@ from omnigibson.controllers import IsGraspingState, ControlType, LocomotionContr
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
 
+from omnigibson.macros import create_module_macros
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+m.DEFAULT_JOINT_POS_KP = 50.0
+m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0     # critically damped
+m.DEFAULT_JOINT_VEL_KP = 2.0
+
 
 class JointController(LocomotionController, ManipulationController, GripperController):
     """
@@ -25,6 +33,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        kp=None,
+        damping_ratio=None,
+        use_impedances=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
     ):
@@ -51,6 +62,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            kp (None or float): If @motor_type is "position" or "velocity", this is the proportional gain applied
+                to the joint controller. If None, a default value will be used.
+            damping_ratio (None or float): If @motor_type is "position", this is the damping ratio applied to the
+                joint controller. If None, a default value will be used.
+            use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
+                applied
             use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values
             compute_delta_in_quat_space (None or List[(rx_idx, ry_idx, rz_idx), ...]): if specified, groups of
                 joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
@@ -62,6 +79,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._motor_type = motor_type.lower()
         self._use_delta_commands = use_delta_commands
         self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
+
+        # Store control gains
+        if self._motor_type == "position":
+            kp = m.DEFAULT_JOINT_POS_KP if kp is None else kp
+            damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if damping_ratio is None else damping_ratio
+        elif self._motor_type == "velocity":
+            kp = m.DEFAULT_JOINT_VEL_KP if kp is None else kp
+            assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=velocity!"
+        else:   # effort
+            assert kp is None, "Cannot set kp for JointController with motor_type=effort!"
+            assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=effort!"
+        self.kp = kp
+        self.kd = None if damping_ratio is None else 2 * np.sqrt(self.kp) * damping_ratio
+        self._use_impedances = use_impedances
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
@@ -78,28 +109,15 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             command_output_limits=command_output_limits,
         )
 
-    def _command_to_control(self, command, control_dict):
-        """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal
+    def _update_goal(self, command, control_dict):
+        # Compute the base value for the command
+        base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
 
-        Args:
-            command (Array[float]): desired (already preprocessed) command to convert into control signals
-            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
-                states necessary for controller computation. Must include the following keys:
-                    joint_position: Array of current joint positions
-                    joint_velocity: Array of current joint velocities
-                    joint_effort: Array of current joint effort
-
-        Returns:
-            Array[float]: outputted (non-clipped!) control signal to deploy
-        """
         # If we're using delta commands, add this value
         if self._use_delta_commands:
-            # Compute the base value for the command.
-            base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
             # Apply the command to the base value.
-            u = base_value + command
+            target = base_value + command
 
             # Correct any gimbal lock issues using the compute_delta_in_quat_space group.
             for rx_ind, ry_ind, rz_ind in self._compute_delta_in_quat_space:
@@ -115,40 +133,76 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 end_rots = T.quat2euler(end_quat)
 
                 # Update the command
-                u[[rx_ind, ry_ind, rz_ind]] = end_rots
+                target[[rx_ind, ry_ind, rz_ind]] = end_rots
 
-        # Otherwise, control is simply the command itself
+        # Otherwise, goal is simply the command itself
         else:
-            u = command
+            target = command
+
+        return dict(target=target)
+
+    def compute_control(self, goal_dict, control_dict):
+        """
+        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal
+
+        Args:
+            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                goals necessary for controller computation. Must include the following keys:
+                    target: desired N-dof absolute joint values used as setpoint
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
+                    joint_position: Array of current joint positions
+                    joint_velocity: Array of current joint velocities
+                    joint_effort: Array of current joint effort
+
+        Returns:
+            Array[float]: outputted (non-clipped!) control signal to deploy
+        """
+        base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
+        target = goal_dict["target"]
+
+        # Convert control into efforts
+        if self._motor_type == "position":
+            # Run impedance controller -- effort = pos_err * kp + vel_err * kd
+            position_error = target - base_value
+            vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
+            u = position_error * self.kp + vel_pos_error * self.kd
+        elif self._motor_type == "velocity":
+            # Compute command torques via PI velocity controller plus gravity compensation torques
+            velocity_error = target - base_value
+            u = velocity_error * self.kp
+        else:   # effort
+            u = target
+
+        # Convert to impedances if requested
+        if self._use_impedances:
+            dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))
+            mm = control_dict["mass_matrix"][dof_idxs_mat]
+            u = np.dot(mm, u)
+
+        # Add gravity compensation
+        u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
 
         # Return control
         return u
 
+    def compute_no_op_goal(self, control_dict):
+        # Compute based on mode
+        if self._motor_type == "position":
+            # Maintain current qpos
+            target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
+        else:
+            # For velocity / effort, directly set to 0
+            target = np.zeros(self.control_dim)
+
+        return dict(target=target)
+
+    def _get_goal_shapes(self):
+        return dict(target=(self.control_dim,))
+
     def is_grasping(self):
         # No good heuristic to determine grasping, so return UNKNOWN
         return IsGraspingState.UNKNOWN
-
-    def compute_no_op_command(self, control_dict):
-        # Compute based on mode
-        if self.use_delta_commands:
-            if self._motor_type == "position":
-                # Zero values
-                cmd = np.zeros(self.command_dim)
-            elif self._motor_type == "velocity" or self._motor_type == "effort":
-                # Run negative delta
-                cmd = -control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
-            else:
-                raise ValueError(f"Got invalid motor type: {self._motor_type}!")
-        else:
-            # Directly use info from control dict
-            if self._motor_type == "position":
-                # Maintain current qpos
-                cmd = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
-            else:
-                # For velocity / effort, directly set to 0
-                cmd = np.zeros(self.command_dim)
-
-        return cmd
 
     @property
     def use_delta_commands(self):
@@ -160,7 +214,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
     @property
     def control_type(self):
-        return ControlType.get_type(type_str=self._motor_type)
+        return ControlType.EFFORT
 
     @property
     def command_dim(self):

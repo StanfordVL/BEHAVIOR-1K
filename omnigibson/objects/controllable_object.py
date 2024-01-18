@@ -310,7 +310,7 @@ class ControllableObject(BaseObject):
 
         for name, controller in self._controllers.items():
             # Set command, then take a controller step
-            controller.update_command(command=action[idx : idx + controller.command_dim])
+            controller.update_goal(command=action[idx : idx + controller.command_dim], control_dict=self.get_control_dict())
             # Update idx
             idx += controller.command_dim
 

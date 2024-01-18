@@ -79,19 +79,20 @@ class DifferentialDriveController(LocomotionController):
             command_output_limits=command_output_limits,
         )
 
-    def compute_no_op_command(self, control_dict):
-        # This is zero-vector, since we want zero linear / angular velocity
-        return np.zeros(2)
+    def _update_goal(self, command, control_dict):
+        # Directly store command as the velocity goal
+        return dict(vel=command)
 
-    def _command_to_control(self, command, control_dict):
+    def compute_control(self, goal_dict, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
         This processes converts the desired (lin_vel, ang_vel) command into (left, right) wheel joint velocity control
         signals.
 
         Args:
-            command (Array[float]): desired (already preprocessed) 2D command to convert into control signals
-                Consists of desired (lin_vel, ang_vel) of the controlled body
+            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                goals necessary for controller computation. Must include the following keys:
+                    vel: desired (lin_vel, ang_vel) of the controlled body
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
 
@@ -99,7 +100,7 @@ class DifferentialDriveController(LocomotionController):
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
                 to the [left, right] wheel joints
         """
-        lin_vel, ang_vel = command
+        lin_vel, ang_vel = goal_dict["vel"]
 
         # Convert to wheel velocities
         left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
@@ -107,6 +108,14 @@ class DifferentialDriveController(LocomotionController):
 
         # Return desired velocities
         return np.array([left_wheel_joint_vel, right_wheel_joint_vel])
+
+    def compute_no_op_goal(self, control_dict):
+        # This is zero-vector, since we want zero linear / angular velocity
+        return dict(vel=np.zeros(2))
+
+    def _get_goal_shapes(self):
+        # Add (2, )-array representing linear, angular velocity
+        return dict(vel=(2,))
 
     @property
     def control_type(self):
