@@ -6,6 +6,8 @@ import os
 import socket
 from pathlib import Path
 from termcolor import colored
+import atexit
+import signal
 
 import numpy as np
 import json
@@ -162,6 +164,14 @@ def launch_app():
                 app.update()
 
     lo.ContextMenu.save_prim = print_save_usd_warning
+    
+    # TODO: add the exit event stream here, in callback, include og._cleanup()
+    shutdown_stream = lo.omni.kit.app.get_app().get_shutdown_event_stream()
+    sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_shutdown_sub")
+    # TODO: clean up all the og.shutdown() calls
+
+    # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     return app
 

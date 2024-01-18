@@ -1,9 +1,9 @@
+import atexit
 import logging
 import os
 import shutil
-import tempfile
-import atexit
 import signal
+import tempfile
 import builtins
 
 # TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
@@ -47,10 +47,9 @@ sim = None  # (this is a singleton so it's okay that it's global)
 # shutdown by the shutdown function.
 tempdir = tempfile.mkdtemp()
 
-def shutdown():
-    global app
-    global sim
+def cleanup():
     # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
+    log.info("WE ARE AT CLEANUP")
     try:
         shutil.rmtree(tempdir)
     except PermissionError:
@@ -58,17 +57,6 @@ def shutdown():
     from omnigibson.utils.ui_utils import suppress_omni_log
     log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
 
-    # Suppress carb warning here that we have no control over -- it's expected
-    if app is not None:
-        with suppress_omni_log(channels=["carb"]):
-            app.close()
 
-    exit(0)
-
-# register signal handler for CTRL + C
-def signal_handler(signal, frame):
-    shutdown()
-signal.signal(signal.SIGINT, signal_handler)
-
-# register handler so that we always shut omiverse down correctly upon termination
-atexit.register(shutdown)
+# Something somewhere disables the default SIGINT handler, so we need to re-enable it
+signal.signal(signal.SIGINT, signal.SIG_DFL)
