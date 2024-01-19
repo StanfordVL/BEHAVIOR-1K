@@ -350,7 +350,7 @@ def plan_arm_motion_ik(
     ik_solver = IKSolver(
         robot_description_path=robot_description_path,
         robot_urdf_path=robot.urdf_path,
-        default_joint_pos=robot.default_joint_pos[joint_control_idx],
+        reset_joint_pos=robot.reset_joint_pos[joint_control_idx],
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
