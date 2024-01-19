@@ -82,7 +82,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_reset_mode="untuck",
-        default_arm_pose="diagonal45",
+        default_arm_pose="vertical",
 
         **kwargs,
     ):
@@ -229,7 +229,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
             if self.default_arm_pose == "vertical":
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [1.46080, -0.75046, 3.08901, 1.79876, 1.49371, -0.52308, 1.56424]
+                    [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
                 )
             elif self.default_arm_pose == "diagonal15":
                 pos[self.arm_control_idx[arm]] = np.array(

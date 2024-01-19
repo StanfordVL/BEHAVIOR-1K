@@ -70,7 +70,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_reset_mode="untuck",
-        default_arm_pose="diagonal30",
+        default_arm_pose="vertical",
         **kwargs,
     ):
         """
