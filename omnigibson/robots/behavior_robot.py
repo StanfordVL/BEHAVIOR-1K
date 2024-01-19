@@ -224,7 +224,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return [joints.index(f"head_{component}_joint") for component in m.COMPONENT_SUFFIXES]
 
     @property
-    def default_joint_pos(self):
+    def _default_joint_pos(self):
         return np.zeros(self.n_joints)
 
     @property
