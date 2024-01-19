@@ -157,9 +157,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         prim = super()._load()
 
         # Also import dummy object if this robot is not fixed base
-        if not self.fixed_base:
+        if self._use_dummy:
             dummy_path = f"{self._prim_path}_dummy"
-            dummy_prim = add_asset_to_stage(asset_path=self.usd_path, prim_path=dummy_path)
+            dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
                 prim_path=dummy_path,
@@ -580,12 +580,30 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         raise NotImplementedError
 
     @property
+    def _dummy_usd_path(self):
+        """
+        Returns:
+            str: Absolute path to the dummy USD to load for, e.g., computing gravity compensation
+        """
+        # By default, this is just the normal usd path
+        return self.usd_path
+
+    @property
     def urdf_path(self):
         """
         Returns:
             str: file path to the robot urdf file.
         """
         raise NotImplementedError
+
+    @property
+    def _use_dummy(self):
+        """
+        Returns:
+            bool: Whether the robot dummy should be loaded and used for some computations, e.g., gravity compensation
+        """
+        # By default, only load if robot is not fixed base
+        return not self.fixed_base
 
     @classproperty
     def _do_not_register_classes(cls):

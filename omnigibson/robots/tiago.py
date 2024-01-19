@@ -372,8 +372,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
         # hand, which does not control the trunk
         fcns = super().get_control_dict()
-        fcns["eef_right_pos_relative"] = lambda: (fcns["eef_right_pos_relative"] +
-                                                  np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx]]))
+        native_fcn = fcns.get_fcn("eef_right_pos_relative")
+        fcns["eef_right_pos_relative"] = lambda: (native_fcn() + np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]]))
 
         return fcns
 
@@ -410,6 +410,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "control_freq": self._control_freq,
             "control_limits": self.control_limits,
             "use_delta_commands": False,
+            "use_impedances": False,
             "motor_type": "velocity",
             "compute_delta_in_quat_space": [(3, 4, 5)],
             "dof_idx": self.base_control_idx,

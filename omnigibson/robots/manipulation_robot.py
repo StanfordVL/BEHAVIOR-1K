@@ -384,18 +384,29 @@ class ManipulationRobot(BaseRobot):
         fcns = super().get_control_dict()
 
         for arm in self.arm_names:
-            fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
-            fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
-            fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
-            fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
-            fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
-            # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
-            # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-            # see self.get_relative_jacobian() for more info
-            eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-            fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
+            self._add_arm_control_dict(fcns=fcns, arm=arm)
 
         return fcns
+
+    def _add_arm_control_dict(self, fcns, arm):
+        """
+        Internally helper function to generate per-arm control dictionary entries. Needed because otherwise generated
+        functions inadvertently point to the same arm, if directly iterated in a for loop!
+
+        Args:
+            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
+            arm (str): specific arm to generate necessary control dict entries for
+        """
+        fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
+        fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
+        fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
+        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
+        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
+        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        # see self.get_relative_jacobian() for more info
+        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()

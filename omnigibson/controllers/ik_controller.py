@@ -177,6 +177,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             damping_ratio=damping_ratio,
             motor_type="position",
             use_delta_commands=False,
+            use_impedances=True,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )

@@ -728,7 +728,7 @@ class CachedFunctions:
         return self.get(name=item)
 
     def __setitem__(self, key, value):
-        return self.add_fcn(name=key, fcn=value)
+        self.add_fcn(name=key, fcn=value)
 
     @cache
     def get(self, name, *args, **kwargs):
