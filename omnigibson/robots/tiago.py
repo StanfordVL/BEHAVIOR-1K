@@ -82,7 +82,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_reset_mode="untuck",
-        default_arm_pose="horizontal",
+        default_arm_pose="diagonal45",
 
         **kwargs,
     ):
@@ -229,23 +229,23 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
             if self.default_arm_pose == "vertical":
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
+                    [1.46080, -0.75046, 3.08901, 1.79876, 1.49371, -0.52308, 1.56424]
                 )
             elif self.default_arm_pose == "diagonal15":
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]
+                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, 2.05251]
                 )
             elif self.default_arm_pose == "diagonal30":
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
+                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, 2.03113]
                 )
             elif self.default_arm_pose == "diagonal45"  :
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
+                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, 1.81302]
                 )
             elif self.default_arm_pose == "horizontal":
                 pos[self.arm_control_idx[arm]] = np.array(
-                    [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
+                    [0.61511, 0.49229, 1.46306, 1.24919, 1.08282, -1.28865, 1.50910]
                 )
             else:
                 raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
