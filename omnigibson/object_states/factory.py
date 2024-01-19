@@ -23,7 +23,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "flammable": [OnFire],
     "saturable": [Saturated],
     "sliceable": [],
-    "slicer": [],
+    "slicer": [SlicerActive],
     "toggleable": [ToggledOn],
     "cloth": [Folded, Unfolded, Overlaid, Draped],
     "fillable": [Filled, Contains],
