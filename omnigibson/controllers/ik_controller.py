@@ -47,7 +47,7 @@ class InverseKinematicsController(ManipulationController):
         robot_urdf_path,
         eef_name,
         control_freq,
-        default_joint_pos,          # TODO: Currently doesn't do anything in Lula
+        reset_joint_pos, 
         control_limits,
         dof_idx,
         command_input_limits="default",
@@ -68,7 +68,7 @@ class InverseKinematicsController(ManipulationController):
             robot_urdf_path (str): path to robot urdf file
             eef_name (str): end effector frame name
             control_freq (int): controller loop frequency
-            default_joint_pos (Array[float]): default joint positions, used as part of nullspace controller in IK.
+            reset_joint_pos (Array[float]): reset joint positions, used as part of nullspace controller in IK.
                 Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx
             control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
                     control signal. Should specify per-dof type limits, i.e.:
@@ -115,7 +115,7 @@ class InverseKinematicsController(ManipulationController):
                 where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
             condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
-                Otherwise, will use the default_joint_pos as the initial guess.
+                Otherwise, will use the reset_joint_pos as the initial guess.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -131,7 +131,7 @@ class InverseKinematicsController(ManipulationController):
         self.kv = kv
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
-        self.default_joint_pos = default_joint_pos[dof_idx]
+        self.reset_joint_pos = reset_joint_pos[dof_idx]
         self.condition_on_current_position = condition_on_current_position
 
         # Create the lula IKSolver
@@ -139,7 +139,7 @@ class InverseKinematicsController(ManipulationController):
             robot_description_path=robot_description_path,
             robot_urdf_path=robot_urdf_path,
             eef_name=eef_name,
-            default_joint_pos=self.default_joint_pos,
+            reset_joint_pos=self.reset_joint_pos,
         )
 
         # Other variables that will be filled in at runtime

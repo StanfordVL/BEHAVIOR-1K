@@ -961,7 +961,7 @@ class ManipulationRobot(BaseRobot):
                 "robot_urdf_path": self.urdf_path,
                 "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.reset_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
@@ -988,7 +988,7 @@ class ManipulationRobot(BaseRobot):
                 "name": "OperationalSpaceController",
                 "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.reset_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
