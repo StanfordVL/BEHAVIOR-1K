@@ -2,12 +2,11 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-from pxr.Sdf import ValueTypeNames as VT
-from pxr import Sdf, Gf
 
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
     get_default_states,
@@ -313,17 +312,17 @@ class StatefulObject(BaseObject):
         self._emitters[emitter_type] = emitter
 
         # Update emitter general settings.
-        emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
-        emitter.CreateAttribute("position", VT.Float3, False).Set(emitter_config["position"])
-        emitter.CreateAttribute("fuel", VT.Float, False).Set(emitter_config["fuel"])
-        emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(emitter_config["coupleRateFuel"])
-        emitter.CreateAttribute("coupleRateVelocity", VT.Float, False).Set(2.0)
-        emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, 0))
-        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(emitter_config["buoyancyPerTemp"])
-        advection.CreateAttribute("burnPerTemp", VT.Float, False).Set(emitter_config["burnPerTemp"])
-        advection.CreateAttribute("gravity", VT.Float3, False).Set(emitter_config["gravity"])
-        vorticity.CreateAttribute("constantMask", VT.Float, False).Set(emitter_config["constantMask"])
-        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(emitter_config["attenuation"])
+        emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
+        emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["position"])
+        emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
+        emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["coupleRateFuel"])
+        emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
+        emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
+        advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["buoyancyPerTemp"])
+        advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["burnPerTemp"])
+        advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["gravity"])
+        vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["constantMask"])
+        rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["attenuation"])
 
         # Update emitter unique settings.
         if emitter_type == EmitterType.FIRE:
@@ -336,22 +335,22 @@ class StatefulObject(BaseObject):
                 bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
                 # Radius is the average x-y half-extent of the object
                 radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
-            emitter.CreateAttribute("radius", VT.Float, False).Set(radius)
-            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(radius*0.2)
-            smoke.CreateAttribute("fade", Sdf.ValueTypeNames.Float, False).Set(2.0)
+            emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
+            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius*0.2)
+            smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
             # Set fire colormap.
             rgbaPoints = []
-            rgbaPoints.append(Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
-            rgbaPoints.append(Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
-            rgbaPoints.append(Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
-            rgbaPoints.append(Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
-            rgbaPoints.append(Gf.Vec4f(78, 39, 6.1, 0.7))
-            colormap.CreateAttribute("rgbaPoints", Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
+            rgbaPoints.append(lazy.pxr.Gf.Vec4f(78, 39, 6.1, 0.7))
+            colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
-            emitter.CreateAttribute("halfSize", VT.Float3, False).Set(
+            emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
                 tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0))
-            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO)
+            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO)
 
     def set_emitter_enabled(self, emitter_type, value):
         """

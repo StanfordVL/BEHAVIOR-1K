@@ -7,7 +7,6 @@ from omnigibson.systems import get_system
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.constants import ParticleModifyMethod
-from pxr import Gf
 
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000

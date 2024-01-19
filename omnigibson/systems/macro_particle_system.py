@@ -1,11 +1,9 @@
 import os
 import matplotlib.pyplot as plt
-import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
-from pxr import UsdPhysics
 import trimesh
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
@@ -406,8 +404,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     def _load_new_particle(cls, prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
-        if not get_prim_at_path(prim_path):
-            omni.kit.commands.execute(
+        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+            lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=cls._particle_object.prim_path,
                 path_to=prim_path,
@@ -1123,15 +1121,15 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
     def _load_new_particle(cls, prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
-        if not get_prim_at_path(prim_path):
-            omni.kit.commands.execute(
+        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+            lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=cls._particle_object.prim_path,
                 path_to=prim_path,
             )
             # Apply RigidBodyAPI to it so it is subject to physics
-            prim = get_prim_at_path(prim_path)
-            UsdPhysics.RigidBodyAPI.Apply(prim)
+            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod

@@ -1,9 +1,8 @@
-from omni.physx.bindings._physx import ContactEventType
-
 import numpy as np
 from collections import defaultdict
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
@@ -85,7 +84,7 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
     # Attempts to attach two objects when a CONTACT_FOUND event happens
     def on_contact(self, other, contact_headers, contact_data):
         for contact_header in contact_headers:
-            if contact_header.type == ContactEventType.CONTACT_FOUND:
+            if contact_header.type == lazy.omni.physx.bindings._physx.ContactEventType.CONTACT_FOUND:
                 # If it has successfully attached to something, break.
                 if self.set_value(other, True):
                     break

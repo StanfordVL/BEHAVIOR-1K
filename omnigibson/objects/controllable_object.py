@@ -69,14 +69,16 @@ class ControllableObject(BaseObject):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
+                Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
+                Set this value instead if you want to initialize the object with a different rese joint position.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = reset_joint_pos if reset_joint_pos is None else np.array(reset_joint_pos)
+        self._reset_joint_pos = None if reset_joint_pos is None else np.array(reset_joint_pos)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -119,7 +121,7 @@ class ControllableObject(BaseObject):
 
         # Update the reset joint pos
         if self._reset_joint_pos is None:
-            self._reset_joint_pos = self.default_joint_pos
+            self._reset_joint_pos = self._default_joint_pos
 
         # Load controllers
         self._load_controllers()
@@ -667,8 +669,24 @@ class ControllableObject(BaseObject):
         return 1e5
 
     @property
+    def reset_joint_pos(self):
+        """
+        Returns:
+            n-array: reset joint positions for this robot
+        """
+        return self._reset_joint_pos
+    
+    @reset_joint_pos.setter
+    def reset_joint_pos(self, value):
+        """
+        Args:
+            value: the new reset joint positions for this robot
+        """
+        self._reset_joint_pos = value
+
+    @property
     @abstractmethod
-    def default_joint_pos(self):
+    def _default_joint_pos(self):
         """
         Returns:
             n-array: Default joint positions for this robot

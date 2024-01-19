@@ -1,9 +1,9 @@
 import os
 
 import numpy as np
-from pxr import Gf
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -13,8 +13,6 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.teleop_utils import TeleopData
 from omnigibson.utils.usd_utils import JointType
-
-from omni.isaac.core.utils.prims import get_prim_at_path
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -83,6 +81,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         variant="default",
         rigid_trunk=False,
         default_trunk_offset=0.365,
+        default_reset_mode="untuck",
         default_arm_pose="vertical",
 
         **kwargs,
@@ -117,7 +116,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
+                Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
+                Set this value instead if you want to initialize the robot with a different rese joint position.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -138,8 +139,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
+                If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
+                If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored. 
+                Otherwise the reset_joint_pos will be initialized to the precomputed joint positions that represents default_arm_pose.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -148,20 +153,13 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self._variant = variant
         self.rigid_trunk = rigid_trunk
         self.default_trunk_offset = default_trunk_offset
+        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+        self.default_reset_mode = default_reset_mode
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
         self.default_arm_pose = default_arm_pose
 
         # Other args that will be created at runtime
         self._world_base_fixed_joint_prim = None
-
-        # Parse reset joint pos if specifying special string
-        if isinstance(reset_joint_pos, str):
-            assert (
-                reset_joint_pos in RESET_JOINT_OPTIONS
-            ), "reset_joint_pos should be one of {} if using a string!".format(RESET_JOINT_OPTIONS)
-            reset_joint_pos = (
-                self.tucked_default_joint_pos if reset_joint_pos == "tuck" else self.untucked_default_joint_pos
-            )
 
         # Run super init
         super().__init__(
@@ -231,31 +229,31 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
         pos[self.camera_control_idx] = np.array([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.045, 0.045])  # open gripper
-
-        # Choose arm based on setting
-        if self.default_arm_pose == "vertical":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal15":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal30":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "diagonal45":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        elif self.default_arm_pose == "horizontal":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
-                [0.22, 0.48, 1.52, 1.76, 0.04, -0.49, 0]
-            )
-        else:
-            raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
+        # Choose arm joint pos based on setting
+        for arm in self.arm_names:
+            pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
+            if self.default_arm_pose == "vertical":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
+                )
+            elif self.default_arm_pose == "diagonal15":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, 2.05251]
+                )
+            elif self.default_arm_pose == "diagonal30":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, 2.03113]
+                )
+            elif self.default_arm_pose == "diagonal45"  :
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, 1.81302]
+                )
+            elif self.default_arm_pose == "horizontal":
+                pos[self.arm_control_idx[arm]] = np.array(
+                    [0.61511, 0.49229, 1.46306, 1.24919, 1.08282, -1.28865, 1.50910]
+                )
+            else:
+                raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
 
     def _create_discrete_action_space(self):
@@ -296,11 +294,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visual_only = True
             self.eef_links[arm].visible = False
 
-        self._world_base_fixed_joint_prim = get_prim_at_path(f"{self._prim_path}/rootJoint")
+        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{self._prim_path}/rootJoint")
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def _initialize(self):
         # Run super method first
@@ -394,10 +392,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def _default_controllers(self):
         # Always call super first
         controllers = super()._default_controllers
-
-        # We use multi finger gripper, differential drive, and IK controllers as default
+        # We use joint controllers for base and camera as default
         controllers["base"] = "JointController"
         controllers["camera"] = "JointController"
+        # We use multi finger gripper, and IK controllers for eefs as default
         for arm in self.arm_names:
             controllers["arm_{}".format(arm)] = "InverseKinematicsController"
             controllers["gripper_{}".format(arm)] = "MultiFingerGripperController"
@@ -444,8 +442,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return cfg
 
     @property
-    def default_joint_pos(self):
-        return self.tucked_default_joint_pos
+    def _default_joint_pos(self):
+        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     def assisted_grasp_start_points(self):
@@ -733,7 +731,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
