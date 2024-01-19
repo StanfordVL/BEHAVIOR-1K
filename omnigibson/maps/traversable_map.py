@@ -1,15 +1,12 @@
 import os
-import pickle
-import sys
 
 import cv2
-import networkx as nx
 import numpy as np
 from PIL import Image
 
 from omnigibson.maps.map_base import BaseMap
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.motion_planning_utils import astar
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -24,26 +21,24 @@ class TraversableMap(BaseMap):
     def __init__(
         self,
         map_resolution=0.1,
-        trav_map_erosion=2,
+        default_erosion_radius=0.0,
         trav_map_with_objects=True,
-        build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
     ):
         """
         Args:
-            map_resolution (float): map resolution
-            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            map_resolution (float): map resolution in meters, each pixel represents this many meters;
+                                    normally, this should be between 0.01 and 0.1
+            default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
-            build_graph (bool): build connectivity graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
         """
         # Set internal values
-        self.map_default_resolution = 0.01  # each pixel represents 0.01m
-        self.trav_map_erosion = trav_map_erosion
+        self.map_default_resolution = 0.01  # each pixel == 0.01m in the dataset representation
+        self.default_erosion_radius = default_erosion_radius
         self.trav_map_with_objects = trav_map_with_objects
-        self.build_graph = build_graph
         self.num_waypoints = num_waypoints
         self.waypoint_interval = int(waypoint_resolution / map_resolution)
 
@@ -53,7 +48,6 @@ class TraversableMap(BaseMap):
         self.mesh_body_id = None
         self.floor_heights = None
         self.floor_map = None
-        self.floor_graph = None
 
         # Run super method
         super().__init__(map_resolution=map_resolution)
@@ -97,82 +91,12 @@ class TraversableMap(BaseMap):
             # We resize the traversability map to the new size computed before
             trav_map = cv2.resize(trav_map, (map_size, map_size))
 
-            # We then erode the image. This is needed because the code that computes shortest path uses the global map
-            # and a point robot
-            if self.trav_map_erosion != 0:
-                trav_map = cv2.erode(trav_map, np.ones((self.trav_map_erosion, self.trav_map_erosion)))
-
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
-
-            # We search for the largest connected areas
-            if self.build_graph:
-                # Directly set map size
-                self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
 
             self.floor_map.append(trav_map)
 
         return map_size
-
-    # TODO: refactor into C++ for speedup
-    @staticmethod
-    def build_trav_graph(map_size, maps_path, floor, trav_map):
-        """
-        Build traversibility graph and only take the largest connected component
-
-        Args:
-            map_size (int): Size of the map being generated
-            maps_path (str): Path to the folder containing the traversability maps
-            floor (int): floor number
-            trav_map ((H, W)-array): traversability map in image form
-        """
-        floor_graph = []
-        graph_file = os.path.join(
-            maps_path, "floor_trav_{}_py{}{}.p".format(floor, sys.version_info.major, sys.version_info.minor)
-        )
-        if os.path.isfile(graph_file):
-            log.info("Loading traversable graph")
-            with open(graph_file, "rb") as pfile:
-                g = pickle.load(pfile)
-        else:
-            log.info("Building traversable graph")
-            g = nx.Graph()
-            for i in range(map_size):
-                for j in range(map_size):
-                    if trav_map[i, j] == 0:
-                        continue
-                    g.add_node((i, j))
-                    # 8-connected graph
-                    neighbors = [(i - 1, j - 1), (i, j - 1), (i + 1, j - 1), (i - 1, j)]
-                    for n in neighbors:
-                        if (
-                            0 <= n[0] < map_size
-                            and 0 <= n[1] < map_size
-                            and trav_map[n[0], n[1]] > 0
-                        ):
-                            g.add_edge(n, (i, j), weight=T.l2_distance(n, (i, j)))
-
-            # only take the largest connected component
-            largest_cc = max(nx.connected_components(g), key=len)
-            g = g.subgraph(largest_cc).copy()
-            try:
-                with open(graph_file, "wb") as pfile:
-                    pickle.dump(g, pfile)
-            except:
-                log.warning("Cannot cache traversable graph to disk possibly because dataset is read-only. Will have to recompute each time.")
-
-        floor_graph.append(g)
-
-        # update trav_map accordingly
-        # This overwrites the traversability map loaded before
-        # It sets everything to zero, then only sets to one the points where we have graph nodes
-        # Dangerous! if the traversability graph is not computed from the loaded map but from a file, it could overwrite
-        # it silently.
-        trav_map[:, :] = 0
-        for node in g.nodes:
-            trav_map[node[0], node[1]] = 255
-
-        return floor_graph
 
     @property
     def n_floors(self):
@@ -181,41 +105,62 @@ class TraversableMap(BaseMap):
             int: Number of floors belonging to this map's associated scene
         """
         return len(self.floor_heights)
+    
+    def _erode_trav_map(self, trav_map, robot=None):
+        # Erode the traversability map to account for the robot's size
+        if robot:
+            robot_chassis_extent = robot.reset_joint_pos_aabb_extent[:2]
+            radius = np.linalg.norm(robot_chassis_extent) / 2.0
+        else:
+            radius = self.default_erosion_radius
+        radius_pixel = int(np.ceil(radius / self.map_resolution))
+        trav_map = cv2.erode(trav_map, np.ones((radius_pixel, radius_pixel)))
+        return trav_map
 
-    def get_random_point(self, floor=None):
+    def get_random_point(self, floor=None, reference_point=None, robot=None):
         """
         Sample a random point on the given floor number. If not given, sample a random floor number.
+        If @reference_point is given, sample a point in the same connected component as the previous point.
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
+                                 Warning: if @reference_point is given, @floor must be given; 
+                                          otherwise, this would lead to undefined behavior
+            reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
         Returns:
             2-tuple:
                 - int: floor number. This is the sampled floor number if @floor is None
                 - 3-array: (x,y,z) randomly sampled point
         """
-        if floor is None:
+        if reference_point is not None:
+            assert floor is not None, "floor must be given if reference_point is given"
+
+        # If nothing is given, sample a random floor and a random point on that floor
+        if floor is None and reference_point is None:
             floor = np.random.randint(0, self.n_floors)
-        trav = self.floor_map[floor]
-        trav_space = np.where(trav == 255)
+        
+        # create a deep copy so that we don't erode the original map
+        trav_map = self.floor_map[floor].copy()
+        trav_map = self._erode_trav_map(trav_map, robot=robot)
+        
+        if reference_point is not None:
+            # Find connected component
+            _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)
+
+            # If previous point is given, sample a point in the same connected component
+            prev_xy_map = self.world_to_map(reference_point[:2])
+            prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
+            trav_space = np.where(component_labels == prev_label)
+        else:
+            trav_space = np.where(trav_map == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
 
-    def has_node(self, floor, world_xy):
-        """
-        Return whether the traversability graph contains a point
-
-            floor: floor number
-            world_xy: 2D location in world reference frame (metric)
-        """
-        map_xy = tuple(self.world_to_map(world_xy))
-        g = self.floor_graph[floor]
-        return g.has_node(map_xy)
-
-    def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
+    def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         """
         Get the shortest path from one point to another point.
         If any of the given point is not in the graph, add it to the graph and
@@ -226,30 +171,25 @@ class TraversableMap(BaseMap):
             source_world (2-array): (x,y) 2D source location in world reference frame (metric)
             target_world (2-array): (x,y) 2D target location in world reference frame (metric)
             entire_path (bool): whether to return the entire path
+            robot (None or BaseRobot): if given, erode the traversability map to account for the robot's size
 
         Returns:
             2-tuple:
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-        assert self.build_graph, "cannot get shortest path without building the graph"
         source_map = tuple(self.world_to_map(source_world))
         target_map = tuple(self.world_to_map(target_world))
 
-        g = self.floor_graph[floor]
+        # create a deep copy so that we don't erode the original map
+        trav_map = self.floor_map[floor].copy()
 
-        if not g.has_node(target_map):
-            nodes = np.array(g.nodes)
-            closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - target_map, axis=1))])
-            g.add_edge(closest_node, target_map, weight=T.l2_distance(closest_node, target_map))
+        trav_map = self._erode_trav_map(trav_map, robot=robot)
 
-        if not g.has_node(source_map):
-            nodes = np.array(g.nodes)
-            closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - source_map, axis=1))])
-            g.add_edge(closest_node, source_map, weight=T.l2_distance(closest_node, source_map))
-
-        path_map = np.array(nx.astar_path(g, source_map, target_map, heuristic=T.l2_distance))
-
+        path_map = astar(trav_map, source_map, target_map)
+        if path_map is None:
+            # No traversable path found
+            return None, None
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
         path_world = path_world[:: self.waypoint_interval]

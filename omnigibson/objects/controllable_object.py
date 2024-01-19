@@ -62,7 +62,7 @@ class ControllableObject(BaseObject):
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -140,7 +140,7 @@ class ControllableObject(BaseObject):
         expected_control_freq = 1.0 / og.sim.get_rendering_dt()
         if self._control_freq is None:
             log.info(
-                "Control frequency is None - being set to default of 1 / render_timestep: %.4f", expected_control_freq
+                "Control frequency is None - being set to default of render_frequency: %.4f", expected_control_freq
             )
             self._control_freq = expected_control_freq
         else:
