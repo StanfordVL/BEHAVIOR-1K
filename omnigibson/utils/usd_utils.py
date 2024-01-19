@@ -159,7 +159,7 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
         f"At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
-    joint = lo.pxr.UsdPhysics.__dict__[joint_type].Define(og.sim.stage, prim_path)
+    joint = getattr(lo.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:

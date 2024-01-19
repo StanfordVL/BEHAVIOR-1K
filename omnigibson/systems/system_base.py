@@ -1067,7 +1067,7 @@ def _create_system_from_metadata(system_name):
     all_systems = set(get_all_system_categories())
     if system_name not in all_systems:
         # Use default config -- assume @system_name is a fluid that uses the same params as water
-        return systems.__dict__["FluidSystem"].create(
+        return systems.FluidSystem.create(
             name=system_name.replace("-", "_"),
             particle_contact_offset=0.012,
             particle_density=500.0,
@@ -1200,7 +1200,7 @@ def _create_system_from_metadata(system_name):
 
         # Generate the requested system
         system_cls = "".join([st.capitalize() for st in system_type.split("_")])
-        return systems.__dict__[f"{system_cls}System"].create(**system_kwargs)
+        return getattr(systems, f"{system_cls}System").create(**system_kwargs)
 
 
 def import_og_systems():

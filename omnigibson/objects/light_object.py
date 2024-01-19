@@ -108,7 +108,7 @@ class LightObject(StatefulObject):
         base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define the actual light link
-        light_prim = lo.pxr.UsdLux.__dict__[f"{self.light_type}Light"].Define(og.sim.stage, f"{self._prim_path}/base_link/light").GetPrim()
+        light_prim = getattr(lo.pxr.UsdLux, f"{self.light_type}Light").Define(og.sim.stage, f"{self._prim_path}/base_link/light").GetPrim()
 
         return prim
 
