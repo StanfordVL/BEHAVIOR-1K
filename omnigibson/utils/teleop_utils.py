@@ -9,7 +9,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from real_tiago.user_interfaces.teleop_core import TeleopData
+from real_tiago.user_interfaces.teleop_core import TeleopObservation
 from real_tiago.user_interfaces.teleop_policy import TeleopPolicy
 
 m = create_module_macros(module_path=__file__)
@@ -48,7 +48,7 @@ class TeleopSystem(TeleopPolicy):
             np.ndarray: array of action data
         """
         # construct robot observation
-        robot_obs = TeleopData()
+        robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
         robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
         for arm in self.robot_arms:
@@ -60,7 +60,7 @@ class TeleopSystem(TeleopPolicy):
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = teleop_actions[arm_name][:3], teleop_actions[arm_name][3:7]
+                delta_pos, delta_orn = teleop_actions[arm_name][:3], T.euler2quat(teleop_actions[arm_name][3:6])
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)

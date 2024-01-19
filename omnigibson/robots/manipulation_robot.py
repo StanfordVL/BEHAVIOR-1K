@@ -4,7 +4,7 @@ import numpy as np
 import networkx as nx
 from omni.physx import get_physx_scene_query_interface
 from pxr import Gf
-from real_tiago.user_interfaces.teleop_core import TeleopData
+from real_tiago.user_interfaces.teleop_core import TeleopAction, TeleopObservation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1476,13 +1476,13 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
         Overwrite this function if the robot is using a different controller.
         Args:
-            teleop_action (TeleopData): teleoperation action data
+            teleop_action (TeleopAction): teleoperation action data
         Returns:
             np.ndarray: array of action data for arm and gripper
         """
@@ -1496,11 +1496,10 @@ class ManipulationRobot(BaseRobot):
                 isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
                 isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
                 f"Only IK and OSC controllers are supported for arm {arm_name}!"
-            target_pos, target_orn = arm_action[:3], arm_action[3:7]
-            target_orn = T.quat2axisangle(arm_action[3:7])
+            target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
             action[self.arm_action_idx[arm_name]] = np.r_[target_pos, target_orn]
             # gripper action
             assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
                 f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
-            action[self.gripper_action_idx[arm_name]] = arm_action[7]
+            action[self.gripper_action_idx[arm_name]] = arm_action[6]
         return action

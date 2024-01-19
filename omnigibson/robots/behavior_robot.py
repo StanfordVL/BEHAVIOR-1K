@@ -5,7 +5,7 @@ import numpy as np
 import os
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
-from real_tiago.user_interfaces.teleop_core import TeleopData
+from real_tiago.user_interfaces.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -415,7 +415,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 \
                or np.any([len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]])
 
-    def teleop_data_to_action(self, teleop_action: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         """
         Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 

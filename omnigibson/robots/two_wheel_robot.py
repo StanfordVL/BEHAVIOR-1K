@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import gym
 import numpy as np
-from real_tiago.user_interfaces.teleop_core import TeleopData
+from real_tiago.user_interfaces.teleop_core import TeleopAction 
 
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
@@ -150,7 +150,7 @@ class TwoWheelRobot(LocomotionRobot):
         classes.add("TwoWheelRobot")
         return classes
     
-    def teleop_data_to_action(self, teleop_action: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports DifferentialDriveController. 

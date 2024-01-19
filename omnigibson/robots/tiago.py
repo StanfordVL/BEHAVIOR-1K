@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from pxr import Gf
-from real_tiago.user_interfaces.teleop_core import TeleopData
+from real_tiago.user_interfaces.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -765,7 +765,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def eef_usd_path(self):
         return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
         action[self.base_action_idx] = teleop_action.base
         return action
