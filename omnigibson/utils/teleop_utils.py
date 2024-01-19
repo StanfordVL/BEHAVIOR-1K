@@ -1,4 +1,3 @@
-import carb
 import numpy as np
 import omni
 import time
@@ -8,6 +7,7 @@ from threading import Thread
 from typing import Any, Iterable, Optional, Tuple
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
@@ -155,18 +155,15 @@ class OVXRSystem(TeleopSystem):
             The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
         """
         # enable xr extension
-        from omni.isaac.core.utils.extensions import enable_extension
-        enable_extension("omni.kit.xr.profile.vr")
-        from omni.kit.xr.core import XRDeviceClass, XRCore, XRCoreEventType
-        from omni.kit.xr.ui.stage.common import XRAvatarManager
-        self.xr_device_class = XRDeviceClass
+        lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
+        self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
         # run super method
         super().__init__(robot, show_control_marker)
         # we want to further slow down the movement speed if we are using touchpad movement
         if enable_touchpad_movement:
             self.movement_speed *= 0.1
         # get xr core and profile
-        self.xr_core = XRCore.get_singleton()
+        self.xr_core = lazy.omni.kit.xr.core.XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
         self.disable_display_output = disable_display_output
         self.enable_touchpad_movement = enable_touchpad_movement
@@ -175,18 +172,18 @@ class OVXRSystem(TeleopSystem):
             "enable_touchpad_movement and align_anchor_to_robot_base cannot be True at the same time!"
         # set avatar
         if self.show_control_marker:
-            self.vr_profile.set_avatar(XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
+            self.vr_profile.set_avatar(lazy.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
         else:
-            self.vr_profile.set_avatar(XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
+            self.vr_profile.set_avatar(lazy.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
         # # set anchor mode to be custom anchor
-        carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene origin")
+        lazy.carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene origin")
         # set vr system
-        carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
+        lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
         # set display mode
-        carb.settings.get_settings().set(
+        lazy.carb.settings.get_settings().set(
             self.vr_profile.get_persistent_path() + "disableDisplayOutput", disable_display_output
         )
-        carb.settings.get_settings().set('/rtx/rendermode', "RaytracedLighting")
+        lazy.carb.settings.get_settings().set('/rtx/rendermode', "RaytracedLighting")
         # devices info
         self.hmd = None
         self.controllers = {}
@@ -200,7 +197,7 @@ class OVXRSystem(TeleopSystem):
             self.raw_data["hand_data"] = {}
             self.teleop_data.hand_data = {}
             self._hand_tracking_subscription = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
-                XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
+                lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
 
     def xr2og(self, transform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -411,7 +408,7 @@ class OVXRSystem(TeleopSystem):
             button_data[controller_name]["axis"] = self.controllers[controller_name].get_axis_state()
         self.raw_data["button_data"] = button_data
 
-    def _update_hand_tracking_data(self, e: carb.events.IEvent) -> None:
+    def _update_hand_tracking_data(self, e) -> None:
         """
         Get hand tracking data, see https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#convention-of-hand-joints for joint indices
         Args:
@@ -683,7 +680,7 @@ class KeyboardSystem(TeleopSystem):
     def start(self) -> None:
         # start the keyboard subscriber
         appwindow = omni.appwindow.get_default_app_window()
-        input_interface = carb.input.acquire_input_interface()
+        input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         input_interface.subscribe_to_keyboard_events(keyboard, self._update_internal_data)   
         for arm in self.robot_arms:
@@ -694,64 +691,64 @@ class KeyboardSystem(TeleopSystem):
 
     def _update_internal_data(self, event) -> None:
         hand = self.robot_arms[self.cur_control_idx]
-        if event.type == carb.input.KeyboardEventType.KEY_RELEASE:
+        if event.type == lazy.carb.input.KeyboardEventType.KEY_RELEASE:
             for arm in self.robot_arms:
                 self.raw_data["transforms"][arm] = (np.zeros(3), np.zeros(3))
             self.raw_data["transforms"]["base"] = np.zeros(4)
-        if event.type == carb.input.KeyboardEventType.KEY_PRESS \
-            or event.type == carb.input.KeyboardEventType.KEY_REPEAT:
+        if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS \
+            or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT:
             key = event.input    
             # update gripper state
-            if key == carb.input.KeyboardInput.KEY_4:
+            if key == lazy.carb.input.KeyboardInput.KEY_4:
                 self.teleop_data.grippers[hand] = (self.teleop_data.grippers[hand] + 1) % 2            
             # update current finger positions
-            elif key == carb.input.KeyboardInput.W:
+            elif key == lazy.carb.input.KeyboardInput.W:
                 self.raw_data["transforms"][hand][0][0] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.S:
+            elif key == lazy.carb.input.KeyboardInput.S:
                 self.raw_data["transforms"][hand][0][0] = -self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.A:
+            elif key == lazy.carb.input.KeyboardInput.A:
                 self.raw_data["transforms"][hand][0][1] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.D:
+            elif key == lazy.carb.input.KeyboardInput.D:
                 self.raw_data["transforms"][hand][0][1] = -self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.E:
+            elif key == lazy.carb.input.KeyboardInput.E:
                 self.raw_data["transforms"][hand][0][2] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.Q:
+            elif key == lazy.carb.input.KeyboardInput.Q:
                 self.raw_data["transforms"][hand][0][2] = -self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.C:
+            elif key == lazy.carb.input.KeyboardInput.C:
                 self.raw_data["transforms"][hand][1][0] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.X:
+            elif key == lazy.carb.input.KeyboardInput.X:
                 self.raw_data["transforms"][hand][1][0] = -self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.T:
+            elif key == lazy.carb.input.KeyboardInput.T:
                 self.raw_data["transforms"][hand][1][1] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.B:
+            elif key == lazy.carb.input.KeyboardInput.B:
                 self.raw_data["transforms"][hand][1][1] = -self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.Z:
+            elif key == lazy.carb.input.KeyboardInput.Z:
                 self.raw_data["transforms"][hand][1][2] = self.movement_speed * self.arm_speed_scaledown
-            elif key == carb.input.KeyboardInput.V:
+            elif key == lazy.carb.input.KeyboardInput.V:
                 self.raw_data["transforms"][hand][1][2] = -self.movement_speed * self.arm_speed_scaledown
             # rotate around hands to control
-            elif key == carb.input.KeyboardInput.KEY_1:
+            elif key == lazy.carb.input.KeyboardInput.KEY_1:
                 self.cur_control_idx = (self.cur_control_idx - 1) % len(self.robot_arms)
                 print(f"Now controlling robot part {self.robot_arms[self.cur_control_idx]}")
-            elif key == carb.input.KeyboardInput.KEY_2:
+            elif key == lazy.carb.input.KeyboardInput.KEY_2:
                 self.cur_control_idx = (self.cur_control_idx + 1) % len(self.robot_arms)
                 print(f"Now controlling robot part {self.robot_arms[self.cur_control_idx]}")
             # update base positions 
-            elif key == carb.input.KeyboardInput.I:
+            elif key == lazy.carb.input.KeyboardInput.I:
                 self.raw_data["transforms"]["base"][0] = self.movement_speed
-            elif key == carb.input.KeyboardInput.K:
+            elif key == lazy.carb.input.KeyboardInput.K:
                 self.raw_data["transforms"]["base"][0] = -self.movement_speed
-            elif key == carb.input.KeyboardInput.U:
+            elif key == lazy.carb.input.KeyboardInput.U:
                 self.raw_data["transforms"]["base"][1] = self.movement_speed
-            elif key == carb.input.KeyboardInput.O:
+            elif key == lazy.carb.input.KeyboardInput.O:
                 self.raw_data["transforms"]["base"][1] = -self.movement_speed
-            elif key == carb.input.KeyboardInput.P:
+            elif key == lazy.carb.input.KeyboardInput.P:
                 self.raw_data["transforms"]["base"][2] = self.movement_speed
-            elif key == carb.input.KeyboardInput.SEMICOLON:
+            elif key == lazy.carb.input.KeyboardInput.SEMICOLON:
                 self.raw_data["transforms"]["base"][2] = -self.movement_speed
-            elif key == carb.input.KeyboardInput.J:
+            elif key == lazy.carb.input.KeyboardInput.J:
                 self.raw_data["transforms"]["base"][3] = self.movement_speed
-            elif key == carb.input.KeyboardInput.L:
+            elif key == lazy.carb.input.KeyboardInput.L:
                 self.raw_data["transforms"]["base"][3] = -self.movement_speed
         return True
 

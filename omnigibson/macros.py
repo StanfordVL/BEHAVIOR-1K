@@ -15,9 +15,27 @@ gm = macros.globals
 
 # Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
+# can override assets_path and dataset_path from environment variable
 gm.ASSET_PATH = "data/assets"
+if "OMNIGIBSON_ASSET_PATH" in os.environ:
+    gm.ASSET_PATH = os.environ["OMNIGIBSON_ASSET_PATH"]
+gm.ASSET_PATH = os.path.expanduser(gm.ASSET_PATH)
+if not os.path.isabs(gm.ASSET_PATH):
+    gm.ASSET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.ASSET_PATH)
+
 gm.DATASET_PATH = "data/og_dataset"
+if "OMNIGIBSON_DATASET_PATH" in os.environ:
+    gm.DATASET_PATH = os.environ["OMNIGIBSON_DATASET_PATH"]
+gm.DATASET_PATH = os.path.expanduser(gm.DATASET_PATH)
+if not os.path.isabs(gm.DATASET_PATH):
+    gm.DATASET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.DATASET_PATH)
+
 gm.KEY_PATH = "data/omnigibson.key"
+if "OMNIGIBSON_KEY_PATH" in os.environ:
+    gm.KEY_PATH = os.environ["OMNIGIBSON_KEY_PATH"]
+gm.KEY_PATH = os.path.expanduser(gm.KEY_PATH)
+if not os.path.isabs(gm.KEY_PATH):
+    gm.KEY_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.KEY_PATH)
 
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
 # integer or string-form integer

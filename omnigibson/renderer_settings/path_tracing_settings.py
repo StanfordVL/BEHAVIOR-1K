@@ -1,5 +1,4 @@
-import carb
-from omni.kit.widget.settings import SettingType
+import omnigibson.lazy as lazy
 
 from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
@@ -25,7 +24,7 @@ class PathTracingSettings(SettingsBase):
         self.denoising_settings = DenoisingSettings()
         self.path_traced_fog_settings = PathTracedFogSettings()
         self.path_traced_volume_settings = PathTracedVolumeSettings()
-        if carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount") > 1:
+        if lazy.carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount") > 1:
             self.multi_gpu_settings = MultiGPUSettings()
 
     @property
@@ -38,7 +37,7 @@ class PathTracingSettings(SettingsBase):
         settings.update(self.denoising_settings.settings)
         settings.update(self.path_traced_fog_settings.settings)
         settings.update(self.path_traced_volume_settings.settings)
-        if carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount") > 1:
+        if lazy.carb.settings.get_settings().get("/renderer/multiGpu/currentGpuCount") > 1:
             settings.update(self.multi_gpu_settings.settings)
         return settings
 
@@ -47,11 +46,11 @@ class AntiAliasingSettings(SubSettingsBase):
     def __init__(self):
         pt_aa_ops = ["Box", "Triangle", "Gaussian", "Uniform"]
         self.sample_pattern = SettingItem(
-            self, SettingType.STRING, "Anti-Aliasing Sample Pattern", "/rtx/pathtracing/aa/op", pt_aa_ops
+            self, lazy.omni.kit.widget.settings.SettingType.STRING, "Anti-Aliasing Sample Pattern", "/rtx/pathtracing/aa/op", pt_aa_ops
         )
         self.filter_radius = SettingItem(
             self,
-            SettingType.FLOAT,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
             "Anti-Aliasing Radius",
             "/rtx/pathtracing/aa/filterRadius",
             range_from=0.0001,
@@ -68,11 +67,11 @@ class AntiAliasingSettings(SubSettingsBase):
 
 class FireflyFilterSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         self.max_intensity_per_sample = SettingItem(
             self,
-            SettingType.FLOAT,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
             "Max Ray Intensity Glossy",
             "/rtx/pathtracing/fireflyFilter/maxIntensityPerSample",
             range_from=0,
@@ -80,7 +79,7 @@ class FireflyFilterSettings(SubSettingsBase):
         )
         self.max_intensityper_sample_diffuse = SettingItem(
             self,
-            SettingType.FLOAT,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
             "Max Ray Intensity Diffuse",
             "/rtx/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse",
             range_from=0,
@@ -101,14 +100,14 @@ class FireflyFilterSettings(SubSettingsBase):
 
 class PathTracingSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         self.pathtracing_max_bounces = SettingItem(
-            self, SettingType.INT, "Max Bounces", "/rtx/pathtracing/maxBounces", range_from=0, range_to=64
+            self, lazy.omni.kit.widget.settings.SettingType.INT, "Max Bounces", "/rtx/pathtracing/maxBounces", range_from=0, range_to=64
         )
         self.max_specular_and_transmission_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max Specular and Transmission Bounces",
             "/rtx/pathtracing/maxSpecularAndTransmissionBounces",
             range_from=1,
@@ -116,7 +115,7 @@ class PathTracingSettings(SubSettingsBase):
         )
         self.maxvolume_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max SSS Volume Scattering Bounces",
             "/rtx/pathtracing/maxVolumeBounces",
             range_from=0,
@@ -124,7 +123,7 @@ class PathTracingSettings(SubSettingsBase):
         )
         self.ptfog_max_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max Fog Scattering Bounces",
             "/rtx/pathtracing/ptfog/maxBounces",
             range_from=1,
@@ -132,7 +131,7 @@ class PathTracingSettings(SubSettingsBase):
         )
         self.ptvol_max_bounces = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max Heterogeneous Volume Scattering Bounces",
             "/rtx/pathtracing/ptvol/maxBounces",
             range_from=0,
@@ -143,7 +142,7 @@ class PathTracingSettings(SubSettingsBase):
         if clamp_spp > 1:  # better 0, but setting range = (1,1) completely disables the UI control range
             self.spp = SettingItem(
                 self,
-                SettingType.INT,
+                lazy.omni.kit.widget.settings.SettingType.INT,
                 "Samples per Pixel per Frame (1 to {})".format(clamp_spp),
                 "/rtx/pathtracing/spp",
                 range_from=1,
@@ -152,7 +151,7 @@ class PathTracingSettings(SubSettingsBase):
         else:
             self.spp = SettingItem(
                 self,
-                SettingType.INT,
+                lazy.omni.kit.widget.settings.SettingType.INT,
                 "Samples per Pixel per Frame",
                 "/rtx/pathtracing/spp",
                 range_from=1,
@@ -160,7 +159,7 @@ class PathTracingSettings(SubSettingsBase):
             )
         self.total_spp = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Total Samples per Pixel (0 = inf)",
             "/rtx/pathtracing/totalSpp",
             range_from=0,
@@ -168,10 +167,10 @@ class PathTracingSettings(SubSettingsBase):
         )
 
         self.fractional_cutout_opacity = SettingItem(
-            self, SettingType.BOOL, "Enable Fractional Cutout Opacity", "/rtx/pathtracing/fractionalCutoutOpacity"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Fractional Cutout Opacity", "/rtx/pathtracing/fractionalCutoutOpacity"
         )
         self.reset_pt_accum_on_anim_time_change = SettingItem(
-            self, SettingType.BOOL, "Reset Accumulation on Time Change", "/rtx/resetPtAccumOnAnimTimeChange"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Reset Accumulation on Time Change", "/rtx/resetPtAccumOnAnimTimeChange"
         )
 
     @property
@@ -191,9 +190,9 @@ class PathTracingSettings(SubSettingsBase):
 
 class SamplingAndCachingSettings(SubSettingsBase):
     def __init__(self):
-        self.cached_enabled = SettingItem(self, SettingType.BOOL, "Enable Caching", "/rtx/pathtracing/cached/enabled")
+        self.cached_enabled = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Caching", "/rtx/pathtracing/cached/enabled")
         self.lightcache_cached_enabled = SettingItem(
-            self, SettingType.BOOL, "Enable Many-Light Sampling", "/rtx/pathtracing/lightcache/cached/enabled"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Many-Light Sampling", "/rtx/pathtracing/lightcache/cached/enabled"
         )
 
     @property
@@ -206,11 +205,11 @@ class SamplingAndCachingSettings(SubSettingsBase):
 
 class DenoisingSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         self.blend_factor = SettingItem(
             self,
-            SettingType.FLOAT,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
             "OptiX Denoiser Blend Factor",
             "/rtx/pathtracing/optixDenoiser/blendFactor",
             range_from=0,
@@ -230,29 +229,29 @@ class DenoisingSettings(SubSettingsBase):
 
 class PathTracedFogSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         self.density = SettingItem(
-            self, SettingType.FLOAT, "Density", "/rtx/pathtracing/ptfog/density", range_from=0, range_to=1
+            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Density", "/rtx/pathtracing/ptfog/density", range_from=0, range_to=1
         )
         self.height = SettingItem(
-            self, SettingType.FLOAT, "Height", "/rtx/pathtracing/ptfog/height", range_from=-10, range_to=1000
+            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Height", "/rtx/pathtracing/ptfog/height", range_from=-10, range_to=1000
         )
         self.falloff = SettingItem(
-            self, SettingType.FLOAT, "Falloff", "/rtx/pathtracing/ptfog/falloff", range_from=0, range_to=100
+            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Falloff", "/rtx/pathtracing/ptfog/falloff", range_from=0, range_to=100
         )
         self.color = SettingItem(
-            self, SettingType.COLOR3, "Color", "/rtx/pathtracing/ptfog/color", range_from=0, range_to=1
+            self, lazy.omni.kit.widget.settings.SettingType.COLOR3, "Color", "/rtx/pathtracing/ptfog/color", range_from=0, range_to=1
         )
         self.asymmetry = SettingItem(
             self,
-            SettingType.FLOAT,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
             "Asymmetry (g)",
             "/rtx/pathtracing/ptfog/asymmetry",
             range_from=-0.99,
             range_to=0.99,
         )
-        self.z_up = SettingItem(self, SettingType.BOOL, "Use +Z Axis for Height", "/rtx/pathtracing/ptfog/ZUp")
+        self.z_up = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Use +Z Axis for Height", "/rtx/pathtracing/ptfog/ZUp")
 
     @property
     def settings(self):
@@ -272,19 +271,19 @@ class PathTracedFogSettings(SubSettingsBase):
 
 class PathTracedVolumeSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         pt_vol_tr_ops = ["Biased Ray Marching", "Ratio Tracking", "Brute-force Ray Marching"]
         self.transmittance_method = SettingItem(
             self,
-            SettingType.STRING,
+            lazy.omni.kit.widget.settings.SettingType.STRING,
             "Transmittance Method",
             "/rtx/pathtracing/ptvol/transmittanceMethod",
             range_list=pt_vol_tr_ops,
         )
         self.max_collision_count = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max Collision Count",
             "/rtx/pathtracing/ptvol/maxCollisionCount",
             range_from=0,
@@ -292,20 +291,20 @@ class PathTracedVolumeSettings(SubSettingsBase):
         )
         self.max_light_collision_count = SettingItem(
             self,
-            SettingType.INT,
+            lazy.omni.kit.widget.settings.SettingType.INT,
             "Max Light Collision Count",
             "/rtx/pathtracing/ptvol/maxLightCollisionCount",
             range_from=0,
             range_to=1024,
         )
         self.max_density = SettingItem(
-            self, SettingType.FLOAT, "Max Density", "/rtx/pathtracing/ptvol/maxDensity", range_from=0, range_to=1000
+            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Max Density", "/rtx/pathtracing/ptvol/maxDensity", range_from=0, range_to=1000
         )
-        self.fast_vdb = SettingItem(self, SettingType.BOOL, "Fast VDB", "/rtx/pathtracing/ptvol/fastVdb")
+        self.fast_vdb = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Fast VDB", "/rtx/pathtracing/ptvol/fastVdb")
 
         # if self._carb_settings.get("/rtx/pathtracing/ptvol/fastVdb")
         self.autoMajorant_vdb = SettingItem(
-            self, SettingType.BOOL, "Fast VDB Auto majorant", "/rtx/pathtracing/ptvol/autoMajorantVdb"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Fast VDB Auto majorant", "/rtx/pathtracing/ptvol/autoMajorantVdb"
         )
 
     @property
@@ -330,19 +329,19 @@ class PathTracedVolumeSettings(SubSettingsBase):
 
 class MultiGPUSettings(SubSettingsBase):
     def __init__(self):
-        self._carb_settings = carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
 
         self.weight_gpu0 = SettingItem(
-            self, SettingType.FLOAT, "GPU 0 Weight", "/rtx/pathtracing/mgpu/weightGpu0", range_from=0, range_to=1
+            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "GPU 0 Weight", "/rtx/pathtracing/mgpu/weightGpu0", range_from=0, range_to=1
         )
         self.compress_radiance = SettingItem(
-            self, SettingType.BOOL, "Compress Radiance", "/rtx/pathtracing/mgpu/compressRadiance"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Compress Radiance", "/rtx/pathtracing/mgpu/compressRadiance"
         )
         self.compress_albedo = SettingItem(
-            self, SettingType.BOOL, "Compress Albedo", "/rtx/pathtracing/mgpu/compressAlbedo"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Compress Albedo", "/rtx/pathtracing/mgpu/compressAlbedo"
         )
         self.compress_normals = SettingItem(
-            self, SettingType.BOOL, "Compress Normals", "/rtx/pathtracing/mgpu/compressNormals"
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Compress Normals", "/rtx/pathtracing/mgpu/compressNormals"
         )
 
     @property

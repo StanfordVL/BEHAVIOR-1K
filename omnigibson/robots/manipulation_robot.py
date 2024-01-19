@@ -1,12 +1,10 @@
 from abc import abstractmethod
-import carb
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from omni.physx import get_physx_scene_query_interface
-from pxr import Gf
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController, OperationalSpaceController
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
@@ -1260,7 +1258,7 @@ class ManipulationRobot(BaseRobot):
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos, _ = T.pose_transform(eef_link_pos, eef_link_orn, attachment_point_pos_local, [0, 0, 0, 1])
         joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos.astype(float)))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos.astype(float)))
 
     def _calculate_in_hand_object(self, arm="default"):
         if gm.AG_CLOTH:

@@ -1,9 +1,9 @@
 import os
 
 import numpy as np
-from pxr import Gf
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -13,8 +13,6 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.teleop_utils import TeleopData
 from omnigibson.utils.usd_utils import JointType
-
-from omni.isaac.core.utils.prims import get_prim_at_path
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -296,11 +294,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visual_only = True
             self.eef_links[arm].visible = False
 
-        self._world_base_fixed_joint_prim = get_prim_at_path(f"{self._prim_path}/rootJoint")
+        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{self._prim_path}/rootJoint")
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def _initialize(self):
         # Run super method first
@@ -731,7 +729,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame

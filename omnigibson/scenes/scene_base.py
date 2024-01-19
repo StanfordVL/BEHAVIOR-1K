@@ -1,9 +1,10 @@
 import json
 from abc import ABC
 from itertools import combinations
-from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
+
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
@@ -584,7 +585,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             color (None or 3-array): If specified, sets the (R,G,B) color of the generated plane
             visible (bool): Whether the plane should be visible or not
         """
-        plane = GroundPlane(
+        plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
             prim_path=prim_path,
             name=name,
             z_position=z_position,
