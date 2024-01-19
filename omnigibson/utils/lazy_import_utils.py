@@ -32,43 +32,44 @@ class LazyImporter(ModuleType):
 
     # Very heavily inspired by optuna.integration._IntegrationModule
     # https://github.com/optuna/optuna/blob/master/optuna/integration/__init__.py
-    def __init__(self, name, module_file, import_structure, extra_objects=None):
-        super().__init__(name)
-        self._modules = set(import_structure.keys())
-        self._class_to_module = {}
-        for key, values in import_structure.items():
-            for value in values:
-                self._class_to_module[value] = key
-        # Needed for autocompletion in an IDE
-        self.__all__ = list(import_structure.keys()) + sum(import_structure.values(), [])
-        self.__file__ = module_file
-        self.__path__ = [os.path.dirname(module_file)]
-        self._objects = {} if extra_objects is None else extra_objects
-        self._name = name
-        self._import_structure = import_structure
-
-    # Needed for autocompletion in an IDE
-    def __dir__(self):
-        return super().__dir__() + self.__all__
+    def __init__(self, module_name, module):
+        super().__init__("lazy_" + module_name)
+        # self._modules = set(import_structure.keys())
+        # self._class_to_module = {}
+        # for key, values in import_structure.items():
+        #     for value in values:
+        #         self._class_to_module[value] = key
+        self._module_path = module_name
+        self._module = module
+        self._submodules = {}
 
     def __getattr__(self, name: str) -> Any:
-        if name in self._objects:
-            return self._objects[name]
-        if name in self._modules:
-            value = self._get_module(name)
-        elif name in self._class_to_module:
-            module = self._get_module(self._class_to_module[name])
-            value = getattr(module, name)
+        # First, try the argument as a module name.
+        submodule = self._get_module(name)
+        if submodule:
+            return submodule
         else:
-            raise AttributeError(f"module {self.__name__} has no attribute {name}")
-
-        setattr(self, name, value)
-        return value
+            # If it's not a module name, try it as a member of this module.
+            try:
+                return getattr(self._module, name)
+            except:
+                raise AttributeError(
+                    f"module {self.__name__} has no attribute {name}"
+                ) from None
 
     def _get_module(self, module_name: str):
-        import omnigibson as og
-        # assert og.app is not None, "Please call `launch_simulator()` before importing any Omniverse modules."
-        return importlib.import_module(module_name, self.__name__)
+        """Recursively create and return a LazyImporter for the given module name."""
 
-    def __reduce__(self):
-        return (self.__class__, (self._name, self.__file__, self._import_structure))
+        # Get the fully qualified module name by prepending self._module_path
+        if self._module_path:
+            module_name = f"{self._module_path}.{module_name}"
+        
+        if module_name in self._submodules:
+            return self._submodules[module_name]
+
+        try:
+            wrapper = LazyImporter(module_name, importlib.import_module(module_name))
+            self._submodules[module_name] = wrapper
+            return wrapper
+        except ModuleNotFoundError:
+            return None
