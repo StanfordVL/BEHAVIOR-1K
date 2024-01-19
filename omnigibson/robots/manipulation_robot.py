@@ -2,8 +2,6 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from omni.physx import get_physx_scene_query_interface
-from pxr import Gf
 from real_tiago.user_interfaces.teleop_core import TeleopAction, TeleopObservation
 
 import omnigibson as og

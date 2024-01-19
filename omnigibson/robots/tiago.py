@@ -1,7 +1,5 @@
 import os
-
 import numpy as np
-from pxr import Gf
 from real_tiago.user_interfaces.teleop_core import TeleopAction
 
 import omnigibson as og

@@ -9,7 +9,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from real_tiago.user_interfaces.teleop_core import TeleopObservation
+from real_tiago.user_interfaces.teleop_core import TeleopAction, TeleopObservation
 from real_tiago.user_interfaces.teleop_policy import TeleopPolicy
 
 m = create_module_macros(module_path=__file__)
@@ -27,6 +27,7 @@ class TeleopSystem(TeleopPolicy):
             show_control_marker (bool): whether to show a visual marker that indicates the target pose of the control.
         """
         super().__init__(config)
+        self.teleop_action: TeleopAction = TeleopAction()
         self.robot = robot
         self.robot_arms = ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         # robot parameters
@@ -56,16 +57,16 @@ class TeleopSystem(TeleopPolicy):
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
             robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, [1]]
         # get teleop action
-        teleop_actions = super().get_action(robot_obs)
+        self.teleop_action = super().get_action(robot_obs)
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = teleop_actions[arm_name][:3], T.euler2quat(teleop_actions[arm_name][3:6])
+                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
                 self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
-        return self.robot.teleop_data_to_action(teleop_actions)
+        return self.robot.teleop_data_to_action(self.teleop_action)
 
 
 class OVXRSystem(TeleopSystem):
