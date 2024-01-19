@@ -386,10 +386,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def _default_controllers(self):
         # Always call super first
         controllers = super()._default_controllers
-
-        # We use multi finger gripper, differential drive, and IK controllers as default
+        # We use joint controllers for base and camera as default
         controllers["base"] = "JointController"
         controllers["camera"] = "JointController"
+        # We use multi finger gripper, and IK controllers for eefs as default
         for arm in self.arm_names:
             controllers["arm_{}".format(arm)] = "InverseKinematicsController"
             controllers["gripper_{}".format(arm)] = "MultiFingerGripperController"
