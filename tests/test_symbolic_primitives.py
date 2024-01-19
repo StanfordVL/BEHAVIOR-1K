@@ -285,6 +285,22 @@ def test_cut(env, prim_gen, apple, knife, countertop):
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
     env.step(action)
 
+def test_persistent_sticky_grasping(env, robot, prim_gen, apple):
+  assert not robot.states[object_states.IsGrasping].get_value(apple)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
+    env.step(action)
+  assert robot.states[object_states.IsGrasping].get_value(apple)
+  state = og.sim.dump_state()
+  og.sim.stop()
+  og.sim.play()
+  og.sim.load_state(state)
+  assert robot.states[object_states.IsGrasping].get_value(apple)
+
+  for _ in range(10):
+    env.step(prim_gen._empty_action())
+
+  assert robot.states[object_states.IsGrasping].get_value(apple)
+
 # def test_place_near_heating_element():
 #    pass
 
