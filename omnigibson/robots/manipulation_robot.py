@@ -123,7 +123,7 @@ class ManipulationRobot(BaseRobot):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -961,7 +961,7 @@ class ManipulationRobot(BaseRobot):
                 "robot_urdf_path": self.urdf_path,
                 "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "default_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
@@ -988,7 +988,7 @@ class ManipulationRobot(BaseRobot):
                 "name": "OperationalSpaceController",
                 "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "default_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (

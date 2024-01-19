@@ -864,7 +864,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ik_solver = IKSolver(
             robot_description_path=self._manipulation_descriptor_path,
             robot_urdf_path=self.robot.urdf_path,
-            default_joint_pos=self.robot.default_joint_pos[self._manipulation_control_idx],
+            default_joint_pos=self.robot.reset_joint_pos[self._manipulation_control_idx],
             eef_name=self.robot.eef_link_names[self.arm],
         )
         # Grab the joint positions in order to reach the desired pose target

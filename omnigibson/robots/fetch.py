@@ -69,8 +69,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Unique to Fetch
         rigid_trunk=False,
         default_trunk_offset=0.365,
+        default_reset_mode="untuck",
         default_arm_pose="diagonal30",
-
         **kwargs,
     ):
         """
@@ -101,7 +101,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -121,6 +121,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -129,17 +130,10 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Store args
         self.rigid_trunk = rigid_trunk
         self.default_trunk_offset = default_trunk_offset
+        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+        self.default_reset_mode = default_reset_mode
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
         self.default_arm_pose = default_arm_pose
-
-        # Parse reset joint pos if specifying special string
-        if isinstance(reset_joint_pos, str):
-            assert (
-                reset_joint_pos in RESET_JOINT_OPTIONS
-            ), "reset_joint_pos should be one of {} if using a string!".format(RESET_JOINT_OPTIONS)
-            reset_joint_pos = (
-                self.tucked_default_joint_pos if reset_joint_pos == "tuck" else self.untucked_default_joint_pos
-            )
 
         # Run super init
         super().__init__(
@@ -338,8 +332,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return cfg
 
     @property
-    def default_joint_pos(self):
-        return self.untucked_default_joint_pos
+    def _default_joint_pos(self):
+        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     def wheel_radius(self):

@@ -116,7 +116,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -137,6 +137,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -434,7 +435,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return cfg
 
     @property
-    def default_joint_pos(self):
+    def _default_joint_pos(self):
         return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
