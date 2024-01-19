@@ -161,151 +161,155 @@ def sponge(env):
 def knife(env):
   return next(iter(env.scene.object_registry("category", "carving_knife")))
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_in_hand_state(env, robot, prim_gen, apple):
-  assert not robot.states[object_states.IsGrasping].get_value(apple)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
-    env.step(action)
-  assert robot.states[object_states.IsGrasping].get_value(apple)
+class TestSymbolicPrimitives:
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_in_hand_state(self, env, robot, prim_gen, apple):
+    assert not robot.states[object_states.IsGrasping].get_value(apple)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
+      env.step(action)
+    assert robot.states[object_states.IsGrasping].get_value(apple)
 
-# def test_navigate():
-#    pass
+  # def test_navigate():
+  #    pass
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_open(env, prim_gen, fridge):
-  assert not fridge.states[object_states.Open].get_value()
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
-    env.step(action)
-  assert fridge.states[object_states.Open].get_value()
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_open(self, env, prim_gen, fridge):
+    assert not fridge.states[object_states.Open].get_value()
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
+      env.step(action)
+    assert fridge.states[object_states.Open].get_value()
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_close(env, prim_gen, fridge):
-  fridge.states[object_states.Open].set_value(True)
-  assert fridge.states[object_states.Open].get_value()
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CLOSE, fridge):
-    env.step(action)
-  assert not fridge.states[object_states.Open].get_value()
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_close(self, env, prim_gen, fridge):
+    fridge.states[object_states.Open].set_value(True)
+    assert fridge.states[object_states.Open].get_value()
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CLOSE, fridge):
+      env.step(action)
+    assert not fridge.states[object_states.Open].get_value()
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_place_inside(env, prim_gen, apple, fridge):
-  assert not apple.states[object_states.Inside].get_value(fridge)
-  assert not fridge.states[object_states.Open].get_value()
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
-    env.step(action)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
-    env.step(action)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_INSIDE, fridge):
-    env.step(action)
-  assert apple.states[object_states.Inside].get_value(fridge)
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_place_inside(self, env, prim_gen, apple, fridge):
+    assert not apple.states[object_states.Inside].get_value(fridge)
+    assert not fridge.states[object_states.Open].get_value()
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
+      env.step(action)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
+      env.step(action)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_INSIDE, fridge):
+      env.step(action)
+    assert apple.states[object_states.Inside].get_value(fridge)
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_place_ontop(env, prim_gen, apple, pan):
-  assert not apple.states[object_states.OnTop].get_value(pan)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
-    env.step(action)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, pan):
-    env.step(action)
-  assert apple.states[object_states.OnTop].get_value(pan)
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_place_ontop(self, env, prim_gen, apple, pan):
+    assert not apple.states[object_states.OnTop].get_value(pan)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
+      env.step(action)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, pan):
+      env.step(action)
+    assert apple.states[object_states.OnTop].get_value(pan)
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_toggle_on(env, prim_gen, stove):
-  assert not stove.states[object_states.ToggledOn].get_value()
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
-    env.step(action)
-  assert stove.states[object_states.ToggledOn].get_value()
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_toggle_on(self, env, prim_gen, stove):
+    assert not stove.states[object_states.ToggledOn].get_value()
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
+      env.step(action)
+    assert stove.states[object_states.ToggledOn].get_value()
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_soak_under(env, prim_gen, robot, sponge, sink):
-  water_system = get_system("water", force_active=True)
-  assert not sponge.states[object_states.Saturated].get_value(water_system)
-  assert not sink.states[object_states.ToggledOn].get_value()
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_soak_under(self, env, prim_gen, robot, sponge, sink):
+    water_system = get_system("water", force_active=True)
+    assert not sponge.states[object_states.Saturated].get_value(water_system)
+    assert not sink.states[object_states.ToggledOn].get_value()
 
-  # First toggle on the sink
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
-    env.step(action)
-  assert sink.states[object_states.ToggledOn].get_value()
+    # First toggle on the sink
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
+      env.step(action)
+    assert sink.states[object_states.ToggledOn].get_value()
 
-  # Then grasp the sponge
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
-    env.step(action)
-  assert robot.states[object_states.IsGrasping].get_value(sponge)
+    # Then grasp the sponge
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
+      env.step(action)
+    assert robot.states[object_states.IsGrasping].get_value(sponge)
 
-  # Then soak the sponge under the water
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
-    env.step(action)
-  assert sponge.states[object_states.Saturated].get_value(water_system)
+    # Then soak the sponge under the water
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+      env.step(action)
+    assert sponge.states[object_states.Saturated].get_value(water_system)
 
-# def test_soak_inside():
-#    pass
+  # def test_soak_inside():
+  #    pass
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_wipe(env, prim_gen, sponge, sink, countertop):
-  # Some pre-assertions
-  water_system = get_system("water", force_active=True)
-  assert not sponge.states[object_states.Saturated].get_value(water_system)
-  assert not sink.states[object_states.ToggledOn].get_value()
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_wipe(self, env, prim_gen, sponge, sink, countertop):
+    # Some pre-assertions
+    water_system = get_system("water", force_active=True)
+    assert not sponge.states[object_states.Saturated].get_value(water_system)
+    assert not sink.states[object_states.ToggledOn].get_value()
 
-  # Dirty the countertop as the setup
-  mud_system = get_system("mud", force_active=True)
-  countertop.states[object_states.Covered].set_value(mud_system, True)
-  assert countertop.states[object_states.Covered].get_value(mud_system)
+    # Dirty the countertop as the setup
+    mud_system = get_system("mud", force_active=True)
+    countertop.states[object_states.Covered].set_value(mud_system, True)
+    assert countertop.states[object_states.Covered].get_value(mud_system)
 
-  # First toggle on the sink
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
-    env.step(action)
-  assert sink.states[object_states.ToggledOn].get_value()
+    # First toggle on the sink
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
+      env.step(action)
+    assert sink.states[object_states.ToggledOn].get_value()
 
-  # Then grasp the sponge
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
-    env.step(action)
-  assert robot.states[object_states.IsGrasping].get_value(sponge)
+    # Then grasp the sponge
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
+      env.step(action)
+    assert robot.states[object_states.IsGrasping].get_value(sponge)
 
-  # Then soak the sponge under the water
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
-    env.step(action)
-  assert sponge.states[object_states.Saturated].get_value(water_system)
+    # Then soak the sponge under the water
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+      env.step(action)
+    assert sponge.states[object_states.Saturated].get_value(water_system)
 
-  # Wipe the countertop with the sponge
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.WIPE, countertop):
-    env.step(action)
-  assert not countertop.states[object_states.Covered].get_value(mud_system)
+    # Wipe the countertop with the sponge
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.WIPE, countertop):
+      env.step(action)
+    assert not countertop.states[object_states.Covered].get_value(mud_system)
 
-@pytest.mark.skip(reason="primitives are broken")
-def test_cut(env, prim_gen, apple, knife, countertop):
-  # assert not apple.states[object_states.Cut].get_value(knife)
-  print("Grasping knife")
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
-    env.step(action)
-  for _ in range(60): env.step(prim_gen._empty_action())
-  print("Cutting apple")
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
-    env.step(action)
-  for _ in range(60): env.step(prim_gen._empty_action())
-  print("Putting knife back on countertop")
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
-    env.step(action)
+  @pytest.mark.skip(reason="primitives are broken")
+  def test_cut(self, env, prim_gen, apple, knife, countertop):
+    # assert not apple.states[object_states.Cut].get_value(knife)
+    print("Grasping knife")
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
+      env.step(action)
+    for _ in range(60): env.step(prim_gen._empty_action())
+    print("Cutting apple")
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
+      env.step(action)
+    for _ in range(60): env.step(prim_gen._empty_action())
+    print("Putting knife back on countertop")
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
+      env.step(action)
 
-def test_persistent_sticky_grasping(env, robot, prim_gen, apple):
-  assert not robot.states[object_states.IsGrasping].get_value(apple)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
-    env.step(action)
-  assert robot.states[object_states.IsGrasping].get_value(apple)
-  state = og.sim.dump_state()
-  og.sim.stop()
-  og.sim.play()
-  og.sim.load_state(state)
-  assert robot.states[object_states.IsGrasping].get_value(apple)
+  def test_persistent_sticky_grasping(self, env, robot, prim_gen, apple):
+    assert not robot.states[object_states.IsGrasping].get_value(apple)
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
+      env.step(action)
+    assert robot.states[object_states.IsGrasping].get_value(apple)
+    state = og.sim.dump_state()
+    og.sim.stop()
+    og.sim.play()
+    og.sim.load_state(state)
+    assert robot.states[object_states.IsGrasping].get_value(apple)
 
-  for _ in range(10):
-    env.step(prim_gen._empty_action())
+    for _ in range(10):
+      env.step(prim_gen._empty_action())
 
-  assert robot.states[object_states.IsGrasping].get_value(apple)
+    assert robot.states[object_states.IsGrasping].get_value(apple)
 
-# def test_place_near_heating_element():
-#    pass
+  # def test_place_near_heating_element():
+  #    pass
 
-# def test_wait_for_cooked():
-#    pass
+  # def test_wait_for_cooked():
+  #    pass
+
+  def teardown_class(cls):
+    og.sim.clear()
 
 def main():
   env = start_env()
