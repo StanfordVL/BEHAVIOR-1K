@@ -723,7 +723,8 @@ class SlicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer")]
+        return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer"),
+                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
 
     @classmethod
     def transition(cls, object_candidates):
@@ -792,7 +793,8 @@ class DicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer")]
+        return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer"),
+                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
 
     @classmethod
     def transition(cls, object_candidates):
