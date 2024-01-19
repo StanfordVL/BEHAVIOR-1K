@@ -1,7 +1,7 @@
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
@@ -71,15 +71,15 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     KeyboardEventHandler.initialize()
     KeyboardEventHandler.add_keyboard_callback(
-        key=lo.carb.input.KeyboardInput.X,
+        key=lazy.carb.input.KeyboardInput.X,
         callback_fn=add_waypoint,
     )
     KeyboardEventHandler.add_keyboard_callback(
-        key=lo.carb.input.KeyboardInput.C,
+        key=lazy.carb.input.KeyboardInput.C,
         callback_fn=clear_waypoints,
     )
     KeyboardEventHandler.add_keyboard_callback(
-        key=lo.carb.input.KeyboardInput.J,
+        key=lazy.carb.input.KeyboardInput.J,
         callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
             waypoints=np.array(waypoints),
             per_step_distance=0.02,
@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         ),
     )
     KeyboardEventHandler.add_keyboard_callback(
-        key=lo.carb.input.KeyboardInput.ESCAPE,
+        key=lazy.carb.input.KeyboardInput.ESCAPE,
         callback_fn=lambda: env.close(),
     )
 

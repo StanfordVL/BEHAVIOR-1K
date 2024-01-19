@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
@@ -377,7 +377,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             if position is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
             if orientation is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lo.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]]))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]]))
 
     @property
     def assisted_grasp_start_points(self):

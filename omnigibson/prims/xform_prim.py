@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 import numpy as np
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler
@@ -57,12 +57,12 @@ class XFormPrim(BasePrim):
         self._set_xform_properties()
 
         # Create collision filter API
-        self._collision_filter_api = lo.pxr.UsdPhysics.FilteredPairsAPI(self._prim) if \
-            self._prim.HasAPI(lo.pxr.UsdPhysics.FilteredPairsAPI) else lo.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        self._collision_filter_api = lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim) if \
+            self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI) else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
 
         # Create binding API
-        self._binding_api = lo.pxr.UsdShade.MaterialBindingAPI(self.prim) if \
-            self._prim.HasAPI(lo.pxr.UsdShade.MaterialBindingAPI) else lo.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+        self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim) if \
+            self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI) else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -98,29 +98,29 @@ class XFormPrim(BasePrim):
             "xformOp:transform",
         ]
         prop_names = self.prim.GetPropertyNames()
-        xformable = lo.pxr.UsdGeom.Xformable(self.prim)
+        xformable = lazy.pxr.UsdGeom.Xformable(self.prim)
         xformable.ClearXformOpOrder()
         # TODO: wont be able to delete props for non root links on articulated objects
         for prop_name in prop_names:
             if prop_name in properties_to_remove:
                 self.prim.RemoveProperty(prop_name)
         if "xformOp:scale" not in prop_names:
-            xform_op_scale = xformable.AddXformOp(lo.pxr.UsdGeom.XformOp.TypeScale, lo.pxr.UsdGeom.XformOp.PrecisionDouble, "")
-            xform_op_scale.Set(lo.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
+            xform_op_scale = xformable.AddXformOp(lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, "")
+            xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
         else:
-            xform_op_scale = lo.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
+            xform_op_scale = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
 
         if "xformOp:translate" not in prop_names:
             xform_op_translate = xformable.AddXformOp(
-                lo.pxr.UsdGeom.XformOp.TypeTranslate, lo.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+                lazy.pxr.UsdGeom.XformOp.TypeTranslate, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
             )
         else:
-            xform_op_translate = lo.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
+            xform_op_translate = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
 
         if "xformOp:orient" not in prop_names:
-            xform_op_rot = xformable.AddXformOp(lo.pxr.UsdGeom.XformOp.TypeOrient, lo.pxr.UsdGeom.XformOp.PrecisionDouble, "")
+            xform_op_rot = xformable.AddXformOp(lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, "")
         else:
-            xform_op_rot = lo.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
+            xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
         self.set_position_orientation(position=current_position, orientation=current_orientation)
@@ -157,25 +157,25 @@ class XFormPrim(BasePrim):
         assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
             f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        mat = lo.pxr.Gf.Transform()
-        mat.SetRotation(lo.pxr.Gf.Rotation(lo.pxr.Gf.Quatd(*orientation)))
-        mat.SetTranslation(lo.pxr.Gf.Vec3d(*position))
+        mat = lazy.pxr.Gf.Transform()
+        mat.SetRotation(lazy.pxr.Gf.Rotation(lazy.pxr.Gf.Quatd(*orientation)))
+        mat.SetTranslation(lazy.pxr.Gf.Vec3d(*position))
 
-        # mat.SetScale(lo.pxr.Gf.Vec3d(*(self.get_world_scale() / self.scale)))
+        # mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.get_world_scale() / self.scale)))
         # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
-        mat.SetScale(lo.pxr.Gf.Vec3d(*(self.scale.astype(np.float64))))
+        mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.scale.astype(np.float64))))
         my_world_transform = np.transpose(mat.GetMatrix())
 
-        parent_world_tf = lo.pxr.UsdGeom.Xformable(lo.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lo.pxr.Usd.TimeCode.Default())
+        parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         parent_world_transform = np.transpose(parent_world_tf)
 
         local_transform = np.matmul(np.linalg.inv(parent_world_transform), my_world_transform)
-        transform = lo.pxr.Gf.Transform()
-        transform.SetMatrix(lo.pxr.Gf.Matrix4d(np.transpose(local_transform)))
+        transform = lazy.pxr.Gf.Transform()
+        transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
         self.set_local_pose(
-            position=np.array(calculated_translation), orientation=lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
+            position=np.array(calculated_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
 
     def get_position_orientation(self):
@@ -187,12 +187,12 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        prim_tf = lo.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lo.pxr.Usd.TimeCode.Default())
-        transform = lo.pxr.Gf.Transform()
+        prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+        transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
         position = transform.GetTranslation()
         orientation = transform.GetRotation().GetQuat()
-        return np.array(position), lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(orientation)[[1, 2, 3, 0]]
+        return np.array(position), lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(orientation)[[1, 2, 3, 0]]
 
     def set_position(self, position):
         """
@@ -266,7 +266,7 @@ class XFormPrim(BasePrim):
         """
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:orient")
-        return np.array(xform_translate_op), lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(xform_orient_op)[[1, 2, 3, 0]]
+        return np.array(xform_translate_op), lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(xform_orient_op)[[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
         """
@@ -280,23 +280,23 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lo.pxr.Gf.Vec3d(*np.array(position, dtype=float))
+            position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
             if "xformOp:translate" not in properties:
-                lo.carb.log_error(
+                lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
             orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
-                lo.carb.log_error(
+                lazy.carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
                 )
             xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
-                rotq = lo.pxr.Gf.Quatf(*orientation)
+                rotq = lazy.pxr.Gf.Quatf(*orientation)
             else:
-                rotq = lo.pxr.Gf.Quatd(*orientation)
+                rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
         BoundingBoxAPI.clear()
         return
@@ -308,8 +308,8 @@ class XFormPrim(BasePrim):
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the world frame. shape is (3, ).
         """
-        prim_tf = lo.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lo.pxr.Usd.TimeCode.Default())
-        transform = lo.pxr.Gf.Transform()
+        prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+        transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
         return np.array(transform.GetScale())
 
@@ -333,10 +333,10 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
-        scale = lo.pxr.Gf.Vec3d(*scale)
+        scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
-            lo.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
+            lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
 
     @property
@@ -389,7 +389,7 @@ class XFormPrim(BasePrim):
         Args:
             material (MaterialPrim): Material to bind to this prim
         """
-        self._binding_api.Bind(lo.pxr.UsdShade.Material(material.prim), bindingStrength=lo.pxr.UsdShade.Tokens.weakerThanDescendants)
+        self._binding_api.Bind(lazy.pxr.UsdShade.Material(material.prim), bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants)
         self._material = material
 
     def add_filtered_collision_pair(self, prim):

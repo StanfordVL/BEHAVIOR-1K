@@ -3,7 +3,7 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
@@ -133,9 +133,9 @@ class PrimitiveObject(StatefulObject):
         self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
         # Add collision API to collision geom
-        lo.pxr.UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
-        lo.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
-        lo.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
+        lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
+        lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
+        lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
 
         # Create a material for this object for the base link
         og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
@@ -218,7 +218,7 @@ class PrimitiveObject(StatefulObject):
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     vals = np.array(attr.Get()).astype(np.float64)
                     attr_pairs.append([attr, vals])
-                geom.GetExtentAttr().Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lo.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
 
         # Calculate how much to scale extents by and then modify the points / normals accordingly
         scaling_factor = 2.0 * radius / original_extent[0]
@@ -230,7 +230,7 @@ class PrimitiveObject(StatefulObject):
             else:
                 vals[:, :2] = vals[:, :2] * scaling_factor
             # Set the value
-            attr.Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*v) for v in vals]))
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
 
     @property
     def height(self):
@@ -268,8 +268,8 @@ class PrimitiveObject(StatefulObject):
                     vals = np.array(attr.Get()).astype(np.float64)
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
-                    attr.Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*v) for v in vals]))
-                geom.GetExtentAttr().Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lo.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
 
     @property
     def size(self):
@@ -307,8 +307,8 @@ class PrimitiveObject(StatefulObject):
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
                     vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
-                    attr.Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*v) for v in vals]))
-                geom.GetExtentAttr().Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lo.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)

@@ -6,7 +6,7 @@ import omnigibson as og
 from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
 from omnigibson.utils.physx_utils import bind_material
 import omnigibson.utils.transform_utils as T
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 
 def make_glass(prim):
     """
@@ -32,9 +32,9 @@ def make_glass(prim):
 
     # Grab the glass material prim; if it doesn't exist, we create it on the fly
     glass_prim_path = "/Looks/OmniGlass"
-    if not lo.omni.isaac.core.utils.prims.get_prim_at_path(glass_prim_path):
+    if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(glass_prim_path):
         mtl_created = []
-        lo.omni.kit.commands.execute(
+        lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
             mdl_name="OmniGlass.mdl",
             mtl_name="OmniGlass",
@@ -58,7 +58,7 @@ def create_pbr_material(prim_path):
     """
     # Use DeepWater omni present for rendering water
     mtl_created = []
-    lo.omni.kit.commands.execute(
+    lazy.omni.kit.commands.execute(
         "CreateAndBindMdlMaterialFromLibrary",
         mdl_name="OmniPBR.mdl",
         mtl_name="OmniPBR",
@@ -67,10 +67,10 @@ def create_pbr_material(prim_path):
     material_path = mtl_created[0]
 
     # Move prim to desired location
-    lo.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
+    lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
 
     # Return generated material
-    return lo.omni.isaac.core.utils.prims.get_prim_at_path(material_path)
+    return lazy.omni.isaac.core.utils.prims.get_prim_at_path(material_path)
 
 
 def create_skylight(intensity=500, color=(1.0, 1.0, 1.0)):
@@ -90,5 +90,5 @@ def create_skylight(intensity=500, color=(1.0, 1.0, 1.0)):
     og.sim.import_object(light)
     light.set_orientation(T.euler2quat([0, 0, -np.pi / 4]))
     light_prim = light.light_link.prim
-    light_prim.GetAttribute("color").Set(lo.pxr.Gf.Vec3f(*color))
+    light_prim.GetAttribute("color").Set(lazy.pxr.Gf.Vec3f(*color))
     return light

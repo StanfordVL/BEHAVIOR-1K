@@ -7,7 +7,7 @@ from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -64,11 +64,11 @@ def check_deletable_prim(prim_path):
     Returns:
         bool: Whether the prim can be deleted or not
     """
-    if lo.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
+    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
         return False
-    if lo.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
+    if lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
         return False
-    if lo.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
         return False
     if prim_path == "/World":
         return False
@@ -355,4 +355,4 @@ def land_object(obj, pos, quat=None, z_offset=None):
 
 
 def meets_minimum_isaac_version(minimum_version):
-    return python_utils.meets_minimum_version(lo.omni.isaac.version.get_version()[0], minimum_version)
+    return python_utils.meets_minimum_version(lazy.omni.isaac.version.get_version()[0], minimum_version)

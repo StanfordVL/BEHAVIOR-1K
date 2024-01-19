@@ -6,7 +6,7 @@ Options for random actions, as well as selection of robot action space
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
@@ -130,7 +130,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Register custom binding to reset the environment
     action_generator.register_custom_keymapping(
-        key=lo.carb.input.KeyboardInput.R,
+        key=lazy.carb.input.KeyboardInput.R,
         description="Reset the robot",
         callback_fn=lambda: env.reset(),
     )

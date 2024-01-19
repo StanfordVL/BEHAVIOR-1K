@@ -3,7 +3,7 @@ from collections import defaultdict
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
@@ -97,7 +97,7 @@ def create_projection_visualization(
             - UsdPrim: Generated Emitter (ComputeGraph) prim generated
     """
     # Create the desired shape which will be used as the source input prim into the generated projection visualization
-    source = lo.pxr.UsdGeom.Sphere.Define(og.sim.stage, lo.pxr.Sdf.Path(prim_path))
+    source = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, lazy.pxr.Sdf.Path(prim_path))
 
     # Modify the radius according to the desired @shape (and also infer the desired spread values)
     if shape == "Cylinder":
@@ -113,7 +113,7 @@ def create_projection_visualization(
     # Set the radius
     source.GetRadiusAttr().Set(source_radius)
     # Also make the prim invisible
-    lo.pxr.UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
+    lazy.pxr.UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
 
     # Generate the ComputeGraph nodes to render the projection
     # Import now to avoid too-eager load of Omni classes due to inheritance
@@ -144,21 +144,21 @@ def create_projection_visualization(
     if material is not None:
         prototype.material = material
     # Override the prototype used by the instancer
-    instancer_prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(instancer_path)
+    instancer_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(instancer_path)
     instancer_prim.GetProperty("inputs:prototypes").SetTargets([prototype_path])
 
     # Destroy the old mat path since we don't use the sprites
-    lo.omni.isaac.core.utils.prims.delete_prim(mat_path)
+    lazy.omni.isaac.core.utils.prims.delete_prim(mat_path)
 
     # Modify the settings of the emitter to match the desired shape from inputs
-    emitter_prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(emitter_path)
+    emitter_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(emitter_path)
     emitter_prim.GetProperty("inputs:active").Set(True)
     emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
     emitter_prim.GetProperty("inputs:lifespan").Set(projection_height / m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:speed").Set(m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:alongAxis").Set(m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS)
-    emitter_prim.GetProperty("inputs:scale").Set(lo.pxr.Gf.Vec3f(1.0, 1.0, 1.0))
-    emitter_prim.GetProperty("inputs:directionRandom").Set(lo.pxr.Gf.Vec3f(*spread))
+    emitter_prim.GetProperty("inputs:scale").Set(lazy.pxr.Gf.Vec3f(1.0, 1.0, 1.0))
+    emitter_prim.GetProperty("inputs:directionRandom").Set(lazy.pxr.Gf.Vec3f(*spread))
     emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
     # Make sure we render 4 times to fully propagate changes (validated empirically)
@@ -168,7 +168,7 @@ def create_projection_visualization(
             og.sim.render()
 
     # Return the particle system prim which "owns" everything
-    return lo.omni.isaac.core.utils.prims.get_prim_at_path(system_path), emitter_prim
+    return lazy.omni.isaac.core.utils.prims.get_prim_at_path(system_path), emitter_prim
 
 
 class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMixin):
@@ -315,13 +315,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
 
             # Create a primitive shape if it doesn't already exist
-            pre_existing_mesh = lo.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
             if not pre_existing_mesh:
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, \
                     f"Must specify projection_mesh_params for {self.obj.name}'s {self.__class__.__name__} " \
                     f"since it has no pre-existing projection mesh!"
-                mesh = getattr(lo.pxr.UsdGeom, self._projection_mesh_params["type"]).Define(og.sim.stage, mesh_prim_path).GetPrim()
+                mesh = getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"]).Define(og.sim.stage, mesh_prim_path).GetPrim()
                 property_names = set(mesh.GetPropertyNames())
                 for shape_attr, default_val in shape_defaults.items():
                     if shape_attr in property_names:
@@ -375,7 +375,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             self._check_in_mesh, _ = generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
             # Store the projection mesh's IDs
-            projection_mesh_ids = lo.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
+            projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
 
             # We also generate the function for checking overlaps at runtime
             def check_overlap():
@@ -897,9 +897,9 @@ class ParticleApplier(ParticleModifier):
             projection_name = f"{name_prefix}_projection_visualization"
             projection_path = f"/OmniGraph/{projection_name}"
             projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
-            if lo.omni.isaac.core.utils.prims.is_prim_path_valid(projection_path):
-                self.projection_system = lo.omni.isaac.core.utils.prims.get_prim_at_path(projection_path)
-                self.projection_emitter = lo.omni.isaac.core.utils.prims.get_prim_at_path(f"{projection_path}/emitter")
+            if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(projection_path):
+                self.projection_system = lazy.omni.isaac.core.utils.prims.get_prim_at_path(projection_path)
+                self.projection_emitter = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{projection_path}/emitter")
             else:
                 self.projection_system, self.projection_emitter = create_projection_visualization(
                     prim_path=projection_visualization_path,
@@ -1007,7 +1007,7 @@ class ParticleApplier(ParticleModifier):
     def remove(self):
         # We need to remove the projection visualization if it exists
         if self.projection_system is not None:
-            lo.omni.isaac.core.utils.prims.delete_prim(self.projection_system.GetPrimPath().pathString)
+            lazy.omni.isaac.core.utils.prims.delete_prim(self.projection_system.GetPrimPath().pathString)
 
     def _modify_particles(self, system):
         if self._sample_with_raycast:

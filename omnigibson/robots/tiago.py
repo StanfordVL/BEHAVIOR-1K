@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -294,11 +294,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visual_only = True
             self.eef_links[arm].visible = False
 
-        self._world_base_fixed_joint_prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(f"{self._prim_path}/rootJoint")
+        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{self._prim_path}/rootJoint")
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lo.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def _initialize(self):
         # Run super method first
@@ -729,7 +729,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lo.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame

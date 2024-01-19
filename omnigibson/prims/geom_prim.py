@@ -1,7 +1,7 @@
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
@@ -147,15 +147,15 @@ class CollisionGeomPrim(GeomPrim):
         self.purpose = "guide"
 
         # Create API references
-        self._collision_api = lo.pxr.UsdPhysics.CollisionAPI(self._prim) if \
-            self._prim.HasAPI(lo.pxr.UsdPhysics.CollisionAPI) else lo.pxr.UsdPhysics.CollisionAPI.Apply(self._prim)
-        self._physx_collision_api = lo.pxr.PhysxSchema.PhysxCollisionAPI(self._prim) if \
-            self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxCollisionAPI) else lo.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
+        self._collision_api = lazy.pxr.UsdPhysics.CollisionAPI(self._prim) if \
+            self._prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI) else lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._prim)
+        self._physx_collision_api = lazy.pxr.PhysxSchema.PhysxCollisionAPI(self._prim) if \
+            self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI) else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
 
         # Optionally add mesh collision API if this is a mesh
         if self._prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-            self._mesh_collision_api = lo.pxr.UsdPhysics.MeshCollisionAPI(self._prim) if \
-                self._prim.HasAPI(lo.pxr.UsdPhysics.MeshCollisionAPI) else lo.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._prim)
+            self._mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI(self._prim) if \
+                self._prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._prim)
             # Set the approximation to be convex hull by default
             self.set_collision_approximation(approximation_type="convexHull")
 
@@ -260,19 +260,19 @@ class CollisionGeomPrim(GeomPrim):
         )
 
         # Make sure to add the appropriate API if we're setting certain values
-        if approximation_type == "convexHull" and not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxConvexHullCollisionAPI):
-            lo.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
-        elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI):
-            lo.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
-        elif approximation_type == "meshSimplification" and not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI):
-            lo.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
-        elif approximation_type == "sdf" and not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
-            lo.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
-        elif approximation_type == "none" and not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
-            lo.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
+        if approximation_type == "convexHull" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
+        elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
+        elif approximation_type == "meshSimplification" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
+        elif approximation_type == "sdf" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
+        elif approximation_type == "none" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
 
         if approximation_type == "convexHull":
-            pch_api = lo.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(self._prim)
+            pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(self._prim)
             # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
             # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
             if pch_api.GetHullVertexLimitAttr().Get() is None:
@@ -301,20 +301,20 @@ class CollisionGeomPrim(GeomPrim):
                                                       materials, otherwise False. Defaults to False.
         """
         if self._binding_api is None:
-            if self._prim.HasAPI(lo.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lo.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
             else:
-                self._binding_api = lo.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if weaker_than_descendants:
             self._binding_api.Bind(
                 physics_material.material,
-                bindingStrength=lo.pxr.UsdShade.Tokens.weakerThanDescendants,
+                bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants,
                 materialPurpose="physics",
             )
         else:
             self._binding_api.Bind(
                 physics_material.material,
-                bindingStrength=lo.pxr.UsdShade.Tokens.strongerThanDescendants,
+                bindingStrength=lazy.pxr.UsdShade.Tokens.strongerThanDescendants,
                 materialPurpose="physics",
             )
         self._applied_physics_material = physics_material
@@ -328,10 +328,10 @@ class CollisionGeomPrim(GeomPrim):
             PhysicsMaterial: the current applied physics material.
         """
         if self._binding_api is None:
-            if self._prim.HasAPI(lo.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lo.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
             else:
-                self._binding_api = lo.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if self._applied_physics_material is not None:
             return self._applied_physics_material
         else:
@@ -340,7 +340,7 @@ class CollisionGeomPrim(GeomPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lo.omni.isaac.core.materials.PhysicsMaterial(prim_path=path)
+                self._applied_physics_material = lazy.omni.isaac.core.materials.PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
 
 

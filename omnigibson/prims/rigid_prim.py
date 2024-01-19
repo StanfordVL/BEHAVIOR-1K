@@ -1,7 +1,7 @@
 import numpy as np
 
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
@@ -84,18 +84,18 @@ class RigidPrim(XFormPrim):
         super()._post_load()
 
         # Apply rigid body and mass APIs
-        if not self._prim.HasAPI(lo.pxr.UsdPhysics.RigidBodyAPI):
-            lo.pxr.UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxRigidBodyAPI):
-            lo.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        if not self._prim.HasAPI(lo.pxr.UsdPhysics.MassAPI):
-            lo.pxr.UsdPhysics.MassAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+            lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
+            lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI):
+            lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
         if not self._visual_only:
-            lo.pxr.PhysxSchema.PhysxContactReportAPI(self._prim) if \
-                self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxContactReportAPI) else \
-                lo.pxr.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
+            lazy.pxr.PhysxSchema.PhysxContactReportAPI(self._prim) if \
+                self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI) else \
+                lazy.pxr.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -118,7 +118,7 @@ class RigidPrim(XFormPrim):
             "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Create contact sensor
-        self._cs = lo.omni.isaac.sensor._sensor.acquire_contact_sensor_interface()
+        self._cs = lazy.omni.isaac.sensor._sensor.acquire_contact_sensor_interface()
         # self._create_contact_sensor()
 
     def _initialize(self):
@@ -177,8 +177,8 @@ class RigidPrim(XFormPrim):
         for prim in prims_to_check:
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
-                is_collision = mesh_prim.HasAPI(lo.pxr.UsdPhysics.CollisionAPI)
+                mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
+                is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}"}
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
@@ -204,7 +204,7 @@ class RigidPrim(XFormPrim):
         # for this link
         if len(coms) > 0:
             com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
-            self.set_attribute("physics:centerOfMass", lo.pxr.Gf.Vec3f(*com))
+            self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
 
     def enable_collisions(self):
         """
@@ -564,7 +564,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: Whether contact reporting is enabled for this rigid prim or not
         """
-        return self._prim.HasAPI(lo.pxr.PhysxSchema.PhysxContactReportAPI)
+        return self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
 
     def enable_gravity(self):
         """
@@ -582,14 +582,14 @@ class RigidPrim(XFormPrim):
         """
         Enable physics for this rigid body
         """
-        prim_id = lo.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.wake_up(og.sim.stage_id, prim_id)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        prim_id = lo.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
 
     def _dump_state(self):

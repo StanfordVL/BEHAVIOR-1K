@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 import numpy as np
 import omnigibson as og
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.usd_utils import create_joint
@@ -108,7 +108,7 @@ class JointPrim(BasePrim):
         super()._post_load()
 
         # Check whether this joint is driven or not
-        self._driven = self._prim.HasAPI(lo.pxr.UsdPhysics.DriveAPI)
+        self._driven = self._prim.HasAPI(lazy.pxr.UsdPhysics.DriveAPI)
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
@@ -116,7 +116,7 @@ class JointPrim(BasePrim):
             # We MUST already have the joint state API defined beforehand in the USD
             # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
             # happens because joint prims are usually created externally during an EntityPrim's initialization phase
-            assert self._prim.HasAPI(lo.pxr.PhysxSchema.JointStateAPI), \
+            assert self._prim.HasAPI(lazy.pxr.PhysxSchema.JointStateAPI), \
                 "Revolute or Prismatic joints must already have JointStateAPI added!"
 
         # Possibly set the bodies
@@ -235,8 +235,8 @@ class JointPrim(BasePrim):
             body0 (str): Absolute prim path to the body prim to set as this joint's parent link.
         """
         # Make sure prim path is valid
-        assert lo.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
-        self._prim.GetRelationship("physics:body0").SetTargets([lo.pxr.Sdf.Path(body0)])
+        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        self._prim.GetRelationship("physics:body0").SetTargets([lazy.pxr.Sdf.Path(body0)])
 
     @property
     def body1(self):
@@ -259,8 +259,8 @@ class JointPrim(BasePrim):
             body1 (str): Absolute prim path to the body prim to set as this joint's child link.
         """
         # Make sure prim path is valid
-        assert lo.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
-        self._prim.GetRelationship("physics:body1").SetTargets([lo.pxr.Sdf.Path(body1)])
+        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        self._prim.GetRelationship("physics:body1").SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     @property
     def local_orientation(self):
@@ -269,8 +269,8 @@ class JointPrim(BasePrim):
             4-array: (x,y,z,w) local quaternion orientation of this joint, relative to the parent link
         """
         # Grab local rotation to parent and child links
-        quat0 = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
-        quat1 = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
+        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
 
         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
         return T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)

@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 from transforms3d.quaternions import quat2mat
 
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import OccupancyGridState
 from omnigibson.utils.python_utils import classproperty
@@ -112,7 +112,7 @@ class ScanSensor(BaseSensor):
 
     def _load(self):
         # Define a LIDAR prim at the current stage
-        result, lidar = lo.omni.kit.commands.execute("RangeSensorCreateLidar", path=self._prim_path)
+        result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self._prim_path)
 
         return lidar.GetPrim()
 
@@ -137,7 +137,7 @@ class ScanSensor(BaseSensor):
         super()._initialize()
 
         # Initialize lidar sensor interface
-        self._rs = lo.omni.isaac.range_sensor._range_sensor.acquire_lidar_sensor_interface()
+        self._rs = lazy.omni.isaac.range_sensor._range_sensor.acquire_lidar_sensor_interface()
 
     @property
     def _obs_space_mapping(self):

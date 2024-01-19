@@ -1,4 +1,4 @@
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 from omnigibson.renderer_settings.common_settings import CommonSettings
 from omnigibson.renderer_settings.path_tracing_settings import PathTracingSettings
 from omnigibson.renderer_settings.post_processing_settings import PostProcessingSettings
@@ -21,7 +21,7 @@ class RendererSettings:
     """
 
     def __init__(self):
-        self._carb_settings = lo.carb.settings.get_settings()
+        self._carb_settings = lazy.carb.settings.get_settings()
         self.common_settings = CommonSettings()
         self.path_tracing_settings = PathTracingSettings()
         self.post_processing_settings = PostProcessingSettings()
@@ -72,7 +72,7 @@ class RendererSettings:
         Returns:
             str: the current renderer.
         """
-        return lo.omni.rtx.window.settings.RendererSettingsFactory.get_current_renderer()
+        return lazy.omni.rtx.window.settings.RendererSettingsFactory.get_current_renderer()
 
     def set_current_renderer(self, renderer):
         """
@@ -82,10 +82,10 @@ class RendererSettings:
             renderer (str): The renderer to set as current (e.g. Real-Time, Path-Traced).
         """
         assert (
-            renderer in lo.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()
-        ), f"renderer must be one of {lo.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()}"
+            renderer in lazy.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()
+        ), f"renderer must be one of {lazy.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()}"
         print(f"Set current renderer to {renderer}.")
-        lo.omni.rtx.window.settings.RendererSettingsFactory.set_current_renderer(renderer)
+        lazy.omni.rtx.window.settings.RendererSettingsFactory.set_current_renderer(renderer)
 
     @property
     def settings(self):

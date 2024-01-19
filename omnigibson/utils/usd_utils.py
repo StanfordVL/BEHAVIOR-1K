@@ -2,7 +2,7 @@ import math
 from collections.abc import Iterable
 import os
 
-import omnigibson.lazy_omni as lo
+import omnigibson.lazy as lazy
 
 import numpy as np
 import trimesh
@@ -29,17 +29,17 @@ def array_to_vtarray(arr, element_type):
         Vt.Array: Vt-typed array, of specified type corresponding to @element_type
     """
     GF_TO_VT_MAPPING = {
-        lo.pxr.Gf.Vec3d: lo.pxr.Vt.Vec3dArray,
-        lo.pxr.Gf.Vec3f: lo.pxr.Vt.Vec3fArray,
-        lo.pxr.Gf.Vec3h: lo.pxr.Vt.Vec3hArray,
-        lo.pxr.Gf.Quatd: lo.pxr.Vt.QuatdArray,
-        lo.pxr.Gf.Quatf: lo.pxr.Vt.QuatfArray,
-        lo.pxr.Gf.Quath: lo.pxr.Vt.QuathArray,
-        int: lo.pxr.Vt.IntArray,
-        float: lo.pxr.Vt.FloatArray,
-        bool: lo.pxr.Vt.BoolArray,
-        str: lo.pxr.Vt.StringArray,
-        chr: lo.pxr.Vt.CharArray,
+        lazy.pxr.Gf.Vec3d: lazy.pxr.Vt.Vec3dArray,
+        lazy.pxr.Gf.Vec3f: lazy.pxr.Vt.Vec3fArray,
+        lazy.pxr.Gf.Vec3h: lazy.pxr.Vt.Vec3hArray,
+        lazy.pxr.Gf.Quatd: lazy.pxr.Vt.QuatdArray,
+        lazy.pxr.Gf.Quatf: lazy.pxr.Vt.QuatfArray,
+        lazy.pxr.Gf.Quath: lazy.pxr.Vt.QuathArray,
+        int: lazy.pxr.Vt.IntArray,
+        float: lazy.pxr.Vt.FloatArray,
+        bool: lazy.pxr.Vt.BoolArray,
+        str: lazy.pxr.Vt.StringArray,
+        chr: lazy.pxr.Vt.CharArray,
     }
 
     # Make sure array type is valid
@@ -70,7 +70,7 @@ def get_prim_nested_children(prim):
         list of Usd.Prim: nested prims
     """
     prims = []
-    for child in lo.omni.isaac.core.utils.prims.get_prim_children(prim):
+    for child in lazy.omni.isaac.core.utils.prims.get_prim_children(prim):
         prims.append(child)
         prims += get_prim_nested_children(prim=child)
 
@@ -92,12 +92,12 @@ def get_camera_params(viewport):
             resolution (dict): resolution as a dict with 'width' and 'height'.
             clipping_range (tuple(float, float)): Near and Far clipping values.
     """
-    stage = lo.omni.usd.get_context().get_stage()
+    stage = lazy.omni.usd.get_context().get_stage()
     prim = stage.GetPrimAtPath(viewport.get_active_camera())
-    prim_tf = lo.omni.usd.get_world_transform_matrix(prim)
-    view_params = lo.omni.syntheticdata.helpers.get_view_params(viewport)
+    prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
+    view_params = lazy.omni.syntheticdata.helpers.get_view_params(viewport)
     fov = 2 * math.atan(view_params["horizontal_aperture"] / (2 * view_params["focal_length"]))
-    view_proj_mat = lo.omni.syntheticdata.helpers.get_view_proj_mat(view_params)
+    view_proj_mat = lazy.omni.syntheticdata.helpers.get_view_proj_mat(view_params)
 
     return {
         "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
@@ -114,13 +114,13 @@ def get_semantic_objects_pose():
     """
     Get pose of all objects with a semantic label.
     """
-    stage = lo.omni.usd.get_context().get_stage()
-    mappings = lo.omni.syntheticdata.helpers.get_instance_mappings()
+    stage = lazy.omni.usd.get_context().get_stage()
+    mappings = lazy.omni.syntheticdata.helpers.get_instance_mappings()
     pose = []
     for m in mappings:
         prim_path = m[1]
         prim = stage.GetPrimAtPath(prim_path)
-        prim_tf = lo.omni.usd.get_world_transform_matrix(prim)
+        prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
         pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
     return pose
 
@@ -159,21 +159,21 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
         f"At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
-    joint = getattr(lo.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
+    joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:
-        assert lo.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
-        joint.GetBody0Rel().SetTargets([lo.pxr.Sdf.Path(body0)])
+        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
     if body1 is not None:
-        assert lo.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
-        joint.GetBody1Rel().SetTargets([lo.pxr.Sdf.Path(body1)])
+        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     # Get the prim pointed to at this path
-    joint_prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
 
     # Apply joint API interface
-    lo.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+    lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
 
     # We need to step rendering once to auto-fill the local pose before overwriting it.
     # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
@@ -181,13 +181,13 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
     og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos0").Set(lo.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
+        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
     if joint_frame_in_parent_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot0").Set(lo.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]))
+        joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]))
     if joint_frame_in_child_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos1").Set(lo.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
     if joint_frame_in_child_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot1").Set(lo.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]]))
+        joint_prim.GetAttribute("physics:localRot1").Set(lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]]))
 
     if break_force is not None:
         joint_prim.GetAttribute("physics:breakForce").Set(break_force)
@@ -474,10 +474,10 @@ class BoundingBoxAPI:
         # Create cache if it doesn't already exist
         if cls.CACHE_NON_FLATCACHE is None:
             og.sim.psi.fetch_results()
-            cls.CACHE_NON_FLATCACHE = lo.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
+            cls.CACHE_NON_FLATCACHE = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
-        aabb = lo.omni.isaac.core.utils.bounds.compute_aabb(bbox_cache=cls.CACHE_NON_FLATCACHE, prim_path=prim_path)
+        aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(bbox_cache=cls.CACHE_NON_FLATCACHE, prim_path=prim_path)
 
         # Sanity check values
         if np.any(aabb[3:] < aabb[:3]):
@@ -654,28 +654,28 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
             use og.sim.stage
     """
     MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-        "Sphere": lo.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
-        "Disk": lo.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
-        "Plane": lo.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
-        "Cylinder": lo.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
-        "Torus": lo.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
-        "Cone": lo.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
-        "Cube": lo.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
+        "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
+        "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
+        "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
+        "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
+        "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
+        "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
+        "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
     }
 
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
     evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
-    u_backup = lo.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
-    v_backup = lo.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
-    hs_backup = lo.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
-    lo.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
-    lo.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
+    u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
+    v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
+    hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
     stage = og.sim.stage if stage is None else stage
 
     # Default half_scale (i.e. half-extent, half_height, radius) is 1.
     # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
     #  (currently it only accepts integer-number and floors 0.5 into 0).
-    lo.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
     kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
     if u_patches is not None and v_patches is not None:
         kwargs["u_patches"] = u_patches
@@ -685,9 +685,9 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
     CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
-    lo.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
-    lo.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
-    lo.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
+    lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
 def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
@@ -840,7 +840,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
     create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage)
-    mesh = lo.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
+    mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
@@ -848,8 +848,8 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = np.array(attr.Get()).astype(np.float64)
-        attr.Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
-    mesh.GetExtentAttr().Set(lo.pxr.Vt.Vec3fArray([lo.pxr.Gf.Vec3f(*(-extents / 2.0)), lo.pxr.Gf.Vec3f(*(extents / 2.0))]))
+        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
+    mesh.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))]))
 
     return mesh
 
@@ -873,8 +873,8 @@ def add_asset_to_stage(asset_path, prim_path):
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
     # Add reference to stage and grab prim
-    lo.omni.isaac.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
-    prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    lazy.omni.isaac.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
+    prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
 
     # Make sure prim was loaded correctly
     assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
@@ -887,4 +887,4 @@ def get_world_prim():
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    return lo.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+    return lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
