@@ -84,7 +84,7 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
     # Attempts to attach two objects when a CONTACT_FOUND event happens
     def on_contact(self, other, contact_headers, contact_data):
         for contact_header in contact_headers:
-            if contact_header.type == lo.ContactEventType.CONTACT_FOUND:
+            if contact_header.type == lo.omni.physx.bindings._physx.ContactEventType.CONTACT_FOUND:
                 # If it has successfully attached to something, break.
                 if self.set_value(other, True):
                     break

@@ -155,15 +155,15 @@ class OVXRSystem(TeleopSystem):
             The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
         """
         # enable xr extension
-        lo.enable_extension("omni.kit.xr.profile.vr")
-        self.xr_device_class = lo.XRDeviceClass
+        lo.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
+        self.xr_device_class = lo.omni.kit.xr.core.XRDeviceClass
         # run super method
         super().__init__(robot, show_control_marker)
         # we want to further slow down the movement speed if we are using touchpad movement
         if enable_touchpad_movement:
             self.movement_speed *= 0.1
         # get xr core and profile
-        self.xr_core = lo.XRCore.get_singleton()
+        self.xr_core = lo.omni.kit.xr.core.XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
         self.disable_display_output = disable_display_output
         self.enable_touchpad_movement = enable_touchpad_movement
@@ -172,9 +172,9 @@ class OVXRSystem(TeleopSystem):
             "enable_touchpad_movement and align_anchor_to_robot_base cannot be True at the same time!"
         # set avatar
         if self.show_control_marker:
-            self.vr_profile.set_avatar(lo.XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
+            self.vr_profile.set_avatar(lo.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
         else:
-            self.vr_profile.set_avatar(lo.XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
+            self.vr_profile.set_avatar(lo.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
         # # set anchor mode to be custom anchor
         lo.carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene origin")
         # set vr system
@@ -197,7 +197,7 @@ class OVXRSystem(TeleopSystem):
             self.raw_data["hand_data"] = {}
             self.teleop_data.hand_data = {}
             self._hand_tracking_subscription = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
-                lo.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
+                lo.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
 
     def xr2og(self, transform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

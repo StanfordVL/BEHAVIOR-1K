@@ -11,7 +11,7 @@ import math
 DEG2RAD = math.pi / 180.0
 
 
-class CreateMeshPrimWithDefaultXformCommand(lo.CreateMeshPrimWithDefaultXformCommand):
+class CreateMeshPrimWithDefaultXformCommand(lo.omni.kit.primitive.mesh.command.CreateMeshPrimWithDefaultXformCommand):
     def __init__(self, prim_type: str, **kwargs):
         """
         Creates primitive.
@@ -59,11 +59,11 @@ class CreateMeshPrimWithDefaultXformCommand(lo.CreateMeshPrimWithDefaultXformCom
 
         self._attributes = {**kwargs}
         # Supported mesh types should have an associated evaluator class
-        self._evaluator_class = lo.command._get_all_evaluators()[prim_type]
+        self._evaluator_class = lo.omni.kit.primitive.mesh.command._get_all_evaluators()[prim_type]
         assert isinstance(self._evaluator_class, type)
 
 
-class Utils2022(lo.Utils):
+class Utils2022(lo.omni.particle.system.core.scripts.utils.Utils):
     """
     Subclass that overrides a specific function within Omni's Utils class to fix a bug
     """
@@ -77,13 +77,13 @@ class Utils2022(lo.Utils):
         if not self.stage.GetPrimAtPath(material_path + "/Looks"):
             self.stage.DefinePrim(material_path + "/Looks", "Scope")
         material_path += "/Looks/" + name
-        material_path = lo.usd.get_stage_next_free_path(
+        material_path = lo.omni.usd.get_stage_next_free_path(
             self.stage, material_path, False
         )
-        material = lo.UsdShade.Material.Define(self.stage, material_path)
+        material = lo.pxr.UsdShade.Material.Define(self.stage, material_path)
 
         shader_path = material_path + "/Shader"
-        shader = lo.UsdShade.Shader.Define(self.stage, shader_path)
+        shader = lo.pxr.UsdShade.Shader.Define(self.stage, shader_path)
 
         # Update Neuraylib MDL search paths
         import lo.omni.particle.system.core as core
@@ -91,14 +91,14 @@ class Utils2022(lo.Utils):
 
         shader.SetSourceAsset(name + ".mdl", "mdl")
         shader.SetSourceAssetSubIdentifier(name, "mdl")
-        shader.GetImplementationSourceAttr().Set(lo.UsdShade.Tokens.sourceAsset)
-        shader.CreateOutput("out", lo.Sdf.ValueTypeNames.Token)
+        shader.GetImplementationSourceAttr().Set(lo.pxr.UsdShade.Tokens.sourceAsset)
+        shader.CreateOutput("out", lo.pxr.Sdf.ValueTypeNames.Token)
         material.CreateSurfaceOutput().ConnectToSource(shader, "out")
 
         return [material_path]
 
 
-class Utils2023(lo.Utils):
+class Utils2023(lo.omni.particle.system.core.scripts.utils.Utils):
     def create_material(self, name):
         material_url = lo.carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
 
@@ -111,7 +111,7 @@ class Utils2023(lo.Utils):
         if not self.stage.GetPrimAtPath(material_path + "/Looks"):
             self.stage.DefinePrim(material_path + "/Looks", "Scope")
         material_path += "/Looks/" + name
-        material_path = lo.usd.get_stage_next_free_path(
+        material_path = lo.omni.usd.get_stage_next_free_path(
             self.stage, material_path, False
         )
         prim = self.stage.DefinePrim(material_path, "Material")
@@ -123,7 +123,7 @@ class Utils2023(lo.Utils):
         return [material_path]
 
 
-class Core(lo.Core):
+class Core(lo.omni.particle.system.core.scripts.core.Core):
     """
     Subclass that overrides a specific function within Omni's Core class to fix a bug
     """
@@ -131,7 +131,7 @@ class Core(lo.Core):
         self._popup_callback = popup_callback
         from omnigibson.utils.sim_utils import meets_minimum_isaac_version
         self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
-        self.context = lo.usd.get_context()
+        self.context = lo.omni.usd.get_context()
         self.stage = self.context.get_stage()
         self.selection = self.context.get_selection()
         self.particle_system_name = particle_system_name
@@ -149,31 +149,31 @@ class Core(lo.Core):
                        if self.stage.GetPrimAtPath(path).GetTypeName() in ["ComputeGraph", "OmniGraph"] ]
 
         if len(graph_paths) > 0:
-            graph = lo.core.get_graph_by_path(graph_paths[0])
+            graph = lo.omni.graph.core.get_graph_by_path(graph_paths[0])
             if len(graph_paths) > 1:
                 lo.carb.log_warn(f"Multiple ComputeGraph prims selected. Only the first will be used: {graph.get_path_to_graph()}")
         elif create_new_graph:
             # If no graph was found in the selected prims, we'll make a new graph.
             # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
-            graph_path = lo.Sdf.Path(f"/OmniGraph/{self.particle_system_name}").MakeAbsolutePath(lo.Sdf.Path.absoluteRootPath)
-            graph_path = lo.usd.get_stage_next_free_path(self.stage, graph_path, True)
+            graph_path = lo.pxr.Sdf.Path(f"/OmniGraph/{self.particle_system_name}").MakeAbsolutePath(lo.pxr.Sdf.Path.absoluteRootPath)
+            graph_path = lo.omni.usd.get_stage_next_free_path(self.stage, graph_path, True)
 
             # prim = self.stage.GetDefaultPrim()
             # path = str(prim.GetPath()) if prim else ""
             self.stage.DefinePrim("/OmniGraph", "Scope")
 
-            container_graphs = lo.core.get_global_container_graphs()
+            container_graphs = lo.omni.graph.core.get_global_container_graphs()
             # FIXME: container_graphs[0] should be the simulation orchestration graph, but this may change in the future.
             container_graph = container_graphs[0]
-            result, wrapper_node = lo.core.cmds.CreateGraphAsNode(
+            result, wrapper_node = lo.omni.graph.core.cmds.CreateGraphAsNode(
                 graph=container_graph,
-                node_name=lo.Sdf.Path(graph_path).name,
+                node_name=lo.pxr.Sdf.Path(graph_path).name,
                 graph_path=graph_path,
                 evaluator_name="push",
                 is_global_graph=True,
                 backed_by_usd=True,
-                fc_backing_type=lo.core.GraphBackingType.GRAPH_BACKING_TYPE_FLATCACHE_SHARED,
-                pipeline_stage=lo.core.GraphPipelineStage.GRAPH_PIPELINE_STAGE_SIMULATION
+                fc_backing_type=lo.omni.graph.core.GraphBackingType.GRAPH_BACKING_TYPE_FLATCACHE_SHARED,
+                pipeline_stage=lo.omni.graph.core.GraphPipelineStage.GRAPH_PIPELINE_STAGE_SIMULATION
             )
             graph = wrapper_node.get_wrapped_graph()
 
@@ -185,7 +185,7 @@ class Core(lo.Core):
         return graph
 
 
-class ArticulationView(lo.ArticulationView):
+class ArticulationView(lo.omni.isaac.core.articulations.ArticulationView):
     """ArticulationView with some additional functionality implemented."""
 
     def set_joint_limits(
@@ -210,7 +210,7 @@ class ArticulationView(lo.ArticulationView):
         if not self._is_initialized:
             lo.carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_limits()
@@ -237,7 +237,7 @@ class ArticulationView(lo.ArticulationView):
                     dof_val = values[articulation_read_idx][dof_read_idx]
                     if dof_types[dof_index] == lo.omni.physics.tensors.DofType.Rotation:
                         dof_val /= DEG2RAD
-                    prim = lo.get_prim_at_path(self._dof_paths[i][dof_index])
+                    prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index])
                     prim.GetAttribute("physics:lowerLimit").Set(dof_val[0])
                     prim.GetAttribute("physics:upperLimit").Set(dof_val[1])
                     dof_read_idx += 1
@@ -269,7 +269,7 @@ class ArticulationView(lo.ArticulationView):
         if not self._is_initialized:
             lo.carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             values = self._backend_utils.move_data(self._physics_view.get_dof_limits(), self._device)
@@ -290,7 +290,7 @@ class ArticulationView(lo.ArticulationView):
             for i in indices:
                 dof_write_idx = 0
                 for dof_index in joint_indices:
-                    prim = lo.get_prim_at_path(self._dof_paths[i][dof_index])
+                    prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index])
                     values[articulation_write_idx][dof_write_idx][0] = prim.GetAttribute("physics:lowerLimit").Get()
                     values[articulation_write_idx][dof_write_idx][1] = prim.GetAttribute("physics:upperLimit").Get()
                     if dof_types[dof_index] == lo.omni.physics.tensors.DofType.Rotation:
@@ -322,7 +322,7 @@ class ArticulationView(lo.ArticulationView):
         if not self._is_initialized:
             lo.carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_max_velocities()
@@ -342,7 +342,7 @@ class ArticulationView(lo.ArticulationView):
             for i in indices:
                 dof_read_idx = 0
                 for dof_index in joint_indices:
-                    prim = lo.PhysxSchema.PhysxJointAPI(lo.get_prim_at_path(self._dof_paths[i][dof_index]))
+                    prim = lo.pxr.PhysxSchema.PhysxJointAPI(lo.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index]))
                     if not prim.GetMaxJointVelocityAttr():
                         prim.CreateMaxJointVelocityAttr().Set(values[articulation_read_idx][dof_read_idx])
                     else:
@@ -376,7 +376,7 @@ class ArticulationView(lo.ArticulationView):
         if not self._is_initialized:
             lo.carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             max_velocities = self._physics_view.get_dof_max_velocities()
@@ -399,7 +399,7 @@ class ArticulationView(lo.ArticulationView):
             for i in indices:
                 dof_write_idx = 0
                 for dof_index in joint_indices:
-                    prim = lo.PhysxSchema.PhysxJointAPI(lo.get_prim_at_path(self._dof_paths[i][dof_index]))
+                    prim = lo.pxr.PhysxSchema.PhysxJointAPI(lo.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index]))
                     max_velocities[articulation_write_idx][dof_write_idx] = prim.GetMaxJointVelocityAttr().Get()
                     dof_write_idx += 1
                 articulation_write_idx += 1
@@ -608,7 +608,7 @@ class ArticulationView(lo.ArticulationView):
             lo.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
         return
 
-class RigidPrimView(lo.RigidPrimView):
+class RigidPrimView(lo.omni.isaac.core.prims.RigidPrimView):
     def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
         """Enable gravity on rigid bodies (enabled by default).
 
@@ -618,7 +618,7 @@ class RigidPrimView(lo.RigidPrimView):
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
         """
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
@@ -630,10 +630,10 @@ class RigidPrimView(lo.RigidPrimView):
             indices = self._backend_utils.to_list(indices)
             for i in indices:
                 if self._physx_rigid_body_apis[i] is None:
-                    if self._prims[i].HasAPI(lo.PhysxSchema.PhysxRigidBodyAPI):
-                        rigid_api = lo.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
+                    if self._prims[i].HasAPI(lo.pxr.PhysxSchema.PhysxRigidBodyAPI):
+                        rigid_api = lo.pxr.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
                     else:
-                        rigid_api = lo.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
+                        rigid_api = lo.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(False)
 
@@ -647,7 +647,7 @@ class RigidPrimView(lo.RigidPrimView):
                                                                                  Defaults to None (i.e: all prims in the view).
         """
         indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
-        if not lo.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not lo.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
                 self._backend_utils.create_tensor_from_list([True] * len(indices), dtype="uint8"), data, indices
@@ -658,10 +658,10 @@ class RigidPrimView(lo.RigidPrimView):
             indices = self._backend_utils.to_list(indices)
             for i in indices:
                 if self._physx_rigid_body_apis[i] is None:
-                    if self._prims[i].HasAPI(lo.PhysxSchema.PhysxRigidBodyAPI):
-                        rigid_api = lo.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
+                    if self._prims[i].HasAPI(lo.pxr.PhysxSchema.PhysxRigidBodyAPI):
+                        rigid_api = lo.pxr.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
                     else:
-                        rigid_api = lo.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
+                        rigid_api = lo.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(True)
             return

@@ -32,7 +32,7 @@ def make_glass(prim):
 
     # Grab the glass material prim; if it doesn't exist, we create it on the fly
     glass_prim_path = "/Looks/OmniGlass"
-    if not lo.get_prim_at_path(glass_prim_path):
+    if not lo.omni.isaac.core.utils.prims.get_prim_at_path(glass_prim_path):
         mtl_created = []
         lo.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
@@ -70,7 +70,7 @@ def create_pbr_material(prim_path):
     lo.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
 
     # Return generated material
-    return lo.get_prim_at_path(material_path)
+    return lo.omni.isaac.core.utils.prims.get_prim_at_path(material_path)
 
 
 def create_skylight(intensity=500, color=(1.0, 1.0, 1.0)):
@@ -90,5 +90,5 @@ def create_skylight(intensity=500, color=(1.0, 1.0, 1.0)):
     og.sim.import_object(light)
     light.set_orientation(T.euler2quat([0, 0, -np.pi / 4]))
     light_prim = light.light_link.prim
-    light_prim.GetAttribute("color").Set(lo.Gf.Vec3f(*color))
+    light_prim.GetAttribute("color").Set(lo.pxr.Gf.Vec3f(*color))
     return light

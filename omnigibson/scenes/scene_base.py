@@ -585,7 +585,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             color (None or 3-array): If specified, sets the (R,G,B) color of the generated plane
             visible (bool): Whether the plane should be visible or not
         """
-        plane = lo.GroundPlane(
+        plane = lo.omni.isaac.core.objects.ground_plane.GroundPlane(
             prim_path=prim_path,
             name=name,
             z_position=z_position,

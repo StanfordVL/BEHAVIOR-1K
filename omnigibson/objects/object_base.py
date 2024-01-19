@@ -178,15 +178,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.visible = self._load_config["visible"]
 
         # First, remove any articulation root API that already exists at the object-level prim
-        if self._prim.HasAPI(lo.UsdPhysics.ArticulationRootAPI):
-            self._prim.RemoveAPI(lo.UsdPhysics.ArticulationRootAPI)
-            self._prim.RemoveAPI(lo.PhysxSchema.PhysxArticulationAPI)
+        if self._prim.HasAPI(lo.pxr.UsdPhysics.ArticulationRootAPI):
+            self._prim.RemoveAPI(lo.pxr.UsdPhysics.ArticulationRootAPI)
+            self._prim.RemoveAPI(lo.pxr.PhysxSchema.PhysxArticulationAPI)
 
         # Potentially add articulation root APIs and also set self collisions
-        root_prim = None if self.articulation_root_path is None else lo.get_prim_at_path(self.articulation_root_path)
+        root_prim = None if self.articulation_root_path is None else lo.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
         if root_prim is not None:
-            lo.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
-            lo.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
+            lo.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
+            lo.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
@@ -198,7 +198,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         )
 
         # Update semantics
-        lo.add_update_semantics(
+        lo.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
             type_label="class",

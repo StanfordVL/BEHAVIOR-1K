@@ -94,7 +94,7 @@ class EntityPrim(XFormPrim):
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
                     for child in prim.GetChildren():
-                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(lo.UsdPhysics.CollisionAPI):
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(lo.pxr.UsdPhysics.CollisionAPI):
                             assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
                             cloth_mesh_prim = child
 
@@ -306,7 +306,7 @@ class EntityPrim(XFormPrim):
                         _, link_local_orn = link.get_local_pose()
 
                         # Find the joint frame orientation in the parent link frame
-                        joint_local_orn = lo.gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+                        joint_local_orn = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
 
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
@@ -1055,7 +1055,7 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many position iterations to take per physics step by the physx solver
         """
-        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
+        return lo.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
             self.articulated else self.root_link.solver_position_iteration_count
 
     @solver_position_iteration_count.setter
@@ -1067,7 +1067,7 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lo.set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
+            lo.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
         else:
             for link in self._links.values():
                 link.solver_position_iteration_count = count
@@ -1078,7 +1078,7 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many velocity iterations to take per physics step by the physx solver
         """
-        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
+        return lo.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
             self.articulated else self.root_link.solver_velocity_iteration_count
 
     @solver_velocity_iteration_count.setter
@@ -1090,7 +1090,7 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lo.set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
+            lo.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
         else:
             for link in self._links.values():
                 link.solver_velocity_iteration_count = count
@@ -1101,7 +1101,7 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for stabilizing this articulation
         """
-        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
+        return lo.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
             self.articulated else self.root_link.stabilization_threshold
 
     @stabilization_threshold.setter
@@ -1113,7 +1113,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Stabilization threshold
         """
         if self.articulated:
-            lo.set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
+            lo.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
         else:
             for link in self._links.values():
                 link.stabilization_threshold = threshold
@@ -1124,7 +1124,7 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for sleeping this articulation
         """
-        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
+        return lo.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
             self.articulated else self.root_link.sleep_threshold
 
     @sleep_threshold.setter
@@ -1136,7 +1136,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lo.set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
+            lo.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
         else:
             for link in self._links.values():
                 link.sleep_threshold = threshold
@@ -1148,7 +1148,7 @@ class EntityPrim(XFormPrim):
             bool: Whether self-collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
-        return lo.get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
+        return lo.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
 
     @self_collisions.setter
     def self_collisions(self, flag):
@@ -1159,7 +1159,7 @@ class EntityPrim(XFormPrim):
             flag (bool): Whether self collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
-        lo.set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
+        lo.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
 
     @property
     def kinematic_only(self):
@@ -1241,7 +1241,7 @@ class EntityPrim(XFormPrim):
         Enable physics for this articulation
         """
         if self.articulated:
-            prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lo.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1252,7 +1252,7 @@ class EntityPrim(XFormPrim):
         Disable physics for this articulation
         """
         if self.articulated:
-            prim_id = lo.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lo.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1280,10 +1280,10 @@ class EntityPrim(XFormPrim):
 
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
-        stage = lo.get_current_stage()
+        stage = lo.omni.isaac.core.utils.stage.get_current_stage()
         link_prim = stage.DefinePrim(f"{self._prim_path}/{link_name}", "Xform")
-        vis_prim = lo.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
-        col_prim = lo.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
+        vis_prim = lo.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
+        col_prim = lo.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
 
         # Set the radius to be 0.03m. In theory, we want this radius to be as small as possible. Otherwise, the cloth
         # dynamics will be unrealistic. However, in practice, if the radius is too small, the attachment becomes very
@@ -1293,15 +1293,15 @@ class EntityPrim(XFormPrim):
 
         # Need to sync the extents
         extent = vis_prim.GetAttribute("extent").Get()
-        extent[0] = lo.Gf.Vec3f(-0.03, -0.03, -0.03)
-        extent[1] = lo.Gf.Vec3f(0.03, 0.03, 0.03)
+        extent[0] = lo.pxr.Gf.Vec3f(-0.03, -0.03, -0.03)
+        extent[1] = lo.pxr.Gf.Vec3f(0.03, 0.03, 0.03)
         vis_prim.GetAttribute("extent").Set(extent)
         col_prim.GetAttribute("extent").Set(extent)
 
         # Add collision API to collision geom
-        lo.UsdPhysics.CollisionAPI.Apply(col_prim)
-        lo.UsdPhysics.MeshCollisionAPI.Apply(col_prim)
-        lo.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
+        lo.pxr.UsdPhysics.CollisionAPI.Apply(col_prim)
+        lo.pxr.UsdPhysics.MeshCollisionAPI.Apply(col_prim)
+        lo.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
 
         # Create a attachment point link
         link = RigidPrim(

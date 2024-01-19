@@ -293,7 +293,7 @@ class CameraMover:
         self.set_lights(self.light_val)
 
     def set_lights(self, intensity):
-        world = lo.get_prim_at_path("/World")
+        world = lo.omni.isaac.core.utils.prims.get_prim_at_path("/World")
         for prim in world.GetChildren():
             for prim_child in prim.GetChildren():
                 for prim_child_child in prim_child.GetChildren():

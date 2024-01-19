@@ -108,7 +108,7 @@ class LightObject(StatefulObject):
         base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define the actual light link
-        light_prim = lo.UsdLux.__dict__[f"{self.light_type}Light"].Define(og.sim.stage, f"{self._prim_path}/base_link/light").GetPrim()
+        light_prim = lo.pxr.UsdLux.__dict__[f"{self.light_type}Light"].Define(og.sim.stage, f"{self._prim_path}/base_link/light").GetPrim()
 
         return prim
 
@@ -120,7 +120,7 @@ class LightObject(StatefulObject):
         self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
 
         # Apply Shaping API and set default cone angle attribute
-        shaping_api = lo.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
+        shaping_api = lo.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
 
         # Optionally set the intensity
         if self._load_config.get("intensity", None) is not None:
@@ -216,7 +216,7 @@ class LightObject(StatefulObject):
         """
         self._light_link.set_attribute(
             "inputs:color" if meets_minimum_isaac_version("2023.0.0") else "color",
-            lo.Gf.Vec3f(color))
+            lo.pxr.Gf.Vec3f(color))
 
     @property
     def texture_file_path(self):
@@ -239,7 +239,7 @@ class LightObject(StatefulObject):
         """
         self._light_link.set_attribute(
             "inputs:texture:file" if meets_minimum_isaac_version("2023.0.0") else "texture:file",
-            lo.Sdf.AssetPath(texture_file_path))
+            lo.pxr.Sdf.AssetPath(texture_file_path))
 
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):

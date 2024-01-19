@@ -169,7 +169,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False)
 
     # Match the push axis to one of the bb axes.
-    joint_orientation = lo.gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+    joint_orientation = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     assert np.isclose(np.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = np.argmax(np.abs(push_axis))
@@ -314,7 +314,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     bbox_wrt_origin = T.relative_pose_transform(bbox_center_in_world, bbox_quat_in_world, *link.get_position_orientation())
     origin_wrt_bbox = T.invert_pose_transform(*bbox_wrt_origin)
 
-    joint_orientation = lo.gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+    joint_orientation = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
     joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     joint_axis /= np.linalg.norm(joint_axis)
     origin_towards_bbox = np.array(bbox_wrt_origin[0])

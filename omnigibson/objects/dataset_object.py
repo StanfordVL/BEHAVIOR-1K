@@ -457,8 +457,8 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lo.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
-                        quat1 = lo.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+                        quat0 = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
+                        quat1 = lo.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)

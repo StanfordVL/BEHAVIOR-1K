@@ -99,20 +99,20 @@ def launch_app():
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
-    app = lo.SimulationApp(config_kwargs)
+    app = lo.omni.isaac.kit.SimulationApp(config_kwargs)
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
     # Enable additional extensions we need
-    lo.enable_extension("omni.flowusd")
-    lo.enable_extension("omni.particle.system.bundle")
-    lo.enable_extension("omni.syntheticdata")
+    lo.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
+    lo.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
+    lo.omni.isaac.core.utils.extensions.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":
-        lo.enable_extension("omni.kit.window.viewport")
+        lo.omni.isaac.core.utils.extensions.enable_extension("omni.kit.window.viewport")
 
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
@@ -131,39 +131,39 @@ def launch_app():
         if gm.REMOTE_STREAMING == "native":
             # Enable Native Livestream extension
             # Default App: Streaming Client from the Omniverse Launcher
-            lo.enable_extension("omni.kit.livestream.native")
+            lo.omni.isaac.core.utils.extensions.enable_extension("omni.kit.livestream.native")
             print(f"Now streaming on {ip} via Omniverse Streaming Client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
-            lo.enable_extension("omni.services.streamclient.webrtc")
+            lo.omni.isaac.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
             raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
-        og_log = lo.get_log()
-        og_log.set_channel_enabled("carb.windowing-glfw.plugin", False, lo.SettingBehavior.OVERRIDE)
+        og_log = lo.omni.log.get_log()
+        og_log.set_channel_enabled("carb.windowing-glfw.plugin", False, lo.omni.log.SettingBehavior.OVERRIDE)
         
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
-        og_log = lo.get_log()
+        og_log = lo.omni.log.get_log()
         for channel in ["omni.hydra.scene_delegate.plugin", "omni.kit.manipulator.prim.model"]:
-            og_log.set_channel_enabled(channel, False, lo.SettingBehavior.OVERRIDE)
+            og_log.set_channel_enabled(channel, False, lo.omni.log.SettingBehavior.OVERRIDE)
 
     # Possibly hide windows if in debug mode
     if gm.GUI_VIEWPORT_ONLY:
         hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
                              "Flow", "Semantics Schema Editor"]
         for name in hide_window_names:
-            window = lo.ui.Workspace.get_window(name)
+            window = lo.omni.ui.Workspace.get_window(name)
             if window is not None:
                 window.visible = False
                 app.update()
 
-    lo.ContextMenu.save_prim = print_save_usd_warning
+    lo.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
     
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lo.omni.kit.app.get_app().get_shutdown_event_stream()
@@ -179,7 +179,7 @@ def launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = launch_app()
 
-    class Simulator(lo.SimulationContext, Serializable):
+    class Simulator(lo.omni.isaac.core.simulation_context.SimulationContext, Serializable):
         """
         Simulator class for directly interfacing with the physx physics engine.
 
@@ -498,7 +498,7 @@ def launch_simulator(*args, **kwargs):
 
             # Cache the mapping from link IDs to object
             for link in obj.links.values():
-                self._link_id_to_objects[lo.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
+                self._link_id_to_objects[lo.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
 
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self.initialize_object_on_next_sim_step(obj=obj)
@@ -516,7 +516,7 @@ def launch_simulator(*args, **kwargs):
 
             # pop all link ids
             for link in obj.links.values():
-                self._link_id_to_objects.pop(lo.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
+                self._link_id_to_objects.pop(lo.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
 
             # If it was queued up to be initialized, remove it from the queue as well
             for i, initialize_obj in enumerate(self._objects_to_initialize):
@@ -785,8 +785,8 @@ def launch_simulator(*args, **kwargs):
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
             if gm.ENABLE_OBJECT_STATES:
-                if event.type == int(lo.SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
-                    joint_path = str(lo.PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                if event.type == int(lo.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
+                    joint_path = str(lo.pxr.PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
                     obj = None
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
@@ -954,12 +954,12 @@ def launch_simulator(*args, **kwargs):
 
         @classmethod
         def clear_instance(cls):
-            lo.SimulationContext.clear_instance()
+            lo.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
             Simulator._world_initialized = None
             return
 
         def __del__(self):
-            lo.SimulationContext.__del__(self)
+            lo.omni.isaac.core.simulation_context.SimulationContext.__del__(self)
             Simulator._world_initialized = None
             return
 
@@ -1017,7 +1017,7 @@ def launch_simulator(*args, **kwargs):
             Returns:
                 Usd.Prim: Prim at /World
             """
-            return lo.get_prim_at_path(prim_path="/World")
+            return lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path="/World")
 
         def clear(self) -> None:
             """
@@ -1176,7 +1176,7 @@ def launch_simulator(*args, **kwargs):
 
             # Open new stage -- suppressing warning that we're opening a new stage
             with suppress_omni_log(None):
-                lo.create_new_stage()
+                lo.omni.isaac.core.utils.stage.create_new_stage()
 
             # Clear physics context
             self._physics_context = None
@@ -1212,7 +1212,7 @@ def launch_simulator(*args, **kwargs):
 
             # Open new stage -- suppressing warning that we're opening a new stage
             with suppress_omni_log(None):
-                lo.open_stage(usd_path=usd_path)
+                lo.omni.isaac.core.utils.stage.open_stage(usd_path=usd_path)
 
             self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
 
@@ -1240,9 +1240,9 @@ def launch_simulator(*args, **kwargs):
             )
 
             # Update internal vars
-            self._physx_interface = lo.get_physx_interface()
-            self._physx_simulation_interface = lo.get_physx_simulation_interface()
-            self._physx_scene_query_interface = lo.get_physx_scene_query_interface()
+            self._physx_interface = lo.omni.physx.get_physx_interface()
+            self._physx_simulation_interface = lo.omni.physx.get_physx_simulation_interface()
+            self._physx_scene_query_interface = lo.omni.physx.get_physx_scene_query_interface()
 
             # Update internal settings
             self._set_physics_engine_settings()
@@ -1278,7 +1278,7 @@ def launch_simulator(*args, **kwargs):
             Returns:
                 int: ID of the current active stage
             """
-            return lo.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+            return lo.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
         @property
         def device(self):

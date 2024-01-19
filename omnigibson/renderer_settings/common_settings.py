@@ -40,7 +40,7 @@ class CommonSettings(SettingsBase):
 class RenderSettings(SubSettingsBase):
     def __init__(self):
         self.multi_threading_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Multi-Threading", "/rtx/multiThreading/enabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Multi-Threading", "/rtx/multiThreading/enabled"
         )
 
     @property
@@ -56,33 +56,33 @@ class GeometrySettings(SubSettingsBase):
         tbnMode = ["AUTO", "CPU", "GPU", "Force GPU"]
         self.tbn_frame_mode = SettingItem(
             self,
-            lo.SettingType.STRING,
+            lo.omni.kit.widget.settings.SettingType.STRING,
             "Normal & Tangent Space Generation Mode",
             "/rtx/hydra/TBNFrameMode",
             range_list=tbnMode,
         )
         self.face_culling_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Back Face Culling", "/rtx/hydra/faceCulling/enabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Back Face Culling", "/rtx/hydra/faceCulling/enabled"
         )
         # Wireframe settings.
         self.wireframe_thickness = SettingItem(
             self,
-            lo.SettingType.FLOAT,
+            lo.omni.kit.widget.settings.SettingType.FLOAT,
             "Wireframe Thickness",
             "/rtx/wireframe/wireframeThickness",
             range_from=0.1,
             range_to=100,
         )
         self.wireframe_thickness_world_space = SettingItem(
-            self, lo.SettingType.BOOL, "Wireframe World Space Thickness", "/rtx/wireframe/wireframeThicknessWorldSpace"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Wireframe World Space Thickness", "/rtx/wireframe/wireframeThicknessWorldSpace"
         )
         self.wireframe_shading_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Shaded Wireframe", "/rtx/wireframe/shading/enabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Shaded Wireframe", "/rtx/wireframe/shading/enabled"
         )
         # Subdivision settings.
         self.subdivision_refinement_level = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Subdivision Global Refinement Level",
             "/rtx/hydra/subdivision/refinementLevel",
             range_from=0,
@@ -90,17 +90,17 @@ class GeometrySettings(SubSettingsBase):
         )
         self.subdivision_adaptive_refinement = SettingItem(
             self,
-            lo.SettingType.BOOL,
+            lo.omni.kit.widget.settings.SettingType.BOOL,
             "Subdivision Feature-adaptive Refinement",
             "/rtx/hydra/subdivision/adaptiveRefinement",
         )
 
         # if set to zero, override to scene unit, which means the scale factor would be 1
         self.renderMeterPerUnit = SettingItem(
-            self, lo.SettingType.FLOAT, "Renderer-internal meters per unit ", "/rtx/scene/renderMeterPerUnit"
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Renderer-internal meters per unit ", "/rtx/scene/renderMeterPerUnit"
         )
         self.only_opaque_ray_flags = SettingItem(
-            self, lo.SettingType.BOOL, "Hide geometry that uses opacity (debug)", "/rtx/debug/onlyOpaqueRayFlags"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Hide geometry that uses opacity (debug)", "/rtx/debug/onlyOpaqueRayFlags"
         )
 
     @property
@@ -121,11 +121,11 @@ class GeometrySettings(SubSettingsBase):
 class MaterialsSettings(SubSettingsBase):
     def __init__(self):
         self.skip_material_loading = SettingItem(
-            self, lo.SettingType.BOOL, "Disable Material Loading", "/app/renderer/skipMaterialLoading"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Disable Material Loading", "/app/renderer/skipMaterialLoading"
         )
         self.max_mip_count = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Textures: Mipmap Levels to Load",
             "/rtx-transient/resourcemanager/maxMipCount",
             range_from=2,
@@ -133,7 +133,7 @@ class MaterialsSettings(SubSettingsBase):
         )
         self.compression_mip_size_threshold = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Textures: Compression Mipmap Size Threshold (0 to disable) ",
             "/rtx-transient/resourcemanager/compressionMipSizeThreshold",
             0,
@@ -141,21 +141,21 @@ class MaterialsSettings(SubSettingsBase):
         )
         self.enable_texture_streaming = SettingItem(
             self,
-            lo.SettingType.BOOL,
+            lo.omni.kit.widget.settings.SettingType.BOOL,
             "Textures: on-demand streaming (toggling requires scene reload)",
             "/rtx-transient/resourcemanager/enableTextureStreaming",
         )
         self.memory_budget = SettingItem(
             self,
-            lo.SettingType.FLOAT,
+            lo.omni.kit.widget.settings.SettingType.FLOAT,
             "Texture streaming memory budget (fraction of GPU memory)",
             "/rtx-transient/resourcemanager/texturestreaming/memoryBudget",
             0.01,
             1,
         )
-        self.animation_time = SettingItem(self, lo.SettingType.FLOAT, "MDL Animation Time Override", "/rtx/animationTime")
+        self.animation_time = SettingItem(self, lo.omni.kit.widget.settings.SettingType.FLOAT, "MDL Animation Time Override", "/rtx/animationTime")
         self.animation_time_use_wallclock = SettingItem(
-            self, lo.SettingType.BOOL, "MDL Animation Time Use Wallclock", "/rtx/animationTimeUseWallclock"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "MDL Animation Time Use Wallclock", "/rtx/animationTimeUseWallclock"
         )
 
     @property
@@ -177,16 +177,16 @@ class LightingSettings(SubSettingsBase):
         show_lights_settings = {"Per-Light Enable": 0, "Force Enable": 1, "Force Disable": 2}
         self.show_lights = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Show Area Lights In Primary Rays",
             "/rtx/raytracing/showLights",
             range_dict=show_lights_settings,
         )
         self.shadow_bias = SettingItem(
-            self, lo.SettingType.FLOAT, "Shadow Bias", "/rtx/raytracing/shadowBias", range_from=0.0, range_to=5.0
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Shadow Bias", "/rtx/raytracing/shadowBias", range_from=0.0, range_to=5.0
         )
         self.skip_most_lights = SettingItem(
-            self, lo.SettingType.BOOL, "Use First Distant Light & First Dome Light Only", "/rtx/scenedb/skipMostLights"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Use First Distant Light & First Dome Light Only", "/rtx/scenedb/skipMostLights"
         )
         # Demo light.
         dome_lighting_sampling_type = {
@@ -197,7 +197,7 @@ class LightingSettings(SubSettingsBase):
         }
         self.upper_lower_strategy = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Hemisphere Sampling",
             "/rtx/domeLight/upperLowerStrategy",
             range_dict=dome_lighting_sampling_type,
@@ -216,14 +216,14 @@ class LightingSettings(SubSettingsBase):
         }
         self.baking_resolution = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Baking Resolution",
             "/rtx/domeLight/baking/resolution",
             range_dict=dome_texture_resolution_items,
         )
         self.resolution_factor = SettingItem(
             self,
-            lo.SettingType.FLOAT,
+            lo.omni.kit.widget.settings.SettingType.FLOAT,
             "Dome Light Texture Resolution Factor",
             "/rtx/domeLight/resolutionFactor",
             range_from=0.01,
@@ -231,7 +231,7 @@ class LightingSettings(SubSettingsBase):
         )
         self.baking_spp = SettingItem(
             self,
-            lo.SettingType.INT,
+            lo.omni.kit.widget.settings.SettingType.INT,
             "Dome Light Material Baking SPP",
             "/rtx/domeLight/baking/spp",
             range_from=1,
@@ -255,35 +255,35 @@ class SimpleFogSettings(SubSettingsBase):
     def __init__(self):
         self._carb_settings = lo.carb.settings.get_settings()
 
-        self.fog_color = SettingItem(self, lo.SettingType.COLOR3, "Color", "/rtx/fog/fogColor")
+        self.fog_color = SettingItem(self, lo.omni.kit.widget.settings.SettingType.COLOR3, "Color", "/rtx/fog/fogColor")
         self.fog_color_intensity = SettingItem(
-            self, lo.SettingType.FLOAT, "Intensity", "/rtx/fog/fogColorIntensity", range_from=1, range_to=1000000
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Intensity", "/rtx/fog/fogColorIntensity", range_from=1, range_to=1000000
         )
         self.fog_z_up_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Height-based Fog - Use +Z Axis", "/rtx/fog/fogZup/enabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Height-based Fog - Use +Z Axis", "/rtx/fog/fogZup/enabled"
         )
         self.fog_start_height = SettingItem(
             self,
-            lo.SettingType.FLOAT,
+            lo.omni.kit.widget.settings.SettingType.FLOAT,
             "Height-based Fog - Plane Height",
             "/rtx/fog/fogStartHeight",
             range_from=-1000000,
             range_to=1000000,
         )
         self.fog_height_density = SettingItem(
-            self, lo.SettingType.FLOAT, "Height Density", "/rtx/fog/fogHeightDensity", range_from=0, range_to=1
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Height Density", "/rtx/fog/fogHeightDensity", range_from=0, range_to=1
         )
         self.fog_height_falloff = SettingItem(
-            self, lo.SettingType.FLOAT, "Height Falloff", "/rtx/fog/fogHeightFalloff", range_from=0, range_to=1000
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Height Falloff", "/rtx/fog/fogHeightFalloff", range_from=0, range_to=1000
         )
         self.fog_distance_density = SettingItem(
-            self, lo.SettingType.FLOAT, "Distance Density", "/rtx/fog/fogDistanceDensity", range_from=0, range_to=1
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Distance Density", "/rtx/fog/fogDistanceDensity", range_from=0, range_to=1
         )
         self.fog_start_dist = SettingItem(
-            self, lo.SettingType.FLOAT, "Start Distance to Camera", "/rtx/fog/fogStartDist", range_from=0, range_to=1000000
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "Start Distance to Camera", "/rtx/fog/fogStartDist", range_from=0, range_to=1000000
         )
         self.fog_end_dist = SettingItem(
-            self, lo.SettingType.FLOAT, "End Distance to Camera", "/rtx/fog/fogEndDist", range_from=0, range_to=1000000
+            self, lo.omni.kit.widget.settings.SettingType.FLOAT, "End Distance to Camera", "/rtx/fog/fogEndDist", range_from=0, range_to=1000000
         )
 
     @property
@@ -310,24 +310,24 @@ class FlowSettings(SubSettingsBase):
         self._carb_settings = lo.carb.settings.get_settings()
 
         self.ray_traced_shadows_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Flow in Real-Time Ray Traced Shadows", "/rtx/flow/rayTracedShadowsEnabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Flow in Real-Time Ray Traced Shadows", "/rtx/flow/rayTracedShadowsEnabled"
         )
         self.ray_traced_reflections_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Flow in Real-Time Ray Traced Reflections", "/rtx/flow/rayTracedReflectionsEnabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Flow in Real-Time Ray Traced Reflections", "/rtx/flow/rayTracedReflectionsEnabled"
         )
         self.path_tracing_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Flow in Path-Traced Mode", "/rtx/flow/pathTracingEnabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Flow in Path-Traced Mode", "/rtx/flow/pathTracingEnabled"
         )
         self.path_tracing_shadows_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Flow in Path-Traced Mode Shadows", "/rtx/flow/pathTracingShadowsEnabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Flow in Path-Traced Mode Shadows", "/rtx/flow/pathTracingShadowsEnabled"
         )
         self.composite_enabled = SettingItem(
-            self, lo.SettingType.BOOL, "Composite with Flow Library Renderer", "/rtx/flow/compositeEnabled"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Composite with Flow Library Renderer", "/rtx/flow/compositeEnabled"
         )
         self.use_flow_library_self_shadow = SettingItem(
-            self, lo.SettingType.BOOL, "Use Flow Library Self Shadow", "/rtx/flow/useFlowLibrarySelfShadow"
+            self, lo.omni.kit.widget.settings.SettingType.BOOL, "Use Flow Library Self Shadow", "/rtx/flow/useFlowLibrarySelfShadow"
         )
-        self.max_blocks = SettingItem(self, lo.SettingType.INT, "Max Blocks", "/rtx/flow/maxBlocks")
+        self.max_blocks = SettingItem(self, lo.omni.kit.widget.settings.SettingType.INT, "Max Blocks", "/rtx/flow/maxBlocks")
 
     @property
     def settings(self):
@@ -397,11 +397,11 @@ class DebugViewSettings(SubSettingsBase):
             "Diffuse GI (Not Accumulated)": "indirectDiffuseNonAccum",
         }
         self.target = SettingItem(
-            self, lo.SettingType.STRING, "Render Target", "/rtx/debugView/target", range_dict=debug_view_items
+            self, lo.omni.kit.widget.settings.SettingType.STRING, "Render Target", "/rtx/debugView/target", range_dict=debug_view_items
         )
         self.scaling = SettingItem(
             self,
-            lo.SettingType.FLOAT,
+            lo.omni.kit.widget.settings.SettingType.FLOAT,
             "Output Value Scaling",
             "/rtx/debugView/scaling",
             range_from=-1000000,

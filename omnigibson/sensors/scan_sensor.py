@@ -112,7 +112,7 @@ class ScanSensor(BaseSensor):
 
     def _load(self):
         # Define a LIDAR prim at the current stage
-        result, lidar = lo.execute("RangeSensorCreateLidar", path=self._prim_path)
+        result, lidar = lo.omni.kit.commands.execute("RangeSensorCreateLidar", path=self._prim_path)
 
         return lidar.GetPrim()
 
@@ -137,7 +137,7 @@ class ScanSensor(BaseSensor):
         super()._initialize()
 
         # Initialize lidar sensor interface
-        self._rs = lo._range_sensor.acquire_lidar_sensor_interface()
+        self._rs = lo.omni.isaac.range_sensor._range_sensor.acquire_lidar_sensor_interface()
 
     @property
     def _obs_space_mapping(self):

@@ -270,7 +270,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
         usd_path = usd_path.replace(".usd", ".encrypted.usd")
         with decrypted(usd_path) as fpath:
-            stage = lo.Usd.Stage.Open(fpath)
+            stage = lo.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
             if supports_state_types(state_types_and_params, prim):
                 valid_models.append(model)

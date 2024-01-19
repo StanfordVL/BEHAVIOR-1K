@@ -404,7 +404,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     def _load_new_particle(cls, prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
-        if not lo.get_prim_at_path(prim_path):
+        if not lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lo.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=cls._particle_object.prim_path,
@@ -1121,15 +1121,15 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
     def _load_new_particle(cls, prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
-        if not lo.get_prim_at_path(prim_path):
+        if not lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lo.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=cls._particle_object.prim_path,
                 path_to=prim_path,
             )
             # Apply RigidBodyAPI to it so it is subject to physics
-            prim = lo.get_prim_at_path(prim_path)
-            lo.UsdPhysics.RigidBodyAPI.Apply(prim)
+            prim = lo.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            lo.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod

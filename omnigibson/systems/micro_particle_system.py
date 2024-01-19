@@ -53,10 +53,10 @@ def set_carb_settings_for_fluid_isosurface():
     dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
     dOptions &= ~(1 << 6 | 1 << 8)
     isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_bool(lo.SETTING_UPDATE_TO_USD, True)
-    isregistry.set_int(lo.SETTING_NUM_THREADS, 8)
-    isregistry.set_bool(lo.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(lo.SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
+    isregistry.set_bool(lo.omni.physx.bindings._physx.SETTING_UPDATE_TO_USD, True)
+    isregistry.set_int(lo.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
+    isregistry.set_bool(lo.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
+    isregistry.set_bool(lo.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
     isregistry.set_int("persistent/simulation/minFrameRate", 60)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
@@ -215,7 +215,7 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert pos.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
-        self.set_attribute(attr="positions", val=lo.Vt.Vec3fArray.FromNumpy(pos.astype(float)))
+        self.set_attribute(attr="positions", val=lo.pxr.Vt.Vec3fArray.FromNumpy(pos.astype(float)))
 
     @property
     def particle_orientations(self):
@@ -243,7 +243,7 @@ class PhysxParticleInstancer(BasePrim):
         quat = quat.astype(float)
         if self._n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
-        self.set_attribute(attr="orientations", val=lo.Vt.QuathArray.FromNumpy(quat))
+        self.set_attribute(attr="orientations", val=lo.pxr.Vt.QuathArray.FromNumpy(quat))
 
     @property
     def particle_velocities(self):
@@ -266,7 +266,7 @@ class PhysxParticleInstancer(BasePrim):
         assert vel.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
         vel = vel.astype(float)
-        self.set_attribute(attr="velocities", val=lo.Vt.Vec3fArray.FromNumpy(vel))
+        self.set_attribute(attr="velocities", val=lo.pxr.Vt.Vec3fArray.FromNumpy(vel))
 
     @property
     def particle_scales(self):
@@ -290,7 +290,7 @@ class PhysxParticleInstancer(BasePrim):
         assert scales.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self._n_particles}!"
         scales = scales.astype(float)
-        self.set_attribute(attr="scales", val=lo.Vt.Vec3fArray.FromNumpy(scales))
+        self.set_attribute(attr="scales", val=lo.pxr.Vt.Vec3fArray.FromNumpy(scales))
 
     @property
     def particle_prototype_ids(self):
@@ -427,7 +427,7 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         # Also apply physics to this material
-        lo.particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        lo.omni.physx.scripts.particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
         # Force populate inputs and outputs of the shader
         cls._material.shader_force_populate()
         # Potentially modify the material
@@ -1235,7 +1235,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         for prototype in cls.particle_prototypes:
             cls._material.bind(prototype.prim_path)
         # Apply the physical material preset based on whether or not this fluid is viscous
-        apply_mat_physics = lo.particleUtils.AddPBDMaterialViscous if cls.is_viscous else lo.particleUtils.AddPBDMaterialWater
+        apply_mat_physics = lo.omni.physx.scripts.particleUtils.AddPBDMaterialViscous if cls.is_viscous else lo.omni.physx.scripts.particleUtils.AddPBDMaterialWater
         apply_mat_physics(p=cls._material.prim)
 
         # Compute the overall color of the fluid system
@@ -1295,7 +1295,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @classmethod
     def _create_particle_prototypes(cls):
         # Simulate particles with simple spheres
-        prototype = lo.UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
+        prototype = lo.pxr.UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
         prototype = VisualGeomPrim(prim_path=prototype.GetPath().pathString, name=prototype.GetPath().pathString)
         prototype.visible = False
@@ -1580,13 +1580,13 @@ class Cloth(MicroParticleSystem):
             n_faces = len(cm.face_matrix())
 
             mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(n_faces, dtype=int) * 3)
-            mesh_prim.GetAttribute("points").Set(lo.Vt.Vec3fArray.FromNumpy(new_vertices))
+            mesh_prim.GetAttribute("points").Set(lo.pxr.Vt.Vec3fArray.FromNumpy(new_vertices))
             mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
-            mesh_prim.GetAttribute("normals").Set(lo.Vt.Vec3fArray.FromNumpy(new_normals))
-            mesh_prim.GetAttribute("primvars:st").Set(lo.Vt.Vec2fArray.FromNumpy(new_texcoord))
+            mesh_prim.GetAttribute("normals").Set(lo.pxr.Vt.Vec3fArray.FromNumpy(new_normals))
+            mesh_prim.GetAttribute("primvars:st").Set(lo.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
 
         # Convert into particle cloth
-        lo.particleUtils.add_physx_particle_cloth(
+        lo.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
             stage=og.sim.stage,
             path=mesh_prim.GetPath(),
             dynamic_mesh_path=None,
@@ -1600,7 +1600,7 @@ class Cloth(MicroParticleSystem):
         )
 
         # Disable welding because it can potentially make thin objects non-manifold
-        auto_particle_cloth_api = lo.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+        auto_particle_cloth_api = lo.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
         auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
 
     @classproperty

@@ -72,7 +72,7 @@ class RendererSettings:
         Returns:
             str: the current renderer.
         """
-        return lo.RendererSettingsFactory.get_current_renderer()
+        return lo.omni.rtx.window.settings.RendererSettingsFactory.get_current_renderer()
 
     def set_current_renderer(self, renderer):
         """
@@ -82,10 +82,10 @@ class RendererSettings:
             renderer (str): The renderer to set as current (e.g. Real-Time, Path-Traced).
         """
         assert (
-            renderer in lo.RendererSettingsFactory.get_registered_renderers()
-        ), f"renderer must be one of {lo.RendererSettingsFactory.get_registered_renderers()}"
+            renderer in lo.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()
+        ), f"renderer must be one of {lo.omni.rtx.window.settings.RendererSettingsFactory.get_registered_renderers()}"
         print(f"Set current renderer to {renderer}.")
-        lo.RendererSettingsFactory.set_current_renderer(renderer)
+        lo.omni.rtx.window.settings.RendererSettingsFactory.set_current_renderer(renderer)
 
     @property
     def settings(self):

@@ -442,11 +442,11 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lo.Gf.Vec3d(*np.array(pose[0], dtype=float))
+    translation = lo.pxr.Gf.Vec3d(*np.array(pose[0], dtype=float))
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
     orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lo.Gf.Quatd(*orientation)) 
+    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lo.pxr.Gf.Quatd(*orientation)) 
 
     return detect_robot_collision(context)
 
@@ -473,10 +473,10 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lo.Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
+                translation = lo.pxr.Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(lo.Gf.Quatd(*orientation))
+                mesh.GetAttribute("xformOp:orient").Set(lo.pxr.Gf.Quatd(*orientation))
 
 
     return detect_robot_collision(context)
@@ -510,7 +510,7 @@ def detect_robot_collision(context):
             if valid_hit:
                 return valid_hit
             mesh_path = mesh.GetPrimPath().pathString
-            mesh_id = lo.PhysicsSchemaTools.encodeSdfPath(mesh_path)
+            mesh_id = lo.pxr.PhysicsSchemaTools.encodeSdfPath(mesh_path)
             if mesh.GetTypeName() == "Mesh":
                 og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
             else:
