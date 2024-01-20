@@ -475,7 +475,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             # Update dummy pose and calculate values
             self._dummy.set_joint_positions(self.get_joint_positions())
             self._dummy.set_joint_velocities(self.get_joint_velocities())
-            self._dummy.set_orientation(self.get_orientation())
+            self._dummy.set_position_orientation(*self.get_position_orientation())
             return self._dummy.get_generalized_gravity_forces()
         else:
             return super().get_generalized_gravity_forces()
