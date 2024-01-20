@@ -44,7 +44,7 @@ def start_env():
         "rigid_trunk": False,
         "default_trunk_offset": 0.365,
         "default_arm_pose": "diagonal30",
-        "reset_joint_pos": "tuck",
+        "default_reset_mode": "tuck",
         "controller_config": {
           "base": {
             "name": "DifferentialDriveController"
