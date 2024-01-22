@@ -60,7 +60,7 @@ task:
   type: GraspTask
   obj_name: cologne
   termination_config:
-    max_steps: 400
+    max_steps: 200
   reward_config:
     dist_coeff: 1.0
     grasp_reward: 1.0

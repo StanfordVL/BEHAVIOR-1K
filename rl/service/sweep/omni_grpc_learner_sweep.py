@@ -20,7 +20,7 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
 
@@ -55,9 +55,9 @@ class MetricsCallback(BaseCallback):
         """
         This event is triggered before updating the policy.
         """
-        envs_num_grasps = list(map(lambda x: x['reward']['grasp']['num_grasp_frames'], self.locals['infos']))
-        mean_grasps = np.mean(envs_num_grasps)
-        wandb.log({"mean_grasps": mean_grasps})
+        envs_num_grasps = list(map(lambda x: x['reward']['grasp']['grasp_success'], self.locals['infos']))
+        grasp_success_rate = np.mean(envs_num_grasps)
+        wandb.log({"grasp_success_rate": grasp_success_rate})
 
 
 # Parse args
@@ -99,6 +99,19 @@ def train():
         task_config['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef
         task_config['regularization_coef'] = wandb.config.regularization_coef
         env.env_method('update_task', task_config)
+        env = VecFrameStack(env, n_stack=5)
+        env = VecMonitor(env)
+
+        env_config['task'] = task_config
+        eval_env = og.Environment(configs=env_config)
+        eval_env = DummyVecEnv([lambda: eval_env])
+        eval_env = VecFrameStack(env, n_stack=5)
+        eval_env = VecVideoRecorder(
+            eval_env,
+            f"videos/{run.id}",
+            # record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=200,
+        )
 
     else:
         import omnigibson as og
@@ -114,6 +127,7 @@ def train():
         og_env = og.Environment(configs=env_config)
         env = DummyVecEnv([lambda: og_env])
         env = VecFrameStack(env, n_stack=5)
+        
         n_envs = 1
 
     # import IPython; IPython.embed()
@@ -163,14 +177,6 @@ def train():
             },
         }
         run = wandb.init()
-        env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env)
-        env = VecVideoRecorder(
-            env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=400,
-        )
         tensorboard_log_dir = f"runs/{run.id}"
         if args.checkpoint is None:
             model = PPO(
@@ -190,11 +196,13 @@ def train():
         metrics_callback = MetricsCallback()
         # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
+        eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
             metrics_callback,
-            # stop_train_callback,
+            eval_callback,
         ])
         print(callback.callbacks)
 

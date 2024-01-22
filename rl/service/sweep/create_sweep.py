@@ -25,7 +25,7 @@ from wandb import AlertLevel
 
 sweep_configuration = {
     "method": "random",
-    "metric": {"goal": "maximize", "name": "mean_grasps"},
+    "metric": {"goal": "maximize", "name": "grasp_success_rate"},
     "parameters": {
         "grasp_reward": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
         "collision_penalty": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
