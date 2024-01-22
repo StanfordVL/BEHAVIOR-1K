@@ -19,7 +19,7 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
 
@@ -114,7 +114,8 @@ def main():
     args = parser.parse_args()
     prefix = ''
     seed = 0
-
+    config_filename = "omni_grpc.yaml"
+    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
     if n_envs > 0:
@@ -127,14 +128,22 @@ def main():
             s.close()
         print(f"Listening on port {local_port}")
         env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
+        env = VecFrameStack(env, n_stack=5)
+        env = VecMonitor(env)
+        eval_env = og.Environment(configs=config)
+        eval_env = DummyVecEnv([lambda: eval_env])
+        eval_env = VecFrameStack(env, n_stack=5)
+        eval_env = VecVideoRecorder(
+            eval_env,
+            f"videos/{run.id}",
+            # record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=200,
+        )
     else:
         import omnigibson as og
         from omnigibson.macros import gm
 
         gm.USE_FLATCACHE = True
-
-        config_filename = "omni_grpc.yaml"
-        config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
         og_env = og.Environment(configs=config)
         env = DummyVecEnv([lambda: og_env])
         env = VecFrameStack(env, n_stack=5)
@@ -194,14 +203,6 @@ def main():
             monitor_gym=True,  # auto-upload the videos of agents playing the game
             # save_code=True,  # optional
         )
-        env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env)
-        env = VecVideoRecorder(
-            env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=400,
-        )
         tensorboard_log_dir = f"runs/{run.id}"
         if args.checkpoint is None:
             model = PPO(
@@ -218,11 +219,12 @@ def main():
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
-        # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
+        eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
-            # stop_train_callback,
+            eval_callback,
         ])
         print(callback.callbacks)
 
