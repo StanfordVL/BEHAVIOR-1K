@@ -19,7 +19,7 @@ class Husky(LocomotionRobot):
         return np.array([0, 1, 2, 3])
 
     @property
-    def default_joint_pos(self):
+    def _default_joint_pos(self):
         return np.zeros(self.n_joints)
 
     @property

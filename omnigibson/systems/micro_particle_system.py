@@ -1,5 +1,6 @@
 import uuid
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.geom_prim import VisualGeomPrim
@@ -18,22 +19,8 @@ import tempfile
 import datetime
 import trimesh
 import pymeshlab
-import omni
-from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
-from omni.physx.scripts import particleUtils
 import numpy as np
-from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from collections import defaultdict
-
-
-# physics settins
-from omni.physx.bindings._physx import (
-    SETTING_UPDATE_TO_USD,
-    SETTING_UPDATE_VELOCITIES_TO_USD,
-    SETTING_NUM_THREADS,
-    SETTING_UPDATE_PARTICLES_TO_USD,
-)
-import carb
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -61,15 +48,15 @@ def set_carb_settings_for_fluid_isosurface():
     Sets relevant rendering settings in the carb settings in order to use isosurface effectively
     """
     # Settings for Isosurface
-    isregistry = carb.settings.acquire_settings_interface()
+    isregistry = lazy.carb.settings.acquire_settings_interface()
     # disable grid and lights
     dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
     dOptions &= ~(1 << 6 | 1 << 8)
     isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_bool(SETTING_UPDATE_TO_USD, True)
-    isregistry.set_int(SETTING_NUM_THREADS, 8)
-    isregistry.set_bool(SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
+    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_TO_USD, True)
+    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
+    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
+    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
     isregistry.set_int("persistent/simulation/minFrameRate", 60)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
@@ -228,7 +215,7 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert pos.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
-        self.set_attribute(attr="positions", val=Vt.Vec3fArray.FromNumpy(pos.astype(float)))
+        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.astype(float)))
 
     @property
     def particle_orientations(self):
@@ -256,7 +243,7 @@ class PhysxParticleInstancer(BasePrim):
         quat = quat.astype(float)
         if self._n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
-        self.set_attribute(attr="orientations", val=Vt.QuathArray.FromNumpy(quat))
+        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat))
 
     @property
     def particle_velocities(self):
@@ -279,7 +266,7 @@ class PhysxParticleInstancer(BasePrim):
         assert vel.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
         vel = vel.astype(float)
-        self.set_attribute(attr="velocities", val=Vt.Vec3fArray.FromNumpy(vel))
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel))
 
     @property
     def particle_scales(self):
@@ -303,7 +290,7 @@ class PhysxParticleInstancer(BasePrim):
         assert scales.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self._n_particles}!"
         scales = scales.astype(float)
-        self.set_attribute(attr="scales", val=Vt.Vec3fArray.FromNumpy(scales))
+        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales))
 
     @property
     def particle_prototype_ids(self):
@@ -440,7 +427,7 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         # Also apply physics to this material
-        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
         # Force populate inputs and outputs of the shader
         cls._material.shader_force_populate()
         # Potentially modify the material
@@ -1248,7 +1235,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         for prototype in cls.particle_prototypes:
             cls._material.bind(prototype.prim_path)
         # Apply the physical material preset based on whether or not this fluid is viscous
-        apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
+        apply_mat_physics = lazy.omni.physx.scripts.particleUtils.AddPBDMaterialViscous if cls.is_viscous else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
         apply_mat_physics(p=cls._material.prim)
 
         # Compute the overall color of the fluid system
@@ -1308,7 +1295,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @classmethod
     def _create_particle_prototypes(cls):
         # Simulate particles with simple spheres
-        prototype = UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
+        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
         prototype = VisualGeomPrim(prim_path=prototype.GetPath().pathString, name=prototype.GetPath().pathString)
         prototype.visible = False
@@ -1432,7 +1419,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Copy it to the standardized prim path
         prototype_path = f"{cls.prim_path}/prototype0"
-        omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+        lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with VisualGeomPrim with the correct scale
         prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
@@ -1593,13 +1580,13 @@ class Cloth(MicroParticleSystem):
             n_faces = len(cm.face_matrix())
 
             mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(n_faces, dtype=int) * 3)
-            mesh_prim.GetAttribute("points").Set(Vt.Vec3fArray.FromNumpy(new_vertices))
+            mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(new_vertices))
             mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
-            mesh_prim.GetAttribute("normals").Set(Vt.Vec3fArray.FromNumpy(new_normals))
-            mesh_prim.GetAttribute("primvars:st").Set(Vt.Vec2fArray.FromNumpy(new_texcoord))
+            mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(new_normals))
+            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
 
         # Convert into particle cloth
-        particleUtils.add_physx_particle_cloth(
+        lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
             stage=og.sim.stage,
             path=mesh_prim.GetPath(),
             dynamic_mesh_path=None,
@@ -1613,7 +1600,7 @@ class Cloth(MicroParticleSystem):
         )
 
         # Disable welding because it can potentially make thin objects non-manifold
-        auto_particle_cloth_api = PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
+        auto_particle_cloth_api = lazy.pxr.PhysxSchema.PhysxAutoParticleClothAPI(mesh_prim)
         auto_particle_cloth_api.GetDisableMeshWeldingAttr().Set(True)
 
     @classproperty

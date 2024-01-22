@@ -54,7 +54,7 @@ class OperationalSpaceController(ManipulationController):
         self,
         task_name,
         control_freq,
-        default_joint_pos,
+        reset_joint_pos,
         control_limits,
         dof_idx,
         command_input_limits="default",
@@ -75,7 +75,7 @@ class OperationalSpaceController(ManipulationController):
                 the inputted control_dict should include entries named <@task_name>_pos_relative and
                 <@task_name>_quat_relative. See self._command_to_control() for what these values should entail.
             control_freq (int): controller loop frequency
-            default_joint_pos (Array[float]): default joint positions, used as part of nullspace controller in IK.
+            reset_joint_pos (Array[float]): reset joint positions, used as part of nullspace controller in IK.
                 Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx
             control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
                     control signal. Should specify per-dof type limits, i.e.:
@@ -193,7 +193,7 @@ class OperationalSpaceController(ManipulationController):
         self.decouple_pos_ori = decouple_pos_ori
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
-        self.default_joint_pos = default_joint_pos[dof_idx].astype(np.float32)
+        self.reset_joint_pos = reset_joint_pos[dof_idx].astype(np.float32)
 
         # Other variables that will be filled in at runtime
         self.goal_pos = None
@@ -390,7 +390,7 @@ class OperationalSpaceController(ManipulationController):
             kd=kd,
             kp_null=self.kp_null,
             kd_null=self.kd_null,
-            rest_qpos=self.default_joint_pos,
+            rest_qpos=self.reset_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
         )

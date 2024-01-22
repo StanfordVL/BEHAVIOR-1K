@@ -7,9 +7,9 @@ import numpy as np
 
 import trimesh
 from scipy.spatial.transform import Rotation
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
@@ -202,7 +202,7 @@ class DatasetObject(USDObject):
         if gm.FORCE_LIGHT_INTENSITY is not None:
             def recursive_light_update(child_prim):
                 if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
-                    child_prim.GetAttribute("intensity").Set(gm.FORCE_LIGHT_INTENSITY)
+                    child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
 
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
@@ -457,8 +457,8 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
-                        quat1 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
+                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)

@@ -4,13 +4,11 @@ import time
 import numpy as np
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.objects import PrimitiveObject
 from omnigibson.robots import Fetch
 from omnigibson.scenes import Scene
 from omnigibson.utils.control_utils import IKSolver
-
-import carb
-import omni
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -82,7 +80,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ik_solver = IKSolver(
         robot_description_path=robot.robot_arm_descriptor_yamls[robot.default_arm],
         robot_urdf_path=robot.urdf_path,
-        default_joint_pos=robot.get_joint_positions()[control_idx],
+        reset_joint_pos=robot.get_joint_positions()[control_idx],
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
@@ -131,12 +129,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         def keyboard_event_handler(event, *args, **kwargs):
             nonlocal command, exit_now
             # Check if we've received a key press or repeat
-            if event.type == carb.input.KeyboardEventType.KEY_PRESS \
-                    or event.type == carb.input.KeyboardEventType.KEY_REPEAT:
-                if event.input == carb.input.KeyboardInput.ENTER:
+            if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS \
+                    or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT:
+                if event.input == lazy.carb.input.KeyboardInput.ENTER:
                     # Execute the command
                     execute_ik(pos=command)
-                elif event.input == carb.input.KeyboardInput.ESCAPE:
+                elif event.input == lazy.carb.input.KeyboardInput.ESCAPE:
                     # Quit
                     og.log.info("Quit.")
                     exit_now = True
@@ -153,8 +151,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             return True
 
         # Hook up the callback function with omni's user interface
-        appwindow = omni.appwindow.get_default_app_window()
-        input_interface = carb.input.acquire_input_interface()
+        appwindow = lazy.omni.appwindow.get_default_app_window()
+        input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, keyboard_event_handler)
 
@@ -171,12 +169,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 def input_to_xyz_delta_command(inp, delta=0.01):
     mapping = {
-        carb.input.KeyboardInput.W: np.array([delta, 0, 0]),
-        carb.input.KeyboardInput.S: np.array([-delta, 0, 0]),
-        carb.input.KeyboardInput.DOWN: np.array([0, 0, -delta]),
-        carb.input.KeyboardInput.UP: np.array([0, 0, delta]),
-        carb.input.KeyboardInput.A: np.array([0, delta, 0]),
-        carb.input.KeyboardInput.D: np.array([0, -delta, 0]),
+        lazy.carb.input.KeyboardInput.W: np.array([delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.S: np.array([-delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.DOWN: np.array([0, 0, -delta]),
+        lazy.carb.input.KeyboardInput.UP: np.array([0, 0, delta]),
+        lazy.carb.input.KeyboardInput.A: np.array([0, delta, 0]),
+        lazy.carb.input.KeyboardInput.D: np.array([0, -delta, 0]),
     }
 
     return mapping.get(inp)

@@ -1,7 +1,7 @@
 """
 Set of utilities for helping to execute robot control
 """
-import lula
+import omnigibson.lazy as lazy
 import numpy as np
 from numba import jit
 import omnigibson.utils.transform_utils as T
@@ -18,7 +18,7 @@ class FKSolver:
         robot_urdf_path,
     ):
         # Create robot description and kinematics
-        self.robot_description = lula.load_robot(robot_description_path, robot_urdf_path)
+        self.robot_description = lazy.lula.load_robot(robot_description_path, robot_urdf_path)
         self.kinematics = self.robot_description.kinematics()
 
     def get_link_poses(
@@ -66,14 +66,14 @@ class IKSolver:
         robot_description_path,
         robot_urdf_path,
         eef_name,
-        default_joint_pos,
+        reset_joint_pos,
     ):
         # Create robot description, kinematics, and config
-        self.robot_description = lula.load_robot(robot_description_path, robot_urdf_path)
+        self.robot_description = lazy.lula.load_robot(robot_description_path, robot_urdf_path)
         self.kinematics = self.robot_description.kinematics()
-        self.config = lula.CyclicCoordDescentIkConfig()
+        self.config = lazy.lula.CyclicCoordDescentIkConfig()
         self.eef_name = eef_name
-        self.default_joint_pos = default_joint_pos
+        self.reset_joint_pos = reset_joint_pos
 
     def solve(
         self,
@@ -100,7 +100,7 @@ class IKSolver:
             weight_quat (float): Weight for the relative importance of position error during CCD
             max_iterations (int): Number of iterations used for each cyclic coordinate descent.
             initial_joint_pos (None or n-array): If specified, will set the initial cspace seed when solving for joint
-                positions. Otherwise, will use self.default_joint_pos
+                positions. Otherwise, will use self.reset_joint_pos
 
         Returns:
             None or n-array: Joint positions for reaching desired target_pos and target_quat, otherwise None if no
@@ -108,10 +108,10 @@ class IKSolver:
         """
         pos = np.array(target_pos, dtype=np.float64).reshape(3, 1)
         rot = np.array(T.quat2mat(np.array([0, 0, 0, 1.0]) if target_quat is None else target_quat), dtype=np.float64)
-        ik_target_pose = lula.Pose3(lula.Rotation3(rot), pos)
+        ik_target_pose = lazy.lula.Pose3(lazy.lula.Rotation3(rot), pos)
 
         # Set the cspace seed and tolerance
-        initial_joint_pos = self.default_joint_pos if initial_joint_pos is None else np.array(initial_joint_pos)
+        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else np.array(initial_joint_pos)
         self.config.cspace_seeds = [initial_joint_pos]
         self.config.position_tolerance = tolerance_pos
         self.config.orientation_tolerance = 100.0 if target_quat is None else tolerance_quat
@@ -126,7 +126,7 @@ class IKSolver:
             self.config.max_iterations_per_descent = max_iterations
 
         # Compute target joint positions
-        ik_results = lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
+        ik_results = lazy.lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
         if ik_results.success:
             return np.array(ik_results.cspace_position)
         else:

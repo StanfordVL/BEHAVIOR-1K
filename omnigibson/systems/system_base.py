@@ -965,8 +965,8 @@ class PhysicalParticleSystem(BaseSystem):
         assert np.all(n_particles_per_axis), f"link {link.name} is too small to sample any particle of radius {cls.particle_radius}."
 
         # 1e-10 is added because the extent might be an exact multiple of particle radius
-        arrs = [np.arange(lo + cls.particle_radius, hi - cls.particle_radius + 1e-10, cls.particle_radius * 2)
-                for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        arrs = [np.arange(l + cls.particle_radius, h - cls.particle_radius + 1e-10, cls.particle_radius * 2)
+                for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
@@ -1067,7 +1067,7 @@ def _create_system_from_metadata(system_name):
     all_systems = set(get_all_system_categories())
     if system_name not in all_systems:
         # Use default config -- assume @system_name is a fluid that uses the same params as water
-        return systems.__dict__["FluidSystem"].create(
+        return systems.FluidSystem.create(
             name=system_name.replace("-", "_"),
             particle_contact_offset=0.012,
             particle_density=500.0,
@@ -1200,7 +1200,7 @@ def _create_system_from_metadata(system_name):
 
         # Generate the requested system
         system_cls = "".join([st.capitalize() for st in system_type.split("_")])
-        return systems.__dict__[f"{system_cls}System"].create(**system_kwargs)
+        return getattr(systems, f"{system_cls}System").create(**system_kwargs)
 
 
 def import_og_systems():

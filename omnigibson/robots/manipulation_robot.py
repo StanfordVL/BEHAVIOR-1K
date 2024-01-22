@@ -1,12 +1,10 @@
 from abc import abstractmethod
-import carb
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from omni.physx import get_physx_scene_query_interface
-from pxr import Gf
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController, OperationalSpaceController
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
@@ -125,7 +123,7 @@ class ManipulationRobot(BaseRobot):
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -963,7 +961,7 @@ class ManipulationRobot(BaseRobot):
                 "robot_urdf_path": self.urdf_path,
                 "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
@@ -990,7 +988,7 @@ class ManipulationRobot(BaseRobot):
                 "name": "OperationalSpaceController",
                 "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
@@ -1260,7 +1258,7 @@ class ManipulationRobot(BaseRobot):
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos, _ = T.pose_transform(eef_link_pos, eef_link_orn, attachment_point_pos_local, [0, 0, 0, 1])
         joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos.astype(float)))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos.astype(float)))
 
     def _calculate_in_hand_object(self, arm="default"):
         if gm.AG_CLOTH:
@@ -1396,7 +1394,7 @@ class ManipulationRobot(BaseRobot):
             return state
 
         # Include AG_state
-        state["ag_obj_constraint_params"] = self._ag_obj_constraint_params
+        state["ag_obj_constraint_params"] = self._ag_obj_constraint_params.copy()
         return state
 
     def _load_state(self, state):
@@ -1417,8 +1415,7 @@ class ManipulationRobot(BaseRobot):
                 data = state["ag_obj_constraint_params"][arm]
                 obj = og.sim.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                self._ag_data[arm] = (obj, link)
-                self._establish_grasp(arm=arm, ag_data=self._ag_data[arm], contact_pos=data["contact_pos"])
+                self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 
     def _serialize(self, state):
         # Call super first
