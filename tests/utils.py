@@ -68,6 +68,9 @@ def assert_test_scene():
                 get_obj_cfg("vacuum", "vacuum", "bdmsbr", visual_only=True, abilities={"toggleable": {}, "particleRemover": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
                 get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "blender": {}, "toggleable": {}}),
                 get_obj_cfg("oven", "oven", "cgtaer", bounding_box=[0.943, 0.837, 1.297]),
+                get_obj_cfg("baking_sheet", "baking_sheet", "yhurut"),
+                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm"),
+                get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
             ],
             "robots": [
                 {

@@ -6,11 +6,15 @@ import json
 from copy import copy
 import itertools
 import os
+from collections import defaultdict
+
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
+from omnigibson.object_states.factory import get_system_states
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -18,9 +22,14 @@ from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
+import bddl
+from bddl.object_taxonomy import ObjectTaxonomy
+from omnigibson.utils.bddl_utils import is_substance_synset, get_system_name_by_synset, SUPPORTED_PREDICATES
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+OBJECT_TAXONOMY = ObjectTaxonomy()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -34,6 +43,8 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 # Default "trash" system if an invalid mixing rule transition occurs
 m.DEFAULT_GARBAGE_SYSTEM = "sludge"
 
+m.DEBUG = False
+
 # Tuple of attributes of objects created in transitions.
 # `states` field is dict mapping object state class to arguments to pass to setter for that class
 _attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn", "states", "callback"]
@@ -46,9 +57,20 @@ ObjectAttrs = namedtuple(
 TransitionResults = namedtuple(
     "TransitionResults", ["add", "remove"], defaults=(None, None))
 
+# Mapping from transition rule json files to rule classe names
+_JSON_FILES_TO_RULES = {
+    "dicing.json": ["DicingRule"],
+    "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
+    "melting.json": ["MeltingRule"],
+    "mixing_stick.json": ["MixingToolRule"],
+    "single_toggleable_machine.json": ["ToggleableMachineRule"],
+    "slicing.json": ["SlicingRule"],
+    "substance_cooking.json": ["CookingPhysicalParticleRule"],
+    "substance_watercooking.json": ["CookingPhysicalParticleRule"],
+    # TODO: washer and dryer
+}
 # Global dicts that will contain mappings
 REGISTERED_RULES = dict()
-
 
 class TransitionRuleAPI:
     """
@@ -551,7 +573,6 @@ class BaseTransitionRule(Registerable):
     candidates = None
 
     def __init_subclass__(cls, **kwargs):
-        # Call super first
         super().__init_subclass__(**kwargs)
 
         # Register this system, and
@@ -799,55 +820,13 @@ class DicingRule(BaseTransitionRule):
         objs_to_remove = []
 
         for diceable_obj in object_candidates["diceable"]:
-            system = get_system(f"diced_{diceable_obj.category}")
+            system = get_system(f"diced__{diceable_obj.category}")
             system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
             objs_to_remove.append(diceable_obj)
 
         return TransitionResults(add=[], remove=objs_to_remove)
-
-
-class CookingPhysicalParticleRule(BaseTransitionRule):
-    """
-    Transition rule to apply to "cook" physicl particles
-    """
-    @classproperty
-    def candidate_filters(cls):
-        # We want to track all possible fillable heatable objects
-        return {"fillable": AndFilter(filters=(AbilityFilter("fillable"), AbilityFilter("heatable")))}
-
-    @classmethod
-    def _generate_conditions(cls):
-        # Only heated objects are valid
-        return [StateCondition(filter_name="fillable", state=Heated, val=True, op=operator.eq)]
-
-    @classmethod
-    def transition(cls, object_candidates):
-        fillable_objs = object_candidates["fillable"]
-
-        # Iterate over all active physical particle systems, and for any non-cooked particles inside,
-        # convert into cooked particles
-        for name, system in PhysicalParticleSystem.get_active_systems().items():
-            # Skip any systems that are already cooked
-            if "cooked" in name:
-                continue
-
-            # Iterate over all fillables -- a given particle should become hot if it is contained in any of the
-            # fillable objects
-            in_volume = np.zeros(system.n_particles).astype(bool)
-            for fillable_obj in fillable_objs:
-                in_volume |= fillable_obj.states[ContainedParticles].get_value(system).in_volume
-
-            # If any are in volume, convert particles
-            in_volume_idx = np.where(in_volume)[0]
-            if len(in_volume_idx) > 0:
-                cooked_system = get_system(f"cooked_{system.name}")
-                particle_positions = fillable_obj.states[ContainedParticles].get_value(system).positions
-                system.remove_particles(idxs=in_volume_idx)
-                cooked_system.generate_particles(positions=particle_positions[in_volume_idx])
-
-        return TransitionResults(add=[], remove=[])
 
 
 class MeltingRule(BaseTransitionRule):
@@ -909,10 +888,11 @@ class RecipeRule(BaseTransitionRule):
     def add_recipe(
         cls,
         name,
-        input_objects=None,
-        input_systems=None,
-        output_objects=None,
-        output_systems=None,
+        input_synsets,
+        output_synsets,
+        input_states=None,
+        output_states=None,
+        fillable_categories=None,
         **kwargs,
     ):
         """
@@ -921,30 +901,113 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             name (str): Name of the recipe
-            input_objects (None or dict): Maps object category to number of instances required for the recipe, or None
-                if no objects required
-            input_systems (None or list of str): Required system names for the recipe, or None if no systems required
-            output_objects (None or dict): Maps object category to number of instances to be spawned in the container
-                when the recipe executes, or None if no objects are to be spawned
-            output_systems (None or list of str): Output system name(s) that will replace all contained objects
-                if the recipe is executed, or None if no system is to be spawned
-
+            input_synsets (dict): Maps synsets to number of instances required for the recipe
+            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
+            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
+                or None if no states are required
+            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
+                or None if no states are required
+            fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
             kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
         """
-        # For now, assert only one of output_objects or output_systems is not None
-        # TODO: How to handle both?
-        assert output_objects is None or output_systems is None, \
-            "Recipe can only generate output objects or output systems, but not both!"
-
         # Store information for this recipe
         cls._RECIPES[name] = {
             "name": name,
-            "input_objects": dict() if input_objects is None else input_objects,
-            "input_systems": [] if input_systems is None else input_systems,
-            "output_objects": dict() if output_objects is None else output_objects,
-            "output_systems": [] if output_systems is None else output_systems,
+
+            # To be filled in later
+            "input_objects": dict(),
+            "input_systems": list(),
+            "output_objects": dict(),
+            "output_systems": list(),
+            "input_states": defaultdict(list),
+            "output_states": defaultdict(list),
+            "root_input_objects":
+            "fillable_categories": None,
+
             **kwargs,
         }
+
+        # Map input/output synsets into input/output objects and systems.
+        for synsets, obj_key, system_key in zip((input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")):
+            for synset, count in synsets.items():
+                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
+                if is_substance_synset(synset):
+                    cls._RECIPES[name][system_key].append(get_system_name_by_synset(synset))
+                else:
+                    obj_categories = OBJECT_TAXONOMY.get_categories(synset)
+                    assert len(obj_categories) == 1, f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                    cls._RECIPES[name][obj_key][obj_categories[0]] = count
+
+        # Assert only one of output_objects or output_systems is not None
+        assert len(cls._RECIPES[name]["output_objects"]) == 0 or len(cls._RECIPES[name]["output_systems"]) == 0, \
+            "Recipe can only generate output objects or output systems, but not both!"
+
+        # Apply post-processing for input/output states if specified
+        for synsets_to_states, states_key in zip((input_states, output_states), ("input_states", "output_states")):
+            if synsets_to_states is None:
+                continue
+            for synsets, states in synsets_to_states.items():
+                # For unary/binary states, synsets is a single synset or a comma-separated pair of synsets, respectively
+                synset_split = synsets.split(",")
+                if len(synset_split) == 1:
+                    first_synset = synset_split[0]
+                    second_synset = None
+                else:
+                    first_synset, second_synset = synset_split
+
+                assert OBJECT_TAXONOMY.is_leaf(first_synset), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+                assert not is_substance_synset(first_synset), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+                obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
+                assert len(obj_categories) == 1, f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+                first_obj_category = obj_categories[0]
+
+                if second_synset is None:
+                    for state_type, state_value in states:
+                        state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
+                        assert issubclass(state_class, AbsoluteObjectState), f"Input/output state type {state_type} must be a unary state!"
+                        cls._RECIPES[name][states_key][first_obj_category].append((state_class, None, state_value))
+                else:
+                    assert OBJECT_TAXONOMY.is_leaf(second_synset), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                    obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
+                    if is_substance_synset(second_synset):
+                        second_obj_category = get_system_name_by_synset(second_synset)
+                        is_substance = True
+                    else:
+                        obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
+                        assert len(obj_categories) == 1, f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                        second_obj_category = obj_categories[0]
+                        is_substance = False
+
+                    for state_type, state_value in states:
+                        state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
+                        assert issubclass(state_class, RelativeObjectState), f"Input/output state type {state_type} must be a binary state!"
+                        assert is_substance == (state_class in get_system_states()), f"Input/output state type {state_type} system state inconsistency found!"
+                        cls._RECIPES[name][states_key][first_obj_category].append((state_class, second_obj_category, state_value))
+
+        if fillable_categories is not None:
+            cls._RECIPES[name]["fillable_categories"] = set()
+            for synset in fillable_categories:
+                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
+                assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
+                for category in OBJECT_TAXONOMY.get_categories(synset):
+                    cls._RECIPES[name]["fillable_categories"].add(category)
+
+    @classmethod
+    def _validate_recipe_container_is_valid(cls, recipe, container):
+        """
+        Validates that @container's category satisfies @recipe's fillable_categories
+
+        Args:
+            recipe (dict): Recipe whose fillable_categories should be checked against @container
+            container (StatefulObject): Container whose category should match one of @recipe's fillable_categories,
+                if specified
+
+        Returns:
+            bool: True if @container is valid, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        return fillable_categories is None or container.category in fillable_categories
 
     @classmethod
     def _validate_recipe_systems_are_contained(cls, recipe, container):
@@ -976,17 +1039,16 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        relevant_systems = set(recipe["input_systems"])
         for system in og.sim.scene.system_registry.objects:
             # Skip cloth system
             if system.name == "cloth":
                 continue
-            if system.name not in relevant_systems and container.states[Contains].get_value(system=system):
+            if system.name not in recipe["input_systems"] and container.states[Contains].get_value(system=system):
                 return False
         return True
 
     @classmethod
-    def _validate_recipe_objects_are_contained(cls, recipe, in_volume):
+    def _validate_recipe_objects_are_contained_and_states_satisfied(cls, recipe, in_volume):
         """
         Validates whether @recipe's input_objects are all contained in the container represented by @in_volume
 
@@ -998,6 +1060,11 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if all the input object quantities are contained
         """
+        if m.DEBUG:
+            print("_validate_recipe_objects_are_contained_and_states_satisfied")
+            from IPython import embed; embed();
+            # TODO: add another field to container_info: objects that are contained AND recipe relevant (category match, states satisfied)
+            # TODO: add another field to container_info: how many copies of recipe are successful
         for obj_category, obj_quantity in recipe["input_objects"].items():
             if np.sum(in_volume[cls._CATEGORY_IDXS[obj_category]]) < obj_quantity:
                 return False
@@ -1054,6 +1121,29 @@ class RecipeRule(BaseTransitionRule):
         return True
 
     @classmethod
+    def _validate_recipe_fillables_exist(cls, recipe):
+        """
+        Validates that recipe @recipe's necessary fillable categorie(s) exist in the current scene
+
+        Args:
+            recipe (dict): Recipe whose fillable categories should be checked
+
+        Returns:
+            bool: True if there is at least a single valid fillable category in the current scene, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        if fillable_categories is None:
+            # Any is valid
+            return True
+        # Otherwise, at least one valid type must exist
+        for category in fillable_categories:
+            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+                return True
+
+        # None found, return False
+        return False
+
+    @classmethod
     def _is_recipe_active(cls, recipe):
         """
         Helper function to determine whether a given recipe @recipe should be actively checked for or not.
@@ -1070,6 +1160,10 @@ class RecipeRule(BaseTransitionRule):
 
         # Check valid object quantities
         if not cls._validate_recipe_objects_exist(recipe=recipe):
+            return False
+
+        # Check valid fillable categories
+        if not cls._validate_recipe_fillables_exist(recipe=recipe):
             return False
 
         return True
@@ -1092,16 +1186,20 @@ class RecipeRule(BaseTransitionRule):
         """
         in_volume = container_info["in_volume"]
 
-        # Verify all required systems are contained in the container
-        if not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+        # Verify the container category is valid
+        if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
             return False
 
-        # Verify all required object quantities are contained in the container
-        if not cls._validate_recipe_objects_are_contained(recipe=recipe, in_volume=in_volume):
+        # Verify all required systems are contained in the container
+        if not cls.relax_recipe_systems and not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+            return False
+
+        # Verify all required object quantities are contained in the container and their states are satisfied
+        if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, in_volume=in_volume):
             return False
 
         # Verify no non-relevant system is contained
-        if not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
+        if not cls.ignore_nonrecipe_systems and not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
             return False
 
         # Verify no non-relevant object is contained if we're not ignoring them
@@ -1227,7 +1325,7 @@ class RecipeRule(BaseTransitionRule):
 
             # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead if requested
             if recipe_results is None and cls.use_garbage_fallback_recipe:
-                og.log.info(f"Did not find a valid recipe; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
+                og.log.info(f"Did not find a valid recipe for rule {cls.__name__}; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
 
                 # Generate garbage fluid
                 garbage_results = cls._execute_recipe(
@@ -1268,18 +1366,23 @@ class RecipeRule(BaseTransitionRule):
         # Compute total volume of all contained items
         volume = 0
 
-        # Remove all recipe system particles contained in the container
+        # Remove either all systems or only the ones specified in the input systems of the recipe
         contained_particles_state = container.states[ContainedParticles]
-        for system in PhysicalParticleSystem.get_active_systems().values():
-            if container.states[Contains].get_value(system):
-                volume += contained_particles_state.get_value(system).n_in_volume * np.pi * (system.particle_radius ** 3) * 4 / 3
-                container.states[Contains].set_value(system, False)
-        for system in VisualParticleSystem.get_active_systems().values():
-            group_name = system.get_group_name(container)
-            if group_name in system.groups and system.num_group_particles(group_name) > 0:
-                system.remove_all_group_particles(group=group_name)
 
-        # Remove either all objects or only the recipe-relevant objects inside the container
+        # TODO: if cls.relax_contained_particles, then we should remove the particles that are relevant to the recipe, e.g. the ones that cover the bagel
+        for system in PhysicalParticleSystem.get_active_systems().values():
+            if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
+                if container.states[Contains].get_value(system):
+                    volume += contained_particles_state.get_value(system).n_in_volume * np.pi * (system.particle_radius ** 3) * 4 / 3
+                    container.states[Contains].set_value(system, False)
+        for system in VisualParticleSystem.get_active_systems().values():
+            if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
+                group_name = system.get_group_name(container)
+                if group_name in system.groups and system.num_group_particles(group_name) > 0:
+                    system.remove_all_group_particles(group=group_name)
+
+        # Remove either all objects or only the ones specified in the input objects of the recipe
+        # TODO: remove the ones that are relevant to the recipe, e.g. the ones that are contained and satisfy the states
         object_mask = in_volume.copy()
         if cls.ignore_nonrecipe_objects:
             object_category_mask = np.zeros_like(object_mask, dtype=bool)
@@ -1298,6 +1401,7 @@ class RecipeRule(BaseTransitionRule):
             assert obj.states[state].set_value(container, True)
 
         # Spawn in new objects
+        # TODO: multiply n_instances by the number of successful recipe executions
         for category, n_instances in recipe["output_objects"].items():
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
@@ -1330,13 +1434,28 @@ class RecipeRule(BaseTransitionRule):
         return TransitionResults(add=objs_to_add, remove=objs_to_remove)
 
     @classproperty
+    def relax_recipe_systems(cls):
+        """
+        Returns:
+            bool: Whether to relax the requirement of having all systems in the recipe contained in the container
+        """
+        raise NotImplementedError("Must be implemented by subclass!")
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        """
+        Returns:
+            bool: Whether contained systems not relevant to the recipe should be ignored or not
+        """
+        raise NotImplementedError("Must be implemented by subclass!")
+
+    @classproperty
     def ignore_nonrecipe_objects(cls):
         """
         Returns:
             bool: Whether contained rigid objects not relevant to the recipe should be ignored or not
         """
-        # False by default
-        return False
+        raise NotImplementedError("Must be implemented by subclass!")
 
     @classproperty
     def use_garbage_fallback_recipe(cls):
@@ -1345,8 +1464,7 @@ class RecipeRule(BaseTransitionRule):
             bool: Whether this recipe rule should use a garbage fallback recipe if all conditions are met but no
                 valid recipe is found for a given container
         """
-        # False by default
-        return False
+        raise NotImplementedError("Must be implemented by subclass!")
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -1356,17 +1474,131 @@ class RecipeRule(BaseTransitionRule):
         return classes
 
 
-# TODO: Make category-specific, e.g.: blender, coffee_maker, etc.
-class BlenderRule(RecipeRule):
+class CookingPhysicalParticleRule(RecipeRule):
     """
-    Transition mixing rule that leverages "blender" ability objects, which require toggledOn in order to trigger
-    the recipe event
+    Transition rule to apply to "cook" physicl particles
     """
+    @classmethod
+    def add_recipe(cls, name, input_synsets, output_synsets):
+        super().add_recipe(
+            name=name,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=None,
+            output_states=None,
+            fillable_categories=None,
+        )
+
+        input_objects = cls._RECIPES[name]["input_objects"]
+        output_objects = cls._RECIPES[name]["output_objects"]
+        assert len(input_objects) == 0, f"No input objects can be specified for {cls.__name__}, recipe: {name}!"
+        assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
+
+        input_systems = cls._RECIPES[name]["input_systems"]
+        output_systems = cls._RECIPES[name]["output_systems"]
+        assert len(input_systems) == 1 or len(input_systems) == 2, \
+            f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
+        if len(input_systems) == 2:
+            assert input_systems[1] == "water", \
+                f"Second input system must be water for {cls.__name__}, recipe: {name}!"
+        assert len(output_systems) == 1, \
+            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+
     @classproperty
     def candidate_filters(cls):
         # Modify the container filter to include "blender" ability as well
         candidate_filters = super().candidate_filters
-        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="blender")])
+        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="heatable")])
+        return candidate_filters
+
+    @classmethod
+    def _generate_conditions(cls):
+        # Only heated objects are valid
+        return [StateCondition(filter_name="container", state=Heated, val=True, op=operator.eq)]
+
+    @classproperty
+    def relax_recipe_systems(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return True
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return True
+
+    @classproperty
+    def use_garbage_fallback_recipe(cls):
+        return False
+
+    @classmethod
+    def _execute_recipe(cls, container, recipe, in_volume):
+        system = get_system(recipe["input_systems"][0])
+        contained_particles_state = container.states[ContainedParticles].get_value(system)
+        in_volume_idx = np.where(contained_particles_state.in_volume)[0]
+        assert len(in_volume_idx) > 0, "No particles found in the container when executing recipe!"
+
+        # Remove uncooked particles
+        system.remove_particles(idxs=in_volume_idx)
+
+        # Generate cooked particles
+        cooked_system = get_system(recipe["output_systems"][0])
+        particle_positions = contained_particles_state.positions[in_volume_idx]
+        cooked_system.generate_particles(positions=particle_positions)
+
+        # Remove water if the cooking requires water
+        if len(recipe["input_systems"]) > 1:
+            water_system = get_system(recipe["input_systems"][1])
+            container.states[Contains].set_value(water_system, False)
+
+        return TransitionResults(add=[], remove=[])
+
+
+class ToggleableMachineRule(RecipeRule):
+    """
+    Transition mixing rule that leverages "blender" ability objects, which require toggledOn in order to trigger
+    the recipe event
+    """
+
+    @classmethod
+    def add_recipe(
+            cls,
+            name,
+            input_synsets,
+            output_synsets,
+            fillable_categories,
+            input_states=None,
+            output_states=None,
+    ):
+        """
+        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
+        will transform into the outputs
+
+        Args:
+            name (str): Name of the recipe
+            input_synsets (dict): Maps synsets to number of instances required for the recipe
+            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
+            fillable_categories (set of str): Set of toggleable machine categories which are allowed for this recipe
+            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
+                or None if no states are required
+            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
+                or None if no states are required
+        """
+        super().add_recipe(
+            name=name,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=fillable_categories
+        )
+
+    @classproperty
+    def candidate_filters(cls):
+        # Modify the container filter to include "blender" ability as well
+        candidate_filters = super().candidate_filters
+        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="toggleable")])
         return candidate_filters
 
     @classmethod
@@ -1375,6 +1607,18 @@ class BlenderRule(RecipeRule):
         return [ChangeConditionWrapper(
             condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
         )]
+
+    @classproperty
+    def relax_recipe_systems(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return False
 
     @classproperty
     def use_garbage_fallback_recipe(cls):
@@ -1387,20 +1631,24 @@ class MixingToolRule(RecipeRule):
     and a container in order to trigger the recipe event
     """
     @classmethod
-    def add_recipe(cls, name, input_objects=None, input_systems=None, output_objects=None, output_systems=None, **kwargs):
-        # We do not allow any input objects to be specified! Assert empty list
-        assert input_objects is None or len(input_objects) == 0, \
-            f"No input_objects should be specified for {cls.__name__}!"
-
-        # Call super
+    def add_recipe(cls, name, input_synsets, output_synsets, input_states=None, output_states=None):
         super().add_recipe(
             name=name,
-            input_objects=input_objects,
-            input_systems=input_systems,
-            output_objects=output_objects,
-            output_systems=output_systems,
-            **kwargs,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=None,
         )
+
+        output_objects = cls._RECIPES[name]["output_objects"]
+        assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
+
+        input_systems = cls._RECIPES[name]["input_systems"]
+        output_systems = cls._RECIPES[name]["output_systems"]
+        assert len(input_systems) > 0, f"Some input systems need to be specified for {cls.__name__}, recipe: {name}!"
+        assert len(output_systems) == 1, \
+            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
 
     @classproperty
     def candidate_filters(cls):
@@ -1415,6 +1663,14 @@ class MixingToolRule(RecipeRule):
         return [ChangeConditionWrapper(
             condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
         )]
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return False
 
     @classproperty
     def ignore_nonrecipe_objects(cls):
@@ -1499,22 +1755,6 @@ class CookingRule(RecipeRule):
         return False
 
     @classmethod
-    def _validate_recipe_container_is_valid(cls, recipe, container):
-        """
-        Validates that @container's category satisfies @recipe's fillable_categories
-
-        Args:
-            recipe (dict): Recipe whose fillable_categories should be checked against @container
-            container (StatefulObject): Container whose category should match one of @recipe's fillable_categories,
-                if specified
-
-        Returns:
-            bool: True if @container is valid, else False
-        """
-        fillable_categories = recipe["fillable_categories"]
-        return fillable_categories is None or container.category in fillable_categories
-
-    @classmethod
     def _validate_recipe_heatsource_is_valid(cls, recipe, heatsource_categories):
         """
         Validates that there is a valid heatsource category in @heatsource_categories compatible with @recipe
@@ -1539,16 +1779,13 @@ class CookingRule(RecipeRule):
 
         # Compute whether each heatsource is affecting the container
         info["heatsource_categories"] = set(obj.category for obj in object_candidates["heatSource"] if
-                                                        obj.states[HeatSourceOrSink].affects_obj(container))
+                                            obj.states[HeatSourceOrSink].affects_obj(container))
 
         return info
 
     @classmethod
     def _is_recipe_active(cls, recipe):
-        # Check for fillable and heatsource categories first
-        if not cls._validate_recipe_fillables_exist(recipe=recipe):
-            return False
-
+        # Check for heatsource categories first
         if not cls._validate_recipe_heatsources_exist(recipe=recipe):
             return False
 
@@ -1557,10 +1794,7 @@ class CookingRule(RecipeRule):
 
     @classmethod
     def _is_recipe_executable(cls, recipe, container, global_info, container_info):
-        # Check for container and heatsource compatibility first
-        if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
-            return False
-
+        # Check for heatsource compatibility first
         if not cls._validate_recipe_heatsource_is_valid(recipe=recipe, heatsource_categories=container_info["heatsource_categories"]):
             return False
 
@@ -1580,7 +1814,7 @@ class CookingRule(RecipeRule):
             cls._LAST_HEAT_TIMESTEP[name] = cls.COUNTER
 
             # If valid number of timesteps met, recipe is indeed executable
-            executable = cls._HEAT_STEPS[name] >= recipe["n_heat_steps"]
+            executable = cls._HEAT_STEPS[name] >= recipe["timesteps"]
 
         return executable
 
@@ -1588,14 +1822,13 @@ class CookingRule(RecipeRule):
     def add_recipe(
             cls,
             name,
-            input_objects=None,
-            input_systems=None,
-            output_objects=None,
-            output_systems=None,
+            input_synsets,
+            output_synsets,
+            input_states=None,
+            output_states=None,
             fillable_categories=None,
             heatsource_categories=None,
-            n_heat_steps=1,
-            **kwargs,
+            timesteps=None,
     ):
         """
         Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
@@ -1603,36 +1836,38 @@ class CookingRule(RecipeRule):
 
         Args:
             name (str): Name of the recipe
-            input_objects (None or dict): Maps object category to number of instances required for the recipe, or None
-                if no objects required
-            input_systems (None or list of str): Required system names for the recipe, or None if no systems required
-            output_objects (None or dict): Maps object category to number of instances to be spawned in the container
-                when the recipe executes, or None if no objects are to be spawned
-            output_systems (None or list of str): Output system name(s) that will replace all contained objects
-                if the recipe is executed, or None if no system is to be spawned
-            fillable_categories (None or list of str): If specified, list of fillable categories which are allowed
+            input_synsets (dict): Maps synsets to number of instances required for the recipe
+            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
+            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
+                or None if no states are required
+            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
+                or None if no states are required
+            fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
                 for this recipe. If None, any fillable is allowed
-            heatsource_categories (None or list of str): If specified, list of heatsource categories which are allowed
+            heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
                 for this recipe. If None, any heatsource is allowed
-            n_heat_steps (int): Number of subsequent heating steps required for the recipe to execute. Default is 1
-                step, i.e.: instantaneous execution
-
-            kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
+            timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
+                it will be set to be 1, i.e.: instantaneous execution
         """
-        # Call super first
+        if heatsource_categories is not None:
+            heatsource_categories_postprocessed = set()
+            for synset in heatsource_categories:
+                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
+                assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
+                for category in OBJECT_TAXONOMY.get_categories(synset):
+                    heatsource_categories_postprocessed.add(category)
+            heatsource_categories = heatsource_categories_postprocessed
+
         super().add_recipe(
             name=name,
-            input_objects=input_objects,
-            input_systems=input_systems,
-            output_objects=output_objects,
-            output_systems=output_systems,
-            **kwargs,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=fillable_categories,
+            heatsource_categories=heatsource_categories,
+            timesteps=1 if timesteps is None else timesteps,
         )
-
-        # Add additional kwargs
-        cls._RECIPES[name]["fillable_categories"] = None if fillable_categories is None else set(fillable_categories)
-        cls._RECIPES[name]["heatsource_categories"] = None if heatsource_categories is None else set(heatsource_categories)
-        cls._RECIPES[name]["n_heat_steps"] = n_heat_steps
 
     @classproperty
     def candidate_filters(cls):
@@ -1662,24 +1897,161 @@ class CookingRule(RecipeRule):
             StateCondition(filter_name="heatSource", state=HeatSourceOrSink, val=True, op=operator.eq),
         ]
 
+    @classproperty
+    def use_garbage_fallback_recipe(cls):
+        return False
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("CookingRule")
+        return classes
+
+class CookingObjectRule(CookingRule):
+    @classmethod
+    def add_recipe(
+            cls,
+            name,
+            input_synsets,
+            output_synsets,
+            input_states=None,
+            output_states=None,
+            fillable_categories=None,
+            heatsource_categories=None,
+            timesteps=None,
+    ):
+        """
+        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
+        will transform into the outputs
+
+        Args:
+            name (str): Name of the recipe
+            input_synsets (dict): Maps synsets to number of instances required for the recipe
+            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
+            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
+                or None if no states are required
+            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
+                or None if no states are required
+            fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
+            heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
+                for this recipe. If None, any heatsource is allowed
+            timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
+                it will be set to be 1, i.e.: instantaneous execution
+        """
+        super().add_recipe(
+            name=name,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=fillable_categories,
+            heatsource_categories=heatsource_categories,
+            timesteps=timesteps,
+        )
+        output_systems = cls._RECIPES[name]["output_systems"]
+        assert len(output_systems) == 0, f"No output systems can be specified for {cls.__name__}, recipe: {name}!"
+
+    @classproperty
+    def relax_recipe_systems(cls):
+        # We don't require systems like seasoning/cheese/sesame seeds/etc. to be contained in the baking sheet
+        return True
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return True
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return True
+
+
+class CookingSystemRule(CookingRule):
+    @classmethod
+    def add_recipe(
+            cls,
+            name,
+            input_synsets,
+            output_synsets,
+            input_states=None,
+            output_states=None,
+            fillable_categories=None,
+            heatsource_categories=None,
+            timesteps=None,
+    ):
+        """
+        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
+        will transform into the outputs
+
+        Args:
+            name (str): Name of the recipe
+            input_synsets (dict): Maps synsets to number of instances required for the recipe
+            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
+            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
+                or None if no states are required
+            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
+                or None if no states are required
+            fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
+            heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
+                for this recipe. If None, any heatsource is allowed
+            timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
+                it will be set to be 1, i.e.: instantaneous execution
+        """
+        super().add_recipe(
+            name=name,
+            input_synsets=input_synsets,
+            output_synsets=output_synsets,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=fillable_categories,
+            heatsource_categories=heatsource_categories,
+            timesteps=timesteps,
+        )
+        output_objects = cls._RECIPES[name]["output_objects"]
+        assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
+
+    @classproperty
+    def relax_recipe_systems(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return False
+
+    @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return False
 
 def import_recipes():
-    # Wrap bddl here so it's only imported if necessary
-    import bddl
-    recipe_fpath = f"{os.path.dirname(bddl.__file__)}/generated_data/transition_rule_recipes.json"
-    if not os.path.exists(recipe_fpath):
-        log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
-        return
-    with open(recipe_fpath, "r") as f:
-        rule_recipes = json.load(f)
-    for rule_name, recipes in rule_recipes.items():
-        rule = REGISTERED_RULES[rule_name]
-        for recipe in recipes:
-            rule.add_recipe(**recipe)
+    for json_file, rule_names in _JSON_FILES_TO_RULES.items():
+        recipe_fpath = os.path.join(os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file)
+        if not os.path.exists(recipe_fpath):
+            log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
+            # return
+        with open(recipe_fpath, "r") as f:
+            rule_recipes = json.load(f)
+            for rule_name in rule_names:
+                rule = REGISTERED_RULES[rule_name]
+                if issubclass(rule, RecipeRule):
+                    for recipe in rule_recipes:
+                        if "rule_name" in recipe:
+                            recipe["name"] = recipe.pop("rule_name")
+                        if "container" in recipe:
+                            recipe["fillable_categories"] = set(recipe.pop("container").keys())
+                        if "heat_source" in recipe:
+                            recipe["heatsource_categories"] = set(recipe.pop("heat_source").keys())
+                        if "machine" in recipe:
+                            recipe["fillable_categories"] = set(recipe.pop("machine").keys())
 
-# Optionally import bddl for rule recipes
-try:
-    import_recipes()
+                        satisfied = True
+                        output_synsets = set(recipe["output_synsets"].keys())
+                        has_substance = any([s for s in output_synsets if is_substance_synset(s)])
+                        if (rule_name == "CookingObjectRule" and has_substance) or (rule_name == "CookingSystemRule" and not has_substance):
+                            satisfied = False
+                        if satisfied:
+                            rule.add_recipe(**recipe)
+                    print(f"All recipes of rule {rule_name} imported successfully.")
 
-except ImportError:
-    log.warning("BDDL could not be imported - rule recipes will be unavailable.")
+import_recipes()

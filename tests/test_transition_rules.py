@@ -14,6 +14,43 @@ from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_o
 import pytest
 import numpy as np
 
+@og_test
+def test_cooking_object_rule():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    from IPython import embed; print("test_cooking_object_rule"); embed()
+
+    oven = og.sim.scene.object_registry("name", "oven")
+    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
+    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    sesame_seed = get_system("sesame_seed")
+
+    place_obj_on_floor_plane(oven)
+    og.sim.step()
+
+    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    og.sim.step()
+    assert baking_sheet.states[Inside].get_value(oven)
+
+    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
+    og.sim.step()
+    assert bagel_dough.states[OnTop].get_value(baking_sheet)
+
+    raw_egg.set_position_orientation([0.02, 0, 0.535], [0, 0, 0, 1])
+    og.sim.step()
+    assert raw_egg.states[OnTop].get_value(bagel_dough)
+
+    assert raw_egg.states[Covered].set_value(sesame_seed, True)
+    og.sim.step()
+
+    assert oven.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+
+
+# @og_test
+# def test_slicing_rule():
+#     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
 @og_test
 def test_blender_rule():
@@ -102,3 +139,5 @@ def test_cooking_rule():
     if dough_exists:
         og.sim.remove_object(dough)
     og.sim.remove_object(sheet)
+
+test_cooking_object_rule()

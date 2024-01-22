@@ -1213,7 +1213,9 @@ def import_og_systems():
 
 
 def is_system_active(system_name):
-    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    if system_name not in REGISTERED_SYSTEMS:
+        return False
+    # assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return system.initialized
 
