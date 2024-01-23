@@ -96,9 +96,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
-        assert not (
-            self._use_delta_commands and command_output_limits == "default"
-        ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
+        assert not (self._use_delta_commands and command_output_limits == "default"), \
+            "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
         super().__init__(
@@ -139,6 +138,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         else:
             target = command
 
+        # Clip the command based on the limits
+        target = target.clip(
+            self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx],
+            self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx],
+        )
+
         return dict(target=target)
 
     def compute_control(self, goal_dict, control_dict):
@@ -162,26 +167,29 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         target = goal_dict["target"]
 
         # Convert control into efforts
-        if self._motor_type == "position":
-            # Run impedance controller -- effort = pos_err * kp + vel_err * kd
-            position_error = target - base_value
-            vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
-            u = position_error * self.kp + vel_pos_error * self.kd
-        elif self._motor_type == "velocity":
-            # Compute command torques via PI velocity controller plus gravity compensation torques
-            velocity_error = target - base_value
-            u = velocity_error * self.kp
-        else:   # effort
-            u = target
-
-        # Convert to impedances if requested
         if self._use_impedances:
+            if self._motor_type == "position":
+                # Run impedance controller -- effort = pos_err * kp + vel_err * kd
+                position_error = target - base_value
+                vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
+                u = position_error * self.kp + vel_pos_error * self.kd
+            elif self._motor_type == "velocity":
+                # Compute command torques via PI velocity controller plus gravity compensation torques
+                velocity_error = target - base_value
+                u = velocity_error * self.kp
+            else:   # effort
+                u = target
+
             dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))
             mm = control_dict["mass_matrix"][dof_idxs_mat]
             u = np.dot(mm, u)
 
-        # Add gravity compensation
-        u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
+            # Add gravity compensation
+            u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
+
+        else:
+            # Desired is the exact goal
+            u = target
 
         # Return control
         return u
@@ -213,8 +221,16 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return self._use_delta_commands
 
     @property
+    def motor_type(self):
+        """
+        Returns:
+            str: The type of motor being simulated by this controller. One of {"position", "velocity", "effort"}
+        """
+        return self._motor_type
+
+    @property
     def control_type(self):
-        return ControlType.EFFORT
+        return ControlType.EFFORT if self._use_impedances else ControlType.get_type(type_str=self._motor_type)
 
     @property
     def command_dim(self):
