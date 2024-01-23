@@ -324,9 +324,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def _actions_to_control(self, action):
+    def _postprocess_control(self, control, control_type):
         # Run super method first
-        u_vec, u_type_vec = super()._actions_to_control(action=action)
+        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
         base_orn = self.base_footprint_link.get_orientation()
@@ -410,7 +410,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "use_delta_commands": False,
             "use_impedances": False,
             "motor_type": "velocity",
-            "compute_delta_in_quat_space": [(3, 4, 5)],
             "dof_idx": self.base_control_idx,
         }
         return dic

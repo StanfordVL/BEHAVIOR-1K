@@ -351,8 +351,30 @@ class ControllableObject(BaseObject):
             u_vec[idx] = ctrl["value"]
             u_type_vec[idx] = ctrl["type"]
 
+        u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
+
         # Deploy control signals
         self.deploy_control(control=u_vec, control_type=u_type_vec, indices=None, normalized=False)
+
+    def _postprocess_control(self, control, control_type):
+        """
+        Runs any postprocessing on @control with corresponding @control_type on this entity. Default is no-op.
+        Deploys control signals @control with corresponding @control_type on this entity.
+
+        Args:
+            control (k- or n-array): control signals to deploy. This should be n-DOF length if all joints are being set,
+                or k-length (k < n) if specific indices are being set. In this case, the length of @control must
+                be the same length as @indices!
+            control_type (k- or n-array): control types for each DOF. Each entry should be one of ControlType.
+                 This should be n-DOF length if all joints are being set, or k-length (k < n) if specific
+                 indices are being set. In this case, the length of @control must be the same length as @indices!
+
+        Returns:
+            2-tuple:
+                - n-array: raw control signals to send to the object's joints
+                - list: control types for each joint
+        """
+        return control, control_type
 
     def deploy_control(self, control, control_type, indices=None, normalized=False):
         """
