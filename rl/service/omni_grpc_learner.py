@@ -138,7 +138,7 @@ def main():
         env = VecMonitor(env)
         eval_env = og.Environment(configs=config)
         eval_env = DummyVecEnv([lambda: eval_env])
-        eval_env = VecFrameStack(env, n_stack=5)
+        eval_env = VecFrameStack(eval_env, n_stack=5)
     else:
         og_env = og.Environment(configs=config)
         env = DummyVecEnv([lambda: og_env])
