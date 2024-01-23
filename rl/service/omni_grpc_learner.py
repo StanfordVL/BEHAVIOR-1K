@@ -23,6 +23,11 @@ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback,
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
 
+import omnigibson as og
+from omnigibson.macros import gm
+
+gm.USE_FLATCACHE = True
+
 class CustomCombinedExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict):
         # We do not know features-dim here before going over all the items,
@@ -114,8 +119,9 @@ def main():
     args = parser.parse_args()
     prefix = ''
     seed = 0
-    config_filename = "omni_grpc.yaml"
-    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, "omni_grpc.yaml")
+    config = yaml.load(open(file_path, "r"), Loader=yaml.FullLoader)
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
     if n_envs > 0:
@@ -133,17 +139,7 @@ def main():
         eval_env = og.Environment(configs=config)
         eval_env = DummyVecEnv([lambda: eval_env])
         eval_env = VecFrameStack(env, n_stack=5)
-        eval_env = VecVideoRecorder(
-            eval_env,
-            f"videos/{run.id}",
-            # record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
     else:
-        import omnigibson as og
-        from omnigibson.macros import gm
-
-        gm.USE_FLATCACHE = True
         og_env = og.Environment(configs=config)
         env = DummyVecEnv([lambda: og_env])
         env = VecFrameStack(env, n_stack=5)
@@ -203,6 +199,13 @@ def main():
             monitor_gym=True,  # auto-upload the videos of agents playing the game
             # save_code=True,  # optional
         )
+        eval_env = VecVideoRecorder(
+            eval_env,
+            f"videos/{run.id}",
+            record_video_trigger=lambda x: True,
+            video_length=200,
+        )
+
         tensorboard_log_dir = f"runs/{run.id}"
         if args.checkpoint is None:
             model = PPO(
