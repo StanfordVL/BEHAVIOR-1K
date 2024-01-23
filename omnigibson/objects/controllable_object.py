@@ -483,6 +483,10 @@ class ControllableObject(BaseObject):
         fcns["_root_pos_quat"] = self.get_position_orientation
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
+        fcns["root_lin_vel"] = self.get_linear_velocity
+        fcns["root_ang_vel"] = self.get_angular_velocity
+        fcns["root_rel_lin_vel"] = self.get_relative_linear_velocity
+        fcns["root_rel_ang_vel"] = self.get_relative_angular_velocity
         fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
         fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
         fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)

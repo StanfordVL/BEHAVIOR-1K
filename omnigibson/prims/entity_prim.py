@@ -882,6 +882,20 @@ class EntityPrim(XFormPrim):
         """
         return self.root_link.get_angular_velocity()
 
+    def get_relative_linear_velocity(self):
+        """
+        Returns:
+            3-array: (x,y,z) Linear velocity of root link in its own frame
+        """
+        return T.quat2mat(self.get_orientation()).T @ self.get_linear_velocity()
+
+    def get_relative_angular_velocity(self):
+        """
+        Returns:
+            3-array: (ax,ay,az) angular velocity of root link in its own frame
+        """
+        return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
+
     def set_position_orientation(self, position=None, orientation=None):
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
