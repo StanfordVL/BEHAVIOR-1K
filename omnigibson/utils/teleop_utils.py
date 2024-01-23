@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, field
 from importlib import import_module
 from threading import Thread
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Iterable, Optional, Tuple, Dict
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -20,10 +20,10 @@ m.movement_speed = 0.2  # the speed of the robot base movement
 
 @dataclass
 class TeleopData:
-    is_valid: dict[str, bool] = field(default_factory=dict)
-    transforms: dict[str, Any] = field(default_factory=dict)
-    grippers: dict[str, float] = field(default_factory=dict)
-    reset: dict[str, bool] = field(default_factory=dict)
+    is_valid: Dict[str, bool] = field(default_factory=dict)
+    transforms: Dict[str, Any] = field(default_factory=dict)
+    grippers: Dict[str, float] = field(default_factory=dict)
+    reset: Dict[str, bool] = field(default_factory=dict)
     robot_attached: bool = False
     n_arms: int = 2
 
