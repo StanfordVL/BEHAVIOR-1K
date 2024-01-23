@@ -8,6 +8,7 @@ from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
 import omnigibson as og
+from omnigibson.macros import macros as m
 
 from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane
 
@@ -17,7 +18,6 @@ import numpy as np
 @og_test
 def test_cooking_object_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    from IPython import embed; print("test_cooking_object_rule"); embed()
 
     oven = og.sim.scene.object_registry("name", "oven")
     baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
@@ -46,7 +46,7 @@ def test_cooking_object_rule():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-
+    from IPython import embed; print("test_cooking_object_rule"); embed()
 
 # @og_test
 # def test_slicing_rule():

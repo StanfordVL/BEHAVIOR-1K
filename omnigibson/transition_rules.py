@@ -7,6 +7,7 @@ from copy import copy
 import itertools
 import os
 from collections import defaultdict
+import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -29,6 +30,7 @@ from omnigibson.utils.bddl_utils import is_substance_synset, get_system_name_by_
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+# Create object taxonomy
 OBJECT_TAXONOMY = ObjectTaxonomy()
 
 # Create settings for this module
@@ -42,8 +44,6 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 # Default "trash" system if an invalid mixing rule transition occurs
 m.DEFAULT_GARBAGE_SYSTEM = "sludge"
-
-m.DEBUG = False
 
 # Tuple of attributes of objects created in transitions.
 # `states` field is dict mapping object state class to arguments to pass to setter for that class
@@ -156,6 +156,7 @@ class TransitionRuleAPI:
         Steps all active transition rules, checking if any are satisfied, and if so, executing their transition
         """
         # First apply any transition object init states from before, and then clear the dictionary
+        # TODO: figure out if this is still needed
         for obj, info in cls._INIT_INFO.items():
             if info["states"] is not None:
                 for state, args in info["states"].items():
@@ -916,17 +917,23 @@ class RecipeRule(BaseTransitionRule):
         # Store information for this recipe
         cls._RECIPES[name] = {
             "name": name,
-
-            # To be filled in later
+            # Maps object categories to number of instances required for the recipe
             "input_objects": dict(),
+            # List of system names required for the recipe
             "input_systems": list(),
+            # Maps object categories to number of instances to be spawned in the container when the recipe executes
             "output_objects": dict(),
+            # List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
             "output_systems": list(),
-            "input_states": defaultdict(list),
-            "output_states": defaultdict(list),
-            "root_input_objects":
+            # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            "input_states": defaultdict(lambda: defaultdict(list)),
+            # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that should be set after the output objects are spawned
+            "output_states": defaultdict(lambda: defaultdict(list)),
+            # Set of fillable categories which are allowed for this recipe
             "fillable_categories": None,
-
+            # networkx DiGraph that represents the kinematic dependency graph of the input objects
+            # If input_states has no kinematic states between pairs of objects, this will be None.
+            "input_object_tree": None,
             **kwargs,
         }
 
@@ -958,6 +965,7 @@ class RecipeRule(BaseTransitionRule):
                 else:
                     first_synset, second_synset = synset_split
 
+                # Assert the first synset is an object because the systems don't have any states.
                 assert OBJECT_TAXONOMY.is_leaf(first_synset), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
                 assert not is_substance_synset(first_synset), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
                 obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
@@ -965,10 +973,12 @@ class RecipeRule(BaseTransitionRule):
                 first_obj_category = obj_categories[0]
 
                 if second_synset is None:
+                    # Unary states for the first synset
                     for state_type, state_value in states:
                         state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
                         assert issubclass(state_class, AbsoluteObjectState), f"Input/output state type {state_type} must be a unary state!"
-                        cls._RECIPES[name][states_key][first_obj_category].append((state_class, None, state_value))
+                        # Example: (Cooked, True)
+                        cls._RECIPES[name][states_key][first_obj_category]["unary"].append((state_class, state_value))
                 else:
                     assert OBJECT_TAXONOMY.is_leaf(second_synset), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
                     obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
@@ -985,8 +995,36 @@ class RecipeRule(BaseTransitionRule):
                         state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
                         assert issubclass(state_class, RelativeObjectState), f"Input/output state type {state_type} must be a binary state!"
                         assert is_substance == (state_class in get_system_states()), f"Input/output state type {state_type} system state inconsistency found!"
-                        cls._RECIPES[name][states_key][first_obj_category].append((state_class, second_obj_category, state_value))
+                        if is_substance:
+                            # Non-kinematic binary states, e.g. Covered, Saturated, Filled, Contains.
+                            # Example: (Covered, "sesame_seed", True)
+                            cls._RECIPES[name][states_key][first_obj_category]["binary_system"].append(
+                                (state_class, second_obj_category, state_value))
+                        else:
+                            # Kinematic binary states w.r.t. the second object.
+                            # Example: (OnTop, "raw_egg", True)
+                            assert cls.is_multi_instance, f"Input/output state type {state_type} can only be used in multi-instance recipes!"
+                            assert states_key != "output_states", f"Output state type {state_type} can only be used in input states!"
+                            cls._RECIPES[name][states_key][first_obj_category]["binary_object"].append(
+                                (state_class, second_obj_category, state_value))
 
+        if cls.is_multi_instance and len(cls._RECIPES[name]["input_objects"]) > 0:
+            # Build a tree of input objects according to the kinematic binary states
+            # Example: 'raw_egg': {'binary_object': [(OnTop, 'bagel_dough', True)]} results in an edge
+            # from 'bagel_dough' to 'raw_egg', i.e. 'bagel_dough' is the parent of 'raw_egg'.
+            input_object_tree = nx.DiGraph()
+            for obj_category, state_checks in cls._RECIPES[name]["input_states"].items():
+                for state_class, second_obj_category, state_value in state_checks["binary_object"]:
+                    input_object_tree.add_edge(second_obj_category, obj_category)
+
+            if not nx.is_empty(input_object_tree):
+                assert nx.is_tree(input_object_tree), f"Input object tree must be a tree! Now: {input_object_tree}."
+                root_nodes = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0]
+                assert len(root_nodes) == 1, f"Input object tree must have exactly one root node! Now: {root_nodes}."
+                assert cls._RECIPES[name]["input_objects"][root_nodes[0]] == 1, f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
+                cls._RECIPES[name]["input_object_tree"] = input_object_tree
+
+        # Map fillable synsets to fillable object categories.
         if fillable_categories is not None:
             cls._RECIPES[name]["fillable_categories"] = set()
             for synset in fillable_categories:
@@ -1050,44 +1088,186 @@ class RecipeRule(BaseTransitionRule):
         return True
 
     @classmethod
-    def _validate_recipe_objects_are_contained_and_states_satisfied(cls, recipe, in_volume):
+    def _validate_recipe_objects_are_contained_and_states_satisfied(cls, recipe, container_info):
         """
-        Validates whether @recipe's input_objects are all contained in the container represented by @in_volume
+        Validates whether @recipe's input_objects are contained in the container and whether their states are satisfied
 
         Args:
             recipe (dict): Recipe whose objects should be checked
-            in_volume (n-array): (N,) flat boolean array corresponding to whether every object from
-                cls._OBJECTS is inside the corresponding container
+            container_info (dict): Output of @cls._compute_container_info(); container-specific information which may
+                be relevant for computing whether recipe is executable. This will be populated with execution info.
 
         Returns:
             bool: True if all the input object quantities are contained
         """
-        if m.DEBUG:
-            print("_validate_recipe_objects_are_contained_and_states_satisfied")
-            from IPython import embed; embed();
-            # TODO: add another field to container_info: objects that are contained AND recipe relevant (category match, states satisfied)
-            # TODO: add another field to container_info: how many copies of recipe are successful
-        for obj_category, obj_quantity in recipe["input_objects"].items():
-            if np.sum(in_volume[cls._CATEGORY_IDXS[obj_category]]) < obj_quantity:
-                return False
-        return True
+        in_volume = container_info["in_volume"]
+
+        container_info["execution_info"] = dict()
+
+        # Filter input objects based on a subset of input states (unary states and binary system states)
+        obj_category_to_valid_objs = dict()
+        for obj_category in recipe["input_objects"]:
+            if obj_category not in recipe["input_states"]:
+                # If there are no input states, all objects of this category are valid
+                obj_category_to_valid_objs[obj_category] = cls._CATEGORY_IDXS[obj_category]
+            else:
+                obj_category_to_valid_objs[obj_category] = []
+                for idx in cls._CATEGORY_IDXS[obj_category]:
+                    obj = cls._OBJECTS[idx]
+                    success = True
+
+                    # Check if unary states are satisfied
+                    for state_class, state_value in recipe["input_states"][obj_category]["unary"]:
+                        if obj.states[state_class].get_value() != state_value:
+                            success = False
+                            break
+                    if not success:
+                        continue
+
+                    # Check if binary system states are satisfied
+                    for state_class, system_name, state_value in recipe["input_states"][obj_category]["binary_system"]:
+                        if obj.states[state_class].get_value(system=get_system(system_name)) != state_value:
+                            success = False
+                            break
+                    if not success:
+                        continue
+
+                    obj_category_to_valid_objs[obj_category].append(idx)
+
+                # Convert to numpy array for faster indexing
+                obj_category_to_valid_objs[obj_category] = np.array(obj_category_to_valid_objs[obj_category], dtype=np.int)
+
+        container_info["execution_info"]["obj_category_to_valid_objs"] = obj_category_to_valid_objs
+        if not cls.is_multi_instance:
+            # Check if sufficiently number of objects are contained
+            for obj_category, obj_quantity in recipe["input_objects"].items():
+                if np.sum(in_volume[obj_category_to_valid_objs[obj_category]]) < obj_quantity:
+                    return False
+            return True
+        else:
+            input_object_tree = recipe["input_object_tree"]
+            # If multi-instance is True but doesn't require kinematic states between objects
+            if input_object_tree is None:
+                num_instances = np.inf
+                # Compute how many instances of this recipe can be produced.
+                # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
+                # container, then 2 instance of the recipe can be produced.
+                for obj_category, obj_quantity in recipe["input_objects"].items():
+                    quantity_in_volume = np.sum(in_volume[obj_category_to_valid_objs[obj_category]])
+                    num_inst = quantity_in_volume // obj_quantity
+                    if num_inst < 1:
+                        return False
+                    num_instances = min(num_instances, num_inst)
+
+                # Map object category to a set of objects that are used in this execution
+                relevant_objects = defaultdict(set)
+                for obj_category, obj_quantity in recipe["input_objects"].items():
+                    quantity_used = num_instances * obj_quantity
+                    relevant_objects[obj_category] = set(obj_category_to_valid_objs[obj_category][:quantity_used])
+
+            # If multi-instance is True and requires kinematic states between objects
+            else:
+                root_node_category = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0][0]
+                # A list of objects belonging to the root node category
+                root_nodes = cls._OBJECTS[cls._CATEGORY_IDXS[root_node_category]]
+                input_states = recipe["input_states"]
+
+                # Recursively check if the kinematic tree is satisfied.
+                # Return True/False, and a set of objects that belong to the subtree rooted at the current node
+                def check_kinematic_tree(obj, should_check_in_volume=False):
+                    # Check if obj is in volume
+                    if should_check_in_volume and not in_volume[cls._OBJECTS_TO_IDX[obj]]:
+                        return False, set()
+
+                    # If the object is a leaf node, return True and the set containing the object
+                    if input_object_tree.out_degree(obj.category) == 0:
+                        return True, set([obj])
+
+                    children_categories = list(input_object_tree.successors(obj.category))
+
+                    all_subtree_objs = set()
+                    for child_cat in children_categories:
+                        assert len(input_states[child_cat]["binary_object"]) == 1, \
+                            "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
+                        state_class, _, state_value = input_states[child_cat]["binary_object"][0]
+                        num_valid_children = 0
+                        for child_obj in cls._OBJECTS[cls._CATEGORY_IDXS[child_cat]]:
+                            # If the child doesn't satisfy the binary object state, skip
+                            if child_obj.states[state_class].get_value(obj) != state_value:
+                                continue
+                            # Recursively check if the subtree rooted at the child is valid
+                            subtree_valid, subtree_objs = check_kinematic_tree(child_obj)
+                            # If the subtree is valid, increment the number of valid children and aggregate the objects
+                            if subtree_valid:
+                                num_valid_children += 1
+                                all_subtree_objs |= subtree_objs
+
+                        # If there are not enough valid children, return False
+                        if num_valid_children < recipe["input_objects"][child_cat]:
+                            return False, set()
+
+                    # If all children categories have sufficient number of objects that satisfy the binary object state,
+                    # e.g. five pieces of pepperoni and two pieces of basil on the pizza, the subtree rooted at the
+                    # current node is valid. Return True and the set of objects in the subtree (all descendants plus
+                    # the current node)
+                    return True, all_subtree_objs | {obj}
+
+                num_instances = 0
+                relevant_objects = defaultdict(set)
+                for root_node in root_nodes:
+                    # should_check_in_volume is True only for the root nodes.
+                    # Example: the bagel dough needs to be in_volume of the container, but the raw egg on top doesn't.
+                    tree_valid, relevant_object_set = check_kinematic_tree(root_node, should_check_in_volume=True)
+                    if tree_valid:
+                        # For each valid tree, increment the number of instances and aggregate the objects
+                        num_instances += 1
+                        for obj in relevant_object_set:
+                            relevant_objects[obj.category].add(obj)
+
+                # If there are no valid trees, return False
+                if num_instances == 0:
+                    return False
+
+            # Map system name to a set of particle indices that are used in this execution
+            relevant_systems = defaultdict(set)
+            for obj_category, objs in relevant_objects.items():
+                for state_class, system_name, state_value in recipe["input_states"][obj_category]["binary_system"]:
+                    if state_class in [Filled, Contains]:
+                        for obj in objs:
+                            contained_particle_idx = obj.states[ContainedParticles].get_value(get_system(system_name)).in_volume.nonzero()[0]
+                            relevant_systems[system_name] |= contained_particle_idx
+                    elif state_class in [Covered]:
+                        for obj in objs:
+                            covered_particle_idx = obj.states[ContactParticles].get_value(get_system(system_name))
+                            relevant_systems[system_name] |= covered_particle_idx
+
+            # Now we populate the execution info with the relevant objects and systems as well as the number of
+            # instances of the recipe that can be produced.
+            container_info["execution_info"]["relevant_objects"] = relevant_objects
+            container_info["execution_info"]["relevant_systems"] = relevant_systems
+            container_info["execution_info"]["num_instances"] = num_instances
+            return True
 
     @classmethod
-    def _validate_nonrecipe_objects_not_contained(cls, recipe, in_volume):
+    def _validate_nonrecipe_objects_not_contained(cls, recipe, container_info):
         """
         Validates whether all objects not relevant to @recipe are not contained in the container
         represented by @in_volume
 
         Args:
             recipe (dict): Recipe whose systems should be checked
-            in_volume (n-array): (N,) flat boolean array corresponding to whether every object from
-                cls._OBJECTS is inside the corresponding container
+            container_info (dict): Output of @cls._compute_container_info(); container-specific information
+                which may be relevant for computing whether recipe is executable
 
         Returns:
             bool: True if none of the non-relevant objects are contained
         """
+        in_volume = container_info["in_volume"]
+        # These are object indices whose objects satisfy the input states
+        obj_category_to_valid_objs = container_info["execution_info"]["obj_category_to_valid_objs"]
         nonrecipe_objects_in_volume = in_volume if len(recipe["input_objects"]) == 0 else \
-            np.delete(in_volume, np.concatenate([cls._CATEGORY_IDXS[obj_category] for obj_category in recipe["input_objects"].keys()]))
+            np.delete(in_volume, np.concatenate([obj_category_to_valid_objs[obj_category]
+                                                 for obj_category in obj_category_to_valid_objs]))
         return not np.any(nonrecipe_objects_in_volume)
 
     @classmethod
@@ -1197,7 +1377,7 @@ class RecipeRule(BaseTransitionRule):
             return False
 
         # Verify all required object quantities are contained in the container and their states are satisfied
-        if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, in_volume=in_volume):
+        if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, container_info=container_info):
             return False
 
         # Verify no non-relevant system is contained
@@ -1205,7 +1385,7 @@ class RecipeRule(BaseTransitionRule):
             return False
 
         # Verify no non-relevant object is contained if we're not ignoring them
-        if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
+        if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, container_info=container_info):
             return False
 
         return True
@@ -1319,7 +1499,7 @@ class RecipeRule(BaseTransitionRule):
                     recipe_results = cls._execute_recipe(
                         container=container,
                         recipe=recipe,
-                        in_volume=container_info["in_volume"],
+                        container_info=container_info,
                     )
                     objs_to_add += recipe_results.add
                     objs_to_remove += recipe_results.remove
@@ -1338,8 +1518,9 @@ class RecipeRule(BaseTransitionRule):
                         input_systems=[],
                         output_objects=dict(),
                         output_systems=[m.DEFAULT_GARBAGE_SYSTEM],
+                        output_states=defaultdict(lambda: defaultdict(list)),
                     ),
-                    in_volume=container_info["in_volume"],
+                    container_info=container_info,
                 )
                 objs_to_add += garbage_results.add
                 objs_to_remove += garbage_results.remove
@@ -1347,7 +1528,7 @@ class RecipeRule(BaseTransitionRule):
         return TransitionResults(add=objs_to_add, remove=objs_to_remove)
 
     @classmethod
-    def _execute_recipe(cls, container, recipe, in_volume):
+    def _execute_recipe(cls, container, recipe, container_info):
         """
         Transforms all items contained in @container into @output_system, generating volume of @output_system
         proportional to the number of items transformed.
@@ -1357,41 +1538,55 @@ class RecipeRule(BaseTransitionRule):
                 @output_system
             recipe (dict): Recipe to execute. Should include, at the minimum, "input_objects", "input_systems",
                 "output_objects", and "output_systems" keys
-            in_volume (n-array): (n_objects,) boolean array specifying whether every object from og.sim.scene.objects
-                is contained in @container or not
+            container_info (dict): Output of @cls._compute_container_info(); container-specific information which may
+                be relevant for computing whether recipe is executable.
 
         Returns:
             TransitionResults: Results of the executed recipe transition
         """
         objs_to_add, objs_to_remove = [], []
 
+        in_volume = container_info["in_volume"]
+        if cls.is_multi_instance:
+            execution_info = container_info["execution_info"]
+
         # Compute total volume of all contained items
         volume = 0
 
-        # Remove either all systems or only the ones specified in the input systems of the recipe
-        contained_particles_state = container.states[ContainedParticles]
+        if not cls.is_multi_instance:
+            # Remove either all systems or only the ones specified in the input systems of the recipe
+            contained_particles_state = container.states[ContainedParticles]
+            for system in PhysicalParticleSystem.get_active_systems().values():
+                if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
+                    if container.states[Contains].get_value(system):
+                        volume += contained_particles_state.get_value(system).n_in_volume * np.pi * (system.particle_radius ** 3) * 4 / 3
+                        container.states[Contains].set_value(system, False)
+            for system in VisualParticleSystem.get_active_systems().values():
+                if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
+                    group_name = system.get_group_name(container)
+                    if group_name in system.groups and system.num_group_particles(group_name) > 0:
+                        system.remove_all_group_particles(group=group_name)
+        else:
+            # Remove the particles that are involved in this execution
+            for system_name, particle_idxs in execution_info["relevant_systems"].items():
+                system = get_system(system_name)
+                volume += len(particle_idxs) * np.pi * (system.particle_radius ** 3) * 4 / 3
+                system.remove_particles(idxs=np.array(list(particle_idxs)))
 
-        # TODO: if cls.relax_contained_particles, then we should remove the particles that are relevant to the recipe, e.g. the ones that cover the bagel
-        for system in PhysicalParticleSystem.get_active_systems().values():
-            if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
-                if container.states[Contains].get_value(system):
-                    volume += contained_particles_state.get_value(system).n_in_volume * np.pi * (system.particle_radius ** 3) * 4 / 3
-                    container.states[Contains].set_value(system, False)
-        for system in VisualParticleSystem.get_active_systems().values():
-            if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
-                group_name = system.get_group_name(container)
-                if group_name in system.groups and system.num_group_particles(group_name) > 0:
-                    system.remove_all_group_particles(group=group_name)
+        if not cls.is_multi_instance:
+            # Remove either all objects or only the ones specified in the input objects of the recipe
+            object_mask = in_volume.copy()
+            if cls.ignore_nonrecipe_objects:
+                object_category_mask = np.zeros_like(object_mask, dtype=bool)
+                for obj_category in recipe["input_objects"].keys():
+                    object_category_mask[cls._CATEGORY_IDXS[obj_category]] = True
+                object_mask &= object_category_mask
+            objs_to_remove.extend(cls._OBJECTS[object_mask])
+        else:
+            # Remove the objects that are involved in this execution
+            for obj_category, objs in execution_info["relevant_objects"].items():
+                objs_to_remove.extend(objs)
 
-        # Remove either all objects or only the ones specified in the input objects of the recipe
-        # TODO: remove the ones that are relevant to the recipe, e.g. the ones that are contained and satisfy the states
-        object_mask = in_volume.copy()
-        if cls.ignore_nonrecipe_objects:
-            object_category_mask = np.zeros_like(object_mask, dtype=bool)
-            for obj_category in recipe["input_objects"].keys():
-                object_category_mask[cls._CATEGORY_IDXS[obj_category]] = True
-            object_mask &= object_category_mask
-        objs_to_remove.extend(cls._OBJECTS[object_mask])
         volume += sum(obj.volume for obj in objs_to_remove)
 
         # Define callback for spawning new objects inside container
@@ -1400,13 +1595,24 @@ class RecipeRule(BaseTransitionRule):
             # TODO: Can we sample inside intelligently?
             state = OnTop
             # TODO: What to do if setter fails?
-            assert obj.states[state].set_value(container, True)
+            if not obj.states[state].set_value(container, True):
+                log.warning(f"Failed to spawn object {obj.name} in container {container.name}!")
 
         # Spawn in new objects
-        # TODO: multiply n_instances by the number of successful recipe executions
         for category, n_instances in recipe["output_objects"].items():
+            # Multiply by number of instances of execution if this is a multi-instance recipe
+            if cls.is_multi_instance:
+                n_instances *= execution_info["num_instances"]
+
+            output_states = dict()
+            for state_type, state_value in recipe["output_states"][category]["unary"]:
+                output_states[state_type] = (state_value,)
+            for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
+                output_states[state_type] = (get_system(system_name), state_value)
+
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
+
             for i in range(n_instances):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
@@ -1416,6 +1622,7 @@ class RecipeRule(BaseTransitionRule):
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,
                     callback=_spawn_object_in_container,
+                    states=output_states,
                     pos=np.ones(3) * (100.0 + i),
                 )
                 objs_to_add.append(new_obj_attrs)
@@ -1428,7 +1635,8 @@ class RecipeRule(BaseTransitionRule):
             out_system.generate_particles_from_link(
                 obj=container,
                 link=contained_particles_state.link,
-                check_contact=cls.ignore_nonrecipe_objects,
+                # In these two cases, we don't necessarily have removed all objects in the container.
+                check_contact=cls.ignore_nonrecipe_objects or cls.is_multi_instance,
                 max_samples=int(volume / (np.pi * (out_system.particle_radius ** 3) * 4 / 3)),
             )
 
@@ -1467,6 +1675,14 @@ class RecipeRule(BaseTransitionRule):
                 valid recipe is found for a given container
         """
         raise NotImplementedError("Must be implemented by subclass!")
+
+    @classproperty
+    def is_multi_instance(cls):
+        """
+        Returns:
+            bool: Whether this rule can be applied multiple times to the same container, e.g. to cook multiple doughs
+        """
+        return False
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -1595,6 +1811,10 @@ class ToggleableMachineRule(RecipeRule):
             output_states=output_states,
             fillable_categories=fillable_categories
         )
+        output_objects = cls._RECIPES[name]["output_objects"]
+        if len(output_objects) > 0:
+            assert len(output_objects) == 1, f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
+            assert output_objects[list(output_objects.keys())[0]] == 1, f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
 
     @classproperty
     def candidate_filters(cls):
@@ -1665,10 +1885,6 @@ class MixingToolRule(RecipeRule):
         return [ChangeConditionWrapper(
             condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
         )]
-
-    @classproperty
-    def ignore_nonrecipe_objects(cls):
-        return False
 
     @classproperty
     def ignore_nonrecipe_systems(cls):
@@ -1961,13 +2177,16 @@ class CookingObjectRule(CookingRule):
         return True
 
     @classproperty
+    def ignore_nonrecipe_systems(cls):
+        return True
+
+    @classproperty
     def ignore_nonrecipe_objects(cls):
         return True
 
     @classproperty
-    def ignore_nonrecipe_systems(cls):
+    def is_multi_instance(cls):
         return True
-
 
 class CookingSystemRule(CookingRule):
     @classmethod
@@ -2019,11 +2238,11 @@ class CookingSystemRule(CookingRule):
         return False
 
     @classproperty
-    def ignore_nonrecipe_objects(cls):
+    def ignore_nonrecipe_systems(cls):
         return False
 
     @classproperty
-    def ignore_nonrecipe_systems(cls):
+    def ignore_nonrecipe_objects(cls):
         return False
 
 def import_recipes():
@@ -2053,6 +2272,7 @@ def import_recipes():
                         if (rule_name == "CookingObjectRule" and has_substance) or (rule_name == "CookingSystemRule" and not has_substance):
                             satisfied = False
                         if satisfied:
+                            print(recipe)
                             rule.add_recipe(**recipe)
                     print(f"All recipes of rule {rule_name} imported successfully.")
 
