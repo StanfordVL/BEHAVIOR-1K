@@ -363,6 +363,8 @@ class OperationalSpaceController(ManipulationController):
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
         ee_vel = np.concatenate([control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]])
+        base_lin_vel = control_dict["root_rel_lin_vel"]
+        base_ang_vel = control_dict["root_rel_ang_vel"]
 
         # Calculate torques
         u = _compute_osc_torques(
@@ -382,6 +384,8 @@ class OperationalSpaceController(ManipulationController):
             rest_qpos=self.reset_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
+            base_lin_vel=base_lin_vel.astype(np.float32),
+            base_ang_vel=base_ang_vel.astype(np.float32),
         ).flatten()
 
         # Apply gravity compensation from the control dict
@@ -435,6 +439,8 @@ def _compute_osc_torques(
     rest_qpos,
     control_dim,
     decouple_pos_ori,
+    base_lin_vel,
+    base_ang_vel,
 ):
     # Compute the inverse
     mm_inv = np.linalg.inv(mm)
@@ -444,8 +450,15 @@ def _compute_osc_torques(
     ori_err = orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
     err = np.concatenate((pos_err, ori_err))
 
+    # Vel target is the base velocity as experienced by the end effector
+    # For angular velocity, this is just the base angular velocity
+    # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
+    #   due to the base linear velocity
+    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos)
+    vel_err = np.concatenate((lin_vel_err, base_ang_vel)) - ee_vel
+
     # Determine desired wrench
-    err = np.expand_dims(kp * err - kd * ee_vel, axis=-1)
+    err = np.expand_dims(kp * err + kd * vel_err, axis=-1)
     m_eef_inv = j_eef @ mm_inv @ j_eef.T
     m_eef = np.linalg.inv(m_eef_inv)
 
