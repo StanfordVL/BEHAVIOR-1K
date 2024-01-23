@@ -470,8 +470,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         return np.zeros(self.action_dim)
 
     def get_generalized_gravity_forces(self):
-        # Override method based on whether we're fixed or not
-        if not self.fixed_base:
+        # Override method based on whether we're using a dummy or not
+        if self._use_dummy:
             # Update dummy pose and calculate values
             self._dummy.set_joint_positions(self.get_joint_positions())
             self._dummy.set_joint_velocities(self.get_joint_velocities())

@@ -948,11 +948,11 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "JointController",
                 "control_freq": self._control_freq,
-                "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
-                "command_output_limits": "default",
-                "use_delta_commands": False,
+                "command_output_limits": None,
+                "motor_type": "position",
+                "use_delta_commands": True,
             }
         return dic
 
