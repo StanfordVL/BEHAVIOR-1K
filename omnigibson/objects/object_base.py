@@ -167,11 +167,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # If the object is fixed_base but kinematic only is false, create the joint
         if self.fixed_base and not self.kinematic_only:
             # Create fixed joint, and set Body0 to be this object's root prim
-            create_joint(
-                prim_path=f"{self._prim_path}/rootJoint",
-                joint_type="FixedJoint",
-                body1=f"{self._prim_path}/{self._root_link_name}",
-            )
+            # This renders, which causes a material lookup error since we're creating a temp file, so we suppress
+            # the error explicitly here
+            with suppress_omni_log(channels=["omni.hydra"]):
+                create_joint(
+                    prim_path=f"{self._prim_path}/rootJoint",
+                    joint_type="FixedJoint",
+                    body1=f"{self._prim_path}/{self._root_link_name}",
+                )
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:

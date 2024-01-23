@@ -66,9 +66,9 @@ class EntityPrim(XFormPrim):
         super()._initialize()
 
         # Force populate inputs and outputs of the shaders of all materials
-        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
+        # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,
         # not the original location
-        with suppress_omni_log(channels=["omni.hydra"]):
+        with suppress_omni_log(channels=["omni.usd"]):
             for material in self.materials:
                 material.shader_force_populate(render=False)
 
