@@ -530,6 +530,7 @@ class KeyboardRobotController:
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = dict()
+        self.joint_idx_to_controller = dict()
         idx = 0
         for name, controller in robot._controllers.items():
             self.controller_info[name] = {
@@ -539,9 +540,12 @@ class KeyboardRobotController:
                 "command_dim": controller.command_dim,
             }
             idx += controller.command_dim
+            for i in controller.dof_idx:
+                self.joint_idx_to_controller[i] = controller
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
+        self.joint_types = [joint.joint_type for joint in robot.joints.values()]    # Ordered list of joint types
         self.joint_command_idx = None   # Indices of joints being directly controlled in the action array
         self.joint_control_idx = None  # Indices of joints being directly controlled in the actual joint array
         self.active_joint_command_idx_idx = 0   # Which index within the joint_command_idx variable is being controlled by the user
@@ -782,6 +786,17 @@ class KeyboardRobotController:
                 # If there is no index, the user is controlling a joint with "[" and "]"
                 if idx is None and len(self.joint_command_idx) != 0:
                     idx = self.joint_command_idx[self.active_joint_command_idx_idx]
+
+                    # Also potentially modify the value being deployed in we're controlling a prismatic joint
+                    # Lower prismatic joint values modifying delta positions since 0.1m is very different from 0.1rad!
+                    joint_idx = self.joint_control_idx[self.active_joint_command_idx_idx]
+
+                    # Import here to avoid circular imports
+                    from omnigibson.utils.constants import JointType
+                    controller = self.joint_idx_to_controller[joint_idx]
+                    if (self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC and
+                            controller.use_delta_commands and controller.motor_type == "position"):
+                        val *= 0.2
 
                 # Set the action
                 if idx is not None:
