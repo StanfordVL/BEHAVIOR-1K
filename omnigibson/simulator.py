@@ -90,7 +90,7 @@ def logo_small():
 
 
 def launch_app():
-    log.info(f"{'-' * 10} Starting {logo_small()} {'-' * 10}")
+    log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
@@ -99,7 +99,22 @@ def launch_app():
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
+
+    # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
+    if not gm.DEBUG:
+        import sys
+        from numba.core.errors import NumbaPerformanceWarning
+        import warnings
+        sys.argv.append("--/log/level=warning")
+        sys.argv.append("--/log/fileLogLevel=warning")
+        sys.argv.append("--/log/outputStreamLevel=error")
+        warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
+    import omni.log
+    omni_log = omni.log.get_log()
+    omni_log.enabled = False
     app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+    omni_log.enabled = True
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
