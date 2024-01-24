@@ -36,7 +36,7 @@ def test_cooking_object_rule():
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
 
-    raw_egg.set_position_orientation([0.02, 0, 0.535], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
     og.sim.step()
     assert raw_egg.states[OnTop].get_value(bagel_dough)
 

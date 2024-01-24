@@ -39,9 +39,6 @@ m = create_module_macros(module_path=__file__)
 # Default melting temperature
 m.MELTING_TEMPERATURE = 100.0
 
-# Where to place objects far out of the scene
-m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
-
 # Default "trash" system if an invalid mixing rule transition occurs
 m.DEFAULT_GARBAGE_SYSTEM = "sludge"
 
@@ -156,7 +153,6 @@ class TransitionRuleAPI:
         Steps all active transition rules, checking if any are satisfied, and if so, executing their transition
         """
         # First apply any transition object init states from before, and then clear the dictionary
-        # TODO: figure out if this is still needed
         for obj, info in cls._INIT_INFO.items():
             if info["states"] is not None:
                 for state, args in info["states"].items():
@@ -198,14 +194,10 @@ class TransitionRuleAPI:
             )
             # First remove pre-existing objects
             for i, removed_obj in enumerate(removed_objs):
-                # TODO: Ideally we want to remove objects, but because of Omniverse's bug on GPU physics, we simply move
-                # the objects into a graveyard for now
-                removed_obj.set_position(np.array(m.OBJECT_GRAVEYARD_POS) + np.ones(3) * i)
-                # og.sim.remove_object(removed_obj)
+                og.sim.remove_object(removed_obj)
 
         # Then add new objects
         if len(added_obj_attrs) > 0:
-            # TODO: Can we avoid this? Currently Rigid contact checking fails if we import objects dynamically
             state = og.sim.dump_state()
             for added_obj_attr in added_obj_attrs:
                 new_obj = added_obj_attr.obj
@@ -226,11 +218,6 @@ class TransitionRuleAPI:
                         "states": added_obj_attr.states,
                         "callback": added_obj_attr.callback,
                     }
-            gm.ENABLE_TRANSITION_RULES = False
-            og.sim.stop()
-            og.sim.play()
-            gm.ENABLE_TRANSITION_RULES = True
-            og.sim.load_state(state)
 
     @classmethod
     def clear(cls):
@@ -843,7 +830,6 @@ class MeltingRule(BaseTransitionRule):
 
     @classmethod
     def _generate_conditions(cls):
-        # Only heated objects are valid
         return [StateCondition(filter_name="meltable", state=Temperature, val=m.MELTING_TEMPERATURE, op=operator.ge)]
 
     @classmethod
@@ -1135,7 +1121,7 @@ class RecipeRule(BaseTransitionRule):
                     obj_category_to_valid_objs[obj_category].append(idx)
 
                 # Convert to numpy array for faster indexing
-                obj_category_to_valid_objs[obj_category] = np.array(obj_category_to_valid_objs[obj_category], dtype=np.int)
+                obj_category_to_valid_objs[obj_category] = np.array(obj_category_to_valid_objs[obj_category], dtype=int)
 
         container_info["execution_info"]["obj_category_to_valid_objs"] = obj_category_to_valid_objs
         if not cls.is_multi_instance:
@@ -1724,7 +1710,7 @@ class CookingPhysicalParticleRule(RecipeRule):
 
     @classproperty
     def candidate_filters(cls):
-        # Modify the container filter to include "blender" ability as well
+        # Modify the container filter to include the heatable ability as well
         candidate_filters = super().candidate_filters
         candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="heatable")])
         return candidate_filters
@@ -1775,8 +1761,8 @@ class CookingPhysicalParticleRule(RecipeRule):
 
 class ToggleableMachineRule(RecipeRule):
     """
-    Transition mixing rule that leverages "blender" ability objects, which require toggledOn in order to trigger
-    the recipe event
+    Transition mixing rule that leverages a single toggleable machine (e.g. electric mixer, coffee machine, blender),
+    which require toggledOn in order to trigger the recipe event
     """
 
     @classmethod
@@ -1818,7 +1804,7 @@ class ToggleableMachineRule(RecipeRule):
 
     @classproperty
     def candidate_filters(cls):
-        # Modify the container filter to include "blender" ability as well
+        # Modify the container filter to include toggleable ability as well
         candidate_filters = super().candidate_filters
         candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="toggleable")])
         return candidate_filters
