@@ -193,7 +193,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     @property
     def state_size(self):
-        # Add 4 for internal quat target and the state size from the control filter
+        # Add state size from the control filter
         return super().state_size + self.control_filter.state_size
 
     def _dump_state(self):
