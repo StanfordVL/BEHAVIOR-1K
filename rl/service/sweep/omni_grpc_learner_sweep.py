@@ -23,6 +23,7 @@ from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFr
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
+import omnigibson as og
 
 class MetricsCallback(BaseCallback):
     """
@@ -30,26 +31,6 @@ class MetricsCallback(BaseCallback):
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, verbose: int = 0):
-        super().__init__(verbose)
-        # Those variables will be accessible in the callback
-        # (they are defined in the base class)
-        # The RL model
-        # self.model = None  # type: BaseAlgorithm
-        # An alias for self.model.get_env(), the environment used for training
-        # self.training_env # type: VecEnv
-        # Number of time the callback was called
-        # self.n_calls = 0  # type: int
-        # num_timesteps = n_envs * n times env.step() was called
-        # self.num_timesteps = 0  # type: int
-        # local and global variables
-        self.locals = {}  # type: Dict[str, Any]
-        # self.globals = {}  # type: Dict[str, Any]
-        # The logger object, used to report things in the terminal
-        # self.logger # type: stable_baselines3.common.logger.Logger
-        # Sometimes, for event callback, it is useful
-        # to have access to the parent object
-        # self.parent = None  # type: Optional[BaseCallback]
 
     def _on_rollout_end(self) -> None:
         """
@@ -58,7 +39,6 @@ class MetricsCallback(BaseCallback):
         envs_num_grasps = list(map(lambda x: x['reward']['grasp']['grasp_success'], self.locals['infos']))
         grasp_success_rate = np.mean(envs_num_grasps)
         wandb.log({"grasp_success_rate": grasp_success_rate})
-
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -74,159 +54,127 @@ parser.add_argument(
 parser.add_argument("--sweep_id", type=str, default=None, help="Sweep ID to run.")
 args = parser.parse_args()
 
-def train():
-    prefix = ''
-    seed = 0
+def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
     config_filename = "../omni_grpc.yaml"
     env_config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-    if n_envs > 0:
-        if args.port is not None:
-            local_port = int(args.port)
-        else:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("", 0))
-            local_port = s.getsockname()[1]
-            s.close()
-        print(f"Listening on port {local_port}")
-        env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
-        task_config = env_config['task']
-        task_config['dist_coeff'] = wandb.config.dist_coeff
-        task_config['grasp_reward'] = wandb.config.grasp_reward
-        task_config['collision_penalty'] = wandb.config.collision_penalty
-        task_config['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
-        task_config['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef
-        task_config['regularization_coef'] = wandb.config.regularization_coef
-        env.env_method('update_task', task_config)
-        env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env)
-
-        env_config['task'] = task_config
-        eval_env = og.Environment(configs=env_config)
-        eval_env = DummyVecEnv([lambda: eval_env])
-        eval_env = VecFrameStack(env, n_stack=5)
-        eval_env = VecVideoRecorder(
-            eval_env,
-            f"videos/{run.id}",
-            # record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
-
+    if args.port is not None:
+        local_port = int(args.port)
     else:
-        import omnigibson as og
-        from omnigibson.macros import gm
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("", 0))
+        local_port = s.getsockname()[1]
+        s.close()
+    print(f"Listening on port {local_port}")
+    env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
+    env = VecFrameStack(env, n_stack=5)
+    env = VecMonitor(env)
 
-        gm.USE_FLATCACHE = True
-        env_config['task']['dist_coeff'] = wandb.config.dist_coeff
-        env_config['task']['grasp_reward'] = wandb.config.grasp_reward
-        env_config['task']['collision_penalty'] = wandb.config.collision_penalty
-        env_config['task']['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
-        env_config['task']['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef
-        env_config['task']['regularization_coef'] = wandb.config.regularization_coef
-        og_env = og.Environment(configs=env_config)
-        env = DummyVecEnv([lambda: og_env])
-        env = VecFrameStack(env, n_stack=5)
-        
-        n_envs = 1
+    eval_env = og.Environment(configs=env_config)
+    eval_env = DummyVecEnv([lambda: eval_env])
+    eval_env = VecFrameStack(env, n_stack=5)
+    return env, eval_env
 
-    # import IPython; IPython.embed()
+def train(env, eval_env):
+    prefix = ''
+    seed = 0
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, "omni_grpc.yaml")
+    env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
+    task_config = env_config['task']
+    task_config['dist_coeff'] = wandb.config.dist_coeff
+    task_config['grasp_reward'] = wandb.config.grasp_reward
+    task_config['collision_penalty'] = wandb.config.collision_penalty
+    task_config['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
+    task_config['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
+    task_config['regularization_coef'] = wandb.config.regularization_coef
+    env.env_method('update_task', task_config)
 
-    # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
-    # visualize the rollouts dynamically
-    if args.eval:
-        ceiling = og_env.scene.object_registry("name", "ceilings")
-        ceiling.visible = False
-        og.sim.enable_viewer_camera_teleoperation()
+    eval_env.update_task(task_config)
 
     # Set the set
     set_random_seed(seed)
-    env.reset()
-
     # policy_kwargs = dict(
     #     features_extractor_class=CustomCombinedExtractor,
     # )
+    config = {
+        "policy": "MultiInputPolicy",
+        "n_steps": 512,
+        "batch_size": 128,
+        "gamma": 0.99,
+        "gae_lambda": 0.9,
+        "n_epochs": 20,
+        "ent_coef": 0.0,
+        "sde_sample_freq": 4,
+        "max_grad_norm": 0.5,
+        "vf_coef": 0.5,
+        "learning_rate": 3e-5,
+        "use_sde": True,
+        "clip_range": 0.4,
+        "policy_kwargs": {
+            "log_std_init": -2,
+            "ortho_init": False,
+            "activation_fn": nn.ReLU,
+            "net_arch": {"pi": [512, 512], "vf": [512, 512]}
+        },
+    }
+    run = wandb.init()
+    eval_env = VecVideoRecorder(
+        eval_env,
+        f"videos/{run.id}",
+        # record_video_trigger=lambda x: x % 2000 == 0,
+        video_length=200,
+    )
+    tensorboard_log_dir = f"runs/{run.id}"
+    model = PPO(
+        env=env,
+        verbose=1,
+        tensorboard_log=tensorboard_log_dir,
+        device='cuda',
+        **config,
+    )
+    checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
+    wandb_callback = WandbCallback(
+        model_save_path=tensorboard_log_dir,
+        verbose=2,
+    )
+    metrics_callback = MetricsCallback()
+    # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
+    # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
+    stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=100, verbose=1)
+    eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
+    callback = CallbackList([
+        wandb_callback,
+        checkpoint_callback,
+        metrics_callback,
+        eval_callback,
+    ])
+    print(callback.callbacks)
 
-    if args.eval:    
-        assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
-        model = PPO.load(args.checkpoint)
-        log.info("Starting evaluation...")
-        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
-        log.info("Finished evaluation!")
-        log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
-    else:
-        config = {
-            "policy": "MultiInputPolicy",
-            "n_steps": 512,
-            "batch_size": 128,
-            "gamma": 0.99,
-            "gae_lambda": 0.9,
-            "n_epochs": 20,
-            "ent_coef": 0.0,
-            "sde_sample_freq": 4,
-            "max_grad_norm": 0.5,
-            "vf_coef": 0.5,
-            "learning_rate": 3e-5,
-            "use_sde": True,
-            "clip_range": 0.4,
-            "policy_kwargs": {
-                "log_std_init": -2,
-                "ortho_init": False,
-                "activation_fn": nn.ReLU,
-                "net_arch": {"pi": [512, 512], "vf": [512, 512]}
-            },
-        }
-        run = wandb.init()
-        tensorboard_log_dir = f"runs/{run.id}"
-        if args.checkpoint is None:
-            model = PPO(
-                env=env,
-                verbose=1,
-                tensorboard_log=tensorboard_log_dir,
-                device='cuda',
-                **config,
-            )
-        else:
-            model = PPO.load(args.checkpoint, env=env)
-        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        wandb_callback = WandbCallback(
-            model_save_path=tensorboard_log_dir,
-            verbose=2,
-        )
-        metrics_callback = MetricsCallback()
-        # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
-        # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
-        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
-        eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
-        callback = CallbackList([
-            wandb_callback,
-            checkpoint_callback,
-            metrics_callback,
-            eval_callback,
-        ])
-        print(callback.callbacks)
+    log.debug(model.policy)
+    log.info(f"model: {model}")
 
-        log.debug(model.policy)
-        log.info(f"model: {model}")
+    log.info("Starting training...")
 
-        log.info("Starting training...")
-
-        USER = os.environ['USER']
-        policy_save_path = wandb.run.dir.split("/")[2:-3]
-        policy_save_path.insert(0, f"/cvgl2/u/{USER}/OmniGibson")
-        policy_save_path.append("runs")
-        policy_save_path.append(wandb.run.id)
-        policy_save_path = "/".join(policy_save_path)
-        text = f"Saved policy path: {policy_save_path}"
-        # wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
-        model.learn(
-            total_timesteps=2_000_000,
-            callback=callback,
-        )
-        log.info("Finished training!")
-
+    USER = os.environ['USER']
+    policy_save_path = wandb.run.dir.split("/")[2:-3]
+    policy_save_path.insert(0, f"/cvgl2/u/{USER}/OmniGibson")
+    policy_save_path.append("runs")
+    policy_save_path.append(wandb.run.id)
+    policy_save_path = "/".join(policy_save_path)
+    text = f"Saved policy path: {policy_save_path}"
+    wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
+    model.learn(
+        total_timesteps=2_000_000,
+        callback=callback,
+    )
+    log.info("Finished training!")
 
 
 if __name__ == "__main__":
     # print(args.sweep_id)
-    wandb.agent(args.sweep_id, entity="behavior-rl", project="sweep", count=3, function=train)
+    env, eval_env = instantiate_envs()
+    def _train():
+        return train(env, eval_env)
+    wandb.agent(args.sweep_id, entity="behavior-rl", project="sb3", count=20, function=_train)

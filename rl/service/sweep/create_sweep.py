@@ -1,41 +1,17 @@
-import argparse
-import logging
-import socket
-import os
-
-import yaml
-
-log = logging.getLogger(__name__)
-
-from telegym import GRPCClientVecEnv
-
-import gymnasium as gym
-import torch as th
-import torch.nn as nn
 import wandb
-from stable_baselines3 import PPO
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.preprocessing import maybe_transpose
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement
-from wandb.integration.sb3 import WandbCallback 
-from wandb import AlertLevel
 
 sweep_configuration = {
     "method": "random",
     "metric": {"goal": "maximize", "name": "grasp_success_rate"},
     "parameters": {
-        "grasp_reward": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
-        "collision_penalty": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
-        "eef_position_penality_coef": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
-        "eef_orientation_penalty_coef": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
-        "eef_orientation_penalty_coef": {"min": 0.0, "max": 1.0, 'distribution': 'uniform'},
-        "regularization_coef": {"min": 0.0,  "max": 1.0, 'distribution': 'uniform'},
+        "dist_coeff": {"min": 0.01, "max": 1.0, 'distribution': 'log_uniform_values'},
+        "grasp_reward": {"min": 0.1, "max": 10.0, 'distribution': 'log_uniform_values'},
+        "collision_penalty": {"min": 0.01, "max": 10.0, 'distribution': 'log_uniform_values'},
+        "eef_position_penalty_coef": {"min": 0.01, "max": 1.0, 'distribution': 'log_uniform_values'},
+        "eef_orientation_penalty_coef_relative": {"min": 0.1, "max": 10.0, 'distribution': 'log_uniform_values'},
+        "regularization_coef": {"min": 0.01,  "max": 1.0, 'distribution': 'log_uniform_values'},
     },
 }
 
-
-sweep_id = wandb.sweep(sweep=sweep_configuration, entity="behavior-rl", project="sweep")
+sweep_id = wandb.sweep(sweep=sweep_configuration, entity="behavior-rl", project="sb3")
 print(sweep_id)

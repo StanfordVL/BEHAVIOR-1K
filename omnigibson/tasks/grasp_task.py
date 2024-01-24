@@ -19,8 +19,6 @@ from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 
-DIST_COEFF = 0.1
-GRASP_REWARD = 1.0
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
 class GraspTask(BaseTask):
@@ -192,8 +190,8 @@ class GraspTask(BaseTask):
     @classproperty
     def default_reward_config(cls):
         return {
-            "dist_coeff": DIST_COEFF,
-            "grasp_reward": GRASP_REWARD,
+            "dist_coeff": 0.1,
+            "grasp_reward": 1.0,
             "collision_penalty": 1.0,
             "eef_position_penalty_coef": 0.01,
             "eef_orientation_penalty_coef": 0.001,
