@@ -222,7 +222,7 @@ def main():
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
-        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=3, min_evals=5, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=100, verbose=1)
         eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
         callback = CallbackList([
             wandb_callback,
