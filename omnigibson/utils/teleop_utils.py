@@ -28,6 +28,7 @@ class TeleopSystem(TeleopPolicy):
         """
         super().__init__(config)
         self.teleop_action: TeleopAction = TeleopAction()
+        self.robot_obs: TeleopObservation = TeleopObservation()
         self.robot = robot
         self.robot_arms = ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         # robot parameters
@@ -49,21 +50,21 @@ class TeleopSystem(TeleopPolicy):
             np.ndarray: array of action data
         """
         # construct robot observation
-        robot_obs = TeleopObservation()
+        self.robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
-        robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
+        self.robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
         for arm in self.robot_arms:
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
-            robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, [1]]
+            self.robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, [1]]
         # get teleop action
-        self.teleop_action = super().get_action(robot_obs)
+        self.teleop_action = super().get_action(self.robot_obs)
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
                 delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
-                rel_target_pos = robot_obs[arm_name][:3] + delta_pos
-                rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
+                rel_target_pos = self.robot_obs[arm_name][:3] + delta_pos
+                rel_target_orn = T.quat_multiply(delta_orn, self.robot_obs[arm_name][3:7])
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
                 self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
