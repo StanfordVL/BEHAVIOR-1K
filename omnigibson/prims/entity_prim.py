@@ -224,7 +224,8 @@ class EntityPrim(XFormPrim):
         self._links = dict()
         for link_name, (link_cls, prim) in links_to_create.items():
             link_load_config = {
-                "kinematic_only": self._load_config["kinematic_only"] if link_name == self._root_link_name else False,
+                "kinematic_only": self._load_config.get("kinematic_only", False)
+                if link_name == self._root_link_name else False,
             }
             link_load_config.update(load_config)
             self._links[link_name] = link_cls(
@@ -880,6 +881,20 @@ class EntityPrim(XFormPrim):
             velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
+
+    def get_relative_linear_velocity(self):
+        """
+        Returns:
+            3-array: (x,y,z) Linear velocity of root link in its own frame
+        """
+        return T.quat2mat(self.get_orientation()).T @ self.get_linear_velocity()
+
+    def get_relative_angular_velocity(self):
+        """
+        Returns:
+            3-array: (ax,ay,az) angular velocity of root link in its own frame
+        """
+        return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
         # Delegate to RigidPrim if we are not articulated

@@ -372,9 +372,9 @@ class TouchingAnyCondition(RuleCondition):
 
         if self._optimized:
             # Register idx mappings
-            self._filter_1_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+            self._filter_1_idxs = {obj: [RigidContactAPI.get_body_row_idx(link.prim_path) for link in obj.links.values()]
                                 for obj in object_candidates[self._filter_1_name]}
-            self._filter_2_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+            self._filter_2_idxs = {obj: [RigidContactAPI.get_body_col_idx(link.prim_path) for link in obj.links.values()]
                                 for obj in object_candidates[self._filter_2_name]}
         else:
             # Register body mappings

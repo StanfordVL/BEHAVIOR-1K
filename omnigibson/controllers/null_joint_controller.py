@@ -19,6 +19,9 @@ class NullJointController(JointController):
         command_input_limits="default",
         command_output_limits="default",
         default_command=None,
+        kp=None,
+        damping_ratio=None,
+        use_impedances=False,
     ):
         """
         Args:
@@ -44,6 +47,12 @@ class NullJointController(JointController):
                 to the @control_limits entry corresponding to self.control_type
             default_command (None or n-array): if specified, should be the same length as @dof_idx, specifying
                 the default control for this controller to output
+            kp (None or float): If @motor_type is "position" or "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
+            damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+                damping ratio applied to the joint controller. If None, a default value will be used.
+            use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
+                applied
         """
         # Store values
         self._default_command = np.zeros(len(dof_idx)) if default_command is None else np.array(default_command)
@@ -56,25 +65,29 @@ class NullJointController(JointController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            kp=kp,
+            damping_ratio=damping_ratio,
+            use_impedances=use_impedances,
+            use_delta_commands=False,
         )
 
-    def compute_no_op_command(self, control_dict):
-        # Set the command to be internal stored default value
-        return self._default_command
+    def compute_no_op_goal(self, control_dict):
+        # Set the goal to be internal stored default value
+        return dict(target=self._default_command)
 
     def _preprocess_command(self, command):
-        # Set the command to be internal stored default value
+        # Override super and force the processed command to be internal stored default value
         return np.array(self._default_command)
 
-    def update_default_command(self, command):
+    def update_default_goal(self, target):
         """
         Updates the internal default command value.
 
         Args:
-            command (n-array): New default command values to set for this controller.
+            target (n-array): New default command values to set for this controller.
                 Should be of dimension @command_dim
         """
-        assert len(command) == self.command_dim, \
-            f"Default control must be length: {self.command_dim}, got length: {len(command)}"
+        assert len(target) == self.control_dim, \
+            f"Default control must be length: {self.control_dim}, got length: {len(target)}"
 
-        self._default_command = np.array(command)
+        self._default_command = np.array(target)

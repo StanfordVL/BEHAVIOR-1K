@@ -75,6 +75,14 @@ def assert_test_scene():
                     "obs_modalities": [],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
+                    "controller_config": {
+                        # Make sure to use null joint controller for the arm so that we can move the arm qpos
+                        # accordingly
+                        "arm_0": {
+                            "name": "NullJointController",
+                            "motor_type": "position",
+                        },
+                    },
                 }
             ]
         }

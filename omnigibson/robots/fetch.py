@@ -272,9 +272,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 if joint.joint_type != JointType.JOINT_FIXED:
                     joint.friction = 500
 
-    def _actions_to_control(self, action):
+    def _postprocess_control(self, control, control_type):
         # Run super method first
-        u_vec, u_type_vec = super()._actions_to_control(action=action)
+        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Override trunk value if we're keeping the trunk rigid
         if self.rigid_trunk:
@@ -325,7 +325,12 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Need to override joint idx being controlled to include trunk in default arm controller configs
         for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
-            arm_cfg["dof_idx"] = np.concatenate([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
+            arm_control_idx = np.concatenate([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
+            arm_cfg["dof_idx"] = arm_control_idx
+
+            # Need to modify the default joint positions also if this is a null joint controller
+            if arm_cfg["name"] == "NullJointController":
+                arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
 
             # If using rigid trunk, we also clamp its limits
             if self.rigid_trunk:
