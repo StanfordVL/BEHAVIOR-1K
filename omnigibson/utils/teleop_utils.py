@@ -56,7 +56,11 @@ class TeleopSystem(TeleopPolicy):
         for arm in self.robot_arms:
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
-            self.robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, [1]]
+            self.robot_obs[arm] = np.r_[
+                rel_cur_pos, 
+                rel_cur_orn,
+                np.mean(self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[self.robot_arms.index(arm)]]])
+            ]
         # get teleop action
         self.teleop_action = super().get_action(self.robot_obs)
         # optionally update control marker
