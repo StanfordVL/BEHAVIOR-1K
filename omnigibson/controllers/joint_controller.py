@@ -35,7 +35,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         command_output_limits="default",
         kp=None,
         damping_ratio=None,
-        use_impedances=True,
+        use_impedances=False,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
     ):
@@ -62,10 +62,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
-            kp (None or float): If @motor_type is "position" or "velocity", this is the proportional gain applied
-                to the joint controller. If None, a default value will be used.
-            damping_ratio (None or float): If @motor_type is "position", this is the damping ratio applied to the
-                joint controller. If None, a default value will be used.
+            kp (None or float): If @motor_type is "position" or "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
+            damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+                damping ratio applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
             use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values

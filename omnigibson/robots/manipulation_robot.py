@@ -953,6 +953,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": None,
                 "motor_type": "position",
                 "use_delta_commands": True,
+                "use_impedances": True,
             }
         return dic
 
@@ -1022,9 +1023,11 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "NullJointController",
                 "control_freq": self._control_freq,
-                "motor_type": "velocity",
+                "motor_type": "position",
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
+                "default_command": self.reset_joint_pos[self.arm_control_idx[arm]],
+                "use_impedances": False,
             }
         return dic
 
@@ -1066,6 +1069,7 @@ class ManipulationRobot(BaseRobot):
                 "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "use_delta_commands": False,
+                "use_impedances": False,
             }
         return dic
 
@@ -1084,6 +1088,8 @@ class ManipulationRobot(BaseRobot):
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.gripper_control_idx[arm],
+                "default_command": np.zeros(len(self.gripper_control_idx[arm])),
+                "use_impedances": False,
             }
         return dic
 

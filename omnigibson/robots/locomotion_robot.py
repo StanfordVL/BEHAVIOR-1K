@@ -99,6 +99,8 @@ class LocomotionRobot(BaseRobot):
             "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.base_control_idx,
+            "default_command": np.zeros(len(self.base_control_idx)),
+            "use_impedances": False,
         }
 
     @property

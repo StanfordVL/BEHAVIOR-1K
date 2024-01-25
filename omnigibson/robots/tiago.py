@@ -427,7 +427,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
                 if arm == "left":
                     # Need to override joint idx being controlled to include trunk in default arm controller configs
-                    arm_cfg["dof_idx"] = np.concatenate([self.trunk_control_idx, self.arm_control_idx[arm]])
+                    arm_control_idx = np.concatenate([self.trunk_control_idx, self.arm_control_idx[arm]])
+                    arm_cfg["dof_idx"] = arm_control_idx
+
+                    # Need to modify the default joint positions also if this is a null joint controller
+                    if arm_cfg["name"] == "NullJointController":
+                        arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
 
                 # If using rigid trunk, we also clamp its limits
                 # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving

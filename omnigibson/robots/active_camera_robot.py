@@ -90,9 +90,11 @@ class ActiveCameraRobot(BaseRobot):
         return {
             "name": "NullJointController",
             "control_freq": self._control_freq,
-            "motor_type": "velocity",
+            "motor_type": "position",
             "control_limits": self.control_limits,
             "dof_idx": self.camera_control_idx,
+            "default_command": self.reset_joint_pos[self.camera_control_idx],
+            "use_impedances": False,
         }
 
     @property
