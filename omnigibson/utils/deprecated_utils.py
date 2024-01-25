@@ -608,6 +608,14 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             lazy.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
         return
 
+    def _invalidate_physics_handle_callback(self, event):
+        # Overwrite super method, add additional de-initialization
+        if event.type == int(lazy.omni.timeline.TimelineEventType.STOP):
+            self._physics_view = None
+            self._invalidate_physics_handle_event = None
+            self._is_initialized = False
+
+
 class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
     def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
         """Enable gravity on rigid bodies (enabled by default).

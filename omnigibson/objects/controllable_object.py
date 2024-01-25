@@ -134,6 +134,14 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
+        # If we haven't already created a physics callback, do so now so control gets updated every sim step
+        callback_name = f"{self.name}_controller_callback"
+        if not og.sim.physics_callback_exists(callback_name=callback_name):
+            og.sim.add_physics_callback(
+                callback_name=callback_name,
+                callback_fn=lambda x: self.step(),
+            )
+
     def load(self):
         # Run super first
         prim = super().load()
@@ -251,10 +259,6 @@ class ControllableObject(BaseObject):
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
         self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
-        # Reset all controllers
-        for controller in self._controllers.values():
-            controller.reset()
-
     @abstractmethod
     def _create_discrete_action_space(self):
         """
@@ -315,18 +319,14 @@ class ControllableObject(BaseObject):
             # Update idx
             idx += controller.command_dim
 
-        # If we haven't already created a physics callback, do so now so control gets updated every sim step
-        callback_name = f"{self.name}_controller_callback"
-        if not og.sim.physics_callback_exists(callback_name=callback_name):
-            og.sim.add_physics_callback(
-                callback_name=callback_name,
-                callback_fn=lambda x: self.step(),
-            )
-
     def step(self):
         """
         Takes a controller step across all controllers and deploys the computed control signals onto the object.
         """
+        # Skip this step if our articulation view is not valid
+        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
+            return
+
         # First, loop over all controllers, and calculate the computed control
         control = dict()
         idx = 0
@@ -523,6 +523,15 @@ class ControllableObject(BaseObject):
         Dump the last action applied to this object. For use in demo collection.
         """
         return self._last_action
+
+    def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
+        # Call super first
+        super().set_joint_positions(positions=positions, indices=indices, normalized=normalized, drive=drive)
+
+        # If we're not driving the joints, reset the controllers so that the goals are updated wrt to the new state
+        if not drive:
+            for controller in self._controllers.values():
+                controller.reset()
 
     @property
     def state_size(self):
