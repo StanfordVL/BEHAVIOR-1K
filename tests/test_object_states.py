@@ -638,16 +638,19 @@ def test_toggled_on():
 
     assert not stove.states[ToggledOn].get_value()
 
-    robot.joints["torso_lift_joint"].set_pos(0.0)
-    robot.joints["shoulder_pan_joint"].set_pos(np.deg2rad(90.0))
-    robot.joints["shoulder_lift_joint"].set_pos(np.deg2rad(8.0))
-    robot.joints["upperarm_roll_joint"].set_pos(0.0)
-    robot.joints["elbow_flex_joint"].set_pos(0.0)
-    robot.joints["forearm_roll_joint"].set_pos(0.0)
-    robot.joints["wrist_flex_joint"].set_pos(0.0)
-    robot.joints["wrist_roll_joint"].set_pos(0.0)
-    robot.joints["l_gripper_finger_joint"].set_pos(0.0)
-    robot.joints["r_gripper_finger_joint"].set_pos(0.0)
+    q = robot.get_joint_positions()
+    jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
+    q[jnt_idxs["torso_lift_joint"]] = 0.0
+    q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
+    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(8.0)
+    q[jnt_idxs["upperarm_roll_joint"]] = 0.0
+    q[jnt_idxs["elbow_flex_joint"]] = 0.0
+    q[jnt_idxs["forearm_roll_joint"]] = 0.0
+    q[jnt_idxs["wrist_flex_joint"]] = 0.0
+    q[jnt_idxs["wrist_roll_joint"]] = 0.0
+    q[jnt_idxs["l_gripper_finger_joint"]] = 0.0
+    q[jnt_idxs["r_gripper_finger_joint"]] = 0.0
+    robot.set_joint_positions(q, drive=False)
 
     steps = m.object_states.toggle.CAN_TOGGLE_STEPS
     for _ in range(steps):
@@ -656,7 +659,8 @@ def test_toggled_on():
     # End-effector not close to the button, stays False
     assert not stove.states[ToggledOn].get_value()
 
-    robot.joints["shoulder_pan_joint"].set_pos(0)
+    q[jnt_idxs["shoulder_pan_joint"]] = 0.0
+    robot.set_joint_positions(q, drive=False)
 
     for _ in range(steps - 1):
         og.sim.step()
