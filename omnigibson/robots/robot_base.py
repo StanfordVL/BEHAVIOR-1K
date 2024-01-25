@@ -228,7 +228,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     sensor = create_sensor(
                         sensor_type=prim_type,
                         prim_path=str(prim.GetPrimPath()),
-                        name=f"{self.name}:{link_name}_{prim.GetName()}_{prim_type}_sensor",
+                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )
                     self._sensors[sensor.name] = sensor
