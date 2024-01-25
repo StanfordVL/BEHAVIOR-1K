@@ -214,6 +214,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         obs_modalities = set()
         for link_name, link in self._links.items():
             # Search through all children prims and see if we find any sensor
+            sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
@@ -228,10 +229,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     sensor = create_sensor(
                         sensor_type=prim_type,
                         prim_path=str(prim.GetPrimPath()),
-                        name=f"{self.name}:{link_name}_{prim.GetName()}_{prim_type}_sensor",
+                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )
                     self._sensors[sensor.name] = sensor
+                    sensor_counts[prim_type] += 1
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
         if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
