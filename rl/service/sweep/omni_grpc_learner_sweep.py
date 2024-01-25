@@ -57,8 +57,9 @@ args = parser.parse_args()
 def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
-    config_filename = "../omni_grpc.yaml"
-    env_config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
+    env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     if args.port is not None:
         local_port = int(args.port)
     else:
@@ -80,7 +81,7 @@ def train(env, eval_env):
     prefix = ''
     seed = 0
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, "omni_grpc.yaml")
+    config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
     env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     task_config = env_config['task']
     task_config['dist_coeff'] = wandb.config.dist_coeff
