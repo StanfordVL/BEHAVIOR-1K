@@ -15,6 +15,7 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.sensors import ALL_SENSOR_MODALITIES
+from omnigibson.simulator import launch_simulator as launch
 
 # Create logger
 logging.basicConfig(format='[%(levelname)s] [%(name)s] %(message)s')

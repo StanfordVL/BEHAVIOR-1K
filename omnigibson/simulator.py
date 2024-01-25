@@ -89,8 +89,8 @@ def logo_small():
     return grey_text + red_text
 
 
-def launch_app():
-    log.info(f"{'-' * 10} Starting {logo_small()} {'-' * 10}")
+def _launch_app():
+    log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
@@ -177,7 +177,7 @@ def launch_app():
 
 def launch_simulator(*args, **kwargs):
     if not og.app:
-        og.app = launch_app()
+        og.app = _launch_app()
 
     class Simulator(lazy.omni.isaac.core.simulation_context.SimulationContext, Serializable):
         """
@@ -647,7 +647,7 @@ def launch_simulator(*args, **kwargs):
                 # We suppress warnings from omni.usd because it complains about values set in the native USD
                 # These warnings occur because the native USD file has some type mismatch in the `scale` property,
                 # where the property expects a double but for whatever reason the USD interprets its values as floats
-                # We supperss omni.physicsschema.plugin when kinematic_only objects are placed with scale ~1.0, to suppress
+                # We suppress omni.physicsschema.plugin when kinematic_only objects are placed with scale ~1.0, to suppress
                 # the following error:
                 # [omni.physicsschema.plugin] ScaleOrientation is not supported for rigid bodies, prim path: [...] You may
                 #   ignore this if the scale is close to uniform.
