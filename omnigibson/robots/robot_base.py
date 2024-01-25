@@ -214,9 +214,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         obs_modalities = set()
         for link_name, link in self._links.items():
             # Search through all children prims and see if we find any sensor
+            sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
-                sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
