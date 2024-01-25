@@ -272,9 +272,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 if joint.joint_type != JointType.JOINT_FIXED:
                     joint.friction = 500
 
-    def _actions_to_control(self, action):
+    def _postprocess_control(self, control, control_type):
         # Run super method first
-        u_vec, u_type_vec = super()._actions_to_control(action=action)
+        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Override trunk value if we're keeping the trunk rigid
         if self.rigid_trunk:
