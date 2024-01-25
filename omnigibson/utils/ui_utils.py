@@ -9,21 +9,61 @@ import sys
 import datetime
 from pathlib import Path
 from PIL import Image
+from termcolor import colored
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
+import omnigibson.lazy as lazy
 from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
-
-# Attempt to import omni, it may not always be necessary here (e.g: when we download datasets) so we catch the import failure explicitly
-try:
-    import omnigibson.lazy as lazy
-except ModuleNotFoundError:
-    print("Could not find omni or carb, skipping import")
 import random
 import imageio
 from IPython import embed
+
+
+def print_icon():
+    raw_texts = [
+        # Lgrey, grey, lgrey, grey, red, lgrey, red
+        ("                   ___________", "", "", "", "", "", "_"),
+        ("                  /          ", "", "", "", "", "", "/ \\"),
+        ("                 /          ", "", "", "", "/ /", "__", ""),
+        ("                /          ", "", "", "", "", "", "/ /  /\\"),
+        ("               /", "__________", "", "", "/ /", "__", "/  \\"),
+        ("               ", "\\   _____  ", "", "", "\\ \\", "__", "\\  /"),
+        ("                ", "\\  \\  ", "/ ", "\\  ", "", "", "\\ \\_/ /"),
+        ("                 ", "\\  \\", "/", "___\\  ", "", "", "\\   /"),
+        ("                  ", "\\__________", "", "", "", "", "\\_/  "),
+    ]
+    for (lgrey_text0, grey_text0, lgrey_text1, grey_text1, red_text0, lgrey_text2, red_text1) in raw_texts:
+        lgrey_text0 = colored(lgrey_text0, "light_grey", attrs=["bold"])
+        grey_text0 = colored(grey_text0, "light_grey", attrs=["bold", "dark"])
+        lgrey_text1 = colored(lgrey_text1, "light_grey", attrs=["bold"])
+        grey_text1 = colored(grey_text1, "light_grey", attrs=["bold", "dark"])
+        red_text0 = colored(red_text0, "light_red", attrs=["bold"])
+        lgrey_text2 = colored(lgrey_text2, "light_grey", attrs=["bold"])
+        red_text1 = colored(red_text1, "light_red", attrs=["bold"])
+        print(lgrey_text0 + grey_text0 + lgrey_text1 + grey_text1 + red_text0 + lgrey_text2 + red_text1)
+
+
+def print_logo():
+    raw_texts = [
+        ("       ___                  _", "  ____ _ _                     "),
+        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
+        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
+        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
+        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
+    ]
+    for (grey_text, red_text) in raw_texts:
+        grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
+        red_text = colored(red_text, "light_red", attrs=["bold"])
+        print(grey_text + red_text)
+
+
+def logo_small():
+    grey_text = colored("Omni", "light_grey", attrs=["bold", "dark"])
+    red_text = colored("Gibson", "light_red", attrs=["bold"])
+    return grey_text + red_text
 
 
 def dock_window(space, name, location, ratio=0.5):
