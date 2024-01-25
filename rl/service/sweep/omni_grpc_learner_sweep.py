@@ -2,11 +2,14 @@ import argparse
 import logging
 import socket
 import os
-
+import sys
 import yaml
 import numpy as np
 
 log = logging.getLogger(__name__)
+current_directory = os.path.dirname(os.path.abspath(__file__))
+parent_directory = os.path.dirname(current_directory)
+sys.path.append(parent_directory)
 
 from telegym import GRPCClientVecEnv
 
@@ -80,6 +83,7 @@ def instantiate_envs():
 def train(env, eval_env):
     prefix = ''
     seed = 0
+    run = wandb.init()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
     env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
@@ -93,7 +97,12 @@ def train(env, eval_env):
     env.env_method('update_task', task_config)
 
     eval_env.update_task(task_config)
-
+    eval_env = VecVideoRecorder(
+        eval_env,
+        f"videos/{run.id}",
+        record_video_trigger=lambda x: True,
+        video_length=200,
+    )
     # Set the set
     set_random_seed(seed)
     # policy_kwargs = dict(
@@ -120,13 +129,6 @@ def train(env, eval_env):
             "net_arch": {"pi": [512, 512], "vf": [512, 512]}
         },
     }
-    run = wandb.init()
-    eval_env = VecVideoRecorder(
-        eval_env,
-        f"videos/{run.id}",
-        # record_video_trigger=lambda x: x % 2000 == 0,
-        video_length=200,
-    )
     tensorboard_log_dir = f"runs/{run.id}"
     model = PPO(
         env=env,
