@@ -216,6 +216,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             # Search through all children prims and see if we find any sensor
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
+                sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
@@ -232,6 +233,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                         **sensor_kwargs,
                     )
                     self._sensors[sensor.name] = sensor
+                    sensor_counts[prim_type] += 1
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
         if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
