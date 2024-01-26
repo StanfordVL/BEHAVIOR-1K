@@ -113,7 +113,7 @@ class GRPCClientVecEnv(DummyVecEnv):
     def env_method(self, method_name: str, *method_args, indices: VecEnvIndices = None, **method_kwargs) -> List[Any]:
         """Call instance methods of vectorized environments."""
         target_envs = self._get_target_envs(indices)
-        env_method = lambda env_i: env_i.env_method(*method_args, **method_kwargs)
+        env_method = lambda env_i: env_i.env_method(method_name, *method_args, **method_kwargs)
         return list(self._executor.map(env_method, target_envs))
 
     def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]:

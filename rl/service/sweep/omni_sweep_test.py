@@ -74,12 +74,9 @@ def instantiate_envs():
     env = VecFrameStack(env, n_stack=5)
     env = VecMonitor(env)
 
-    # Manually specify port for eval env
-    eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
-    eval_env = VecFrameStack(eval_env, n_stack=5)
-    return env, eval_env
+    return env
 
-def train(env, eval_env):
+def train(env):
     prefix = ''
     seed = 0
     run = wandb.init()
@@ -95,9 +92,8 @@ def train(env, eval_env):
     task_config['regularization_coef'] = wandb.config.regularization_coef
     env.env_method('update_task', task_config)
 
-    eval_env.env_method('update_task', task_config)
     eval_env = VecVideoRecorder(
-        eval_env,
+        env,
         f"videos/{run.id}",
         record_video_trigger=lambda x: True,
         video_length=200,
@@ -166,7 +162,7 @@ def train(env, eval_env):
     policy_save_path.append(wandb.run.id)
     policy_save_path = "/".join(policy_save_path)
     text = f"Saved policy path: {policy_save_path}"
-    wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
+    # wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
     model.learn(
         total_timesteps=2_000_000,
         callback=callback,
@@ -176,7 +172,7 @@ def train(env, eval_env):
 
 if __name__ == "__main__":
     # print(args.sweep_id)
-    env, eval_env = instantiate_envs()
+    env = instantiate_envs()
     def _train():
-        return train(env, eval_env)
+        return train(env)
     wandb.agent(args.sweep_id, entity="behavior-rl", project="sb3", count=20, function=_train)

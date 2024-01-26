@@ -411,11 +411,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.stop()
         self._load_task(task_config=task_config)
         og.sim.play()
-        self.reset()
 
         # Load obs / action spaces
         self.load_observation_space()
         self._load_action_space()
+
+        self.reset()
 
         # Scene is now loaded again
         self._loaded = True
