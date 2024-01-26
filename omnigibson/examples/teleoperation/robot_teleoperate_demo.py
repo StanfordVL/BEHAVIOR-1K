@@ -11,13 +11,14 @@ from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.teleop_utils import TeleopSystem
 
 from real_tiago.utils.general_utils import AttrDict
-from real_tiago.utils.camera_utils import RealSenseCamera
+# from real_tiago.utils.camera_utils import RealSenseCamera
 
+TELEOP_METHOD = "oculus"
 teleop_config = AttrDict(
-    arm_left_controller='keyboard',
-    arm_right_controller='keyboard',
-    base_controller='keyboard',
-    torso_controller='keyboard',
+    arm_left_controller=TELEOP_METHOD,
+    arm_right_controller=TELEOP_METHOD,
+    base_controller=TELEOP_METHOD,
+    torso_controller=TELEOP_METHOD,
 
     interface_kwargs=AttrDict(
         oculus={},
@@ -50,8 +51,6 @@ def main():
     for arm in arms:
         robot_cfg["controller_config"][f"arm_{arm}"] = {
             "name": "InverseKinematicsController",
-            "mode": "pose_delta_ori",
-            "kv": 5.0,
             "command_input_limits": None,
         }
         robot_cfg["controller_config"][f"gripper_{arm}"] = {

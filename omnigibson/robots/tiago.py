@@ -765,5 +765,5 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = teleop_action.base * 0.2
+        action[self.base_action_idx] = teleop_action.base * 0.1
         return action
