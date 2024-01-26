@@ -5,9 +5,9 @@ import logging
 import os
 import socket
 from pathlib import Path
-from termcolor import colored
 import atexit
 import signal
+from contextlib import nullcontext
 
 import numpy as np
 import json
@@ -20,7 +20,8 @@ from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
-from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger, suppress_omni_log
+from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
+                                       print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -45,50 +46,6 @@ def print_save_usd_warning(_):
     log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
 
 
-def print_icon():
-    raw_texts = [
-        # Lgrey, grey, lgrey, grey, red, lgrey, red
-        ("                   ___________", "", "", "", "", "", "_"),
-        ("                  /          ", "", "", "", "", "", "/ \\"),
-        ("                 /          ", "", "", "", "/ /", "__", ""),
-        ("                /          ", "", "", "", "", "", "/ /  /\\"),
-        ("               /", "__________", "", "", "/ /", "__", "/  \\"),
-        ("               ", "\\   _____  ", "", "", "\\ \\", "__", "\\  /"),
-        ("                ", "\\  \\  ", "/ ", "\\  ", "", "", "\\ \\_/ /"),
-        ("                 ", "\\  \\", "/", "___\\  ", "", "", "\\   /"),
-        ("                  ", "\\__________", "", "", "", "", "\\_/  "),
-    ]
-    for (lgrey_text0, grey_text0, lgrey_text1, grey_text1, red_text0, lgrey_text2, red_text1) in raw_texts:
-        lgrey_text0 = colored(lgrey_text0, "light_grey", attrs=["bold"])
-        grey_text0 = colored(grey_text0, "light_grey", attrs=["bold", "dark"])
-        lgrey_text1 = colored(lgrey_text1, "light_grey", attrs=["bold"])
-        grey_text1 = colored(grey_text1, "light_grey", attrs=["bold", "dark"])
-        red_text0 = colored(red_text0, "light_red", attrs=["bold"])
-        lgrey_text2 = colored(lgrey_text2, "light_grey", attrs=["bold"])
-        red_text1 = colored(red_text1, "light_red", attrs=["bold"])
-        print(lgrey_text0 + grey_text0 + lgrey_text1 + grey_text1 + red_text0 + lgrey_text2 + red_text1)
-
-
-def print_logo():
-    raw_texts = [
-        ("       ___                  _", "  ____ _ _                     "),
-        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
-        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
-        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
-        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
-    ]
-    for (grey_text, red_text) in raw_texts:
-        grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
-        red_text = colored(red_text, "light_red", attrs=["bold"])
-        print(grey_text + red_text)
-
-
-def logo_small():
-    grey_text = colored("Omni", "light_grey", attrs=["bold", "dark"])
-    red_text = colored("Gibson", "light_red", attrs=["bold"])
-    return grey_text + red_text
-
-
 def _launch_app():
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
@@ -99,7 +56,21 @@ def _launch_app():
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
-    app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+
+    # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
+    if not gm.DEBUG:
+        import sys
+        from numba.core.errors import NumbaPerformanceWarning
+        import warnings
+        # TODO: Find a more elegant way to prune omni logging
+        # sys.argv.append("--/log/level=warning")
+        # sys.argv.append("--/log/fileLogLevel=warning")
+        # sys.argv.append("--/log/outputStreamLevel=error")
+        warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
+    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+    with launch_context(None):
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
