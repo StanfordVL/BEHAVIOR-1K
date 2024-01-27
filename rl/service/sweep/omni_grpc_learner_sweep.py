@@ -84,7 +84,7 @@ def instantiate_envs():
 
     eval_env = og.Environment(configs=env_config)
     eval_env = DummyVecEnv([lambda: eval_env])
-    eval_env = VecFrameStack(env, n_stack=5)
+    eval_env = VecFrameStack(eval_env, n_stack=5)
     return env, eval_env
 
 def train(env, eval_env):
