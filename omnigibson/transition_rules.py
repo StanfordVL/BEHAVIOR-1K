@@ -1091,13 +1091,14 @@ class RecipeRule(BaseTransitionRule):
         container_info["execution_info"] = dict()
 
         # Filter input objects based on a subset of input states (unary states and binary system states)
-        obj_category_to_valid_objs = dict()
+        # Map object categories (str) to valid indices (np.ndarray)
+        category_to_valid_indices = dict()
         for obj_category in recipe["input_objects"]:
             if obj_category not in recipe["input_states"]:
                 # If there are no input states, all objects of this category are valid
-                obj_category_to_valid_objs[obj_category] = cls._CATEGORY_IDXS[obj_category]
+                category_to_valid_indices[obj_category] = cls._CATEGORY_IDXS[obj_category]
             else:
-                obj_category_to_valid_objs[obj_category] = []
+                category_to_valid_indices[obj_category] = []
                 for idx in cls._CATEGORY_IDXS[obj_category]:
                     obj = cls._OBJECTS[idx]
                     success = True
@@ -1118,16 +1119,16 @@ class RecipeRule(BaseTransitionRule):
                     if not success:
                         continue
 
-                    obj_category_to_valid_objs[obj_category].append(idx)
+                    category_to_valid_indices[obj_category].append(idx)
 
                 # Convert to numpy array for faster indexing
-                obj_category_to_valid_objs[obj_category] = np.array(obj_category_to_valid_objs[obj_category], dtype=int)
+                category_to_valid_indices[obj_category] = np.array(category_to_valid_indices[obj_category], dtype=int)
 
-        container_info["execution_info"]["obj_category_to_valid_objs"] = obj_category_to_valid_objs
+        container_info["execution_info"]["category_to_valid_indices"] = category_to_valid_indices
         if not cls.is_multi_instance:
             # Check if sufficiently number of objects are contained
             for obj_category, obj_quantity in recipe["input_objects"].items():
-                if np.sum(in_volume[obj_category_to_valid_objs[obj_category]]) < obj_quantity:
+                if np.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
                     return False
             return True
         else:
@@ -1139,7 +1140,7 @@ class RecipeRule(BaseTransitionRule):
                 # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
                 # container, then 2 instance of the recipe can be produced.
                 for obj_category, obj_quantity in recipe["input_objects"].items():
-                    quantity_in_volume = np.sum(in_volume[obj_category_to_valid_objs[obj_category]])
+                    quantity_in_volume = np.sum(in_volume[category_to_valid_indices[obj_category]])
                     num_inst = quantity_in_volume // obj_quantity
                     if num_inst < 1:
                         return False
@@ -1149,13 +1150,13 @@ class RecipeRule(BaseTransitionRule):
                 relevant_objects = defaultdict(set)
                 for obj_category, obj_quantity in recipe["input_objects"].items():
                     quantity_used = num_instances * obj_quantity
-                    relevant_objects[obj_category] = set(obj_category_to_valid_objs[obj_category][:quantity_used])
+                    relevant_objects[obj_category] = set(cls._OBJECTS[category_to_valid_indices[obj_category][:quantity_used]])
 
             # If multi-instance is True and requires kinematic states between objects
             else:
                 root_node_category = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0][0]
                 # A list of objects belonging to the root node category
-                root_nodes = cls._OBJECTS[cls._CATEGORY_IDXS[root_node_category]]
+                root_nodes = cls._OBJECTS[category_to_valid_indices[root_node_category]]
                 input_states = recipe["input_states"]
 
                 # Recursively check if the kinematic tree is satisfied.
@@ -1177,7 +1178,8 @@ class RecipeRule(BaseTransitionRule):
                             "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
                         state_class, _, state_value = input_states[child_cat]["binary_object"][0]
                         num_valid_children = 0
-                        for child_obj in cls._OBJECTS[cls._CATEGORY_IDXS[child_cat]]:
+                        children_objs = cls._OBJECTS[category_to_valid_indices[child_cat]]
+                        for child_obj in children_objs:
                             # If the child doesn't satisfy the binary object state, skip
                             if child_obj.states[state_class].get_value(obj) != state_value:
                                 continue
@@ -1250,10 +1252,10 @@ class RecipeRule(BaseTransitionRule):
         """
         in_volume = container_info["in_volume"]
         # These are object indices whose objects satisfy the input states
-        obj_category_to_valid_objs = container_info["execution_info"]["obj_category_to_valid_objs"]
+        category_to_valid_indices = container_info["execution_info"]["category_to_valid_indices"]
         nonrecipe_objects_in_volume = in_volume if len(recipe["input_objects"]) == 0 else \
-            np.delete(in_volume, np.concatenate([obj_category_to_valid_objs[obj_category]
-                                                 for obj_category in obj_category_to_valid_objs]))
+            np.delete(in_volume, np.concatenate([category_to_valid_indices[obj_category]
+                                                 for obj_category in category_to_valid_indices]))
         return not np.any(nonrecipe_objects_in_volume)
 
     @classmethod
