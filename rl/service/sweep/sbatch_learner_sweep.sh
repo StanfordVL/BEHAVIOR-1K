@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH --account=cvgl
-#SBATCH --partition=svl --qos=normal
+#SBATCH --partition=svl
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=72
-#SBATCH --mem=200G
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=30G
 #SBATCH --gres=gpu:2080ti:1
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"

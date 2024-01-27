@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --account=cvgl
-#SBATCH --partition=svl --qos=normal
+#SBATCH --partition=svl
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=30G
