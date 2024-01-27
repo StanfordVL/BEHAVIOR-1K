@@ -202,7 +202,7 @@ def main():
         eval_env = VecVideoRecorder(
             eval_env,
             f"videos/{run.id}",
-            record_video_trigger=lambda x: True,
+            record_video_trigger=lambda x: x % 2000 == 0,
             video_length=200,
         )
 

@@ -26,6 +26,7 @@ from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFr
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
+import omnigibson as og
 
 class MetricsCallback(BaseCallback):
     """
@@ -62,6 +63,9 @@ args = parser.parse_args()
 def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
+    env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     if args.port is not None:
         local_port = int(args.port)
     else:
@@ -75,14 +79,21 @@ def instantiate_envs():
     env = VecMonitor(env)
 
     # Manually specify port for eval env
-    eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
-    eval_env = VecFrameStack(eval_env, n_stack=5)
+    # eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
+    # eval_env = VecFrameStack(eval_env, n_stack=5)
+
+    eval_env = og.Environment(configs=env_config)
+    eval_env = DummyVecEnv([lambda: eval_env])
+    eval_env = VecFrameStack(env, n_stack=5)
     return env, eval_env
 
 def train(env, eval_env):
     prefix = ''
     seed = 0
-    run = wandb.init()
+    run = wandb.init(
+        sync_tensorboard=True,
+        monitor_gym=True
+    )
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
     env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
@@ -95,11 +106,12 @@ def train(env, eval_env):
     task_config['regularization_coef'] = wandb.config.regularization_coef
     env.env_method('update_task', task_config)
 
-    eval_env.env_method('update_task', task_config)
+    # eval_env.env_method('update_task', task_config)
+    eval_env.update_task(task_config)
     eval_env = VecVideoRecorder(
         eval_env,
         f"videos/{run.id}",
-        record_video_trigger=lambda x: True,
+        record_video_trigger=lambda x: x % 2000 == 0,
         video_length=200,
     )
     # Set the set

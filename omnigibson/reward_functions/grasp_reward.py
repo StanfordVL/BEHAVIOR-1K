@@ -90,3 +90,17 @@ class GraspReward(BaseRewardFunction):
         self.prev_grasping = current_grasping
 
         return reward, {"grasp_success": self.grasp_success}
+    
+    def reset(self, task, env):
+        """
+        Reward function-specific reset
+
+        Args:
+            task (BaseTask): Task instance
+            env (Environment): Environment instance
+        """
+        super().reset(task, env)
+        self.prev_grasping = False
+        self.prev_eef_pos = None
+        self.prev_eef_rot = None
+        self.grasp_success = 0

@@ -79,7 +79,10 @@ def instantiate_envs():
 def train(env):
     prefix = ''
     seed = 0
-    run = wandb.init()
+    run = wandb.init(
+        sync_tensorboard=True,
+        monitor_gym=True
+    )
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "../omni_grpc.yaml"))
     env_config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
@@ -95,7 +98,7 @@ def train(env):
     eval_env = VecVideoRecorder(
         env,
         f"videos/{run.id}",
-        record_video_trigger=lambda x: True,
+        record_video_trigger=lambda x: x % 2000 == 0,
         video_length=200,
     )
     # Set the set
