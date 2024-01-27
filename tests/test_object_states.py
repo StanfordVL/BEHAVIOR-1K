@@ -1146,23 +1146,24 @@ def test_covered():
     )
     for obj in (bracelet, oyster, breakfast_table):
         for system in systems:
+            print(f"Testing Covered {obj.name} with {system.name}")
             sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
             obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
             place_obj_on_floor_plane(obj)
-
             for _ in range(5):
                 og.sim.step()
 
             assert obj.states[Covered].set_value(system, True) == sampleable
-
-            for _ in range(5):
+            for _ in range(10):
                 og.sim.step()
-
             assert obj.states[Covered].get_value(system) == sampleable
-            obj.states[Covered].set_value(system, False)
 
-            for _ in range(5):
-                og.sim.step()
+            assert obj.states[Covered].set_value(system, False)
+
+            # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
+            # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
+            obj.states[Covered].clear_cache()
+            obj.states[ContactParticles].clear_cache()
             assert not obj.states[Covered].get_value(system)
 
             system.remove_all_particles()
