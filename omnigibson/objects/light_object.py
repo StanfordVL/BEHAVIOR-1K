@@ -243,7 +243,7 @@ class LightObject(StatefulObject):
 
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
-        # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
+        # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
             light_type=self.light_type,

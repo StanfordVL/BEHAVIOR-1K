@@ -311,7 +311,7 @@ class PrimitiveObject(StatefulObject):
                 geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
-        # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
+        # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
             primitive_type=self._primitive_type,

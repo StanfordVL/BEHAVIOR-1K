@@ -786,7 +786,6 @@ class BDDLSampler:
                         name=f"{category}_{len(og.sim.scene.objects)}",
                         category=category,
                         model=model,
-                        fit_avg_dim_volume=True,
                         prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
                     )
                     num_new_obj += 1
