@@ -140,7 +140,7 @@ def main():
     teleop_sys.start()
     # main simulation loop
     for _ in range(10000):
-        action = teleop_sys.get_action()
+        action = teleop_sys.get_action(teleop_sys.get_obs())
         env.step(action) 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()

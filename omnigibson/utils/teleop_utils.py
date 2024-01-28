@@ -43,36 +43,52 @@ class TeleopSystem(TeleopPolicy):
                                                            visual_only=True)
                 og.sim.import_object(self.control_markers[arm_name])
 
-    def get_action(self) -> np.ndarray:
+    def get_obs(self) -> TeleopObservation:
         """
-        Generate action data from VR input for robot teleoperation
+        Retrieve observation data from robot
         Returns:
-            np.ndarray: array of action data
+            TeleopObservation: dataclass containing robot observations
         """
-        # construct robot observation
-        self.robot_obs = TeleopObservation()
+        robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
-        self.robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
+        robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
         for arm in self.robot_arms:
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
-            self.robot_obs[arm] = np.r_[
+            robot_obs[arm] = np.r_[
                 rel_cur_pos, 
                 rel_cur_orn,
                 np.mean(self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[self.robot_arms.index(arm)]]])
             ]
+        return robot_obs
+
+    def get_action(self, robot_obs: TeleopObservation) -> np.ndarray:
+        """
+        Generate action data from VR input for robot teleoperation
+        Args:
+            robot_obs (TeleopObservation): dataclass containing robot observations 
+        Returns:
+            np.ndarray: array of action data
+        """
         # get teleop action
-        self.teleop_action = super().get_action(self.robot_obs)
+        self.teleop_action = super().get_action(robot_obs)
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
                 delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
-                rel_target_pos = self.robot_obs[arm_name][:3] + delta_pos
-                rel_target_orn = T.quat_multiply(delta_orn, self.robot_obs[arm_name][3:7])
+                rel_target_pos = robot_obs[arm_name][:3] + delta_pos
+                rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
                 self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
 
+    def reset(self) -> None:
+        """
+        Reset the teleop policy
+        """
+        self.teleop_action = TeleopAction()
+        self.robot_obs = TeleopObservation()
+        super().reset_state()
 
 class OVXRSystem(TeleopSystem):
     """
