@@ -61,6 +61,9 @@ class RigidPrim(XFormPrim):
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
+        
+        self._kinematic_world_pose_cache = {'position': None, 'orientation': None}
+        self._kinematic_local_pose_cache = {'position': None, 'orientation': None}
 
         # Run super init
         super().__init__(
@@ -284,6 +287,9 @@ class RigidPrim(XFormPrim):
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
+        if self.kinematic_only:
+            self._kinematic_world_pose_cache['position'] = None
+            self._kinematic_world_pose_cache['orientation'] = None
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -294,13 +300,24 @@ class RigidPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
+        if self.kinematic_only and self._kinematic_world_pose_cache['position'] is not None:
+            return self._kinematic_world_pose_cache['position'], self._kinematic_world_pose_cache['orientation']
+        
         pos, ori = self._rigid_prim_view.get_world_poses()
 
         assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
             f"{self.prim_path} orientation {ori} is not a unit quaternion."
-        return pos[0], ori[0][[1, 2, 3, 0]]
+        
+        pos = pos[0]
+        ori = ori[0][[1, 2, 3, 0]]
+        self._kinematic_world_pose_cache['position'] = pos
+        self._kinematic_world_pose_cache['orientation'] = ori
+        return pos, ori
 
     def set_local_pose(self, position=None, orientation=None):
+        if self.kinematic_only:
+            self._kinematic_local_pose_cache['position'] = None
+            self._kinematic_local_pose_cache['orientation'] = None
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -309,8 +326,15 @@ class RigidPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):
+        if self.kinematic_only and self._kinematic_local_pose_cache['position'] is not None:
+            return self._kinematic_local_pose_cache['position'], self._kinematic_local_pose_cache['orientation']
+        
         positions, orientations = self._rigid_prim_view.get_local_poses()
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        positions = positions[0]
+        orientations = orientations[0][[1, 2, 3, 0]]
+        self._kinematic_local_pose_cache['position'] = positions
+        self._kinematic_local_pose_cache['orientation'] = orientations
+        return positions, orientations
 
     @property
     def _rigid_prim_view(self):
