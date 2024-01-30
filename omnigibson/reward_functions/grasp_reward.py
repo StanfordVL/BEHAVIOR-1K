@@ -25,7 +25,6 @@ class GraspReward(BaseRewardFunction):
         self.eef_position_penalty_coef = eef_position_penalty_coef
         self.eef_orientation_penalty_coef = eef_orientation_penalty_coef
         self.regularization_coef = regularization_coef
-        self.grasp_success = 0
 
         # Run super
         super().__init__()
@@ -35,7 +34,7 @@ class GraspReward(BaseRewardFunction):
 
         robot = env.robots[0]
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
-        current_grasping = True if obj_in_hand == self.obj else False
+        current_grasping = (obj_in_hand == self.obj)
         
         # Reward varying based on combination of whether the robot was previously grasping the desired and object
         # and is currently grasping the desired object
@@ -84,12 +83,9 @@ class GraspReward(BaseRewardFunction):
             dist = T.l2_distance(robot_center, obj_center)
             reward += math.exp(-dist) * self.dist_coeff
 
-        if current_grasping:
-            self.grasp_success = 1
-
         self.prev_grasping = current_grasping
 
-        return reward, {"grasp_success": self.grasp_success}
+        return reward, {"grasp_success": current_grasping}
     
     def reset(self, task, env):
         """
@@ -103,4 +99,3 @@ class GraspReward(BaseRewardFunction):
         self.prev_grasping = False
         self.prev_eef_pos = None
         self.prev_eef_rot = None
-        self.grasp_success = 0

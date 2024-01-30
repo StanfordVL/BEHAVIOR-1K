@@ -28,24 +28,6 @@ from wandb.integration.sb3 import WandbCallback
 from wandb import AlertLevel
 import omnigibson as og
 
-class MetricsCallback(BaseCallback):
-    """
-    A custom metrics callback that derives from ``BaseCallback``.
-
-    :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
-    """
-
-    def _on_step(self) -> bool:
-        return True
-
-    def _on_rollout_end(self) -> None:
-        """
-        This event is triggered before updating the policy.
-        """
-        envs_num_grasps = list(map(lambda x: x['reward']['grasp']['grasp_success'], self.locals['infos']))
-        grasp_success_rate = np.mean(envs_num_grasps)
-        wandb.log({"grasp_success_rate": grasp_success_rate})
-
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
@@ -76,7 +58,7 @@ def instantiate_envs():
     print(f"Listening on port {local_port}")
     env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
     env = VecFrameStack(env, n_stack=5)
-    env = VecMonitor(env)
+    env = VecMonitor(env, info_keywords=("is_success",))
 
     # Manually specify port for eval env
     # eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
@@ -153,7 +135,6 @@ def train(env, eval_env):
         model_save_path=tensorboard_log_dir,
         verbose=2,
     )
-    metrics_callback = MetricsCallback()
     # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
     # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
     stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=100, verbose=1)
@@ -161,7 +142,6 @@ def train(env, eval_env):
     callback = CallbackList([
         wandb_callback,
         checkpoint_callback,
-        metrics_callback,
         eval_callback,
     ])
     print(callback.callbacks)

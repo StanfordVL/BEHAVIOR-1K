@@ -564,6 +564,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Increment step
             self._current_step += 1
 
+            # Hacky way of getting the success condition
+            info["is_success"] = info["reward"]["grasp"]["grasp_success"]
+
             return obs, reward, terminated, truncated, info
         except:
             raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
