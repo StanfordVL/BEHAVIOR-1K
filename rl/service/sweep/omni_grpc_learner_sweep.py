@@ -42,6 +42,9 @@ parser.add_argument(
 parser.add_argument("--sweep_id", type=str, default=None, help="Sweep ID to run.")
 args = parser.parse_args()
 
+# TODO: Get this from config
+STEPS_PER_EPISODE = 200
+
 def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
@@ -90,11 +93,12 @@ def train(env, eval_env):
 
     # eval_env.env_method('update_task', task_config)
     eval_env.update_task(task_config)
+    n_evals = 5
     eval_env = VecVideoRecorder(
         eval_env,
         f"videos/{run.id}",
-        record_video_trigger=lambda x: x % 2000 == 0,
-        video_length=200,
+        record_video_trigger=lambda x: x % (n_evals * STEPS_PER_EPISODE) == 0,
+        video_length=STEPS_PER_EPISODE,
     )
     # Set the set
     set_random_seed(seed)
@@ -137,8 +141,9 @@ def train(env, eval_env):
     )
     # Add with eval call back https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#stoptrainingonnomodelimprovement
     # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=50, min_evals=10, verbose=1)
-    stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=100, verbose=1)
-    eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
+    # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
+    eval_every_n_episodes = 10
+    eval_callback = EvalCallback(eval_env, eval_freq=eval_every_n_episodes * args.n_envs * STEPS_PER_EPISODE, callback_after_eval=None, verbose=1, best_model_save_path='logs/best_model')
     callback = CallbackList([
         wandb_callback,
         checkpoint_callback,
