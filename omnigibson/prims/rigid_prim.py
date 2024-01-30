@@ -314,7 +314,8 @@ class RigidPrim(XFormPrim):
         
         pos = pos[0]
         ori = ori[0][[1, 2, 3, 0]]
-        self._kinematic_world_pose_cache = (pos, ori)
+        if self.kinematic_only:
+            self._kinematic_world_pose_cache = (pos, ori)
         return pos, ori
 
     def set_local_pose(self, position=None, orientation=None):
@@ -337,7 +338,8 @@ class RigidPrim(XFormPrim):
         positions, orientations = self._rigid_prim_view.get_local_poses()
         positions = positions[0]
         orientations = orientations[0][[1, 2, 3, 0]]
-        self._kinematic_local_pose_cache = (positions, orientations)
+        if self.kinematic_only:
+            self._kinematic_local_pose_cache = (positions, orientations)
         return positions, orientations
 
     @property
