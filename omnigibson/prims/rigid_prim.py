@@ -63,7 +63,7 @@ class RigidPrim(XFormPrim):
         self._visual_meshes = None
         
         # Caches for kinematic-only objects
-        # This exsists because RigidPrimView uses USD pose read, which is very slow
+        # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
         self._kinematic_local_pose_cache = None
 
