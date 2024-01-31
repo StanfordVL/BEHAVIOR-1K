@@ -26,7 +26,7 @@ from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFr
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
-import omnigibson as og
+# import omnigibson as og
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -64,12 +64,12 @@ def instantiate_envs():
     env = VecMonitor(env, info_keywords=("is_success",))
 
     # Manually specify port for eval env
-    # eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
-    # eval_env = VecFrameStack(eval_env, n_stack=5)
-
-    eval_env = og.Environment(configs=env_config)
-    eval_env = DummyVecEnv([lambda: eval_env])
+    eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
     eval_env = VecFrameStack(eval_env, n_stack=5)
+
+    # eval_env = og.Environment(configs=env_config)
+    # eval_env = DummyVecEnv([lambda: eval_env])
+    # eval_env = VecFrameStack(eval_env, n_stack=5)
     return env, eval_env
 
 def train(env, eval_env):
@@ -91,8 +91,8 @@ def train(env, eval_env):
     task_config['regularization_coef'] = wandb.config.regularization_coef
     env.env_method('update_task', task_config)
 
-    # eval_env.env_method('update_task', task_config)
-    eval_env.update_task(task_config)
+    eval_env.env_method('update_task', task_config)
+    # eval_env.update_task(task_config)
     n_evals = 5
     eval_env = VecVideoRecorder(
         eval_env,
