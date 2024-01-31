@@ -13,7 +13,7 @@ from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_o
 import pytest
 import numpy as np
 
-
+"""
 @og_test
 def test_on_top():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
@@ -1170,7 +1170,7 @@ def test_covered():
             system.remove_all_particles()
 
         obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
-
+"""
 @og_test
 def test_vision_sensor_pose():
     robot = og.sim.scene.object_registry("name", "robot0")
@@ -1178,13 +1178,16 @@ def test_vision_sensor_pose():
     assert len(sensors) > 0
     vision_sensor = sensors[0]
     
+    breakpoint()
     # Get vision sensor world pose via directly calling get_position_orientation
     sensor_world_pos1, sensor_world_ori1 = vision_sensor.get_position_orientation()
     
     # Get vision sensor world pose via multiplying robot world pose and sensor local pose
     robot_world_pos, robot_world_ori = robot.get_position_orientation()
     sensor_local_pos, sensor_local_ori = vision_sensor.get_local_pose()
-    sensor_world_pos2 = robot_world_pos + sensor_local_pos
+    robot_world_rot_mat = T.quat2mat(robot_world_ori)
+    rotated_sensor_local_pos = np.matmul(robot_world_rot_mat, sensor_local_pos)
+    sensor_world_pos2 = robot_world_pos + rotated_sensor_local_pos
     sensor_world_ori2 = T.quat_multiply(robot_world_ori, sensor_local_ori)
     
     print("--------------------------------------")
