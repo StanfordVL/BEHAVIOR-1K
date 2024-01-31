@@ -177,6 +177,49 @@ class XFormPrim(BasePrim):
         self.set_local_pose(
             position=np.array(calculated_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
+    
+    def _get_world_pose_transform_w_scale(self, prim_path):
+        fabric_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path, fabric=True)
+        xformable_prim = lazy.usdrt.Rt.Xformable(fabric_prim)
+        
+        if xformable_prim.HasWorldXform():
+            world_pos_attr = xformable_prim.GetWorldPositionAttr()
+            if not world_pos_attr.IsValid():
+                world_pos = lazy.usdrt.Gf.Vec3d(0)
+            else:
+                world_pos = world_pos_attr.Get(lazy.usdrt.Usd.TimeCode.Default())
+            world_orientation_attr = xformable_prim.GetWorldOrientationAttr()
+            if not world_orientation_attr.IsValid():
+                world_orientation = lazy.usdrt.Gf.Quatf(1)
+            else:
+                world_orientation = world_orientation_attr.Get(lazy.usdrt.Usd.TimeCode.Default())
+            world_scale_attr = xformable_prim.GetWorldScaleAttr()
+            if not world_scale_attr.IsValid():
+                world_scale = lazy.usdrt.Gf.Vec3d(1)
+            else:
+                world_scale = world_scale_attr.Get(lazy.usdrt.Usd.TimeCode.Default())
+            scale = lazy.usdrt.Gf.Matrix4d()
+            rot = lazy.usdrt.Gf.Matrix4d()
+            scale.SetScale(lazy.usdrt.Gf.Vec3d(world_scale))
+            rot.SetRotate(lazy.usdrt.Gf.Quatd(world_orientation))
+            result = scale * rot
+            result.SetTranslateOnly(world_pos)
+            return result
+        elif xformable_prim.HasLocalXform():
+            local_transform = xformable_prim.GetLocalMatrixAttr().Get(lazy.usdrt.Usd.TimeCode.Default())
+            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=False))
+            parent_world_transform = lazy.usdrt.Gf.Matrix4d(1.0)
+            if parent_prim:
+                parent_world_transform = self._get_world_pose_transform_w_scale(lazy.omni.isaac.core.utils.prims.get_prim_path(parent_prim))
+            return local_transform * parent_world_transform
+        else:
+            usd_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=False)
+            local_transform = lazy.usdrt.Gf.Matrix4d(lazy.pxr.UsdGeom.Xformable(usd_prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default()))
+            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=False))
+            parent_world_transform = lazy.usdrt.Gf.Matrix4d(1.0)
+            if parent_prim:
+                parent_world_transform = self._get_world_pose_transform_w_scale(lazy.omni.isaac.core.utils.prims.get_prim_path(parent_prim))
+            return local_transform * parent_world_transform
 
     def get_position_orientation(self):
         """
@@ -187,12 +230,25 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
+        result_transform = self._get_world_pose_transform_w_scale(self._prim_path)
+        result_transform.Orthonormalize()
+        result_transform = np.transpose(result_transform)
+        rotation_mat = R.from_matrix(result_transform[:3, :3])
+        
+        final_position = result_transform[:3, 3]
+        final_orientation = rotation_mat.as_quat()
+        
+        return np.array(final_position), np.array(final_orientation)
+        
+        """
         prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
         position = transform.GetTranslation()
         orientation = transform.GetRotation().GetQuat()
         return np.array(position), lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(orientation)[[1, 2, 3, 0]]
+        """
+        
 
     def set_position(self, position):
         """
