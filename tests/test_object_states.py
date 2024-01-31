@@ -1,5 +1,6 @@
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
+from omnigibson.sensors import VisionSensor
 from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
@@ -1169,6 +1170,37 @@ def test_covered():
             system.remove_all_particles()
 
         obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
+
+@og_test
+def test_vision_sensor_pose():
+    robot = og.sim.scene.object_registry("name", "robot0")
+    sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
+    assert len(sensors) > 0
+    vision_sensor = sensors[0]
+    
+    # Get vision sensor world pose via directly calling get_position_orientation
+    sensor_world_pos1, sensor_world_ori1 = vision_sensor.get_position_orientation()
+    
+    # Get vision sensor world pose via multiplying robot world pose and sensor local pose
+    robot_world_pos, robot_world_ori = robot.get_position_orientation()
+    sensor_local_pos, sensor_local_ori = vision_sensor.get_local_pose()
+    sensor_world_pos2 = robot_world_pos + sensor_local_pos
+    sensor_world_ori2 = T.quat_multiply(robot_world_ori, sensor_local_ori)
+    
+    print("--------------------------------------")
+    print(f"robot_world_pos: {robot_world_pos}")
+    print(f"robot_world_ori: {robot_world_ori}")
+    print(f"sensor_local_pos: {sensor_local_pos}")
+    print(f"sensor_local_ori: {sensor_local_ori}")
+    print(f"sensor_world_pos1: {sensor_world_pos1}")
+    print(f"sensor_world_ori1: {sensor_world_ori1}")
+    print(f"sensor_world_pos2: {sensor_world_pos2}")
+    print(f"sensor_world_ori2: {sensor_world_ori2}")
+    print("--------------------------------------")
+    
+    # Check that the two methods give the same result
+    assert np.allclose(sensor_world_pos1, sensor_world_pos2)
+    assert np.allclose(sensor_world_ori1, sensor_world_ori2)
 
 
 def test_clear_sim():
