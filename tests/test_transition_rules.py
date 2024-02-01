@@ -287,8 +287,10 @@ def test_cooking_object_rule_success():
     new_bagels = final_bagels - initial_bagels
     for bagel in new_bagels:
         assert bagel.states[Cooked].get_value()
-        assert bagel.states[OnTop].get_value(baking_sheet)
-
+        # This assertion occasionally fails, because when four bagels are sampled on top of the baking sheet one by one,
+        # there is no guarantee that all four of them will be on top of the baking sheet at the end.
+        # assert bagel.states[OnTop].get_value(baking_sheet)
+        assert bagel.states[Inside].get_value(oven)
     # Clean up
     sesame_seed.remove_all_particles()
     og.sim.step()
