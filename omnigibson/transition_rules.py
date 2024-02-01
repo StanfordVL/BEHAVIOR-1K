@@ -193,8 +193,7 @@ class TransitionRuleAPI:
                 f"the scene."
             )
             # First remove pre-existing objects
-            for i, removed_obj in enumerate(removed_objs):
-                og.sim.remove_object(removed_obj)
+            og.sim.remove_objects(removed_objs)
 
         # Then add new objects
         if len(added_obj_attrs) > 0:

@@ -20,6 +20,18 @@ def og_test(func):
 
 num_objs = 0
 
+def retrieve_obj_cfg(obj):
+    return {
+        "name": obj.name,
+        "category": obj.category,
+        "model": obj.model,
+        "prim_type": obj.prim_type,
+        "position": obj.get_position(),
+        "scale": obj.scale,
+        "abilities": obj.abilities,
+        "visual_only": obj.visual_only,
+    }
+
 def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, bounding_box=None, abilities=None, visual_only=False):
     global num_objs
     num_objs += 1
