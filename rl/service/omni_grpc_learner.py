@@ -163,13 +163,13 @@ def train(env, eval_env):
             sync_tensorboard=True,
             monitor_gym=True
         )
-        task_config = _get_env_config()['task']['reward_config']
-        task_config['dist_coeff'] = wandb.config.dist_coeff
-        task_config['grasp_reward'] = wandb.config.grasp_reward
-        task_config['collision_penalty'] = wandb.config.collision_penalty
-        task_config['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
-        task_config['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
-        task_config['regularization_coef'] = wandb.config.regularization_coef
+        task_config = _get_env_config()['task']
+        task_config['reward_config']['dist_coeff'] = wandb.config.dist_coeff
+        task_config['reward_config']['grasp_reward'] = wandb.config.grasp_reward
+        task_config['reward_config']['collision_penalty'] = wandb.config.collision_penalty
+        task_config['reward_config']['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
+        task_config['reward_config']['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
+        task_config['reward_config']['regularization_coef'] = wandb.config.regularization_coef
         env.env_method('update_task', task_config)
         eval_env.env_method('update_task', task_config)
     else:
