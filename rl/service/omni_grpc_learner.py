@@ -68,7 +68,7 @@ def instantiate_envs():
         # Manually specify port for eval env
         eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
         eval_env = VecFrameStack(eval_env, n_stack=5)
-
+        eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
     else:
         import omnigibson as og
         from omnigibson.macros import gm
