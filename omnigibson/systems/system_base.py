@@ -139,11 +139,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
         # Add to registry
         SYSTEM_REGISTRY.add(obj=cls)
-        # Make sure to refresh any transition rules that require this system
-        # Import now to avoid circular imports
-        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-        system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-        TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+        TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
         for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
@@ -218,11 +215,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
             # Remove from active registry
             SYSTEM_REGISTRY.remove(obj=cls)
-            # Make sure to refresh any transition rules that require this system
-            # Import now to avoid circular imports
-            from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-            system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-            TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+            TransitionRuleAPI.refresh_all_rules()
 
     @classmethod
     def reset(cls):

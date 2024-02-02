@@ -576,16 +576,6 @@ class BaseTransitionRule(Registerable):
             cls.conditions = cls._generate_conditions()
 
     @classproperty
-    def required_systems(cls):
-        """
-        Particle systems that this transition rule cares about. Should be specified by subclass.
-
-        Returns:
-            list of str: Particle system names which must be active in order for the transition rule to occur
-        """
-        return []
-
-    @classproperty
     def candidate_filters(cls):
         """
         Object candidate filters that this transition rule cares about.
@@ -635,12 +625,10 @@ class BaseTransitionRule(Registerable):
         filters = cls.candidate_filters
         obj_dict = {filter_name: [] for filter_name in filters.keys()}
 
-        # Only compile candidates if all active system requirements are met
-        if np.all([is_system_active(system_name=name) for name in cls.required_systems]):
-            for obj in objects:
-                for fname, f in filters.items():
-                    if f(obj):
-                        obj_dict[fname].append(obj)
+        for obj in objects:
+            for fname, f in filters.items():
+                if f(obj):
+                    obj_dict[fname].append(obj)
 
         return obj_dict
 
@@ -712,7 +700,6 @@ RULES_REGISTRY = Registry(
     name="TransitionRuleRegistry",
     class_types=BaseTransitionRule,
     default_key="__name__",
-    group_keys=["required_systems"],
 )
 
 
