@@ -10,4 +10,6 @@ robot:
       command_input_limits: default
       command_output_limits: default
       mode: binary
+      open_qpos: null
+      closed_qpos: null
       limit_tolerance: 0.01
