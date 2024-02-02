@@ -2,14 +2,16 @@ import argparse
 import logging
 import socket
 import os
-
+import sys
 import yaml
 
 log = logging.getLogger(__name__)
+current_directory = os.path.dirname(os.path.abspath(__file__))
+parent_directory = os.path.dirname(current_directory)
+sys.path.append(parent_directory)
 
 from telegym import GRPCClientVecEnv
 
-import gymnasium as gym
 import torch as th
 import torch.nn as nn
 import wandb
@@ -19,109 +21,35 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, EvalCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 from wandb import AlertLevel
 
-import omnigibson as og
-from omnigibson.macros import gm
+# Parse args
+parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
+parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
+parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
+parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
+parser.add_argument(
+    "--checkpoint",
+    type=str,
+    default=None,
+    help="Absolute path to desired PPO checkpoint to load for evaluation",
+)
+parser.add_argument("--sweep_id", type=str, default=None, help="Sweep ID to run.")
+args = parser.parse_args()
 
-gm.USE_FLATCACHE = True
-
-class CustomCombinedExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Dict):
-        # We do not know features-dim here before going over all the items,
-        # so put something dummy for now. PyTorch requires calling
-        super().__init__(observation_space, features_dim=1)
-        extractors = {}
-        self.step_index = 0
-        total_concat_size = 0
-        feature_size = 128
-        time_dimension = None
-        for key, subspace in observation_space.spaces.items():
-            # For now, only keep RGB observations
-            log.info(f"obs {key} shape: {subspace.shape}")
-            if time_dimension is None:
-                time_dimension = subspace.shape[0]
-            else:
-                assert time_dimension == subspace.shape[0], f"All observation subspaces must have the same time dimension. Expected {time_dimension}, found {subspace.shape[0]}"
-            if key == "rgb":
-                assert len(subspace.shape) == 4, "Expected frame-stacked (f, c, h, w) RGB observations"
-                n_input_channels = subspace.shape[1]  # channel 
-                cnn = nn.Sequential(
-                    nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
-                    nn.ReLU(),
-                    nn.MaxPool2d(2),
-                    nn.Conv2d(4, 8, kernel_size=4, stride=2, padding=0),
-                    nn.ReLU(),
-                    nn.MaxPool2d(2),
-                    nn.Conv2d(8, 4, kernel_size=3, stride=1, padding=0),
-                    nn.ReLU(),
-                    nn.Flatten(),
-                )
-                test_tensor = th.zeros(subspace.shape)
-                with th.no_grad():
-                    n_flatten = cnn(test_tensor[None]).shape[1]
-                fc = nn.Sequential(nn.Linear(n_flatten, feature_size), nn.ReLU())
-                extractors[key] = nn.Sequential(cnn, fc)
-                total_concat_size += feature_size
-            elif key == "proprio":
-                assert len(subspace.shape) == 2, "Expected frame-stacked (f, n) proprio observations"
-                mlp = nn.Sequential(
-                    nn.Linear(subspace.shape[0], feature_size),
-                    nn.ReLU(),
-                    nn.Linear(subspace.shape[0], feature_size),
-                    nn.ReLU(),
-                )
-                extractors[key] = mlp
-                total_concat_size += feature_size
-
-        self._across_time = nn.Sequential(
-            nn.Linear(total_concat_size * 5, feature_size),
-            nn.ReLU(),
-            nn.Linear(subspace.shape[0], feature_size),
-            nn.ReLU(),
-        )
-
-        self.extractors = nn.ModuleDict(extractors)
-
-        # Update the features dim manually
-        self._features_dim = total_concat_size
-
-    def forward(self, observations) -> th.Tensor:
-        encoded_tensor_list = []
-        self.step_index += 1
-
-        # self.extractors contain nn.Modules that do all the processing.
-        for i in range(next(iter(observations.values())).shape[0]):
-            for key, extractor in self.extractors.items():
-                encoded_tensor_list.append(extractor(observations[key][i]))
-
-        feature = th.cat(encoded_tensor_list, dim=1)
-        feature = self._across_time(feature)
-        return feature
-
-
-def main():
-    # Parse args
-    parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
-
-    parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
-    parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
-    parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default=None,
-        help="Absolute path to desired PPO checkpoint to load for evaluation",
-    )
-
-    args = parser.parse_args()
-    prefix = ''
-    seed = 0
+def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "omni_grpc.yaml")
-    config = yaml.load(open(file_path, "r"), Loader=yaml.FullLoader)
+    config_path = os.path.normpath(os.path.join(script_dir, "omni_grpc.yaml"))
+    config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
+    return config
+
+EVAL_EVERY_N_EPISODES = 10
+NUM_EVAL_EPISODES = 5
+STEPS_PER_EPISODE = _get_env_config()['task']['termination_config']['max_steps']
+
+def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
     if n_envs > 0:
@@ -135,35 +63,140 @@ def main():
         print(f"Listening on port {local_port}")
         env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
         env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env)
-        eval_env = og.Environment(configs=config)
-        eval_env = DummyVecEnv([lambda: eval_env])
+        env = VecMonitor(env, info_keywords=("is_success",))
+
+        # Manually specify port for eval env
+        eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
         eval_env = VecFrameStack(eval_env, n_stack=5)
+
     else:
-        og_env = og.Environment(configs=config)
+        import omnigibson as og
+        from omnigibson.macros import gm
+        gm.USE_FLATCACHE = True
+
+        og_env = og.Environment(configs=_get_env_config())
         env = DummyVecEnv([lambda: og_env])
         env = VecFrameStack(env, n_stack=5)
-        n_envs = 1
+        env = VecMonitor(env, info_keywords=("is_success",))
+        eval_env = env
+        args.n_envs = 1
+    return env, eval_env
 
-    # import IPython; IPython.embed()
+# class CustomCombinedExtractor(BaseFeaturesExtractor):
+#     def __init__(self, observation_space: gym.spaces.Dict):
+#         # We do not know features-dim here before going over all the items,
+#         # so put something dummy for now. PyTorch requires calling
+#         super().__init__(observation_space, features_dim=1)
+#         extractors = {}
+#         self.step_index = 0
+#         total_concat_size = 0
+#         feature_size = 128
+#         time_dimension = None
+#         for key, subspace in observation_space.spaces.items():
+#             # For now, only keep RGB observations
+#             log.info(f"obs {key} shape: {subspace.shape}")
+#             if time_dimension is None:
+#                 time_dimension = subspace.shape[0]
+#             else:
+#                 assert time_dimension == subspace.shape[0], f"All observation subspaces must have the same time dimension. Expected {time_dimension}, found {subspace.shape[0]}"
+#             if key == "rgb":
+#                 assert len(subspace.shape) == 4, "Expected frame-stacked (f, c, h, w) RGB observations"
+#                 n_input_channels = subspace.shape[1]  # channel 
+#                 cnn = nn.Sequential(
+#                     nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
+#                     nn.ReLU(),
+#                     nn.MaxPool2d(2),
+#                     nn.Conv2d(4, 8, kernel_size=4, stride=2, padding=0),
+#                     nn.ReLU(),
+#                     nn.MaxPool2d(2),
+#                     nn.Conv2d(8, 4, kernel_size=3, stride=1, padding=0),
+#                     nn.ReLU(),
+#                     nn.Flatten(),
+#                 )
+#                 test_tensor = th.zeros(subspace.shape)
+#                 with th.no_grad():
+#                     n_flatten = cnn(test_tensor[None]).shape[1]
+#                 fc = nn.Sequential(nn.Linear(n_flatten, feature_size), nn.ReLU())
+#                 extractors[key] = nn.Sequential(cnn, fc)
+#                 total_concat_size += feature_size
+#             elif key == "proprio":
+#                 assert len(subspace.shape) == 2, "Expected frame-stacked (f, n) proprio observations"
+#                 mlp = nn.Sequential(
+#                     nn.Linear(subspace.shape[0], feature_size),
+#                     nn.ReLU(),
+#                     nn.Linear(subspace.shape[0], feature_size),
+#                     nn.ReLU(),
+#                 )
+#                 extractors[key] = mlp
+#                 total_concat_size += feature_size
 
-    # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
-    # visualize the rollouts dynamically
-    if args.eval:
-        ceiling = og_env.scene.object_registry("name", "ceilings")
-        ceiling.visible = False
-        og.sim.enable_viewer_camera_teleoperation()
+#         self._across_time = nn.Sequential(
+#             nn.Linear(total_concat_size * 5, feature_size),
+#             nn.ReLU(),
+#             nn.Linear(subspace.shape[0], feature_size),
+#             nn.ReLU(),
+#         )
 
+#         self.extractors = nn.ModuleDict(extractors)
+
+#         # Update the features dim manually
+#         self._features_dim = total_concat_size
+
+#     def forward(self, observations) -> th.Tensor:
+#         encoded_tensor_list = []
+#         self.step_index += 1
+
+#         # self.extractors contain nn.Modules that do all the processing.
+#         for i in range(next(iter(observations.values())).shape[0]):
+#             for key, extractor in self.extractors.items():
+#                 encoded_tensor_list.append(extractor(observations[key][i]))
+
+#         feature = th.cat(encoded_tensor_list, dim=1)
+#         feature = self._across_time(feature)
+#         return feature
+
+def train(env, eval_env):
+    prefix = ''
+    seed = 0
+    if args.sweep_id:
+        run = wandb.init(
+            sync_tensorboard=True,
+            monitor_gym=True
+        )
+        task_config = _get_env_config()['task']['reward_config']
+        task_config['dist_coeff'] = wandb.config.dist_coeff
+        task_config['grasp_reward'] = wandb.config.grasp_reward
+        task_config['collision_penalty'] = wandb.config.collision_penalty
+        task_config['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
+        task_config['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
+        task_config['regularization_coef'] = wandb.config.regularization_coef
+        env.env_method('update_task', task_config)
+        eval_env.env_method('update_task', task_config)
+    else:
+        run = wandb.init(
+            entity="behavior-rl",
+            project="sb3",
+            sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+            monitor_gym=True,  # auto-upload the videos of agents playing the game
+            # save_code=True,  # optional
+        )
+
+    eval_env = VecVideoRecorder(
+        eval_env,
+        f"videos/{run.id}",
+        record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
+        video_length=STEPS_PER_EPISODE,
+    )
     # Set the set
     set_random_seed(seed)
-    env.reset()
-
     # policy_kwargs = dict(
     #     features_extractor_class=CustomCombinedExtractor,
     # )
-
-    if args.eval:    
+    if args.eval:
+        # Need to enable rendering in simulator.step and something else     
         assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
+        ceiling = env.scene.object_registry("name", "ceilings")
+        ceiling.visible = False   
         model = PPO.load(args.checkpoint)
         log.info("Starting evaluation...")
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
@@ -191,21 +224,6 @@ def main():
                 "net_arch": {"pi": [512, 512], "vf": [512, 512]}
             },
         }
-        run = wandb.init(
-            entity="behavior-rl",
-            project="sb3",
-            config=config,
-            sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-            monitor_gym=True,  # auto-upload the videos of agents playing the game
-            # save_code=True,  # optional
-        )
-        eval_env = VecVideoRecorder(
-            eval_env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
-
         tensorboard_log_dir = f"runs/{run.id}"
         if args.checkpoint is None:
             model = PPO(
@@ -222,8 +240,8 @@ def main():
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
-        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=100, min_evals=100, verbose=1)
-        eval_callback = EvalCallback(eval_env, eval_freq=2000, callback_after_eval=stop_train_callback, verbose=1, best_model_save_path='logs/best_model')
+        # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
+        eval_callback = EvalCallback(eval_env, eval_freq=EVAL_EVERY_N_EPISODES * args.n_envs * STEPS_PER_EPISODE, callback_after_eval=None, verbose=1, best_model_save_path='logs/best_model', n_eval_episodes=NUM_EVAL_EPISODES, deterministic=True, render=False)
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
@@ -233,17 +251,8 @@ def main():
 
         log.debug(model.policy)
         log.info(f"model: {model}")
-
         log.info("Starting training...")
-
-        USER = os.environ['USER']
-        policy_save_path = wandb.run.dir.split("/")[2:-3]
-        policy_save_path.insert(0, f"/cvgl2/u/{USER}/OmniGibson")
-        policy_save_path.append("runs")
-        policy_save_path.append(wandb.run.id)
-        policy_save_path = "/".join(policy_save_path)
-        text = f"Saved policy path: {policy_save_path}"
-        wandb.alert(title="Run launched", text=text, level=AlertLevel.INFO)
+        wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
             total_timesteps=2_000_000,
             callback=callback,
@@ -251,6 +260,10 @@ def main():
         log.info("Finished training!")
 
 
-
 if __name__ == "__main__":
-    main()
+    env, eval_env = instantiate_envs()
+    _train = lambda: train(env, eval_env)
+    if args.sweep_id:
+        wandb.agent(args.sweep_id, entity="behavior-rl", project="sb3", count=20, function=_train)
+    else:
+        _train()

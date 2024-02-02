@@ -2,7 +2,7 @@ import wandb
 
 sweep_configuration = {
     "method": "random",
-    "metric": {"goal": "maximize", "name": "grasp_success_rate"},
+    "metric": {"goal": "maximize", "name": "eval/success_rate"},
     "parameters": {
         "dist_coeff": {"min": 0.01, "max": 1.0, 'distribution': 'log_uniform_values'},
         "grasp_reward": {"min": 0.1, "max": 10.0, 'distribution': 'log_uniform_values'},
