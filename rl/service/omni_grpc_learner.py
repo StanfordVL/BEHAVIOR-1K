@@ -241,7 +241,7 @@ def train(env, eval_env):
             verbose=2,
         )
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
-        eval_callback = EvalCallback(eval_env, eval_freq=EVAL_EVERY_N_EPISODES * args.n_envs * STEPS_PER_EPISODE, callback_after_eval=None, verbose=1, best_model_save_path='logs/best_model', n_eval_episodes=NUM_EVAL_EPISODES, deterministic=True, render=False)
+        eval_callback = EvalCallback(eval_env, eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE, callback_after_eval=None, verbose=1, best_model_save_path='logs/best_model', n_eval_episodes=NUM_EVAL_EPISODES, deterministic=True, render=False)
         callback = CallbackList([
             wandb_callback,
             checkpoint_callback,
