@@ -201,8 +201,8 @@ class XFormPrim(BasePrim):
         # Inverse of parent world transform multiplied by the current world transform
         # Note: only the parent's scale matters for the local transform
         # Pose(parent->me) = inv(Pose(world->parent)) * Pose(world->me)
-        #                    = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
-        #                      * (Translation(world->me) * Rotation(world->me))
+        #                  = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
+        #                    * (Translation(world->me) * Rotation(world->me))
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
