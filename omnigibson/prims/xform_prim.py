@@ -6,8 +6,9 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+import omnigibson.utils.transform_utils as T
 from scipy.spatial.transform import Rotation as R
-
+from omnigibson.macros import gm
 
 class XFormPrim(BasePrim):
     """
@@ -163,17 +164,37 @@ class XFormPrim(BasePrim):
 
         # mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.get_world_scale() / self.scale)))
         # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
-        mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.scale.astype(np.float64))))
+        # mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.scale.astype(np.float64))))
+
         my_world_transform = np.transpose(mat.GetMatrix())
 
-        parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-        parent_world_transform = np.transpose(parent_world_tf)
+        parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
+        parent_path = str(parent_prim.GetPath())
+        parent_scale = parent_prim.GetAttribute("xformOp:scale").Get()
+        parent_scale = np.array(np.ones(3) if parent_scale is None else parent_scale)
+        parent_scale_tf = np.eye(4)
+        parent_scale_tf[:3, :3] = np.eye(3) * parent_scale
 
-        local_transform = np.matmul(np.linalg.inv(parent_world_transform), my_world_transform)
+        if gm.ENABLE_FLATCACHE and og.sim is not None and og.sim.is_playing():
+            if parent_prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                parent_view = lazy.omni.isaac.core.prims.RigidPrimView(parent_path)
+                parent_view.initialize(og.sim.physics_sim_view)
+            else:
+                parent_view = lazy.omni.isaac.core.prims.XFormPrimView(parent_path)
+            
+            parent_pos, parent_ori = parent_view.get_world_poses()
+            parent_pose = (parent_pos[0], parent_ori[0][[1, 2, 3, 0]])
+            parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
+        else:
+            parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+            parent_world_transform = np.transpose(parent_world_tf)
+        
+        local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
+
         self.set_local_pose(
             position=np.array(calculated_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
@@ -187,7 +208,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(self._prim_path)  
+        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(self._prim_path)
         return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
 
     def set_position(self, position):
