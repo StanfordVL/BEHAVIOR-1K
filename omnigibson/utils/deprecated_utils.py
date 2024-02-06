@@ -1,17 +1,29 @@
 """
 A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
-import omnigibson.lazy as lazy
+import carb
 from typing import List, Optional, Tuple, Union, Callable
+import omni.usd as ou
+from omni.particle.system.core.scripts.core import Core as OmniCore
+from omni.particle.system.core.scripts.utils import Utils as OmniUtils
+from pxr import Sdf, UsdShade, PhysxSchema, Usd, UsdGeom, UsdPhysics
+import omni
+import omni.graph.core as ogc
+from omni.kit.primitive.mesh.command import _get_all_evaluators
+from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
+import omni.timeline
+from omni.isaac.core.utils.prims import get_prim_at_path
 import numpy as np
 import torch
 import warp as wp
 import math
+from omni.isaac.core.articulations import ArticulationView as _ArticulationView
+from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
 
 DEG2RAD = math.pi / 180.0
 
 
-class CreateMeshPrimWithDefaultXformCommand(lazy.omni.kit.primitive.mesh.command.CreateMeshPrimWithDefaultXformCommand):
+class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
     def __init__(self, prim_type: str, **kwargs):
         """
         Creates primitive.
@@ -48,10 +60,10 @@ class CreateMeshPrimWithDefaultXformCommand(lazy.omni.kit.primitive.mesh.command
         """
 
         self._prim_type = prim_type[0:1].upper() + prim_type[1:].lower()
-        self._usd_context = lazy.omni.usd.get_context()
+        self._usd_context = omni.usd.get_context()
         self._selection = self._usd_context.get_selection()
         self._stage = kwargs.get("stage", self._usd_context.get_stage())
-        self._settings = lazy.carb.settings.get_settings()
+        self._settings = carb.settings.get_settings()
         self._default_path = kwargs.get("prim_path", None)
         self._select_new_prim = kwargs.get("select_new_prim", True)
         self._prepend_default_prim = kwargs.get("prepend_default_prim", True)
@@ -59,11 +71,11 @@ class CreateMeshPrimWithDefaultXformCommand(lazy.omni.kit.primitive.mesh.command
 
         self._attributes = {**kwargs}
         # Supported mesh types should have an associated evaluator class
-        self._evaluator_class = lazy.omni.kit.primitive.mesh.command._get_all_evaluators()[prim_type]
+        self._evaluator_class = _get_all_evaluators()[prim_type]
         assert isinstance(self._evaluator_class, type)
 
 
-class Utils2022(lazy.omni.particle.system.core.scripts.utils.Utils):
+class Utils2022(OmniUtils):
     """
     Subclass that overrides a specific function within Omni's Utils class to fix a bug
     """
@@ -77,30 +89,30 @@ class Utils2022(lazy.omni.particle.system.core.scripts.utils.Utils):
         if not self.stage.GetPrimAtPath(material_path + "/Looks"):
             self.stage.DefinePrim(material_path + "/Looks", "Scope")
         material_path += "/Looks/" + name
-        material_path = lazy.omni.usd.get_stage_next_free_path(
+        material_path = ou.get_stage_next_free_path(
             self.stage, material_path, False
         )
-        material = lazy.pxr.UsdShade.Material.Define(self.stage, material_path)
+        material = UsdShade.Material.Define(self.stage, material_path)
 
         shader_path = material_path + "/Shader"
-        shader = lazy.pxr.UsdShade.Shader.Define(self.stage, shader_path)
+        shader = UsdShade.Shader.Define(self.stage, shader_path)
 
         # Update Neuraylib MDL search paths
-        import lazy.omni.particle.system.core as core
+        import omni.particle.system.core as core
         core.update_mdl_search_paths()
 
         shader.SetSourceAsset(name + ".mdl", "mdl")
         shader.SetSourceAssetSubIdentifier(name, "mdl")
-        shader.GetImplementationSourceAttr().Set(lazy.pxr.UsdShade.Tokens.sourceAsset)
-        shader.CreateOutput("out", lazy.pxr.Sdf.ValueTypeNames.Token)
+        shader.GetImplementationSourceAttr().Set(UsdShade.Tokens.sourceAsset)
+        shader.CreateOutput("out", Sdf.ValueTypeNames.Token)
         material.CreateSurfaceOutput().ConnectToSource(shader, "out")
 
         return [material_path]
 
 
-class Utils2023(lazy.omni.particle.system.core.scripts.utils.Utils):
+class Utils2023(OmniUtils):
     def create_material(self, name):
-        material_url = lazy.carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
+        material_url = carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
 
         # TODO: THIS IS THE ONLY LINE WE CHANGE! "/" SHOULD BE ""
         material_path = ""
@@ -111,19 +123,19 @@ class Utils2023(lazy.omni.particle.system.core.scripts.utils.Utils):
         if not self.stage.GetPrimAtPath(material_path + "/Looks"):
             self.stage.DefinePrim(material_path + "/Looks", "Scope")
         material_path += "/Looks/" + name
-        material_path = lazy.omni.usd.get_stage_next_free_path(
+        material_path = ou.get_stage_next_free_path(
             self.stage, material_path, False
         )
         prim = self.stage.DefinePrim(material_path, "Material")
         if material_url:
             prim.GetReferences().AddReference(material_url)
         else:
-            lazy.carb.log_error("Failed to find material URL in settings")
+            carb.log_error("Failed to find material URL in settings")
 
         return [material_path]
 
 
-class Core(lazy.omni.particle.system.core.scripts.core.Core):
+class Core(OmniCore):
     """
     Subclass that overrides a specific function within Omni's Core class to fix a bug
     """
@@ -131,7 +143,7 @@ class Core(lazy.omni.particle.system.core.scripts.core.Core):
         self._popup_callback = popup_callback
         from omnigibson.utils.sim_utils import meets_minimum_isaac_version
         self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
-        self.context = lazy.omni.usd.get_context()
+        self.context = ou.get_context()
         self.stage = self.context.get_stage()
         self.selection = self.context.get_selection()
         self.particle_system_name = particle_system_name
@@ -149,43 +161,43 @@ class Core(lazy.omni.particle.system.core.scripts.core.Core):
                        if self.stage.GetPrimAtPath(path).GetTypeName() in ["ComputeGraph", "OmniGraph"] ]
 
         if len(graph_paths) > 0:
-            graph = lazy.omni.graph.core.get_graph_by_path(graph_paths[0])
+            graph = ogc.get_graph_by_path(graph_paths[0])
             if len(graph_paths) > 1:
-                lazy.carb.log_warn(f"Multiple ComputeGraph prims selected. Only the first will be used: {graph.get_path_to_graph()}")
+                carb.log_warn(f"Multiple ComputeGraph prims selected. Only the first will be used: {graph.get_path_to_graph()}")
         elif create_new_graph:
             # If no graph was found in the selected prims, we'll make a new graph.
             # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
-            graph_path = lazy.pxr.Sdf.Path(f"/OmniGraph/{self.particle_system_name}").MakeAbsolutePath(lazy.pxr.Sdf.Path.absoluteRootPath)
-            graph_path = lazy.omni.usd.get_stage_next_free_path(self.stage, graph_path, True)
+            graph_path = Sdf.Path(f"/OmniGraph/{self.particle_system_name}").MakeAbsolutePath(Sdf.Path.absoluteRootPath)
+            graph_path = ou.get_stage_next_free_path(self.stage, graph_path, True)
 
             # prim = self.stage.GetDefaultPrim()
             # path = str(prim.GetPath()) if prim else ""
             self.stage.DefinePrim("/OmniGraph", "Scope")
 
-            container_graphs = lazy.omni.graph.core.get_global_container_graphs()
+            container_graphs = ogc.get_global_container_graphs()
             # FIXME: container_graphs[0] should be the simulation orchestration graph, but this may change in the future.
             container_graph = container_graphs[0]
-            result, wrapper_node = lazy.omni.graph.core.cmds.CreateGraphAsNode(
+            result, wrapper_node = ogc.cmds.CreateGraphAsNode(
                 graph=container_graph,
-                node_name=lazy.pxr.Sdf.Path(graph_path).name,
+                node_name=Sdf.Path(graph_path).name,
                 graph_path=graph_path,
                 evaluator_name="push",
                 is_global_graph=True,
                 backed_by_usd=True,
-                fc_backing_type=lazy.omni.graph.core.GraphBackingType.GRAPH_BACKING_TYPE_FLATCACHE_SHARED,
-                pipeline_stage=lazy.omni.graph.core.GraphPipelineStage.GRAPH_PIPELINE_STAGE_SIMULATION
+                fc_backing_type=ogc.GraphBackingType.GRAPH_BACKING_TYPE_FLATCACHE_SHARED,
+                pipeline_stage=ogc.GraphPipelineStage.GRAPH_PIPELINE_STAGE_SIMULATION
             )
             graph = wrapper_node.get_wrapped_graph()
 
             if created_paths is not None:
                 created_paths.append(graph.get_path_to_graph())
 
-            lazy.carb.log_info(f"No ComputeGraph selected. A new graph has been created at {graph.get_path_to_graph()}")
+            carb.log_info(f"No ComputeGraph selected. A new graph has been created at {graph.get_path_to_graph()}")
 
         return graph
 
 
-class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
+class ArticulationView(_ArticulationView):
     """ArticulationView with some additional functionality implemented."""
 
     def set_joint_limits(
@@ -208,9 +220,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
                                                                                  Defaults to None (i.e: all dofs).
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_limits()
@@ -235,9 +247,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
                 dof_read_idx = 0
                 for dof_index in joint_indices:
                     dof_val = values[articulation_read_idx][dof_read_idx]
-                    if dof_types[dof_index] == lazy.omni.physics.tensors.DofType.Rotation:
+                    if dof_types[dof_index] == omni.physics.tensors.DofType.Rotation:
                         dof_val /= DEG2RAD
-                    prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index])
+                    prim = get_prim_at_path(self._dof_paths[i][dof_index])
                     prim.GetAttribute("physics:lowerLimit").Set(dof_val[0])
                     prim.GetAttribute("physics:upperLimit").Set(dof_val[1])
                     dof_read_idx += 1
@@ -267,9 +279,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             Union[np.ndarray, torch.Tensor, wp.indexedarray]: joint limits for articulations in the view. shape (M, K).
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             values = self._backend_utils.move_data(self._physics_view.get_dof_limits(), self._device)
@@ -290,10 +302,10 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             for i in indices:
                 dof_write_idx = 0
                 for dof_index in joint_indices:
-                    prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index])
+                    prim = get_prim_at_path(self._dof_paths[i][dof_index])
                     values[articulation_write_idx][dof_write_idx][0] = prim.GetAttribute("physics:lowerLimit").Get()
                     values[articulation_write_idx][dof_write_idx][1] = prim.GetAttribute("physics:upperLimit").Get()
-                    if dof_types[dof_index] == lazy.omni.physics.tensors.DofType.Rotation:
+                    if dof_types[dof_index] == omni.physics.tensors.DofType.Rotation:
                         values[articulation_write_idx][dof_write_idx] = values[articulation_write_idx][dof_write_idx] * DEG2RAD
                     dof_write_idx += 1
                 articulation_write_idx += 1
@@ -320,9 +332,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
                                                                                  Defaults to None (i.e: all dofs).
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             new_values = self._physics_view.get_dof_max_velocities()
@@ -342,7 +354,7 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             for i in indices:
                 dof_read_idx = 0
                 for dof_index in joint_indices:
-                    prim = lazy.pxr.PhysxSchema.PhysxJointAPI(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index]))
+                    prim = PhysxSchema.PhysxJointAPI(get_prim_at_path(self._dof_paths[i][dof_index]))
                     if not prim.GetMaxJointVelocityAttr():
                         prim.CreateMaxJointVelocityAttr().Set(values[articulation_read_idx][dof_read_idx])
                     else:
@@ -374,9 +386,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             Union[np.ndarray, torch.Tensor, wp.indexedarray]: maximum velocities for articulations in the view. shape (M, K).
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return None
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, "cpu")
             max_velocities = self._physics_view.get_dof_max_velocities()
@@ -399,7 +411,7 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             for i in indices:
                 dof_write_idx = 0
                 for dof_index in joint_indices:
-                    prim = lazy.pxr.PhysxSchema.PhysxJointAPI(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._dof_paths[i][dof_index]))
+                    prim = PhysxSchema.PhysxJointAPI(get_prim_at_path(self._dof_paths[i][dof_index]))
                     max_velocities[articulation_write_idx][dof_write_idx] = prim.GetMaxJointVelocityAttr().Get()
                     dof_write_idx += 1
                 articulation_write_idx += 1
@@ -453,9 +465,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             >>> prims.set_joint_positions(positions, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             new_dof_pos = self._physics_view.get_dof_positions()
@@ -470,7 +482,7 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             # self._physics_view.set_dof_position_targets(new_dof_pos, indices)
             self.set_joint_position_targets(positions, indices, joint_indices)
         else:
-            lazy.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
 
     def set_joint_velocities(
         self,
@@ -519,9 +531,9 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             >>> prims.set_joint_velocities(velocities, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
             new_dof_vel = self._physics_view.get_dof_velocities()
@@ -536,7 +548,7 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             # self._physics_view.set_dof_velocity_targets(new_dof_vel, indices)
             self.set_joint_velocity_targets(velocities, indices, joint_indices)
         else:
-            lazy.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
         return
 
     def set_joint_efforts(
@@ -586,10 +598,10 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             >>> prims.set_joint_efforts(efforts, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
         """
         if not self._is_initialized:
-            lazy.carb.log_warn("ArticulationView needs to be initialized.")
+            carb.log_warn("ArticulationView needs to be initialized.")
             return
 
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
 
@@ -605,18 +617,18 @@ class ArticulationView(lazy.omni.isaac.core.articulations.ArticulationView):
             )
             self._physics_view.set_dof_actuation_forces(new_dof_efforts, indices)
         else:
-            lazy.carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
+            carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_efforts")
         return
 
     def _invalidate_physics_handle_callback(self, event):
         # Overwrite super method, add additional de-initialization
-        if event.type == int(lazy.omni.timeline.TimelineEventType.STOP):
+        if event.type == int(omni.timeline.TimelineEventType.STOP):
             self._physics_view = None
             self._invalidate_physics_handle_event = None
             self._is_initialized = False
 
 
-class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
+class RigidPrimView(_RigidPrimView):
     def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
         """Enable gravity on rigid bodies (enabled by default).
 
@@ -626,7 +638,7 @@ class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
         """
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
@@ -638,10 +650,10 @@ class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
             indices = self._backend_utils.to_list(indices)
             for i in indices:
                 if self._physx_rigid_body_apis[i] is None:
-                    if self._prims[i].HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
-                        rigid_api = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
+                    if self._prims[i].HasAPI(PhysxSchema.PhysxRigidBodyAPI):
+                        rigid_api = PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
                     else:
-                        rigid_api = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
+                        rigid_api = PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(False)
 
@@ -655,7 +667,7 @@ class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
                                                                                  Defaults to None (i.e: all prims in the view).
         """
         indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
-        if not lazy.omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
                 self._backend_utils.create_tensor_from_list([True] * len(indices), dtype="uint8"), data, indices
@@ -666,10 +678,10 @@ class RigidPrimView(lazy.omni.isaac.core.prims.RigidPrimView):
             indices = self._backend_utils.to_list(indices)
             for i in indices:
                 if self._physx_rigid_body_apis[i] is None:
-                    if self._prims[i].HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
-                        rigid_api = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
+                    if self._prims[i].HasAPI(PhysxSchema.PhysxRigidBodyAPI):
+                        rigid_api = PhysxSchema.PhysxRigidBodyAPI(self._prims[i])
                     else:
-                        rigid_api = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
+                        rigid_api = PhysxSchema.PhysxRigidBodyAPI.Apply(self._prims[i])
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(True)
             return
