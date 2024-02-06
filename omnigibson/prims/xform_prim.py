@@ -167,7 +167,7 @@ class XFormPrim(BasePrim):
 
         my_world_transform = np.transpose(mat.GetMatrix())
 
-        # When flatcache is on, we need to use USDRt to get the parent's world transform
+        # When flatcache is on and when physics is active, we need to use USDRt to get the parent's world transform
         if gm.ENABLE_FLATCACHE and og.sim is not None and og.sim.is_playing():
             parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
             parent_path = str(parent_prim.GetPath())
@@ -187,12 +187,22 @@ class XFormPrim(BasePrim):
             parent_scale_tf = np.eye(4)
             parent_scale_tf[:3, :3] = np.diag(parent_scale)
 
+            # Combine translation, rotation, and scale to get the parent world transform
+            # Parent World Transform Matrix:
+            # | R_parent * S_parent   T_parent |
+            # |          0            1        |
             parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
         # When flatcache is off, we can simply use USD to get the parent's world transform
         else:
             parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
             parent_world_transform = np.transpose(parent_world_tf)
 
+        # Calculate the local transform from parent to current prim
+        # Inverse of parent world transform multiplied by the current world transform
+        # Note: only the parent's scale matters for the local transform
+        # Pose(parent->me) = inv(Pose(world->parent)) * Pose(world->me)
+        #                    = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
+        #                      * (Translation(world->me) * Rotation(world->me))
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
