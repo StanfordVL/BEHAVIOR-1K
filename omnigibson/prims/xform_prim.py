@@ -188,9 +188,7 @@ class XFormPrim(BasePrim):
             parent_scale_tf[:3, :3] = np.diag(parent_scale)
 
             # Combine translation, rotation, and scale to get the parent world transform
-            # Parent World Transform Matrix:
-            # | R_parent * S_parent   T_parent |
-            # |          0            1        |
+            # translation --> rotation --> scale, for each nested prim
             parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
         # When flatcache is off, we can simply use USD to get the parent's world transform
         else:
@@ -200,6 +198,8 @@ class XFormPrim(BasePrim):
         # Calculate the local transform from parent to current prim
         # Inverse of parent world transform multiplied by the current world transform
         # Note: only the parent's scale matters for the local transform
+        # Notation: Pose(X) = Translation(X) * Rotation(X) * Scale(X)
+        #
         # Pose(parent->me) = inv(Pose(world->parent)) * Pose(world->me)
         #                  = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
         #                    * (Translation(world->me) * Rotation(world->me))
