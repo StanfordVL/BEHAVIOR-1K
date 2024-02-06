@@ -152,51 +152,55 @@ class XFormPrim(BasePrim):
                 Default is None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
+        
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+        
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
         assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
             f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         mat = lazy.pxr.Gf.Transform()
+        # Only set rotation and translation but not scale for the child prim because it's irrelevant for its local transform
         mat.SetRotation(lazy.pxr.Gf.Rotation(lazy.pxr.Gf.Quatd(*orientation)))
         mat.SetTranslation(lazy.pxr.Gf.Vec3d(*position))
 
-        # mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.get_world_scale() / self.scale)))
-        # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
-        # mat.SetScale(lazy.pxr.Gf.Vec3d(*(self.scale.astype(np.float64))))
-
         my_world_transform = np.transpose(mat.GetMatrix())
 
-        parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
-        parent_path = str(parent_prim.GetPath())
-        parent_scale = parent_prim.GetAttribute("xformOp:scale").Get()
-        parent_scale = np.array(np.ones(3) if parent_scale is None else parent_scale)
-        parent_scale_tf = np.eye(4)
-        parent_scale_tf[:3, :3] = np.eye(3) * parent_scale
-
+        # When flatcache is on, we need to use USDRt to get the parent's world transform
         if gm.ENABLE_FLATCACHE and og.sim is not None and og.sim.is_playing():
+            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
+            parent_path = str(parent_prim.GetPath())
+
+            # Check whether the parent is a rigid body
             if parent_prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
                 parent_view = lazy.omni.isaac.core.prims.RigidPrimView(parent_path)
                 parent_view.initialize(og.sim.physics_sim_view)
             else:
                 parent_view = lazy.omni.isaac.core.prims.XFormPrimView(parent_path)
-            
+
             parent_pos, parent_ori = parent_view.get_world_poses()
             parent_pose = (parent_pos[0], parent_ori[0][[1, 2, 3, 0]])
+
+            # Get the parent scale transform
+            parent_scale = np.array(np.ones(3) if parent_prim.GetAttribute("xformOp:scale").Get() is None else parent_prim.GetAttribute("xformOp:scale").Get())
+            parent_scale_tf = np.eye(4)
+            parent_scale_tf[:3, :3] = np.diag(parent_scale)
+
             parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
+        # When flatcache is off, we can simply use USD to get the parent's world transform
         else:
             parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
             parent_world_transform = np.transpose(parent_world_tf)
-        
+
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
-        calculated_translation = transform.GetTranslation()
-        calculated_orientation = transform.GetRotation().GetQuat()
+        local_translation = transform.GetTranslation()
+        local_orientation = transform.GetRotation().GetQuat()
 
         self.set_local_pose(
-            position=np.array(calculated_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
+            position=np.array(local_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(local_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
 
     def get_position_orientation(self):
