@@ -16,137 +16,7 @@ import pytest
 import numpy as np
 
 @og_test
-def test_cooking_object_rule_failure_unary_states():
-    assert len(REGISTERED_RULES) > 0, "No rules registered!"
-
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
-
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-
-    place_obj_on_floor_plane(oven)
-    og.sim.step()
-
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
-    og.sim.step()
-    assert baking_sheet.states[Inside].get_value(oven)
-
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
-    og.sim.step()
-    assert bagel_dough.states[OnTop].get_value(baking_sheet)
-    assert raw_egg.states[OnTop].get_value(bagel_dough)
-
-    # This fails the recipe because it requires the bagel dough and the raw egg to be not cooked
-    assert bagel_dough.states[Cooked].set_value(True)
-    assert raw_egg.states[Cooked].set_value(True)
-    og.sim.step()
-
-    assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
-    og.sim.step()
-
-    assert oven.states[ToggledOn].set_value(True)
-    og.sim.step()
-
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-    assert len(final_bagels) == len(initial_bagels)
-
-    # Clean up
-    sesame_seed.remove_all_particles()
-
-@og_test
-def test_cooking_object_rule_failure_binary_system_states():
-    assert len(REGISTERED_RULES) > 0, "No rules registered!"
-
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
-
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-
-    place_obj_on_floor_plane(oven)
-    og.sim.step()
-
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
-    og.sim.step()
-    assert baking_sheet.states[Inside].get_value(oven)
-
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
-    og.sim.step()
-    assert bagel_dough.states[OnTop].get_value(baking_sheet)
-    assert raw_egg.states[OnTop].get_value(bagel_dough)
-
-    assert bagel_dough.states[Cooked].set_value(False)
-    assert raw_egg.states[Cooked].set_value(False)
-    og.sim.step()
-
-    # This fails the recipe because it requires the bagel dough and the raw egg to be covered with sesame seed
-    assert bagel_dough.states[Covered].set_value(sesame_seed, False)
-    assert raw_egg.states[Covered].set_value(sesame_seed, False)
-    og.sim.step()
-
-    assert oven.states[ToggledOn].set_value(True)
-    og.sim.step()
-
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-    assert len(final_bagels) == len(initial_bagels)
-
-    # Clean up
-    sesame_seed.remove_all_particles()
-
-@og_test
-def test_cooking_object_rule_failure_binary_object_states():
-    assert len(REGISTERED_RULES) > 0, "No rules registered!"
-
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
-
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-
-    place_obj_on_floor_plane(oven)
-    og.sim.step()
-
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
-    og.sim.step()
-    assert baking_sheet.states[Inside].get_value(oven)
-
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.12, 0.15, 0.47], [0, 0, 0, 1])
-    og.sim.step()
-    assert bagel_dough.states[OnTop].get_value(baking_sheet)
-    # This fails the recipe because it requires the raw egg to be on top of the bagel dough
-    assert not raw_egg.states[OnTop].get_value(bagel_dough)
-
-    assert bagel_dough.states[Cooked].set_value(False)
-    assert raw_egg.states[Cooked].set_value(False)
-    og.sim.step()
-
-    assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
-    og.sim.step()
-
-    assert oven.states[ToggledOn].set_value(True)
-    og.sim.step()
-
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
-    assert len(final_bagels) == len(initial_bagels)
-
-    # Clean up
-    sesame_seed.remove_all_particles()
-
-@og_test
 def test_cooking_object_rule_failure_wrong_container():
-    # from IPython import embed; print("debug"); embed()
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
     oven = og.sim.scene.object_registry("name", "oven")
@@ -155,7 +25,7 @@ def test_cooking_object_rule_failure_wrong_container():
     raw_egg = og.sim.scene.object_registry("name", "raw_egg")
     sesame_seed = get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -182,7 +52,179 @@ def test_cooking_object_rule_failure_wrong_container():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    assert len(final_bagels) == len(initial_bagels)
+
+    # Clean up
+    sesame_seed.remove_all_particles()
+
+@og_test
+def test_cooking_object_rule_failure_recipe_objects():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+
+    oven = og.sim.scene.object_registry("name", "oven")
+    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
+    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    sesame_seed = get_system("sesame_seed")
+
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+
+    place_obj_on_floor_plane(oven)
+    og.sim.step()
+
+    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    og.sim.step()
+    assert baking_sheet.states[Inside].get_value(oven)
+
+    # This fails the recipe because it requires the bagel dough to be on top of the baking sheet
+    bagel_dough.set_position_orientation([1, 0, 0.495], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([1.02, 0, 0.54], [0, 0, 0, 1])
+    og.sim.step()
+    assert not bagel_dough.states[OnTop].get_value(baking_sheet)
+    assert raw_egg.states[OnTop].get_value(bagel_dough)
+
+    assert bagel_dough.states[Cooked].set_value(False)
+    assert raw_egg.states[Cooked].set_value(False)
+    og.sim.step()
+
+    assert bagel_dough.states[Covered].set_value(sesame_seed, True)
+    assert raw_egg.states[Covered].set_value(sesame_seed, True)
+    og.sim.step()
+
+    assert oven.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    assert len(final_bagels) == len(initial_bagels)
+
+    # Clean up
+    sesame_seed.remove_all_particles()
+
+@og_test
+def test_cooking_object_rule_failure_unary_states():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+
+    oven = og.sim.scene.object_registry("name", "oven")
+    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
+    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    sesame_seed = get_system("sesame_seed")
+
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+
+    place_obj_on_floor_plane(oven)
+    og.sim.step()
+
+    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    og.sim.step()
+    assert baking_sheet.states[Inside].get_value(oven)
+
+    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
+    og.sim.step()
+    assert bagel_dough.states[OnTop].get_value(baking_sheet)
+    assert raw_egg.states[OnTop].get_value(bagel_dough)
+
+    # This fails the recipe because it requires the bagel dough and the raw egg to be not cooked
+    assert bagel_dough.states[Cooked].set_value(True)
+    assert raw_egg.states[Cooked].set_value(True)
+    og.sim.step()
+
+    assert bagel_dough.states[Covered].set_value(sesame_seed, True)
+    assert raw_egg.states[Covered].set_value(sesame_seed, True)
+    og.sim.step()
+
+    assert oven.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    assert len(final_bagels) == len(initial_bagels)
+
+    # Clean up
+    sesame_seed.remove_all_particles()
+
+@og_test
+def test_cooking_object_rule_failure_binary_system_states():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+
+    oven = og.sim.scene.object_registry("name", "oven")
+    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
+    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    sesame_seed = get_system("sesame_seed")
+
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+
+    place_obj_on_floor_plane(oven)
+    og.sim.step()
+
+    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    og.sim.step()
+    assert baking_sheet.states[Inside].get_value(oven)
+
+    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
+    og.sim.step()
+    assert bagel_dough.states[OnTop].get_value(baking_sheet)
+    assert raw_egg.states[OnTop].get_value(bagel_dough)
+
+    assert bagel_dough.states[Cooked].set_value(False)
+    assert raw_egg.states[Cooked].set_value(False)
+    og.sim.step()
+
+    # This fails the recipe because it requires the bagel dough and the raw egg to be covered with sesame seed
+    assert bagel_dough.states[Covered].set_value(sesame_seed, False)
+    assert raw_egg.states[Covered].set_value(sesame_seed, False)
+    og.sim.step()
+
+    assert oven.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    assert len(final_bagels) == len(initial_bagels)
+
+    # Clean up
+    sesame_seed.remove_all_particles()
+
+@og_test
+def test_cooking_object_rule_failure_binary_object_states():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+
+    oven = og.sim.scene.object_registry("name", "oven")
+    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
+    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    sesame_seed = get_system("sesame_seed")
+
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+
+    place_obj_on_floor_plane(oven)
+    og.sim.step()
+
+    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    og.sim.step()
+    assert baking_sheet.states[Inside].get_value(oven)
+
+    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.12, 0.15, 0.47], [0, 0, 0, 1])
+    og.sim.step()
+    assert bagel_dough.states[OnTop].get_value(baking_sheet)
+    # This fails the recipe because it requires the raw egg to be on top of the bagel dough
+    assert not raw_egg.states[OnTop].get_value(bagel_dough)
+
+    assert bagel_dough.states[Cooked].set_value(False)
+    assert raw_egg.states[Cooked].set_value(False)
+    og.sim.step()
+
+    assert bagel_dough.states[Covered].set_value(sesame_seed, True)
+    assert raw_egg.states[Covered].set_value(sesame_seed, True)
+    og.sim.step()
+
+    assert oven.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
@@ -198,7 +240,7 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     raw_egg = og.sim.scene.object_registry("name", "raw_egg")
     sesame_seed = get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
     # This fails the recipe because it requires the oven to be the heat source, not the stove
     place_obj_on_floor_plane(stove)
@@ -228,7 +270,7 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     # Make sure the stove affects the baking sheet
     assert stove.states[HeatSourceOrSink].affects_obj(baking_sheet)
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
@@ -247,7 +289,7 @@ def test_cooking_object_rule_success():
     deleted_objs = [bagel_dough, raw_egg]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -273,7 +315,7 @@ def test_cooking_object_rule_success():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel").copy()
+    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
     # Recipe should execute successfully: new bagels should be created, and the ingredients should be deleted
     assert len(final_bagels) > len(initial_bagels)
@@ -291,6 +333,7 @@ def test_cooking_object_rule_success():
         # there is no guarantee that all four of them will be on top of the baking sheet at the end.
         # assert bagel.states[OnTop].get_value(baking_sheet)
         assert bagel.states[Inside].get_value(oven)
+
     # Clean up
     sesame_seed.remove_all_particles()
     og.sim.step()
@@ -303,97 +346,452 @@ def test_cooking_object_rule_success():
         og.sim.import_object(obj)
     og.sim.step()
 
-# @og_test
-# def test_slicing_rule():
-#     assert len(REGISTERED_RULES) > 0, "No rules registered!"
+@og_test
+def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    food_processor = og.sim.scene.object_registry("name", "food_processor")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
 
-# @og_test
-# def test_blender_rule():
-#     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-#     blender = og.sim.scene.object_registry("name", "blender")
-#
-#     blender.set_orientation([0, 0, 0, 1])
-#     place_obj_on_floor_plane(blender)
-#     og.sim.step()
-#
-#     milk = get_system("whole_milk")
-#     chocolate_sauce = get_system("chocolate_sauce")
-#     milkshake = get_system("milkshake")
-#     milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
-#     chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
-#
-#     ice_cream = DatasetObject(
-#         name="ice_cream",
-#         category="scoop_of_ice_cream",
-#         model="dodndj",
-#         bounding_box=[0.076, 0.077, 0.065],
-#     )
-#     og.sim.import_object(ice_cream)
-#     ice_cream.set_position([0, 0, 0.54])
-#
-#     for i in range(5):
-#         og.sim.step()
-#
-#     assert milkshake.n_particles == 0
-#
-#     blender.states[ToggledOn].set_value(True)
-#     og.sim.step()
-#
-#     assert milk.n_particles == 0
-#     assert chocolate_sauce.n_particles == 0
-#     assert milkshake.n_particles > 0
-#
-#     # Remove objects and systems from recipe output
-#     milkshake.remove_all_particles()
-#     if og.sim.scene.object_registry("name", "ice_cream") is not None:
-#         og.sim.remove_object(obj=ice_cream)
-#
-#
-# @og_test
-# def test_cooking_rule():
-#     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-#     oven = og.sim.scene.object_registry("name", "oven")
-#     oven.keep_still()
-#     oven.set_orientation([0, 0, -0.707, 0.707])
-#     place_obj_on_floor_plane(oven)
-#     og.sim.step()
-#
-#     sheet = DatasetObject(
-#         name="sheet",
-#         category="baking_sheet",
-#         model="yhurut",
-#         bounding_box=[0.520, 0.312, 0.0395],
-#     )
-#
-#     og.sim.import_object(sheet)
-#     sheet.set_position_orientation([0.072, 0.004, 0.455], [0, 0, 0, 1])
-#
-#     dough = DatasetObject(
-#         name="dough",
-#         category="sugar_cookie_dough",
-#         model="qewbbb",
-#         bounding_box=[0.200, 0.192, 0.0957],
-#     )
-#     og.sim.import_object(dough)
-#     dough.set_position_orientation([0.072, 0.004, 0.555], [0, 0, 0, 1])
-#
-#     for i in range(10):
-#         og.sim.step()
-#
-#     assert len(og.sim.scene.object_registry("category", "sugar_cookie", default_val=[])) == 0
-#
-#     oven.states[ToggledOn].set_value(True)
-#     og.sim.step()
-#     og.sim.step()
-#
-#     dough_exists = og.sim.scene.object_registry("name", "dough") is not None
-#     assert not dough_exists or not dough.states[OnTop].get_value(sheet)
-#     assert len(og.sim.scene.object_registry("category", "sugar_cookie")) > 0
-#
-#     # Remove objects
-#     if dough_exists:
-#         og.sim.remove_object(dough)
-#     og.sim.remove_object(sheet)
+    deleted_objs = [ice_cream]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-# test_cooking_object_rule_failure_wrong_container()
-# test_cooking_object_rule_failure_unary_states()
+    # This fails the recipe because it requires the blender to be the container, not the food processor
+    place_obj_on_floor_plane(food_processor)
+    og.sim.step()
+
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.25]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.25]]))
+    ice_cream.set_position([0, 0, 0.2])
+
+    og.sim.step()
+
+    assert food_processor.states[Contains].get_value(milk)
+    assert food_processor.states[Contains].get_value(chocolate_sauce)
+    assert ice_cream.states[Inside].get_value(food_processor)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    food_processor.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no milkshake should be created, and sludge should be created.
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles > 0
+    assert milk.n_particles == 0
+    assert chocolate_sauce.n_particles == 0
+    for obj in deleted_objs:
+        assert og.sim.scene.object_registry("name", obj.name) is None
+
+    # Clean up
+    sludge.remove_all_particles()
+    og.sim.step()
+
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_system_failure_recipe_systems():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    blender = og.sim.scene.object_registry("name", "blender")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
+
+    deleted_objs = [ice_cream]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(blender)
+    og.sim.step()
+
+    # This fails the recipe because it requires the milk to be in the blender
+    milk.generate_particles(positions=np.array([[0.02, 0, 1.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
+    ice_cream.set_position([0, 0, 0.54])
+
+    og.sim.step()
+
+    assert not blender.states[Contains].get_value(milk)
+    assert blender.states[Contains].get_value(chocolate_sauce)
+    assert ice_cream.states[Inside].get_value(blender)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    blender.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no milkshake should be created, and sludge should be created.
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles > 0
+    assert chocolate_sauce.n_particles == 0
+    for obj in deleted_objs:
+        assert og.sim.scene.object_registry("name", obj.name) is None
+
+    # Clean up
+    sludge.remove_all_particles()
+    milk.remove_all_particles()
+    og.sim.step()
+
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_system_failure_recipe_objects():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    blender = og.sim.scene.object_registry("name", "blender")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
+
+    place_obj_on_floor_plane(blender)
+    og.sim.step()
+
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
+    # This fails the recipe because it requires the ice cream to be inside the blender
+    ice_cream.set_position([0, 0, 1.54])
+
+    og.sim.step()
+
+    assert blender.states[Contains].get_value(milk)
+    assert blender.states[Contains].get_value(chocolate_sauce)
+    assert not ice_cream.states[Inside].get_value(blender)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    blender.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no milkshake should be created, and sludge should be created.
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles > 0
+    assert milk.n_particles == 0
+    assert chocolate_sauce.n_particles == 0
+
+    # Clean up
+    sludge.remove_all_particles()
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    blender = og.sim.scene.object_registry("name", "blender")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
+    water = get_system("water")
+
+    deleted_objs = [ice_cream]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(blender)
+    og.sim.step()
+
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
+    # This fails the recipe because water (nonrecipe system) is in the blender
+    water.generate_particles(positions=np.array([[0, 0, 0.5]]))
+    ice_cream.set_position([0, 0, 0.54])
+
+    og.sim.step()
+
+    assert blender.states[Contains].get_value(milk)
+    assert blender.states[Contains].get_value(chocolate_sauce)
+    assert blender.states[Contains].get_value(water)
+    assert ice_cream.states[Inside].get_value(blender)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    blender.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no milkshake should be created, and sludge should be created.
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles > 0
+    assert milk.n_particles == 0
+    assert chocolate_sauce.n_particles == 0
+    assert water.n_particles == 0
+
+    # Clean up
+    sludge.remove_all_particles()
+    og.sim.step()
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    blender = og.sim.scene.object_registry("name", "blender")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    bowl = og.sim.scene.object_registry("name", "bowl")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
+
+    deleted_objs = [ice_cream, bowl]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(blender)
+    og.sim.step()
+
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
+    ice_cream.set_position([0, 0, 0.54])
+    # This fails the recipe because the bowl (nonrecipe object) is in the blender
+    bowl.set_position([0, 0, 0.6])
+
+    og.sim.step()
+
+    assert blender.states[Contains].get_value(milk)
+    assert blender.states[Contains].get_value(chocolate_sauce)
+    assert ice_cream.states[Inside].get_value(blender)
+    assert bowl.states[Inside].get_value(blender)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    blender.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no milkshake should be created, and sludge should be created.
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles > 0
+    assert milk.n_particles == 0
+    assert chocolate_sauce.n_particles == 0
+
+    # Clean up
+    sludge.remove_all_particles()
+    og.sim.step()
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_system_success():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    blender = og.sim.scene.object_registry("name", "blender")
+    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = get_system("whole_milk")
+    chocolate_sauce = get_system("chocolate_sauce")
+    milkshake = get_system("milkshake")
+    sludge = get_system("sludge")
+
+    deleted_objs = [ice_cream]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(blender)
+    og.sim.step()
+
+    milk.generate_particles(positions=np.array([[0.02, 0, 0.5]]))
+    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.5]]))
+    ice_cream.set_position([0, 0, 0.54])
+
+    og.sim.step()
+
+    assert blender.states[Contains].get_value(milk)
+    assert blender.states[Contains].get_value(chocolate_sauce)
+    assert ice_cream.states[Inside].get_value(blender)
+
+    assert milkshake.n_particles == 0
+    assert sludge.n_particles == 0
+
+    blender.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should execute successfully: new milkshake should be created, and the ingredients should be deleted
+    assert milkshake.n_particles > 0
+    assert sludge.n_particles == 0
+    assert milk.n_particles == 0
+    assert chocolate_sauce.n_particles == 0
+    for obj in deleted_objs:
+        assert og.sim.scene.object_registry("name", obj.name) is None
+
+    # Clean up
+    milkshake.remove_all_particles()
+    og.sim.step()
+
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_object_failure_unary_states():
+    from IPython import embed; embed()
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    electric_mixer = og.sim.scene.object_registry("name", "electric_mixer")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    another_raw_egg = og.sim.scene.object_registry("name", "another_raw_egg")
+    flour = get_system("flour")
+    granulated_sugar = get_system("granulated_sugar")
+    vanilla = get_system("vanilla")
+    melted_butter = get_system("melted__butter")
+    baking_powder = get_system("baking_powder")
+    salt = get_system("salt")
+    sludge = get_system("sludge")
+
+    initial_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+
+    deleted_objs = [raw_egg, another_raw_egg]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(electric_mixer)
+    og.sim.step()
+
+    another_raw_egg.set_position_orientation([0, 0.1, 0.2], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0, 0.1, 0.17], [0, 0, 0, 1])
+    flour.generate_particles(positions=np.array([[-0.02, 0.06, 0.15]]))
+    granulated_sugar.generate_particles(positions=np.array([[0.0, 0.06, 0.15]]))
+    vanilla.generate_particles(positions=np.array([[0.02, 0.06, 0.15]]))
+    melted_butter.generate_particles(positions=np.array([[-0.02, 0.08, 0.15]]))
+    baking_powder.generate_particles(positions=np.array([[0.0, 0.08, 0.15]]))
+    salt.generate_particles(positions=np.array([[0.02, 0.08, 0.15]]))
+    # This fails the recipe because the egg should not be cooked
+    raw_egg.states[Cooked].set_value(True)
+    og.sim.step()
+
+    assert electric_mixer.states[Contains].get_value(flour)
+    assert electric_mixer.states[Contains].get_value(granulated_sugar)
+    assert electric_mixer.states[Contains].get_value(vanilla)
+    assert electric_mixer.states[Contains].get_value(melted_butter)
+    assert electric_mixer.states[Contains].get_value(baking_powder)
+    assert electric_mixer.states[Contains].get_value(salt)
+    assert raw_egg.states[Inside].get_value(electric_mixer)
+    assert raw_egg.states[Cooked].get_value()
+    assert another_raw_egg.states[Inside].get_value(electric_mixer)
+    assert not another_raw_egg.states[Cooked].get_value()
+
+    assert sludge.n_particles == 0
+
+    electric_mixer.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should fail: no dough should be created, and sludge should be created.
+    final_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+
+    # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
+    assert len(final_doughs) == len(initial_doughs)
+    for obj in deleted_objs:
+        assert og.sim.scene.object_registry("name", obj.name) is None
+    assert flour.n_particles == 0
+    assert granulated_sugar.n_particles == 0
+    assert vanilla.n_particles == 0
+    assert melted_butter.n_particles == 0
+    assert baking_powder.n_particles == 0
+    assert salt.n_particles == 0
+    assert sludge.n_particles > 0
+
+    # Clean up
+    sludge.remove_all_particles()
+    og.sim.step()
+
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+@og_test
+def test_single_toggleable_machine_rule_output_object_success():
+    from IPython import embed; embed()
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    electric_mixer = og.sim.scene.object_registry("name", "electric_mixer")
+    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
+    another_raw_egg = og.sim.scene.object_registry("name", "another_raw_egg")
+    flour = get_system("flour")
+    granulated_sugar = get_system("granulated_sugar")
+    vanilla = get_system("vanilla")
+    melted_butter = get_system("melted__butter")
+    baking_powder = get_system("baking_powder")
+    salt = get_system("salt")
+    sludge = get_system("sludge")
+
+    initial_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+
+    deleted_objs = [raw_egg, another_raw_egg]
+    deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+
+    place_obj_on_floor_plane(electric_mixer)
+    og.sim.step()
+
+    another_raw_egg.set_position_orientation([0, 0.1, 0.2], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0, 0.1, 0.17], [0, 0, 0, 1])
+    flour.generate_particles(positions=np.array([[-0.02, 0.06, 0.15]]))
+    granulated_sugar.generate_particles(positions=np.array([[0.0, 0.06, 0.15]]))
+    vanilla.generate_particles(positions=np.array([[0.02, 0.06, 0.15]]))
+    melted_butter.generate_particles(positions=np.array([[-0.02, 0.08, 0.15]]))
+    baking_powder.generate_particles(positions=np.array([[0.0, 0.08, 0.15]]))
+    salt.generate_particles(positions=np.array([[0.02, 0.08, 0.15]]))
+
+    og.sim.step()
+
+    assert electric_mixer.states[Contains].get_value(flour)
+    assert electric_mixer.states[Contains].get_value(granulated_sugar)
+    assert electric_mixer.states[Contains].get_value(vanilla)
+    assert electric_mixer.states[Contains].get_value(melted_butter)
+    assert electric_mixer.states[Contains].get_value(baking_powder)
+    assert electric_mixer.states[Contains].get_value(salt)
+    assert raw_egg.states[Inside].get_value(electric_mixer)
+    assert not raw_egg.states[Cooked].get_value()
+    assert another_raw_egg.states[Inside].get_value(electric_mixer)
+    assert not another_raw_egg.states[Cooked].get_value()
+
+    assert sludge.n_particles == 0
+
+    electric_mixer.states[ToggledOn].set_value(True)
+    og.sim.step()
+
+    # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
+    final_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+
+    # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
+    assert len(final_doughs) > len(initial_doughs)
+    for obj in deleted_objs:
+        assert og.sim.scene.object_registry("name", obj.name) is None
+    assert flour.n_particles == 0
+    assert granulated_sugar.n_particles == 0
+    assert vanilla.n_particles == 0
+    assert melted_butter.n_particles == 0
+    assert baking_powder.n_particles == 0
+    assert salt.n_particles == 0
+
+    # Need to step again for the new dough to be initialized, placed in the container, and cooked.
+    og.sim.step()
+
+    # All new doughs should not be cooked
+    new_doughs = final_doughs - initial_doughs
+    for dough in new_doughs:
+        assert not dough.states[Cooked].get_value()
+        assert dough.states[OnTop].get_value(electric_mixer)
+
+    # Clean up
+    og.sim.remove_objects(new_doughs)
+    og.sim.step()
+
+    for obj_cfg in deleted_objs_cfg:
+        obj = DatasetObject(**obj_cfg)
+        og.sim.import_object(obj)
+    og.sim.step()
+
+
+test_single_toggleable_machine_rule_output_object_failure_unary_states()

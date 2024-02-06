@@ -32,7 +32,7 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
 # Modifiers denoting a semantic difference in the system
-SYSTEM_PREFIXES = {"diced", "cooked"}
+SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
@@ -140,6 +140,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # Add to registry
         SYSTEM_REGISTRY.add(obj=cls)
 
+        # Avoid circular import
+        from omnigibson.transition_rules import TransitionRuleAPI
         TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
@@ -216,6 +218,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
             # Remove from active registry
             SYSTEM_REGISTRY.remove(obj=cls)
 
+            # Avoid circular import
+            from omnigibson.transition_rules import TransitionRuleAPI
             TransitionRuleAPI.refresh_all_rules()
 
     @classmethod

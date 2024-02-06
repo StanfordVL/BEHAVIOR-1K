@@ -83,6 +83,10 @@ def assert_test_scene():
                 get_obj_cfg("baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]),
                 get_obj_cfg("bagel_dough", "bagel_dough", "iuembm"),
                 get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
+                get_obj_cfg("food_processor", "food_processor", "gamkbo"),
+                get_obj_cfg("electric_mixer", "electric_mixer", "ceaeqf"),
+                get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
             ],
             "robots": [
                 {

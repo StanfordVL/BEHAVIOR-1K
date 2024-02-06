@@ -1057,7 +1057,7 @@ def test_filled():
     systems = (
         get_system("water"),
         get_system("raspberry"),
-        get_system("diced_apple"),
+        get_system("diced__apple"),
     )
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])

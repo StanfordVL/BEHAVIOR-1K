@@ -474,19 +474,15 @@ class ChangeConditionWrapper(RuleCondition):
                 values have changed since the previous time this condition was called
         """
         self._condition = condition
-        self._last_valid_candidates = None
+        self._last_valid_candidates = {filter_name: set() for filter_name in self.modifies_filter_names}
 
     def refresh(self, object_candidates):
         # Refresh nested condition
         self._condition.refresh(object_candidates=object_candidates)
 
-        # Clear last valid candidates
-        self._last_valid_candidates = {filter_name: set() for filter_name in self.modifies_filter_names}
-
     def __call__(self, object_candidates):
         # Call wrapped method first
         valid = self._condition(object_candidates=object_candidates)
-
         # Iterate over all current candidates -- if there's a mismatch in last valid candidates and current,
         # then we store it, otherwise, we don't
         for filter_name in self.modifies_filter_names:
@@ -824,7 +820,7 @@ class MeltingRule(BaseTransitionRule):
 
         # Convert the meltable object into its melted substance
         for meltable_obj in object_candidates["meltable"]:
-            system = get_system(f"melted_{meltable_obj.category}")
+            system = get_system(f"melted__{meltable_obj.category}")
             system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
@@ -1344,22 +1340,27 @@ class RecipeRule(BaseTransitionRule):
 
         # Verify the container category is valid
         if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
+            print("recipe container is not valid")
             return False
 
         # Verify all required systems are contained in the container
         if not cls.relax_recipe_systems and not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+            print("recipe systems are not contained")
             return False
 
         # Verify all required object quantities are contained in the container and their states are satisfied
         if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, container_info=container_info):
+            print("recipe objects are not contained or their states are not satisfied")
             return False
 
         # Verify no non-relevant system is contained
         if not cls.ignore_nonrecipe_systems and not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
+            print("non-recipe systems are contained")
             return False
 
         # Verify no non-relevant object is contained if we're not ignoring them
         if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, container_info=container_info):
+            print("non-recipe objects are contained")
             return False
 
         return True
