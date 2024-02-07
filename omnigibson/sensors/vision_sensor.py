@@ -9,7 +9,6 @@ from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
-from omnigibson.utils.usd_utils import get_camera_params
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -115,7 +114,7 @@ class VisionSensor(BaseSensor):
             camera_params="camera_params",
         )
         
-        assert set(self._RAW_SENSOR_TYPES.keys()) == set(self.all_modalities), \
+        assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != 'camera_params'} == set(self.all_modalities), \
             "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
         # Run super method
@@ -223,8 +222,6 @@ class VisionSensor(BaseSensor):
         for modality in self._modalities:
             raw_obs = self._annotators[modality].get_data()
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
-            if modality == "camera_params":
-                continue
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
         return obs
 
@@ -430,21 +427,19 @@ class VisionSensor(BaseSensor):
             n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
-        params = get_camera_params(viewport=self._viewport.viewport_api)
-        h, w = self.image_height, self.image_width
-        horizontal_fov = params["fov"]
-        vertical_fov = horizontal_fov * h / w
+        projection_matrix = self.camera_parameters["cameraProjection"]
+        projection_matrix = np.array(projection_matrix).reshape(4, 4)
 
-        f_x = (w / 2.0) / np.tan(horizontal_fov / 2.0)
-        f_y = (h / 2.0) / np.tan(vertical_fov / 2.0)
+        fx = projection_matrix[0, 0]
+        fy = projection_matrix[1, 1]
+        cx = projection_matrix[0, 2]
+        cy = projection_matrix[1, 2]
+        s = projection_matrix[0, 1]  # Skew factor
 
-        K = np.array([
-            [f_x, 0.0, w / 2.0],
-            [0.0, f_y, h / 2.0],
-            [0.0, 0.0, 1.0]
-        ])
-
-        return K
+        intrinsic_matrix = np.array([[fx, s, cx],
+                                     [0.0, fy, cy],
+                                     [0.0, 0.0, 1.0]])
+        return intrinsic_matrix
 
     @property
     def _obs_space_mapping(self):
