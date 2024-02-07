@@ -184,14 +184,6 @@ class TransitionRuleAPI:
         """
         # Process all transition results
         if len(removed_objs) > 0:
-            disclaimer(
-                f"We are attempting to remove objects during the transition rule phase of the simulator step.\n"
-                f"However, Omniverse currently has a bug when using GPU dynamics where a segfault will occur if an "
-                f"object in contact with another object is attempted to be removed.\n"
-                f"This bug should be fixed by the next Omniverse release.\n"
-                f"In the meantime, we instead teleport these objects to a graveyard location located far outside of "
-                f"the scene."
-            )
             # First remove pre-existing objects
             og.sim.remove_objects(removed_objs)
 
@@ -705,9 +697,8 @@ class SlicingRule(BaseTransitionRule):
     """
     @classproperty
     def candidate_filters(cls):
-        # TODO: Remove hacky filter once half category is updated properly
         return {
-            "sliceable": AndFilter(filters=[AbilityFilter("sliceable"), NotFilter(NameFilter(name="half"))]),
+            "sliceable": AbilityFilter("sliceable"),
             "slicer": AbilityFilter("slicer"),
         }
 
@@ -720,6 +711,11 @@ class SlicingRule(BaseTransitionRule):
     @classmethod
     def transition(cls, object_candidates):
         objs_to_add, objs_to_remove = [], []
+
+        # Define callback for propagating non-kinematic state from whole objects to half objects
+        def _get_load_non_kin_state_callback(state):
+            return lambda obj: obj.load_non_kin_state(state)
+
         for sliceable_obj in object_candidates["sliceable"]:
             # Object parts offset annotation are w.r.t the base link of the whole object.
             pos, orn = sliceable_obj.get_position_orientation()
@@ -749,18 +745,19 @@ class SlicingRule(BaseTransitionRule):
                 part_bb_orn = T.quat_multiply(orn, part_bb_orn)
                 part_obj_name = f"half_{sliceable_obj.name}_{i}"
                 part_obj = DatasetObject(
-                    prim_path=f"/World/{part_obj_name}",
                     name=part_obj_name,
                     category=part["category"],
                     model=part["model"],
                     bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
+                # Propagate non-physical states of the whole object to the half objects, e.g. cooked, saturated, etc.
                 # Add the new object to the results.
                 new_obj_attrs = ObjectAttrs(
                     obj=part_obj,
                     bb_pos=part_bb_pos,
                     bb_orn=part_bb_orn,
+                    callback=_get_load_non_kin_state_callback(sliceable_obj.dump_state())
                 )
                 objs_to_add.append(new_obj_attrs)
 
@@ -792,7 +789,11 @@ class DicingRule(BaseTransitionRule):
         objs_to_remove = []
 
         for diceable_obj in object_candidates["diceable"]:
-            system = get_system(f"diced__{diceable_obj.category}")
+            obj_category = diceable_obj.category
+            system_name = "diced__" + diceable_obj.category.removeprefix("half_")
+            if Cooked in diceable_obj.states and diceable_obj.states[Cooked].get_value():
+                system_name = "cooked__" + system_name
+            system = get_system(system_name)
             system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
@@ -812,7 +813,7 @@ class MeltingRule(BaseTransitionRule):
 
     @classmethod
     def _generate_conditions(cls):
-        return [StateCondition(filter_name="meltable", state=Temperature, val=m.MELTING_TEMPERATURE, op=operator.ge)]
+        return [StateCondition(filter_name="meltable", state=MaxTemperature, val=m.MELTING_TEMPERATURE, op=operator.ge)]
 
     @classmethod
     def transition(cls, object_candidates):
@@ -1610,8 +1611,8 @@ class RecipeRule(BaseTransitionRule):
             out_system.generate_particles_from_link(
                 obj=container,
                 link=contained_particles_state.link,
-                # In these two cases, we don't necessarily have removed all objects in the container.
-                check_contact=cls.ignore_nonrecipe_objects or cls.is_multi_instance,
+                # We don't necessarily have removed all objects in the container.
+                check_contact=cls.ignore_nonrecipe_objects,
                 max_samples=int(volume / (np.pi * (out_system.particle_radius ** 3) * 4 / 3)),
             )
 
@@ -1692,8 +1693,8 @@ class CookingPhysicalParticleRule(RecipeRule):
         assert len(input_systems) == 1 or len(input_systems) == 2, \
             f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
         if len(input_systems) == 2:
-            assert input_systems[1] == "water", \
-                f"Second input system must be water for {cls.__name__}, recipe: {name}!"
+            assert input_systems[1] == "cooked__water", \
+                f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
         assert len(output_systems) == 1, \
             f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
 
@@ -1726,7 +1727,8 @@ class CookingPhysicalParticleRule(RecipeRule):
         return False
 
     @classmethod
-    def _execute_recipe(cls, container, recipe, in_volume):
+    def _execute_recipe(cls, container, recipe, container_info):
+        in_volume = container_info["in_volume"]
         system = get_system(recipe["input_systems"][0])
         contained_particles_state = container.states[ContainedParticles].get_value(system)
         in_volume_idx = np.where(contained_particles_state.in_volume)[0]
@@ -1742,8 +1744,8 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         # Remove water if the cooking requires water
         if len(recipe["input_systems"]) > 1:
-            water_system = get_system(recipe["input_systems"][1])
-            container.states[Contains].set_value(water_system, False)
+            cooked_water_system = get_system(recipe["input_systems"][1])
+            container.states[Contains].set_value(cooked_water_system, False)
 
         return TransitionResults(add=[], remove=[])
 
@@ -1860,6 +1862,10 @@ class MixingToolRule(RecipeRule):
         return [ChangeConditionWrapper(
             condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
         )]
+
+    @classproperty
+    def relax_recipe_systems(cls):
+        return False
 
     @classproperty
     def ignore_nonrecipe_systems(cls):
@@ -2101,6 +2107,7 @@ class CookingRule(RecipeRule):
         classes.add("CookingRule")
         return classes
 
+
 class CookingObjectRule(CookingRule):
     @classmethod
     def add_recipe(
@@ -2163,6 +2170,7 @@ class CookingObjectRule(CookingRule):
     def is_multi_instance(cls):
         return True
 
+
 class CookingSystemRule(CookingRule):
     @classmethod
     def add_recipe(
@@ -2219,6 +2227,7 @@ class CookingSystemRule(CookingRule):
     @classproperty
     def ignore_nonrecipe_objects(cls):
         return False
+
 
 def import_recipes():
     for json_file, rule_names in _JSON_FILES_TO_RULES.items():

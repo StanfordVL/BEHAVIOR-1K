@@ -1102,6 +1102,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
     _particle_radius = None
     _particle_offset = None
 
+    # We need to manually call refresh_particles_view the first time when particle count goes from 0 to non-zero
+    _has_refreshed_particles_view = False
+
     @classmethod
     def initialize(cls):
         # Run super method first
@@ -1111,11 +1114,17 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         og.sim.stage.DefinePrim(f"{cls.prim_path}/particles", "Scope")
 
         # A new view needs to be created every time once sim is playing, so we add a callback now
-        og.sim.add_callback_on_play(name=f"{cls.name}_particles_view", callback=cls._refresh_particles_view)
+        og.sim.add_callback_on_play(name=f"{cls.name}_particles_view", callback=cls.refresh_particles_view)
 
         # If sim is already playing, refresh particles immediately
         if og.sim.is_playing():
-            cls._refresh_particles_view()
+            cls.refresh_particles_view()
+
+    @classmethod
+    def update(cls):
+        if not cls._has_refreshed_particles_view and cls.n_particles > 0:
+            cls.refresh_particles_view()
+            cls._has_refreshed_particles_view = True
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -1142,7 +1151,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
     @classmethod
-    def _refresh_particles_view(cls):
+    def refresh_particles_view(cls):
         """
         Internal helper method to refresh the particles' rigid body view to grab state
 
@@ -1166,7 +1175,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         super().remove_particle_by_name(name=name)
 
         # Refresh particles view
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
     @classmethod
     def add_particle(cls, prim_path, scale, idn=None):
@@ -1174,7 +1183,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         particle = super().add_particle(prim_path=prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
         return particle
 
@@ -1441,7 +1450,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         super()._load_state(state=state)
 
         # Make sure view is refreshed
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
         # Make sure we update all the velocities
         cls.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])

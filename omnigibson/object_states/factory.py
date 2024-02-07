@@ -16,7 +16,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "freezable": [Frozen],
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
-    "meltable": [],
+    "meltable": [MaxTemperature],
     "mixingTool": [],
     "openable": [Open],
     "flammable": [OnFire],

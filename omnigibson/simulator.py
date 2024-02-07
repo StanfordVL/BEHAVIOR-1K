@@ -29,6 +29,7 @@ from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBre
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
 
 # Create module logger
@@ -621,6 +622,9 @@ def launch_simulator(*args, **kwargs):
                     # Only need to update if object is already initialized as well
                     if obj.initialized:
                         obj.update_handles()
+                for system in self.scene.systems:
+                    if issubclass(system, MacroPhysicalParticleSystem):
+                        system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()

@@ -480,6 +480,10 @@ class StatefulObject(BaseObject):
         # Call super method first
         super()._load_state(state=state)
 
+        # Load non-kinematic states
+        self.load_non_kin_state(state)
+
+    def load_non_kin_state(self, state):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
