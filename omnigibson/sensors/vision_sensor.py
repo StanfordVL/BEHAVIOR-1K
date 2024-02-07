@@ -5,12 +5,11 @@ import gym
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
-from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
+from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
-from omnigibson.utils.ui_utils import dock_window, suppress_omni_log
+from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils.usd_utils import get_camera_params
-from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -97,40 +96,9 @@ class VisionSensor(BaseSensor):
         load_config["viewport_name"] = viewport_name
 
         # Create variables that will be filled in later at runtime
-        self._sd = None             # synthetic data interface
         self._viewport = None       # Viewport from which to grab data
         self._annotators = None
         self._render_product = None
-
-        self._SENSOR_HELPERS = dict(
-            rgb=lazy.omni.syntheticdata.sensors.get_rgb,
-            depth=lazy.omni.syntheticdata.sensors.get_depth,
-            depth_linear=lazy.omni.syntheticdata.sensors.get_depth_linear,
-            normal=lazy.omni.syntheticdata.sensors.get_normals,
-            seg_semantic=lazy.omni.syntheticdata.sensors.get_semantic_segmentation,
-            seg_instance=lazy.omni.syntheticdata.sensors.get_instance_segmentation,
-            flow=lazy.omni.syntheticdata.sensors.get_motion_vector,
-            bbox_2d_tight=lazy.omni.syntheticdata.sensors.get_bounding_box_2d_tight,
-            bbox_2d_loose=lazy.omni.syntheticdata.sensors.get_bounding_box_2d_loose,
-            bbox_3d=lazy.omni.syntheticdata.sensors.get_bounding_box_3d,
-            camera=get_camera_params,
-        )
-        #assert set(self._SENSOR_HELPERS.keys()) == set(self.all_modalities), \
-        #    "VisionSensor._SENSOR_HELPERS must have the same keys as VisionSensor.all_modalities!"
-        
-        # Define raw sensor types
-        self._RAW_SENSOR_TYPES = dict(
-            rgb=lazy.omni.syntheticdata._syntheticdata.SensorType.Rgb,
-            depth=lazy.omni.syntheticdata._syntheticdata.SensorType.Depth,
-            depth_linear=lazy.omni.syntheticdata._syntheticdata.SensorType.DepthLinear,
-            normal=lazy.omni.syntheticdata._syntheticdata.SensorType.Normal,
-            seg_semantic=lazy.omni.syntheticdata._syntheticdata.SensorType.SemanticSegmentation,
-            seg_instance=lazy.omni.syntheticdata._syntheticdata.SensorType.InstanceSegmentation,
-            flow=lazy.omni.syntheticdata._syntheticdata.SensorType.MotionVector,
-            bbox_2d_tight=lazy.omni.syntheticdata._syntheticdata.SensorType.BoundingBox2DTight,
-            bbox_2d_loose=lazy.omni.syntheticdata._syntheticdata.SensorType.BoundingBox2DLoose,
-            bbox_3d=lazy.omni.syntheticdata._syntheticdata.SensorType.BoundingBox3D,
-        )
         
         self._RAW_SENSOR_TYPES = dict(
             rgb="rgb",
@@ -146,6 +114,9 @@ class VisionSensor(BaseSensor):
             bbox_3d="bounding_box_3d",
             camera_params="camera_params",
         )
+        
+        assert set(self._RAW_SENSOR_TYPES.keys()) == set(self.all_modalities), \
+            "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
         # Run super method
         super().__init__(
@@ -168,9 +139,6 @@ class VisionSensor(BaseSensor):
 
         # Add this sensor to the list of global sensors
         self.SENSORS[self._prim_path] = self
-
-        # Get synthetic data interface
-        self._sd = lazy.omni.syntheticdata._syntheticdata.acquire_syntheticdata_interface()
         
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
         self._render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, resolution)
@@ -238,22 +206,6 @@ class VisionSensor(BaseSensor):
             names (str or list of str): Name of the raw sensor(s) to initialize.
                 If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
         """
-        
-        """
-        # Standardize the input and grab the intersection with all possible raw sensors
-        names = set([names]) if isinstance(names, str) else set(names)
-        names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))
-
-        # Initialize sensors
-        sensors = []
-        for name in names:
-            sensors.append(lazy.omni.syntheticdata.sensors.create_or_retrieve_sensor(self._viewport.viewport_api, self._RAW_SENSOR_TYPES[name]))
-
-        # Suppress syntheticdata warning here because we know the first render is invalid
-        with suppress_omni_log(channels=["omni.syntheticdata.plugin"]):
-            render()
-        render()    # Extra frame required to prevent access violation error
-        """
         names = {names} if isinstance(names, str) else set(names)
         for name in names:
             self._add_modality_to_backend(modality=name)
@@ -268,19 +220,6 @@ class VisionSensor(BaseSensor):
         # Run super first to grab any upstream obs
         obs = super()._get_obs()
 
-        """
-        # Process each sensor modality individually
-        for modality in self.modalities:
-            mod_kwargs = dict()
-            mod_kwargs["viewport"] = self._viewport.viewport_api
-            if modality == "seg_instance":
-                mod_kwargs.update({"parsed": True, "return_mapping": False})
-            elif modality == "bbox_3d":
-                mod_kwargs.update({"parsed": True, "return_corners": True})
-            obs[modality] = self._SENSOR_HELPERS[modality](**mod_kwargs)
-
-        return obs
-        """
         for modality in self._modalities:
             raw_obs = self._annotators[modality].get_data()
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
@@ -291,8 +230,6 @@ class VisionSensor(BaseSensor):
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
-        # should_initialize = modality not in self._modalities
-        
         should_initialize = modality not in self._modalities
 
         # Run super
