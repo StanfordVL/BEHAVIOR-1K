@@ -1008,7 +1008,7 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
 
     milk.generate_particles(positions=np.array([[0.02, 0, 0.25]]))
     chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.25]]))
-    ice_cream.set_position([0, 0, 0.2])
+    ice_cream.set_position([-0.03, 0.02, 0.25])
 
     og.sim.step()
 
