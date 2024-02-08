@@ -16,6 +16,120 @@ from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_o
 import pytest
 import numpy as np
 
+@pytest.mark.skip(reason="dryer is not fillable yet.")
+@og_test
+def test_dryer_rule():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    clothes_dryer = og.sim.scene.object_registry("name", "clothes_dryer")
+    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+    bowl = og.sim.scene.object_registry("name", "bowl")
+    water = get_system("water")
+
+    place_obj_on_floor_plane(clothes_dryer)
+    og.sim.step()
+
+    remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
+    bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
+    og.sim.step()
+
+    assert remover_dishtowel.states[Saturated].set_value(water, True)
+    assert bowl.states[Covered].set_value(water, True)
+    og.sim.step()
+
+    assert remover_dishtowel.states[Saturated].get_value(water)
+    assert clothes_dryer.states[Contains].get_value(water)
+
+    # The rule will not execute if Open is True
+    clothes_dryer.states[Open].set_value(True)
+    og.sim.step()
+
+    assert remover_dishtowel.states[Saturated].get_value(water)
+    assert clothes_dryer.states[Contains].get_value(water)
+
+    clothes_dryer.states[Open].set_value(False)
+    clothes_dryer.states[ToggledOn].set_value(True)
+
+    # The rule will execute when Open is False and ToggledOn is True
+    og.sim.step()
+
+    # Need to take one more step for the state setters to take effect
+    og.sim.step()
+
+    assert not remover_dishtowel.states[Saturated].get_value(water)
+    assert not clothes_dryer.states[Contains].get_value(water)
+
+    # Clean up
+    water.remove_all_particles()
+    og.sim.step()
+
+@og_test
+def test_washer_rule():
+    assert len(REGISTERED_RULES) > 0, "No rules registered!"
+    washer = og.sim.scene.object_registry("name", "washer")
+    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+    bowl = og.sim.scene.object_registry("name", "bowl")
+    water = get_system("water")
+    dust = get_system("dust") # always remove
+    salt = get_system("salt") # always remove (not explicitly specified)
+    rust = get_system("rust") # never remove
+    spray_paint = get_system("spray_paint") # requires acetone
+    acetone = get_system("acetone") # solvent for spray paint
+    cooking_oil = get_system("cooking_oil") # requires vinegar, lemon_juice, vinegar, etc.
+
+    place_obj_on_floor_plane(washer)
+    og.sim.step()
+
+    remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
+    bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
+    og.sim.step()
+
+    assert bowl.states[Covered].set_value(dust, True)
+    assert bowl.states[Covered].set_value(salt, True)
+    assert bowl.states[Covered].set_value(rust, True)
+    assert bowl.states[Covered].set_value(spray_paint, True)
+    assert bowl.states[Covered].set_value(acetone, True)
+    assert bowl.states[Covered].set_value(cooking_oil, True)
+
+    assert not remover_dishtowel.states[Saturated].get_value(water)
+    assert not bowl.states[Covered].get_value(water)
+
+    # The rule will not execute if Open is True
+    washer.states[Open].set_value(True)
+    og.sim.step()
+
+    assert bowl.states[Covered].get_value(dust)
+    assert bowl.states[Covered].get_value(salt)
+    assert bowl.states[Covered].get_value(rust)
+    assert bowl.states[Covered].get_value(spray_paint)
+    assert bowl.states[Covered].get_value(acetone)
+    assert bowl.states[Covered].get_value(cooking_oil)
+    assert not remover_dishtowel.states[Saturated].get_value(water)
+    assert not bowl.states[Covered].get_value(water)
+
+    washer.states[Open].set_value(False)
+    washer.states[ToggledOn].set_value(True)
+
+    # The rule will execute when Open is False and ToggledOn is True
+    og.sim.step()
+
+    # Need to take one more step for the state setters to take effect
+    og.sim.step()
+
+    assert not bowl.states[Covered].get_value(dust)
+    assert not bowl.states[Covered].get_value(salt)
+    assert bowl.states[Covered].get_value(rust)
+    assert not bowl.states[Covered].get_value(spray_paint)
+    assert not bowl.states[Covered].get_value(acetone)
+    assert bowl.states[Covered].get_value(cooking_oil)
+    assert remover_dishtowel.states[Saturated].get_value(water)
+    assert bowl.states[Covered].get_value(water)
+
+    # Clean up
+    water.remove_all_particles()
+    rust.remove_all_particles()
+    cooking_oil.remove_all_particles()
+    og.sim.step()
+
 @og_test
 def test_slicing_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"

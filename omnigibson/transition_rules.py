@@ -64,7 +64,7 @@ _JSON_FILES_TO_RULES = {
     "slicing.json": ["SlicingRule"],
     "substance_cooking.json": ["CookingPhysicalParticleRule"],
     "substance_watercooking.json": ["CookingPhysicalParticleRule"],
-    # TODO: washer and dryer
+    "washer.json": ["WasherRule"],
 }
 # Global dicts that will contain mappings
 REGISTERED_RULES = dict()
@@ -521,14 +521,52 @@ class OrConditionWrapper(RuleCondition):
             pruned_candidates[condition] = copy(object_candidates)
             condition(object_candidates=pruned_candidates[condition])
 
-        # Now, take the union over all keys in the candidates --
-        # if the result is empty, then we immediately return False
-        for filter_name, old_candidates in object_candidates.keys():
-            # If an entry was already empty, we skip it
-            if len(old_candidates) == 0:
-                continue
+        # For each filter, take the union over object candidates across each condition.
+        # If the result is empty, we immediately return False.
+        for filter_name in object_candidates:
             object_candidates[filter_name] = \
-                list(set(np.concatenate([candidates[filter_name] for candidates in pruned_candidates.values()])))
+                list(set.union(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()]))
+            if len(object_candidates[filter_name]) == 0:
+                return False
+
+        return True
+
+    @property
+    def modifies_filter_names(self):
+        # Return all wrapped names
+        return set.union(*(condition.modifies_filter_names for condition in self._conditions))
+
+
+class AndConditionWrapper(RuleCondition):
+    """
+    Logical AND between multiple RuleConditions
+    """
+    def __init__(self, conditions):
+        """
+        Args:
+            conditions (list of RuleConditions): Conditions to take logical OR over. This will generate
+                the UNION of all pruning between the two sets
+        """
+        self._conditions = conditions
+
+    def refresh(self, object_candidates):
+        # Refresh nested conditions
+        for condition in self._conditions:
+            condition.refresh(object_candidates=object_candidates)
+
+    def __call__(self, object_candidates):
+        # Iterate over all conditions and aggregate their results
+        pruned_candidates = dict()
+        for condition in self._conditions:
+            # Copy the candidates because they get modified in place
+            pruned_candidates[condition] = copy(object_candidates)
+            condition(object_candidates=pruned_candidates[condition])
+
+        # For each filter, take the intersection over object candidates across each condition.
+        # If the result is empty, we immediately return False.
+        for filter_name in object_candidates:
+            object_candidates[filter_name] = \
+                list(set.intersection(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()]))
             if len(object_candidates[filter_name]) == 0:
                 return False
 
@@ -689,6 +727,169 @@ RULES_REGISTRY = Registry(
     class_types=BaseTransitionRule,
     default_key="__name__",
 )
+
+
+class WasherDryerRule(BaseTransitionRule):
+    """
+    Transition rule to apply to cloth washers and dryers.
+    """
+    @classmethod
+    def _generate_conditions(cls):
+        assert len(cls.candidate_filters.keys()) == 1
+        machine_type = list(cls.candidate_filters.keys())[0]
+        return [ChangeConditionWrapper(
+            condition=AndConditionWrapper(conditions=[
+                StateCondition(filter_name=machine_type, state=ToggledOn, val=True, op=operator.eq),
+                StateCondition(filter_name=machine_type, state=Open, val=False, op=operator.eq),
+            ])
+        )]
+
+    @classmethod
+    def _compute_global_rule_info(cls):
+        """
+        Helper function to compute global information necessary for checking rules. This is executed exactly
+        once per cls.transition() step
+
+        Returns:
+            dict: Keyword-mapped global rule information
+        """
+        # Compute all obj
+        obj_positions = np.array([obj.aabb_center for obj in og.sim.scene.objects])
+        return dict(obj_positions=obj_positions)
+
+    @classmethod
+    def _compute_container_info(cls, object_candidates, container, global_info):
+        """
+        Helper function to compute container-specific information necessary for checking rules. This is executed once
+        per container per cls.transition() step
+
+        Args:
+            object_candidates (dict): Dictionary mapping corresponding keys from @cls.filters to list of individual
+                object instances where the filter is satisfied
+            container (StatefulObject): Relevant container object for computing information
+            global_info (dict): Output of @cls._compute_global_rule_info(); global information which may be
+                relevant for computing container information
+
+        Returns:
+            dict: Keyword-mapped container information
+        """
+        del object_candidates
+        obj_positions = global_info["obj_positions"]
+        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
+
+        in_volume_objs = list(np.array(og.sim.scene.objects)[in_volume])
+        # Remove the container itself
+        if container in in_volume_objs:
+            in_volume_objs.remove(container)
+
+        return dict(in_volume_objs=in_volume_objs)
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("WasherDryerRule")
+        return classes
+
+class WasherRule(WasherDryerRule):
+    _CLEANING_CONDITONS = None
+
+    @classmethod
+    def register_cleaning_conditions(cls, conditions):
+        """
+        Register cleaning conditions for this rule.
+
+        Args:
+        conditions (dict): Dictionary mapping the synset of ParticleSystem (str) to None or list of synsets of
+            ParticleSystem (str). None represents "never", empty list represents "always", or non-empty list represents
+            at least one of the systems in the list needs to be present in the washer for the key system to be removed.
+            E.g. "rust.n.01" -> None: "never remove rust.n.01 from the washer"
+            E.g. "dust.n.01" -> []: "always remove dust.n.01 from the washer"
+            E.g. "cooking_oil.n.01" -> ["sodium_carbonate.n.01", "vinegar.n.01"]: "remove cooking_oil.n.01 from the
+            washer if either sodium_carbonate.n.01 or vinegar.n.01 is present"
+            For keys not present in the dictionary, the default is []: "always remove"
+        """
+        cls._CLEANING_CONDITONS = dict()
+        for solute, solvents in conditions.items():
+            assert OBJECT_TAXONOMY.is_leaf(solute), f"Synset {solute} must be a leaf node in the taxonomy!"
+            assert is_substance_synset(solute), f"Synset {solute} must be a substance synset!"
+            solute_name = get_system_name_by_synset(solute)
+            if solvents is None:
+                cls._CLEANING_CONDITONS[solute_name] = None
+            else:
+                solvent_names = []
+                for solvent in solvents:
+                    assert OBJECT_TAXONOMY.is_leaf(solvent), f"Synset {solvent} must be a leaf node in the taxonomy!"
+                    assert is_substance_synset(solvent), f"Synset {solvent} must be a substance synset!"
+                    solvent_name = get_system_name_by_synset(solvent)
+                    solvent_names.append(solvent_name)
+                cls._CLEANING_CONDITONS[solute_name] = solvent_names
+
+    @classproperty
+    def candidate_filters(cls):
+        return {
+            "washer": CategoryFilter("washer"),
+        }
+
+    @classmethod
+    def transition(cls, object_candidates):
+        water = get_system("water")
+        global_info = cls._compute_global_rule_info()
+        for washer in object_candidates["washer"]:
+            # Remove the systems if the conditions are met
+            systems_to_remove = []
+            for system in ParticleRemover.supported_active_systems:
+                # Never remove
+                if system.name in cls._CLEANING_CONDITONS and cls._CLEANING_CONDITONS[system.name] is None:
+                    continue
+                if not washer.states[Contains].get_value(system):
+                    continue
+
+                solvents = cls._CLEANING_CONDITONS.get(system.name, [])
+                # Always remove
+                if len(solvents) == 0:
+                    systems_to_remove.append(system)
+                else:
+                    solvents = [get_system(solvent) for solvent in solvents if is_system_active(solvent)]
+                    # If any of the solvents are present
+                    if any(washer.states[Contains].get_value(solvent) for solvent in solvents):
+                        systems_to_remove.append(system)
+
+            for system in systems_to_remove:
+                washer.states[Contains].set_value(system, False)
+
+            # Make the objects wet
+            container_info = cls._compute_container_info(object_candidates=object_candidates, container=washer, global_info=global_info)
+            in_volume_objs = container_info["in_volume_objs"]
+            for obj in in_volume_objs:
+                if Saturated in obj.states:
+                    obj.states[Saturated].set_value(water, True)
+                else:
+                    obj.states[Covered].set_value(water, True)
+
+        return TransitionResults(add=[], remove=[])
+
+
+class DryerRule(WasherDryerRule):
+    @classproperty
+    def candidate_filters(cls):
+        return {
+            "dryer": CategoryFilter("clothes_dryer"),
+        }
+
+    @classmethod
+    def transition(cls, object_candidates):
+        water = get_system("water")
+        global_info = cls._compute_global_rule_info()
+        for dryer in object_candidates["dryer"]:
+            container_info = cls._compute_container_info(object_candidates=object_candidates, container=dryer, global_info=global_info)
+            in_volume_objs = container_info["in_volume_objs"]
+            for obj in in_volume_objs:
+                if Saturated in obj.states:
+                    obj.states[Saturated].set_value(water, False)
+            dryer.states[Contains].set_value(water, False)
+
+        return TransitionResults(add=[], remove=[])
 
 
 class SlicingRule(BaseTransitionRule):
@@ -1367,21 +1568,16 @@ class RecipeRule(BaseTransitionRule):
         return True
 
     @classmethod
-    def _compute_global_rule_info(cls, object_candidates):
+    def _compute_global_rule_info(cls):
         """
         Helper function to compute global information necessary for checking rules. This is executed exactly
         once per cls.transition() step
-
-        Args:
-            object_candidates (dict): Dictionary mapping corresponding keys from @cls.filters to list of individual
-                object instances where the filter is satisfied
 
         Returns:
             dict: Keyword-mapped global rule information
         """
         # Compute all relevant object AABB positions
         obj_positions = np.array([obj.aabb_center for obj in cls._OBJECTS])
-
         return dict(obj_positions=obj_positions)
 
     @classmethod
@@ -1400,6 +1596,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             dict: Keyword-mapped container information
         """
+        del object_candidates
         obj_positions = global_info["obj_positions"]
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
@@ -1453,7 +1650,7 @@ class RecipeRule(BaseTransitionRule):
         objs_to_add, objs_to_remove = [], []
 
         # Compute global info
-        global_info = cls._compute_global_rule_info(object_candidates=object_candidates)
+        global_info = cls._compute_global_rule_info()
 
         # Iterate over all fillable objects, to execute recipes for each one
         for container in object_candidates["container"]:
@@ -1539,9 +1736,8 @@ class RecipeRule(BaseTransitionRule):
                         container.states[Contains].set_value(system, False)
             for system in VisualParticleSystem.get_active_systems().values():
                 if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
-                    group_name = system.get_group_name(container)
-                    if group_name in system.groups and system.num_group_particles(group_name) > 0:
-                        system.remove_all_group_particles(group=group_name)
+                    if container.states[Contains].get_value(system):
+                        container.states[Contains].set_value(system, False)
         else:
             # Remove the particles that are involved in this execution
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
@@ -1728,7 +1924,6 @@ class CookingPhysicalParticleRule(RecipeRule):
 
     @classmethod
     def _execute_recipe(cls, container, recipe, container_info):
-        in_volume = container_info["in_volume"]
         system = get_system(recipe["input_systems"][0])
         contained_particles_state = container.states[ContainedParticles].get_value(system)
         in_volume_idx = np.where(contained_particles_state.in_volume)[0]
@@ -1797,7 +1992,12 @@ class ToggleableMachineRule(RecipeRule):
     def candidate_filters(cls):
         # Modify the container filter to include toggleable ability as well
         candidate_filters = super().candidate_filters
-        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="toggleable")])
+        candidate_filters["container"] = AndFilter(filters=[
+            candidate_filters["container"],
+            AbilityFilter(ability="toggleable"),
+            NotFilter(CategoryFilter("washer")),
+            NotFilter(CategoryFilter("clothes_dryer")),
+        ])
         return candidate_filters
 
     @classmethod
@@ -2234,30 +2434,32 @@ def import_recipes():
         recipe_fpath = os.path.join(os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file)
         if not os.path.exists(recipe_fpath):
             log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
-            # return
+
         with open(recipe_fpath, "r") as f:
             rule_recipes = json.load(f)
-            for rule_name in rule_names:
-                rule = REGISTERED_RULES[rule_name]
-                if issubclass(rule, RecipeRule):
-                    for recipe in rule_recipes:
-                        if "rule_name" in recipe:
-                            recipe["name"] = recipe.pop("rule_name")
-                        if "container" in recipe:
-                            recipe["fillable_categories"] = set(recipe.pop("container").keys())
-                        if "heat_source" in recipe:
-                            recipe["heatsource_categories"] = set(recipe.pop("heat_source").keys())
-                        if "machine" in recipe:
-                            recipe["fillable_categories"] = set(recipe.pop("machine").keys())
 
-                        satisfied = True
-                        output_synsets = set(recipe["output_synsets"].keys())
-                        has_substance = any([s for s in output_synsets if is_substance_synset(s)])
-                        if (rule_name == "CookingObjectRule" and has_substance) or (rule_name == "CookingSystemRule" and not has_substance):
-                            satisfied = False
-                        if satisfied:
-                            print(recipe)
-                            rule.add_recipe(**recipe)
-                    print(f"All recipes of rule {rule_name} imported successfully.")
+        for rule_name in rule_names:
+            rule = REGISTERED_RULES[rule_name]
+            if rule == WasherRule:
+                rule.register_cleaning_conditions(rule_recipes)
+            elif issubclass(rule, RecipeRule):
+                for recipe in rule_recipes:
+                    if "rule_name" in recipe:
+                        recipe["name"] = recipe.pop("rule_name")
+                    if "container" in recipe:
+                        recipe["fillable_categories"] = set(recipe.pop("container").keys())
+                    if "heat_source" in recipe:
+                        recipe["heatsource_categories"] = set(recipe.pop("heat_source").keys())
+                    if "machine" in recipe:
+                        recipe["fillable_categories"] = set(recipe.pop("machine").keys())
+
+                    satisfied = True
+                    output_synsets = set(recipe["output_synsets"].keys())
+                    has_substance = any([s for s in output_synsets if is_substance_synset(s)])
+                    if (rule_name == "CookingObjectRule" and has_substance) or (rule_name == "CookingSystemRule" and not has_substance):
+                        satisfied = False
+                    if satisfied:
+                        rule.add_recipe(**recipe)
+                log.info(f"All recipes of rule {rule_name} imported successfully.")
 
 import_recipes()

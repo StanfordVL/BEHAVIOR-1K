@@ -1230,6 +1230,14 @@ def is_physical_particle_system(system_name):
     return issubclass(system, PhysicalParticleSystem)
 
 
+def is_fluid_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    # Avoid circular imports
+    from omnigibson.systems.micro_particle_system import FluidSystem
+    return issubclass(system, FluidSystem)
+
+
 def get_system(system_name, force_active=True):
     # Make sure scene exists
     assert og.sim.scene is not None, "Cannot get systems until scene is imported!"

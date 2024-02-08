@@ -40,7 +40,7 @@ class ParticleSource(ParticleApplier):
     Args:
         obj (StatefulObject): Object to which this state will be applied
         conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
-            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            None represents "never", empty list represents "always", or each 2-tuple is interpreted as a single condition in the form of
             (ParticleModifyCondition, value) necessary in order for this particle modifier to be
             able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
 
@@ -148,7 +148,7 @@ class ParticleSink(ParticleRemover):
     Args:
         obj (StatefulObject): Object to which this state will be applied
         conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
-            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            None represents "never", empty list represents "always", or each 2-tuple is interpreted as a single condition in the form of
             (ParticleModifyCondition, value) necessary in order for this particle modifier to be
             able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
 
@@ -170,11 +170,14 @@ class ParticleSink(ParticleRemover):
         sink_height (None or float): Height of the cylinder representing particles' sinking volume, if specified.
             If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
             object asset, otherwise, it will be set to a default value
-
-        default_physical_conditions (None or list): Condition(s) needed to remove any physical particles not explicitly
+        default_fluid_conditions (None or list): Condition(s) needed to remove any fluid particles not explicitly
             specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
             not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
             2-tuples
+        default_physical_conditions (None or list): Condition(s) needed to remove any physical (excluding fluid)
+            particles not explicitly specified in @conditions. If None, then it is assumed that no other physical
+            particles can be removed. If not None, should be in same format as an entry in @conditions, i.e.: list of
+            (ParticleModifyCondition, val) 2-tuples
         default_visual_conditions (None or list): Condition(s) needed to remove any visual particles not explicitly
             specified in @conditions. If None, then it is assumed that no other visual particles can be removed. If
             not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
@@ -186,6 +189,7 @@ class ParticleSink(ParticleRemover):
         conditions,
         sink_radius=None,
         sink_height=None,
+        default_fluid_conditions=None,
         default_physical_conditions=None,
         default_visual_conditions=None,
     ):
@@ -209,6 +213,7 @@ class ParticleSink(ParticleRemover):
             conditions=conditions,
             method=ParticleModifyMethod.PROJECTION,
             projection_mesh_params=projection_mesh_params,
+            default_fluid_conditions=default_fluid_conditions,
             default_physical_conditions=default_physical_conditions,
             default_visual_conditions=default_visual_conditions,
         )

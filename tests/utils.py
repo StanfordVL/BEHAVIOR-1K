@@ -93,6 +93,8 @@ def assert_test_scene():
                 get_obj_cfg("apple", "apple", "agveuv"),
                 get_obj_cfg("table_knife", "table_knife", "jxdfyy"),
                 get_obj_cfg("half_apple", "half_apple", "sguztn"),
+                get_obj_cfg("washer", "washer", "dobgmu"),
+                get_obj_cfg("carpet_sweeper", "carpet_sweeper", "xboreo"),
             ],
             "robots": [
                 {
