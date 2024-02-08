@@ -133,10 +133,6 @@ class VX300S(ManipulationRobot):
         # Fetch does not support discrete actions
         raise ValueError("VX300S does not support discrete actions!")
 
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params (e.g. damping, stiffness, max_effort) here
-
     @property
     def controller_order(self):
         return [f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
