@@ -504,7 +504,7 @@ class OrConditionWrapper(RuleCondition):
         """
         Args:
             conditions (list of RuleConditions): Conditions to take logical OR over. This will generate
-                the UNION of all pruning between the two sets
+                the UNION of all candidates.
         """
         self._conditions = conditions
 
@@ -544,8 +544,8 @@ class AndConditionWrapper(RuleCondition):
     def __init__(self, conditions):
         """
         Args:
-            conditions (list of RuleConditions): Conditions to take logical OR over. This will generate
-                the UNION of all pruning between the two sets
+            conditions (list of RuleConditions): Conditions to take logical AND over. This will generate
+                the INTERSECTION of all candidates.
         """
         self._conditions = conditions
 
@@ -792,6 +792,11 @@ class WasherDryerRule(BaseTransitionRule):
         return classes
 
 class WasherRule(WasherDryerRule):
+    """
+    Transition rule to apply to cloth washers.
+    1. remove "dirty" particles from the washer if the necessary solvent is present.
+    2. wet the objects inside by making them either Saturated with or Covered by water.
+    """
     _CLEANING_CONDITONS = None
 
     @classmethod
@@ -871,6 +876,11 @@ class WasherRule(WasherDryerRule):
 
 
 class DryerRule(WasherDryerRule):
+    """
+    Transition rule to apply to cloth dryers.
+    1. dry the objects inside by making them not Saturated with water.
+    2. remove all water from the dryer.
+    """
     @classproperty
     def candidate_filters(cls):
         return {
@@ -1097,7 +1107,7 @@ class RecipeRule(BaseTransitionRule):
             "output_systems": list(),
             # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
             "input_states": defaultdict(lambda: defaultdict(list)),
-            # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that should be set after the output objects are spawned
+            # Maps object categories to ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
             "output_states": defaultdict(lambda: defaultdict(list)),
             # Set of fillable categories which are allowed for this recipe
             "fillable_categories": None,
@@ -1107,6 +1117,13 @@ class RecipeRule(BaseTransitionRule):
             **kwargs,
         }
 
+        cls._populate_input_output_objects_systems(name=name, input_synsets=input_synsets, output_synsets=output_synsets)
+        cls._populate_input_output_states(name=name, input_states=input_states, output_states=output_states)
+        cls._populate_input_object_tree(name=name)
+        cls._populate_fillable_categories(name=name, fillable_categories=fillable_categories)
+
+    @classmethod
+    def _populate_input_output_objects_systems(cls, name, input_synsets, output_synsets):
         # Map input/output synsets into input/output objects and systems.
         for synsets, obj_key, system_key in zip((input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")):
             for synset, count in synsets.items():
@@ -1122,6 +1139,8 @@ class RecipeRule(BaseTransitionRule):
         assert len(cls._RECIPES[name]["output_objects"]) == 0 or len(cls._RECIPES[name]["output_systems"]) == 0, \
             "Recipe can only generate output objects or output systems, but not both!"
 
+    @classmethod
+    def _populate_input_output_states(cls, name, input_states, output_states):
         # Apply post-processing for input/output states if specified
         for synsets_to_states, states_key in zip((input_states, output_states), ("input_states", "output_states")):
             if synsets_to_states is None:
@@ -1178,8 +1197,10 @@ class RecipeRule(BaseTransitionRule):
                             cls._RECIPES[name][states_key][first_obj_category]["binary_object"].append(
                                 (state_class, second_obj_category, state_value))
 
+    @classmethod
+    def _populate_input_object_tree(cls, name):
         if cls.is_multi_instance and len(cls._RECIPES[name]["input_objects"]) > 0:
-            # Build a tree of input objects according to the kinematic binary states
+            # Build a tree of input object categories according to the kinematic binary states
             # Example: 'raw_egg': {'binary_object': [(OnTop, 'bagel_dough', True)]} results in an edge
             # from 'bagel_dough' to 'raw_egg', i.e. 'bagel_dough' is the parent of 'raw_egg'.
             input_object_tree = nx.DiGraph()
@@ -1194,6 +1215,8 @@ class RecipeRule(BaseTransitionRule):
                 assert cls._RECIPES[name]["input_objects"][root_nodes[0]] == 1, f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
                 cls._RECIPES[name]["input_object_tree"] = input_object_tree
 
+    @classmethod
+    def _populate_fillable_categories(cls, name, fillable_categories):
         # Map fillable synsets to fillable object categories.
         if fillable_categories is not None:
             cls._RECIPES[name]["fillable_categories"] = set()
@@ -1272,8 +1295,22 @@ class RecipeRule(BaseTransitionRule):
         """
         in_volume = container_info["in_volume"]
 
+        # Store necessary information for execution
         container_info["execution_info"] = dict()
+        category_to_valid_indices = cls._filter_input_objects_by_unary_and_binary_system_states(recipe=recipe)
+        container_info["execution_info"]["category_to_valid_indices"] = category_to_valid_indices
 
+        if not cls.is_multi_instance:
+            return cls._validate_recipe_objects_non_multi_instance(
+                recipe=recipe, category_to_valid_indices=category_to_valid_indices, in_volume=in_volume,
+            )
+        else:
+            return cls._validate_recipe_objects_multi_instance(
+                recipe=recipe, category_to_valid_indices=category_to_valid_indices, container_info=container_info,
+            )
+
+    @classmethod
+    def _filter_input_objects_by_unary_and_binary_system_states(cls, recipe):
         # Filter input objects based on a subset of input states (unary states and binary system states)
         # Map object categories (str) to valid indices (np.ndarray)
         category_to_valid_indices = dict()
@@ -1307,118 +1344,144 @@ class RecipeRule(BaseTransitionRule):
 
                 # Convert to numpy array for faster indexing
                 category_to_valid_indices[obj_category] = np.array(category_to_valid_indices[obj_category], dtype=int)
+        return category_to_valid_indices
 
-        container_info["execution_info"]["category_to_valid_indices"] = category_to_valid_indices
-        if not cls.is_multi_instance:
-            # Check if sufficiently number of objects are contained
+    @classmethod
+    def _validate_recipe_objects_non_multi_instance(cls, recipe, category_to_valid_indices, in_volume):
+        # Check if sufficiently number of objects are contained
+        for obj_category, obj_quantity in recipe["input_objects"].items():
+            if np.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
+                return False
+        return True
+
+    @classmethod
+    def _validate_recipe_objects_multi_instance(cls, recipe, category_to_valid_indices, container_info):
+        in_volume = container_info["in_volume"]
+        input_object_tree = recipe["input_object_tree"]
+
+        # Map object category to a set of objects that are used in this execution
+        relevant_objects = defaultdict(set)
+
+        # Map system name to a set of particle indices that are used in this execution
+        relevant_systems = defaultdict(set)
+
+        # Number of instances of this recipe that can be produced
+        num_instances = 0
+
+        # Define a recursive function to check the kinematic tree
+        def check_kinematic_tree(obj, should_check_in_volume=False):
+            """
+            Recursively check if the kinematic tree is satisfied.
+            Return True/False, and a set of objects that belong to the subtree rooted at the current node
+
+            Args:
+                obj (BaseObject): Subtree root node to check
+                should_check_in_volume (bool): Whether to check if the object is in the volume or not
+            Returns:
+                bool: True if the subtree rooted at the current node is satisfied
+                set: Set of objects that belong to the subtree rooted at the current node
+            """
+
+            # Check if obj is in volume
+            if should_check_in_volume and not in_volume[cls._OBJECTS_TO_IDX[obj]]:
+                return False, set()
+
+            # If the object is a leaf node, return True and the set containing the object
+            if input_object_tree.out_degree(obj.category) == 0:
+                return True, set([obj])
+
+            children_categories = list(input_object_tree.successors(obj.category))
+
+            all_subtree_objs = set()
+            for child_cat in children_categories:
+                assert len(input_states[child_cat]["binary_object"]) == 1, \
+                    "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
+                state_class, _, state_value = input_states[child_cat]["binary_object"][0]
+                num_valid_children = 0
+                children_objs = cls._OBJECTS[category_to_valid_indices[child_cat]]
+                for child_obj in children_objs:
+                    # If the child doesn't satisfy the binary object state, skip
+                    if child_obj.states[state_class].get_value(obj) != state_value:
+                        continue
+                    # Recursively check if the subtree rooted at the child is valid
+                    subtree_valid, subtree_objs = check_kinematic_tree(child_obj)
+                    # If the subtree is valid, increment the number of valid children and aggregate the objects
+                    if subtree_valid:
+                        num_valid_children += 1
+                        all_subtree_objs |= subtree_objs
+
+                # If there are not enough valid children, return False
+                if num_valid_children < recipe["input_objects"][child_cat]:
+                    return False, set()
+
+            # If all children categories have sufficient number of objects that satisfy the binary object state,
+            # e.g. five pieces of pepperoni and two pieces of basil on the pizza, the subtree rooted at the
+            # current node is valid. Return True and the set of objects in the subtree (all descendants plus
+            # the current node)
+            return True, all_subtree_objs | {obj}
+
+        # If multi-instance is True but doesn't require kinematic states between objects
+        if input_object_tree is None:
+            num_instances = np.inf
+            # Compute how many instances of this recipe can be produced.
+            # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
+            # container, then 2 instance of the recipe can be produced.
             for obj_category, obj_quantity in recipe["input_objects"].items():
-                if np.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
+                quantity_in_volume = np.sum(in_volume[category_to_valid_indices[obj_category]])
+                num_inst = quantity_in_volume // obj_quantity
+                if num_inst < 1:
                     return False
-            return True
+                num_instances = min(num_instances, num_inst)
+
+            for obj_category, obj_quantity in recipe["input_objects"].items():
+                quantity_used = num_instances * obj_quantity
+                # Pick the first quantity_used objects from the valid indices
+                relevant_objects[obj_category] = set(
+                    cls._OBJECTS[category_to_valid_indices[obj_category][:quantity_used]])
+
+        # If multi-instance is True and requires kinematic states between objects
         else:
-            input_object_tree = recipe["input_object_tree"]
-            # If multi-instance is True but doesn't require kinematic states between objects
-            if input_object_tree is None:
-                num_instances = np.inf
-                # Compute how many instances of this recipe can be produced.
-                # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
-                # container, then 2 instance of the recipe can be produced.
-                for obj_category, obj_quantity in recipe["input_objects"].items():
-                    quantity_in_volume = np.sum(in_volume[category_to_valid_indices[obj_category]])
-                    num_inst = quantity_in_volume // obj_quantity
-                    if num_inst < 1:
-                        return False
-                    num_instances = min(num_instances, num_inst)
+            root_node_category = [node for node in input_object_tree.nodes()
+                                  if input_object_tree.in_degree(node) == 0][0]
+            # A list of objects belonging to the root node category
+            root_nodes = cls._OBJECTS[category_to_valid_indices[root_node_category]]
+            input_states = recipe["input_states"]
 
-                # Map object category to a set of objects that are used in this execution
-                relevant_objects = defaultdict(set)
-                for obj_category, obj_quantity in recipe["input_objects"].items():
-                    quantity_used = num_instances * obj_quantity
-                    relevant_objects[obj_category] = set(cls._OBJECTS[category_to_valid_indices[obj_category][:quantity_used]])
+            for root_node in root_nodes:
+                # should_check_in_volume is True only for the root nodes.
+                # Example: the bagel dough needs to be in_volume of the container, but the raw egg on top doesn't.
+                tree_valid, relevant_object_set = check_kinematic_tree(obj=root_node, should_check_in_volume=True)
+                if tree_valid:
+                    # For each valid tree, increment the number of instances and aggregate the objects
+                    num_instances += 1
+                    for obj in relevant_object_set:
+                        relevant_objects[obj.category].add(obj)
 
-            # If multi-instance is True and requires kinematic states between objects
-            else:
-                root_node_category = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0][0]
-                # A list of objects belonging to the root node category
-                root_nodes = cls._OBJECTS[category_to_valid_indices[root_node_category]]
-                input_states = recipe["input_states"]
+            # If there are no valid trees, return False
+            if num_instances == 0:
+                return False
 
-                # Recursively check if the kinematic tree is satisfied.
-                # Return True/False, and a set of objects that belong to the subtree rooted at the current node
-                def check_kinematic_tree(obj, should_check_in_volume=False):
-                    # Check if obj is in volume
-                    if should_check_in_volume and not in_volume[cls._OBJECTS_TO_IDX[obj]]:
-                        return False, set()
-
-                    # If the object is a leaf node, return True and the set containing the object
-                    if input_object_tree.out_degree(obj.category) == 0:
-                        return True, set([obj])
-
-                    children_categories = list(input_object_tree.successors(obj.category))
-
-                    all_subtree_objs = set()
-                    for child_cat in children_categories:
-                        assert len(input_states[child_cat]["binary_object"]) == 1, \
-                            "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
-                        state_class, _, state_value = input_states[child_cat]["binary_object"][0]
-                        num_valid_children = 0
-                        children_objs = cls._OBJECTS[category_to_valid_indices[child_cat]]
-                        for child_obj in children_objs:
-                            # If the child doesn't satisfy the binary object state, skip
-                            if child_obj.states[state_class].get_value(obj) != state_value:
-                                continue
-                            # Recursively check if the subtree rooted at the child is valid
-                            subtree_valid, subtree_objs = check_kinematic_tree(child_obj)
-                            # If the subtree is valid, increment the number of valid children and aggregate the objects
-                            if subtree_valid:
-                                num_valid_children += 1
-                                all_subtree_objs |= subtree_objs
-
-                        # If there are not enough valid children, return False
-                        if num_valid_children < recipe["input_objects"][child_cat]:
-                            return False, set()
-
-                    # If all children categories have sufficient number of objects that satisfy the binary object state,
-                    # e.g. five pieces of pepperoni and two pieces of basil on the pizza, the subtree rooted at the
-                    # current node is valid. Return True and the set of objects in the subtree (all descendants plus
-                    # the current node)
-                    return True, all_subtree_objs | {obj}
-
-                num_instances = 0
-                relevant_objects = defaultdict(set)
-                for root_node in root_nodes:
-                    # should_check_in_volume is True only for the root nodes.
-                    # Example: the bagel dough needs to be in_volume of the container, but the raw egg on top doesn't.
-                    tree_valid, relevant_object_set = check_kinematic_tree(root_node, should_check_in_volume=True)
-                    if tree_valid:
-                        # For each valid tree, increment the number of instances and aggregate the objects
-                        num_instances += 1
-                        for obj in relevant_object_set:
-                            relevant_objects[obj.category].add(obj)
-
-                # If there are no valid trees, return False
-                if num_instances == 0:
-                    return False
-
-            # Map system name to a set of particle indices that are used in this execution
-            relevant_systems = defaultdict(set)
-            for obj_category, objs in relevant_objects.items():
-                for state_class, system_name, state_value in recipe["input_states"][obj_category]["binary_system"]:
+        # Note that for multi instance recipes, the relevant system particles are NOT the ones in the container.
+        # Instead, they are the ones that are related to the relevant objects, e.g. salt covering the bagel dough.
+        for obj_category, objs in relevant_objects.items():
+            for state_class, system_name, state_value in recipe["input_states"][obj_category]["binary_system"]:
+                # If the state value is False, skip
+                if not state_value:
+                    continue
+                for obj in objs:
                     if state_class in [Filled, Contains]:
-                        for obj in objs:
-                            contained_particle_idx = obj.states[ContainedParticles].get_value(get_system(system_name)).in_volume.nonzero()[0]
-                            relevant_systems[system_name] |= contained_particle_idx
+                        contained_particle_idx = obj.states[ContainedParticles].get_value(get_system(system_name)).in_volume.nonzero()[0]
+                        relevant_systems[system_name] |= contained_particle_idx
                     elif state_class in [Covered]:
-                        for obj in objs:
-                            covered_particle_idx = obj.states[ContactParticles].get_value(get_system(system_name))
-                            relevant_systems[system_name] |= covered_particle_idx
+                        covered_particle_idx = obj.states[ContactParticles].get_value(get_system(system_name))
+                        relevant_systems[system_name] |= covered_particle_idx
 
-            # Now we populate the execution info with the relevant objects and systems as well as the number of
-            # instances of the recipe that can be produced.
-            container_info["execution_info"]["relevant_objects"] = relevant_objects
-            container_info["execution_info"]["relevant_systems"] = relevant_systems
-            container_info["execution_info"]["num_instances"] = num_instances
-            return True
+        # Now we populate the execution info with the relevant objects and systems as well as the number of
+        # instances of the recipe that can be produced.
+        container_info["execution_info"]["relevant_objects"] = relevant_objects
+        container_info["execution_info"]["relevant_systems"] = relevant_systems
+        container_info["execution_info"]["num_instances"] = num_instances
+        return True
 
     @classmethod
     def _validate_nonrecipe_objects_not_contained(cls, recipe, container_info):
@@ -1542,27 +1605,22 @@ class RecipeRule(BaseTransitionRule):
 
         # Verify the container category is valid
         if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
-            print("recipe container is not valid")
             return False
 
         # Verify all required systems are contained in the container
         if not cls.relax_recipe_systems and not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
-            print("recipe systems are not contained")
             return False
 
         # Verify all required object quantities are contained in the container and their states are satisfied
         if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, container_info=container_info):
-            print("recipe objects are not contained or their states are not satisfied")
             return False
 
         # Verify no non-relevant system is contained
         if not cls.ignore_nonrecipe_systems and not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
-            print("non-recipe systems are contained")
             return False
 
         # Verify no non-relevant object is contained if we're not ignoring them
         if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, container_info=container_info):
-            print("non-recipe objects are contained")
             return False
 
         return True
@@ -1807,7 +1865,8 @@ class RecipeRule(BaseTransitionRule):
             out_system.generate_particles_from_link(
                 obj=container,
                 link=contained_particles_state.link,
-                # We don't necessarily have removed all objects in the container.
+                # When ignore_nonrecipe_objects is True, we don't necessarily remove all objects in the container.
+                # Therefore, we need to check for contact when generating output systems.
                 check_contact=cls.ignore_nonrecipe_objects,
                 max_samples=int(volume / (np.pi * (out_system.particle_radius ** 3) * 4 / 3)),
             )
@@ -1995,6 +2054,7 @@ class ToggleableMachineRule(RecipeRule):
         candidate_filters["container"] = AndFilter(filters=[
             candidate_filters["container"],
             AbilityFilter(ability="toggleable"),
+            # Exclude washer and clothes dryer because they are handled by WasherRule and DryerRule
             NotFilter(CategoryFilter("washer")),
             NotFilter(CategoryFilter("clothes_dryer")),
         ])
@@ -2453,10 +2513,11 @@ def import_recipes():
                     if "machine" in recipe:
                         recipe["fillable_categories"] = set(recipe.pop("machine").keys())
 
+                    # Route the recipe to the correct rule: CookingObjectRule or CookingSystemRule
                     satisfied = True
                     output_synsets = set(recipe["output_synsets"].keys())
                     has_substance = any([s for s in output_synsets if is_substance_synset(s)])
-                    if (rule_name == "CookingObjectRule" and has_substance) or (rule_name == "CookingSystemRule" and not has_substance):
+                    if (rule == CookingObjectRule and has_substance) or (rule == CookingSystemRule and not has_substance):
                         satisfied = False
                     if satisfied:
                         rule.add_recipe(**recipe)
