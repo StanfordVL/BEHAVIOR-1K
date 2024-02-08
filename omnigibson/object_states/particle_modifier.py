@@ -418,6 +418,15 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Store check overlap function
         self._check_overlap = check_overlap
 
+        # Update the saturation limit for each system
+        for system_name in self.conditions.keys():
+            system = get_system(system_name, force_active=False)
+            limit = self.visual_particle_modification_limit \
+                if is_visual_particle_system(system_name=system.name) \
+                else self.physical_particle_modification_limit
+            self.obj.states[Saturated].set_limit(system=system, limit=limit)
+
+
     def _generate_condition(self, condition_type, value):
         """
         Generates a valid condition function given @condition_type and its corresponding @value
@@ -580,12 +589,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
                         system = get_system(system_name)
-                        # Update saturation limit if it's not specified yet
-                        limit = self.visual_particle_modification_limit \
-                            if is_visual_particle_system(system_name=system.name) \
-                            else self.physical_particle_modification_limit
-                        if system not in self.obj.states[Saturated].limits:
-                            self.obj.states[Saturated].set_limit(system=system, limit=limit)
                         # Sanity check for oversaturation
                         if self.obj.states[Saturated].get_value(system=system):
                             continue

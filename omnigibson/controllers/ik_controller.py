@@ -231,9 +231,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["control_filter"] = self.control_filter.deserialize(state=state[idx + 4: idx + 4 + self.control_filter.state_size])
+        state_dict["control_filter"] = self.control_filter.deserialize(state=state[idx: idx + self.control_filter.state_size])
 
-        return state_dict, idx + 4 + self.control_filter.state_size
+        return state_dict, idx + self.control_filter.state_size
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
