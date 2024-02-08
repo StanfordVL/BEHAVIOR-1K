@@ -9,21 +9,61 @@ import sys
 import datetime
 from pathlib import Path
 from PIL import Image
+from termcolor import colored
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
+import omnigibson.lazy as lazy
 from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
-
-# Attempt to import omni, it may not always be necessary here (e.g: when we download datasets) so we catch the import failure explicitly
-try:
-    import omnigibson.lazy as lazy
-except ModuleNotFoundError:
-    print("Could not find omni or carb, skipping import")
 import random
 import imageio
 from IPython import embed
+
+
+def print_icon():
+    raw_texts = [
+        # Lgrey, grey, lgrey, grey, red, lgrey, red
+        ("                   ___________", "", "", "", "", "", "_"),
+        ("                  /          ", "", "", "", "", "", "/ \\"),
+        ("                 /          ", "", "", "", "/ /", "__", ""),
+        ("                /          ", "", "", "", "", "", "/ /  /\\"),
+        ("               /", "__________", "", "", "/ /", "__", "/  \\"),
+        ("               ", "\\   _____  ", "", "", "\\ \\", "__", "\\  /"),
+        ("                ", "\\  \\  ", "/ ", "\\  ", "", "", "\\ \\_/ /"),
+        ("                 ", "\\  \\", "/", "___\\  ", "", "", "\\   /"),
+        ("                  ", "\\__________", "", "", "", "", "\\_/  "),
+    ]
+    for (lgrey_text0, grey_text0, lgrey_text1, grey_text1, red_text0, lgrey_text2, red_text1) in raw_texts:
+        lgrey_text0 = colored(lgrey_text0, "light_grey", attrs=["bold"])
+        grey_text0 = colored(grey_text0, "light_grey", attrs=["bold", "dark"])
+        lgrey_text1 = colored(lgrey_text1, "light_grey", attrs=["bold"])
+        grey_text1 = colored(grey_text1, "light_grey", attrs=["bold", "dark"])
+        red_text0 = colored(red_text0, "light_red", attrs=["bold"])
+        lgrey_text2 = colored(lgrey_text2, "light_grey", attrs=["bold"])
+        red_text1 = colored(red_text1, "light_red", attrs=["bold"])
+        print(lgrey_text0 + grey_text0 + lgrey_text1 + grey_text1 + red_text0 + lgrey_text2 + red_text1)
+
+
+def print_logo():
+    raw_texts = [
+        ("       ___                  _", "  ____ _ _                     "),
+        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
+        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
+        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
+        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
+    ]
+    for (grey_text, red_text) in raw_texts:
+        grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
+        red_text = colored(red_text, "light_red", attrs=["bold"])
+        print(grey_text + red_text)
+
+
+def logo_small():
+    grey_text = colored("Omni", "light_grey", attrs=["bold", "dark"])
+    red_text = colored("Gibson", "light_red", attrs=["bold"])
+    return grey_text + red_text
 
 
 def dock_window(space, name, location, ratio=0.5):
@@ -530,6 +570,7 @@ class KeyboardRobotController:
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = dict()
+        self.joint_idx_to_controller = dict()
         idx = 0
         for name, controller in robot._controllers.items():
             self.controller_info[name] = {
@@ -539,9 +580,12 @@ class KeyboardRobotController:
                 "command_dim": controller.command_dim,
             }
             idx += controller.command_dim
+            for i in controller.dof_idx:
+                self.joint_idx_to_controller[i] = controller
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
+        self.joint_types = [joint.joint_type for joint in robot.joints.values()]    # Ordered list of joint types
         self.joint_command_idx = None   # Indices of joints being directly controlled in the action array
         self.joint_control_idx = None  # Indices of joints being directly controlled in the actual joint array
         self.active_joint_command_idx_idx = 0   # Which index within the joint_command_idx variable is being controlled by the user
@@ -782,6 +826,17 @@ class KeyboardRobotController:
                 # If there is no index, the user is controlling a joint with "[" and "]"
                 if idx is None and len(self.joint_command_idx) != 0:
                     idx = self.joint_command_idx[self.active_joint_command_idx_idx]
+
+                    # Also potentially modify the value being deployed in we're controlling a prismatic joint
+                    # Lower prismatic joint values modifying delta positions since 0.1m is very different from 0.1rad!
+                    joint_idx = self.joint_control_idx[self.active_joint_command_idx_idx]
+
+                    # Import here to avoid circular imports
+                    from omnigibson.utils.constants import JointType
+                    controller = self.joint_idx_to_controller[joint_idx]
+                    if (self.joint_types[joint_idx] == JointType.JOINT_PRISMATIC and
+                            controller.use_delta_commands and controller.motor_type == "position"):
+                        val *= 0.2
 
                 # Set the action
                 if idx is not None:

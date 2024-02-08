@@ -228,7 +228,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
-        pos[self.camera_control_idx] = np.array([0.0, 0.45])
+        pos[self.camera_control_idx] = np.array([0.0, -0.45])
         # Choose arm joint pos based on setting
         for arm in self.arm_names:
             pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
@@ -324,9 +324,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def _actions_to_control(self, action):
+    def _postprocess_control(self, control, control_type):
         # Run super method first
-        u_vec, u_type_vec = super()._actions_to_control(action=action)
+        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
         base_orn = self.base_footprint_link.get_orientation()
@@ -369,10 +369,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Modify the right hand's pos_relative in the z-direction based on the trunk's value
         # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
         # hand, which does not control the trunk
-        dic = super().get_control_dict()
-        dic["eef_right_pos_relative"][2] = dic["eef_right_pos_relative"][2] - self.get_joint_positions()[self.trunk_control_idx]
+        fcns = super().get_control_dict()
+        native_fcn = fcns.get_fcn("eef_right_pos_relative")
+        fcns["eef_right_pos_relative"] = lambda: (native_fcn() + np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]]))
 
-        return dic
+        return fcns
 
     @property
     def default_proprio_obs(self):
@@ -407,8 +408,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "control_freq": self._control_freq,
             "control_limits": self.control_limits,
             "use_delta_commands": False,
+            "use_impedances": False,
             "motor_type": "velocity",
-            "compute_delta_in_quat_space": [(3, 4, 5)],
             "dof_idx": self.base_control_idx,
         }
         return dic
@@ -426,7 +427,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
                 if arm == "left":
                     # Need to override joint idx being controlled to include trunk in default arm controller configs
-                    arm_cfg["dof_idx"] = np.concatenate([self.trunk_control_idx, self.arm_control_idx[arm]])
+                    arm_control_idx = np.concatenate([self.trunk_control_idx, self.arm_control_idx[arm]])
+                    arm_cfg["dof_idx"] = arm_control_idx
+
+                    # Need to modify the default joint positions also if this is a null joint controller
+                    if arm_cfg["name"] == "NullJointController":
+                        arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
 
                 # If using rigid trunk, we also clamp its limits
                 # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving

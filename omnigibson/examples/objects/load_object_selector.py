@@ -40,7 +40,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         category=obj_category,
         model=obj_model,
         bounding_box=avg_category_spec.get(obj_category),
-        fit_avg_dim_volume=True,
         position=[0, 0, 50.0],
     )
 

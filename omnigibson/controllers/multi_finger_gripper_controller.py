@@ -124,13 +124,19 @@ class MultiFingerGripperController(GripperController):
         # Return from super method
         return super()._preprocess_command(command=command)
 
-    def _command_to_control(self, command, control_dict):
+    def _update_goal(self, command, control_dict):
+        # Directly store command as the goal
+        return dict(target=command)
+
+    def compute_control(self, goal_dict, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) gripper
         joint control signal
 
         Args:
-            command (Array[float]): desired (already preprocessed) command to convert into control signals.
+            goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                goals necessary for controller computation. Must include the following keys:
+                    target: desired gripper target
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -139,18 +145,19 @@ class MultiFingerGripperController(GripperController):
         Returns:
             Array[float]: outputted (non-clipped!) control signal to deploy
         """
+        target = goal_dict["target"]
         joint_pos = control_dict["joint_position"][self.dof_idx]
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
             u = (
                 self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                if command[0] >= 0.0
+                if target[0] >= 0.0
                 else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             )
         else:
             # Use continuous signal
-            u = command
+            u = target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
@@ -249,13 +256,16 @@ class MultiFingerGripperController(GripperController):
         # Store calculated state
         self._is_grasping = is_grasping
 
+    def compute_no_op_goal(self, control_dict):
+        # Just use a zero vector
+        return dict(target=np.zeros(self.command_dim))
+
+    def _get_goal_shapes(self):
+        return dict(target=(self.command_dim,))
+
     def is_grasping(self):
         # Return cached value
         return self._is_grasping
-
-    def compute_no_op_command(self, control_dict):
-        # Just use a zero vector
-        return np.zeros(self.command_dim)
 
     @property
     def control_type(self):

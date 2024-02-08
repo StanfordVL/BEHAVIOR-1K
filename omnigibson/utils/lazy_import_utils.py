@@ -9,21 +9,26 @@ class LazyImporter(ModuleType):
         super().__init__("lazy_" + module_name)
         self._module_path = module_name
         self._module = module
+        self._not_module = set()
         self._submodules = {}
 
     def __getattr__(self, name: str):
         # First, try the argument as a module name.
-        submodule = self._get_module(name)
-        if submodule:
-            return submodule
-        else:
-            # If it's not a module name, try it as a member of this module.
-            try:
-                return getattr(self._module, name)
-            except:
-                raise AttributeError(
-                    f"module {self.__name__} has no attribute {name}"
-                ) from None
+        if name not in self._not_module:
+            submodule = self._get_module(name)
+            if submodule:
+                return submodule
+            else:
+                # Record module not found so that we don't keep looking.
+                self._not_module.add(name)
+
+        # If it's not a module name, try it as a member of this module.
+        try:
+            return getattr(self._module, name)
+        except:
+            raise AttributeError(
+                f"module {self.__name__} has no attribute {name}"
+            ) from None
 
     def _get_module(self, module_name: str):
         """Recursively create and return a LazyImporter for the given module name."""
