@@ -416,10 +416,10 @@ def test_mixing_rule_failure_recipe_systems():
     place_obj_on_floor_plane(bowl)
     og.sim.step()
 
-    water.generate_particles(positions=[[-0.02, 0, 0.03]])
-    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.03]])
+    water.generate_particles(positions=[[-0.02, 0.0, 0.02]])
+    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.02]])
     # This fails the recipe because lemon juice (recipe system) is not in the bowl
-    lemon_juice.generate_particles(positions=[[0.02, 0.0, 1.03]])
+    lemon_juice.generate_particles(positions=[[0.02, 0.0, 1.02]])
 
     assert bowl.states[Contains].get_value(water)
     assert bowl.states[Contains].get_value(granulated_sugar)
@@ -459,11 +459,11 @@ def test_mixing_rule_failure_nonrecipe_systems():
     place_obj_on_floor_plane(bowl)
     og.sim.step()
 
-    water.generate_particles(positions=[[-0.02, 0, 0.03]])
-    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.03]])
-    lemon_juice.generate_particles(positions=[[0.02, 0.0, 0.03]])
+    water.generate_particles(positions=[[-0.02, 0, 0.02]])
+    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.02]])
+    lemon_juice.generate_particles(positions=[[0.02, 0.0, 0.02]])
     # This fails the recipe because salt (nonrecipe system) is in the bowl
-    salt.generate_particles(positions=[[0.0, 0.02, 0.03]])
+    salt.generate_particles(positions=[[0.0, 0.02, 0.02]])
 
     assert bowl.states[Contains].get_value(water)
     assert bowl.states[Contains].get_value(granulated_sugar)
@@ -503,9 +503,9 @@ def test_mixing_rule_success():
     place_obj_on_floor_plane(bowl)
     og.sim.step()
 
-    water.generate_particles(positions=[[-0.02, 0, 0.03]])
-    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.03]])
-    lemon_juice.generate_particles(positions=[[0.02, 0.0, 0.03]])
+    water.generate_particles(positions=[[-0.02, 0.0, 0.02]])
+    granulated_sugar.generate_particles(positions=[[0.0, 0.0, 0.02]])
+    lemon_juice.generate_particles(positions=[[0.02, 0.0, 0.02]])
 
     assert bowl.states[Contains].get_value(water)
     assert bowl.states[Contains].get_value(granulated_sugar)
@@ -1421,14 +1421,14 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation([0, 0.1, 0.2], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0, 0.1, 0.17], [0, 0, 0, 1])
-    flour.generate_particles(positions=np.array([[-0.02, 0.06, 0.15]]))
-    granulated_sugar.generate_particles(positions=np.array([[0.0, 0.06, 0.15]]))
-    vanilla.generate_particles(positions=np.array([[0.02, 0.06, 0.15]]))
-    melted_butter.generate_particles(positions=np.array([[-0.02, 0.08, 0.15]]))
-    baking_powder.generate_particles(positions=np.array([[0.0, 0.08, 0.15]]))
-    salt.generate_particles(positions=np.array([[0.02, 0.08, 0.15]]))
+    another_raw_egg.set_position_orientation([-0.01, -0.14, 0.40], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([-0.01, -0.14, 0.37], [0, 0, 0, 1])
+    flour.generate_particles(positions=np.array([[-0.01, -0.15, 0.33]]))
+    granulated_sugar.generate_particles(positions=np.array([[0.01, -0.15, 0.33]]))
+    vanilla.generate_particles(positions=np.array([[0.03, -0.15, 0.33]]))
+    melted_butter.generate_particles(positions=np.array([[-0.01, -0.13, 0.33]]))
+    baking_powder.generate_particles(positions=np.array([[0.01, -0.13, 0.33]]))
+    salt.generate_particles(positions=np.array([[0.03, -0.13, 0.33]]))
     # This fails the recipe because the egg should not be cooked
     raw_egg.states[Cooked].set_value(True)
     og.sim.step()
@@ -1495,14 +1495,14 @@ def test_single_toggleable_machine_rule_output_object_success():
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation([0, 0.1, 0.2], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0, 0.1, 0.17], [0, 0, 0, 1])
-    flour.generate_particles(positions=np.array([[-0.02, 0.06, 0.15]]))
-    granulated_sugar.generate_particles(positions=np.array([[0.0, 0.06, 0.15]]))
-    vanilla.generate_particles(positions=np.array([[0.02, 0.06, 0.15]]))
-    melted_butter.generate_particles(positions=np.array([[-0.02, 0.08, 0.15]]))
-    baking_powder.generate_particles(positions=np.array([[0.0, 0.08, 0.15]]))
-    salt.generate_particles(positions=np.array([[0.02, 0.08, 0.15]]))
+    another_raw_egg.set_position_orientation([-0.01, -0.14, 0.40], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([-0.01, -0.14, 0.37], [0, 0, 0, 1])
+    flour.generate_particles(positions=np.array([[-0.01, -0.15, 0.33]]))
+    granulated_sugar.generate_particles(positions=np.array([[0.01, -0.15, 0.33]]))
+    vanilla.generate_particles(positions=np.array([[0.03, -0.15, 0.33]]))
+    melted_butter.generate_particles(positions=np.array([[-0.01, -0.13, 0.33]]))
+    baking_powder.generate_particles(positions=np.array([[0.01, -0.13, 0.33]]))
+    salt.generate_particles(positions=np.array([[0.03, -0.13, 0.33]]))
 
     og.sim.step()
 

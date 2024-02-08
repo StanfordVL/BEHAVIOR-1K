@@ -1039,7 +1039,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
                 particle_idns.append(info["particle_idns"])
                 particle_attached_references.append(info["particle_attached_references"])
             else:
-                indices_to_remove = np.append(indices_to_remove, info["particle_indices"])
+                indices_to_remove = np.append(indices_to_remove, np.array(info["particle_indices"], dtype=int))
         cls._sync_particle_groups(
             group_objects=group_objects,
             particle_idns=particle_idns,
@@ -1083,7 +1083,6 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         group_objs = []
         # Index starts at 1 because index 0 is n_groups
         idx = 1
-        indices_to_remove = np.array([], dtype=int)
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
             obj = og.sim.scene.object_registry("uuid", obj_uuid)
