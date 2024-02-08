@@ -543,15 +543,7 @@ class VisualParticleSystem(BaseSystem):
         cls._group_objects = dict()
         cls._group_scales = dict()
 
-    @classmethod
-    def remove_particle_by_name(cls, name):
-        """
-        Remove particle with name @name from both the simulator and internal state
 
-        Args:
-            name (str): Name of the particle to remove
-        """
-        raise NotImplementedError()
 
     @classmethod
     def remove_all_group_particles(cls, group):

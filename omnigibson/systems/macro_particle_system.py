@@ -326,7 +326,7 @@ class MacroParticleSystem(BaseSystem):
         return np.array(cls._color)
 
 
-class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
+class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
     """
     Particle system class that procedurally generates individual particles that are not subject to physics
     """
