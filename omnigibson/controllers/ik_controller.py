@@ -55,6 +55,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
         kp=None,
         damping_ratio=None,
+        use_impedances=True,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
@@ -91,9 +92,11 @@ class InverseKinematicsController(JointController, ManipulationController):
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
             kp (None or float): The proportional gain applied to the joint controller. If None, a default value
-                will be used.
+                will be used. Only relevant if @use_impedances=True
             damping_ratio (None or float): The damping ratio applied to the joint controller. If None, a default
-                value will be used.
+                value will be used. Only relevant if @use_impedances=True
+            use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
+                applied
             mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
                 cartesian values, relative to the robot base frame. Valid options are:
                     - "absolute_pose": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
@@ -177,7 +180,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             damping_ratio=damping_ratio,
             motor_type="position",
             use_delta_commands=False,
-            use_impedances=True,
+            use_impedances=use_impedances,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
