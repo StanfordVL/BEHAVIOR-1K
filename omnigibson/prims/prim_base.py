@@ -114,7 +114,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             raise ValueError("Cannot remove a prim that was never loaded.")
 
         # Remove prim if it can be deleted
-        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(self.prim_path) and check_deletable_prim(self.prim_path):
+        if check_deletable_prim(self.prim_path):
             lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
 
         # Also clear the name so we can reuse this later
