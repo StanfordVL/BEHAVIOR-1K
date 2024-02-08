@@ -688,7 +688,7 @@ def launch_simulator(*args, **kwargs):
             assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
             return int(n_physics_timesteps_per_render)
 
-        def step(self, render=True):
+        def step(self, render=False):
             """
             Step the simulation at self.render_timestep
 
