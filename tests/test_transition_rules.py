@@ -28,6 +28,7 @@ def test_dryer_rule():
     place_obj_on_floor_plane(clothes_dryer)
     og.sim.step()
 
+    # Place the two objects inside the dryer
     remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
     bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
     og.sim.step()
@@ -79,6 +80,7 @@ def test_washer_rule():
     place_obj_on_floor_plane(washer)
     og.sim.step()
 
+    # Place the two objects inside the washer
     remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
     bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
     og.sim.step()
@@ -126,7 +128,11 @@ def test_washer_rule():
 
     # Clean up
     water.remove_all_particles()
+    dust.remove_all_particles()
+    salt.remove_all_particles()
     rust.remove_all_particles()
+    spray_paint.remove_all_particles()
+    acetone.remove_all_particles()
     cooking_oil.remove_all_particles()
     og.sim.step()
 
@@ -795,7 +801,7 @@ def test_cooking_object_rule_failure_wrong_container():
     bagel_dough.set_position_orientation([0, 0, 0.45], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.02, 0, 0.50], [0, 0, 0, 1])
     og.sim.step()
-    assert bagel_dough.states[OnTop].get_value(stockpot)
+    assert bagel_dough.states[Inside].get_value(stockpot)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
 
     assert bagel_dough.states[Cooked].set_value(False)
