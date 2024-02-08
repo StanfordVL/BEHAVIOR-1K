@@ -119,12 +119,11 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         # Also clear the name so we can reuse this later
         self.remove_names()
 
-    @abstractmethod
     def _load(self):
         """
         Loads the raw prim into the simulator. Any post-processing should be done in @self._post_load()
         """
-        raise NotImplementedError()
+        pass
 
     @property
     def loaded(self):

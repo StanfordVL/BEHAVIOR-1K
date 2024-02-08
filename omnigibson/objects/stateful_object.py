@@ -451,12 +451,12 @@ class StatefulObject(BaseObject):
                 material.diffuse_tint = diffuse_tint
 
     def remove(self):
+        # Run super
+        super().remove()
+
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
             state_instance.remove()
-
-        # Run super
-        super().remove()
 
     def _dump_state(self):
         # Grab state from super class

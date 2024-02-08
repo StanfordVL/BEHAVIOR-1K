@@ -15,6 +15,7 @@ from omnigibson.object_states.object_state_base import IntrinsicObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, get_system, \
     is_visual_particle_system, is_physical_particle_system, is_fluid_system, is_system_active, REGISTERED_SYSTEMS
 from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
@@ -884,6 +885,7 @@ class ParticleApplier(ParticleModifier):
         self._in_mesh_local_particle_directions = None
 
         self.projection_system = None
+        self.projection_system_prim = None
         self.projection_emitter = None
 
         # Run super
@@ -929,7 +931,8 @@ class ParticleApplier(ParticleModifier):
                     parent_scale=self.link.scale,
                     material=system.material,
                 )
-
+            self.projection_system_prim = BasePrim(prim_path=self.projection_system.GetPrimPath().pathString,
+                                                   name=projection_name)
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
             self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere")
             self.projection_source_sphere.initialize()
@@ -1024,8 +1027,8 @@ class ParticleApplier(ParticleModifier):
 
     def remove(self):
         # We need to remove the projection visualization if it exists
-        if self.projection_system is not None:
-            lazy.omni.isaac.core.utils.prims.delete_prim(self.projection_system.GetPrimPath().pathString)
+        if self.projection_system_prim is not None:
+            og.sim.remove_prim(self.projection_system_prim)
 
     def _modify_particles(self, system):
         if self._sample_with_raycast:
