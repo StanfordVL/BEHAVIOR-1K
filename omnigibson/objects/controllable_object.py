@@ -533,13 +533,6 @@ class ControllableObject(BaseObject):
             for controller in self._controllers.values():
                 controller.reset()
 
-    @property
-    def state_size(self):
-        # Grab size from super and add in controller state sizes
-        size = super().state_size
-
-        return size + sum([c.state_size for c in self._controllers.values()])
-
     def _dump_state(self):
         # Grab super state
         state = super()._dump_state()

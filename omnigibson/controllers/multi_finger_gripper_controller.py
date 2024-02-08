@@ -40,6 +40,8 @@ class MultiFingerGripperController(GripperController):
         command_output_limits="default",
         inverted=False,
         mode="binary",
+        open_qpos=None,
+        closed_qpos=None,
         limit_tolerance=0.001,
     ):
         """
@@ -74,6 +76,14 @@ class MultiFingerGripperController(GripperController):
                 "smooth": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
                 "independent": 2D command, sends independent signals to each finger joint equal to the preprocessed command
 
+            open_qpos (None or Array[float]): If specified, the joint positions representing a fully-opened gripper.
+                This is to allow representing the open state as a partially opened gripper, rather than the full
+                opened gripper. If None, will simply use the native joint limits of the gripper joints. Only relevant
+                if using @mode=binary and @motor_type=position
+            closed_qpos (None or Array[float]): If specified, the joint positions representing a fully-closed gripper.
+                This is to allow representing the closed state as a partially closed gripper, rather than the full
+                closed gripper. If None, will simply use the native joint limits of the gripper joints. Only relevant
+                if using @mode=binary and @motor_type=position
             limit_tolerance (float): sets the tolerance from the joint limit ends, below which controls will be zeroed
                 out if the control is using velocity or torque control
         """
@@ -84,6 +94,8 @@ class MultiFingerGripperController(GripperController):
         self._inverted = inverted
         self._mode = mode
         self._limit_tolerance = limit_tolerance
+        self._open_qpos = open_qpos if open_qpos is None else np.array(open_qpos)
+        self._closed_qpos = closed_qpos if closed_qpos is None else np.array(closed_qpos)
 
         # Create other args to be filled in at runtime
         self._is_grasping = IsGraspingState.FALSE
@@ -150,11 +162,12 @@ class MultiFingerGripperController(GripperController):
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
-            u = (
-                self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                if target[0] >= 0.0
-                else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-            )
+            if target[0] >= 0.0:
+                u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx] \
+                    if self._open_qpos is None else self._open_qpos
+            else:
+                u = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx] \
+                    if self._closed_qpos is None else self._closed_qpos
         else:
             # Use continuous signal
             u = target
