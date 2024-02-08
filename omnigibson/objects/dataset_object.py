@@ -7,9 +7,9 @@ import numpy as np
 
 import trimesh
 from scipy.spatial.transform import Rotation
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
@@ -57,7 +57,6 @@ class DatasetObject(USDObject):
         abilities=None,
         include_default_states=True,
         bounding_box=None,
-        fit_avg_dim_volume=False,
         in_rooms=None,
         **kwargs,
     ):
@@ -98,8 +97,6 @@ class DatasetObject(USDObject):
             bounding_box (None or 3-array): If specified, will scale this object such that it fits in the desired
                 (x,y,z) object-aligned bounding box. Note that EITHER @bounding_box or @scale may be specified
                 -- not both!
-            fit_avg_dim_volume (bool): whether to fit the object to have the same volume as the average dimension
-                while keeping the aspect ratio. Note that if this is set, it will override both @scale and @bounding_box
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
                 a list of room type(s) or a single room type
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -117,7 +114,6 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
-        load_config["fit_avg_dim_volume"] = fit_avg_dim_volume
 
         # Infer the correct usd path to use
         if model is None:
@@ -202,7 +198,7 @@ class DatasetObject(USDObject):
         if gm.FORCE_LIGHT_INTENSITY is not None:
             def recursive_light_update(child_prim):
                 if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
-                    child_prim.GetAttribute("intensity").Set(gm.FORCE_LIGHT_INTENSITY)
+                    child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
 
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
@@ -223,19 +219,8 @@ class DatasetObject(USDObject):
                 joint.friction = friction
 
     def _post_load(self):
-        # We run this post loading first before any others because we're modifying the load config that will be used
-        # downstream
-        # Set the scale of this prim according to its bounding box
-        if self._load_config["fit_avg_dim_volume"]:
-            # By default, we assume scale does not change if no avg obj specs are given, otherwise, scale accordingly
-            scale = np.ones(3)
-            if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None:
-                # Find the average volume, and scale accordingly relative to the native volume based on the bbox
-                volume_ratio = np.product(self.avg_obj_dims["size"]) / np.product(self.native_bbox)
-                size_ratio = np.cbrt(volume_ratio)
-                scale *= size_ratio
-        # Otherwise, if manual bounding box is specified, scale based on ratio between that and the native bbox
-        elif self._load_config["bounding_box"] is not None:
+        # If manual bounding box is specified, scale based on ratio between that and the native bbox
+        if self._load_config["bounding_box"] is not None:
             scale = np.ones(3)
             valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
@@ -259,22 +244,16 @@ class DatasetObject(USDObject):
             material.shader_update_asset_paths_with_root_path(root_path)
 
         # Assign realistic density and mass based on average object category spec
-        if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None and self.avg_obj_dims["mass"] is not None:
-            # Assume each link has the same density
-            v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
-            mass = self.avg_obj_dims["mass"] * v_ratio
+        if self.avg_obj_dims is not None and self.avg_obj_dims["density"] is not None:
             if self._prim_type == PrimType.RIGID:
-                density = mass / self.volume
                 for link in self._links.values():
                     # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
                     if link.has_collision_meshes:
                         link.mass = 0.0
-                        link.density = density
+                        link.density = self.avg_obj_dims["density"]
 
             elif self._prim_type == PrimType.CLOTH:
-                # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
-                mass = self.avg_obj_dims["mass"] * v_ratio
-                self.root_link.mass = mass
+                self.root_link.mass = self.avg_obj_dims["density"] * self.root_link.volume
 
     def _update_texture_change(self, object_state):
         """
@@ -457,8 +436,8 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
-                        quat1 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
+                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)
@@ -617,7 +596,7 @@ class DatasetObject(USDObject):
         return AVERAGE_CATEGORY_SPECS.get(self.category, None)
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
-        # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
+        # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
             name=name,

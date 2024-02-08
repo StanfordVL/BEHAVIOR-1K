@@ -38,7 +38,7 @@ def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, bou
     }
 
 def assert_test_scene():
-    if og.sim.scene is None:
+    if og.sim is None or og.sim.scene is None:
         cfg = {
             "scene": {
                 "type": "Scene",
@@ -75,12 +75,21 @@ def assert_test_scene():
                     "obs_modalities": [],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
+                    "controller_config": {
+                        # Make sure to use null joint controller for the arm so that we can move the arm qpos
+                        # accordingly
+                        "arm_0": {
+                            "name": "NullJointController",
+                            "motor_type": "position",
+                        },
+                    },
                 }
             ]
         }
 
         # Make sure sim is stopped
-        og.sim.stop()
+        if og.sim is not None:
+            og.sim.stop()
 
         # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
         gm.ENABLE_OBJECT_STATES = True

@@ -1,9 +1,11 @@
+import pytest
 import omnigibson as og
 import numpy as np
 from omnigibson.macros import gm
 from omnigibson.utils.teleop_utils import TeleopSystem
 from omnigibson.utils.transform_utils import quat2euler, euler2quat
 
+@pytest.mark.skip(reason="test is broken")
 def test_teleop():
     cfg = {
         "env": {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.},

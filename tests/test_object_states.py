@@ -638,16 +638,19 @@ def test_toggled_on():
 
     assert not stove.states[ToggledOn].get_value()
 
-    robot.joints["torso_lift_joint"].set_pos(0.0)
-    robot.joints["shoulder_pan_joint"].set_pos(np.deg2rad(90.0))
-    robot.joints["shoulder_lift_joint"].set_pos(np.deg2rad(8.0))
-    robot.joints["upperarm_roll_joint"].set_pos(0.0)
-    robot.joints["elbow_flex_joint"].set_pos(0.0)
-    robot.joints["forearm_roll_joint"].set_pos(0.0)
-    robot.joints["wrist_flex_joint"].set_pos(0.0)
-    robot.joints["wrist_roll_joint"].set_pos(0.0)
-    robot.joints["l_gripper_finger_joint"].set_pos(0.0)
-    robot.joints["r_gripper_finger_joint"].set_pos(0.0)
+    q = robot.get_joint_positions()
+    jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
+    q[jnt_idxs["torso_lift_joint"]] = 0.0
+    q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
+    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(8.0)
+    q[jnt_idxs["upperarm_roll_joint"]] = 0.0
+    q[jnt_idxs["elbow_flex_joint"]] = 0.0
+    q[jnt_idxs["forearm_roll_joint"]] = 0.0
+    q[jnt_idxs["wrist_flex_joint"]] = 0.0
+    q[jnt_idxs["wrist_roll_joint"]] = 0.0
+    q[jnt_idxs["l_gripper_finger_joint"]] = 0.0
+    q[jnt_idxs["r_gripper_finger_joint"]] = 0.0
+    robot.set_joint_positions(q, drive=False)
 
     steps = m.object_states.toggle.CAN_TOGGLE_STEPS
     for _ in range(steps):
@@ -656,7 +659,8 @@ def test_toggled_on():
     # End-effector not close to the button, stays False
     assert not stove.states[ToggledOn].get_value()
 
-    robot.joints["shoulder_pan_joint"].set_pos(0)
+    q[jnt_idxs["shoulder_pan_joint"]] = 0.0
+    robot.set_joint_positions(q, drive=False)
 
     for _ in range(steps - 1):
         og.sim.step()
@@ -1142,23 +1146,24 @@ def test_covered():
     )
     for obj in (bracelet, oyster, breakfast_table):
         for system in systems:
+            print(f"Testing Covered {obj.name} with {system.name}")
             sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
             obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
             place_obj_on_floor_plane(obj)
-
             for _ in range(5):
                 og.sim.step()
 
             assert obj.states[Covered].set_value(system, True) == sampleable
-
-            for _ in range(5):
+            for _ in range(10):
                 og.sim.step()
-
             assert obj.states[Covered].get_value(system) == sampleable
-            obj.states[Covered].set_value(system, False)
 
-            for _ in range(5):
-                og.sim.step()
+            assert obj.states[Covered].set_value(system, False)
+
+            # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
+            # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
+            obj.states[Covered].clear_cache()
+            obj.states[ContactParticles].clear_cache()
             assert not obj.states[Covered].get_value(system)
 
             system.remove_all_particles()

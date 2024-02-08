@@ -104,8 +104,8 @@ def is_substance_synset(synset):
     return "substance" in OBJECT_TAXONOMY.get_abilities(synset)
 
 def get_system_name_by_synset(synset):
-    system_names = OBJECT_TAXONOMY.get_subtree_categories(synset)
-    assert len(system_names) == 1, f"Got multiple systems for {synset}: {system_names}"
+    system_names = OBJECT_TAXONOMY.get_subtree_substances(synset)
+    assert len(system_names) == 1, f"Got zero or multiple systems for {synset}: {system_names}"
     return system_names[0]
 
 def process_single_condition(condition):
@@ -786,7 +786,6 @@ class BDDLSampler:
                         name=f"{category}_{len(og.sim.scene.objects)}",
                         category=category,
                         model=model,
-                        fit_avg_dim_volume=True,
                         prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
                     )
                     num_new_obj += 1

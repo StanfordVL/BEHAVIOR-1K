@@ -73,11 +73,12 @@ class ActiveCameraRobot(BaseRobot):
         return {
             "name": "JointController",
             "control_freq": self._control_freq,
-            "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.camera_control_idx,
-            "command_output_limits": "default",
-            "use_delta_commands": False,
+            "command_output_limits": None,
+            "motor_type": "position",
+            "use_delta_commands": True,
+            "use_impedances": False,
         }
 
     @property
@@ -89,9 +90,11 @@ class ActiveCameraRobot(BaseRobot):
         return {
             "name": "NullJointController",
             "control_freq": self._control_freq,
-            "motor_type": "velocity",
+            "motor_type": "position",
             "control_limits": self.control_limits,
             "dof_idx": self.camera_control_idx,
+            "default_command": self.reset_joint_pos[self.camera_control_idx],
+            "use_impedances": False,
         }
 
     @property

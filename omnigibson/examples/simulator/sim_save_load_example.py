@@ -2,8 +2,8 @@ import os
 import numpy as np
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import KeyboardEventHandler
-import carb
 
 TEST_OUT_PATH = ""  # Define output directory here.
 
@@ -49,7 +49,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         def complete_loop():
             nonlocal completed
             completed = True
-        KeyboardEventHandler.add_keyboard_callback(carb.input.KeyboardInput.Z, complete_loop)
+        KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
         env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
 
@@ -72,7 +72,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         print()
         print("View reloaded scene. Once finished, press Z.")
         # Register callback so user knows to press space once they're done manipulating the scene
-        KeyboardEventHandler.add_keyboard_callback(carb.input.KeyboardInput.Z, complete_loop)
+        KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
         env.step(np.zeros(env.robots[0].action_dim))
 

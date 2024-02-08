@@ -372,9 +372,9 @@ class TouchingAnyCondition(RuleCondition):
 
         if self._optimized:
             # Register idx mappings
-            self._filter_1_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+            self._filter_1_idxs = {obj: [RigidContactAPI.get_body_row_idx(link.prim_path) for link in obj.links.values()]
                                 for obj in object_candidates[self._filter_1_name]}
-            self._filter_2_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+            self._filter_2_idxs = {obj: [RigidContactAPI.get_body_col_idx(link.prim_path) for link in obj.links.values()]
                                 for obj in object_candidates[self._filter_2_name]}
         else:
             # Register body mappings
@@ -723,7 +723,8 @@ class SlicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer")]
+        return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer"),
+                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
 
     @classmethod
     def transition(cls, object_candidates):
@@ -792,7 +793,8 @@ class DicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer")]
+        return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer"),
+                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
 
     @classmethod
     def transition(cls, object_candidates):

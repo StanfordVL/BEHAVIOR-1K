@@ -4,8 +4,6 @@ import os
 import numpy as np
 import yaml
 
-from omnigibson import example_config_path
-
 # File I/O related
 
 
@@ -68,6 +66,7 @@ def load_default_config():
     Returns:
         dict: Loaded default configuration file
     """
+    from omnigibson import example_config_path
     return parse_config(f"{example_config_path}/default_cfg.yaml")
 
 

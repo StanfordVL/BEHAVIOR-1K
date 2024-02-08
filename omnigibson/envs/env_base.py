@@ -6,6 +6,7 @@ import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
+from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import create_sensor, VisionSensor
@@ -35,9 +36,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Call super first
         super().__init__()
 
-        # Support gymnasium's render mode metadata
-        self.render_mode = "rgb_array"
-        self.metadata = {"render.modes": ["rgb_array"]}
+        # Launch Isaac Sim
+        launch_simulator()
 
         # Initialize other placeholders that will be filled in later
         self._task = None
@@ -63,8 +63,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = self.env_config["automatic_reset"]
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
-        self.physics_timestep = self.env_config["physics_timestep"]
-        self.action_timestep = self.env_config["action_timestep"]
+        self.physics_frequency = self.env_config["physics_frequency"]
+        self.action_frequency = self.env_config["action_frequency"]
         self.device = self.env_config["device"]
         self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]    # how high to offset object placement to account for one action step of dropping
 
@@ -146,7 +146,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * (self.action_timestep ** 2)
+        drop_distance = 0.5 * 9.8 * ((1. / self.action_frequency) ** 2)
         assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
     def _load_task(self, task_config=None):
@@ -191,7 +191,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Set the simulator settings
         # NOTE: This must be done BEFORE the scene is loaded, or else all vision sensors can't retrieve observations
-        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+        og.sim.set_simulation_dt(physics_dt=(1. / self.physics_frequency), rendering_dt=(1. / self.action_frequency))
 
         # Create the scene from our scene config
         scene = create_class_from_registry_and_config(
@@ -763,8 +763,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_timestep": 1 / 60.,
-                "physics_timestep": 1 / 60.,
+                "action_frequency": 60,
+                "physics_frequency": 60,
                 "device": None,
                 "automatic_reset": False,
                 "flatten_action_space": False,
@@ -784,9 +784,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Traversibility map kwargs
                 "waypoint_resolution": 0.2,
                 "num_waypoints": 10,
-                "build_graph": True,
                 "trav_map_resolution": 0.1,
-                "trav_map_erosion": 2,
+                "default_erosion_radius": 0.0,
                 "trav_map_with_objects": True,
                 "scene_instance": None,
                 "scene_file": None,

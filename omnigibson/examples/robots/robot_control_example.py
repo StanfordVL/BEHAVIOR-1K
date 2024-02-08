@@ -7,10 +7,10 @@ import numpy as np
 import yaml
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
-import carb.input
 
 
 CONTROL_MODES = dict(
@@ -66,7 +66,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the config for generating the environment we want
-    cfg = yaml.safe_load(open("omni_grpc.yaml", "r"))
+    env_cfg = dict()
+    env_cfg["action_frequency"] = 10
+    env_cfg["physics_frequency"] = 60
 
     # # Add the robot we want to load
     # robot0_cfg = dict()
@@ -112,7 +114,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Register custom binding to reset the environment
     action_generator.register_custom_keymapping(
-        key=carb.input.KeyboardInput.R,
+        key=lazy.carb.input.KeyboardInput.R,
         description="Reset the robot",
         callback_fn=lambda: env.reset(),
     )

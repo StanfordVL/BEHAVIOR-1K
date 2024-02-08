@@ -1,12 +1,13 @@
 import numpy as np
 from math import ceil
+import heapq
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
-from pxr import PhysicsSchemaTools, Gf
+import omnigibson.lazy as lazy
 
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
@@ -349,7 +350,7 @@ def plan_arm_motion_ik(
     ik_solver = IKSolver(
         robot_description_path=robot_description_path,
         robot_urdf_path=robot.urdf_path,
-        default_joint_pos=robot.default_joint_pos[joint_control_idx],
+        reset_joint_pos=robot.reset_joint_pos[joint_control_idx],
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
@@ -441,11 +442,11 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
+    translation = lazy.pxr.Gf.Vec3d(*np.array(pose[0], dtype=float))
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
     orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
+    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation)) 
 
     return detect_robot_collision(context)
 
@@ -472,10 +473,10 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
+                translation = lazy.pxr.Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
+                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
 
 
     return detect_robot_collision(context)
@@ -509,7 +510,7 @@ def detect_robot_collision(context):
             if valid_hit:
                 return valid_hit
             mesh_path = mesh.GetPrimPath().pathString
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh_path)
+            mesh_id = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(mesh_path)
             if mesh.GetTypeName() == "Mesh":
                 og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
             else:
@@ -547,3 +548,79 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
     return len(collision_prims) > 0
+
+def astar(search_map, start, goal, eight_connected=True):
+    """
+    A* search algorithm for finding a path from start to goal on a grid map
+
+    Args:
+        search_map (Array): 2D Grid map to search on
+        start (Array): Start position on the map
+        goal (Array): Goal position on the map
+        eight_connected (bool): Whether we consider the sides and diagonals of a cell as neighbors or just the sides
+    
+    Returns:
+        2D numpy array or None: Array of shape (N, 2) where N is the number of steps in the path. 
+                                Each row represents the (x, y) coordinates of a step on the path. 
+                                If no path is found, returns None.
+    """
+    def heuristic(node):
+        # Calculate the Euclidean distance from node to goal
+        return np.sqrt((node[0] - goal[0])**2 + (node[1] - goal[1])**2)
+    
+    def get_neighbors(cell):
+        if eight_connected:
+            # 8-connected grid
+            return [(cell[0] + 1, cell[1]), (cell[0] - 1, cell[1]), (cell[0], cell[1] + 1), (cell[0], cell[1] - 1), 
+                    (cell[0] + 1, cell[1] + 1), (cell[0] - 1, cell[1] - 1), (cell[0] + 1, cell[1] - 1), (cell[0] - 1, cell[1] + 1)]
+        else:
+            # 4-connected grid
+            return [(cell[0] + 1, cell[1]), (cell[0] - 1, cell[1]), (cell[0], cell[1] + 1), (cell[0], cell[1] - 1)]
+    
+    def is_valid(cell):
+        # Check if cell is within the map and traversable
+        return (0 <= cell[0] < search_map.shape[0] and
+                0 <= cell[1] < search_map.shape[1] and
+                search_map[cell] != 0)
+
+    def cost(cell1, cell2):
+        # Define the cost of moving from cell1 to cell2
+        # Return 1 for adjacent cells and square root of 2 for diagonal cells in an 8-connected grid.
+        if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
+            return 1
+        else:
+            return np.sqrt(2)
+
+    open_set = [(0, start)]
+    came_from = {}
+    visited = set()
+    g_score = {cell: float('inf') for cell in np.ndindex(search_map.shape)}
+    g_score[start] = 0
+
+    while open_set:
+        _, current = heapq.heappop(open_set)
+
+        visited.add(current)
+
+        if current == goal:
+            # Reconstruct path
+            path = []
+            while current in came_from:
+                path.insert(0, current)
+                current = came_from[current]
+            path.insert(0, start)
+            return np.array(path)
+
+        for neighbor in get_neighbors(current):
+            # Skip neighbors that are not valid or have already been visited
+            if not is_valid(neighbor) or neighbor in visited:
+                continue
+            tentative_g_score = g_score[current] + cost(current, neighbor)
+            if tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score = tentative_g_score + heuristic(neighbor)
+                heapq.heappush(open_set, (f_score, neighbor))
+
+    # Return None if no path is found
+    return None

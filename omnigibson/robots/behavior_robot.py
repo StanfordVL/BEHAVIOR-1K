@@ -3,11 +3,11 @@ from collections import OrderedDict
 import itertools
 import numpy as np
 import os
-from pxr import Gf
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
@@ -224,7 +224,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return [joints.index(f"head_{component}_joint") for component in m.COMPONENT_SUFFIXES]
 
     @property
-    def default_joint_pos(self):
+    def _default_joint_pos(self):
         return np.zeros(self.n_joints)
 
     @property
@@ -377,7 +377,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             if position is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
             if orientation is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]]))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]]))
 
     @property
     def assisted_grasp_start_points(self):

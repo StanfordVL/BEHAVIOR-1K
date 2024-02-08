@@ -16,7 +16,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
-    from pxr import Usd
+    import omnigibson.lazy as lazy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -270,7 +270,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
         usd_path = usd_path.replace(".usd", ".encrypted.usd")
         with decrypted(usd_path) as fpath:
-            stage = Usd.Stage.Open(fpath)
+            stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
             if supports_state_types(state_types_and_params, prim):
                 valid_models.append(model)

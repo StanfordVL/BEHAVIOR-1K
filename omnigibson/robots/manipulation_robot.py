@@ -1,12 +1,10 @@
 from abc import abstractmethod
-import carb
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from omni.physx import get_physx_scene_query_interface
-from pxr import Gf
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController, OperationalSpaceController
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
@@ -118,14 +116,14 @@ class ManipulationRobot(BaseRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
             action_normalize (bool): whether to normalize inputted actions. This will override any default values
                 specified by this class.
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
@@ -381,21 +379,32 @@ class ManipulationRobot(BaseRobot):
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
-        dic = super().get_control_dict()
+        fcns = super().get_control_dict()
 
         for arm in self.arm_names:
-            rel_eef_pos, rel_eef_quat = self.get_relative_eef_pose(arm)
-            dic[f"eef_{arm}_pos_relative"] = rel_eef_pos
-            dic[f"eef_{arm}_quat_relative"] = rel_eef_quat
-            dic[f"eef_{arm}_lin_vel_relative"] = self.get_relative_eef_lin_vel(arm)
-            dic[f"eef_{arm}_ang_vel_relative"] = self.get_relative_eef_ang_vel(arm)
-            # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
-            # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-            # see self.get_relative_jacobian() for more info
-            eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
+            self._add_arm_control_dict(fcns=fcns, arm=arm)
 
-        return dic
+        return fcns
+
+    def _add_arm_control_dict(self, fcns, arm):
+        """
+        Internally helper function to generate per-arm control dictionary entries. Needed because otherwise generated
+        functions inadvertently point to the same arm, if directly iterated in a for loop!
+
+        Args:
+            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
+            arm (str): specific arm to generate necessary control dict entries for
+        """
+        fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
+        fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
+        fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
+        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
+        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
+        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        # see self.get_relative_jacobian() for more info
+        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
@@ -939,11 +948,12 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "JointController",
                 "control_freq": self._control_freq,
-                "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
-                "command_output_limits": "default",
-                "use_delta_commands": False,
+                "command_output_limits": None,
+                "motor_type": "position",
+                "use_delta_commands": True,
+                "use_impedances": True,
             }
         return dic
 
@@ -963,14 +973,13 @@ class ManipulationRobot(BaseRobot):
                 "robot_urdf_path": self.urdf_path,
                 "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
                     np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
                     np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
-                "kv": 2.0,
                 "mode": "pose_delta_ori",
                 "smoothing_filter_size": 2,
                 "workspace_pose_limiter": None,
@@ -990,7 +999,7 @@ class ManipulationRobot(BaseRobot):
                 "name": "OperationalSpaceController",
                 "task_name": f"eef_{arm}",
                 "control_freq": self._control_freq,
-                "default_joint_pos": self.default_joint_pos,
+                "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
@@ -1014,9 +1023,11 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "NullJointController",
                 "control_freq": self._control_freq,
-                "motor_type": "velocity",
+                "motor_type": "position",
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
+                "default_command": self.reset_joint_pos[self.arm_control_idx[arm]],
+                "use_impedances": False,
             }
         return dic
 
@@ -1058,6 +1069,7 @@ class ManipulationRobot(BaseRobot):
                 "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "use_delta_commands": False,
+                "use_impedances": False,
             }
         return dic
 
@@ -1076,6 +1088,8 @@ class ManipulationRobot(BaseRobot):
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.gripper_control_idx[arm],
+                "default_command": np.zeros(len(self.gripper_control_idx[arm])),
+                "use_impedances": False,
             }
         return dic
 
@@ -1225,7 +1239,7 @@ class ManipulationRobot(BaseRobot):
             # a zero action will actually keep the AG setting where it already is.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
-            threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
+            threshold = np.mean([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]], axis=0)
             if controller.control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
@@ -1260,7 +1274,7 @@ class ManipulationRobot(BaseRobot):
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos, _ = T.pose_transform(eef_link_pos, eef_link_orn, attachment_point_pos_local, [0, 0, 0, 1])
         joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos.astype(float)))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos.astype(float)))
 
     def _calculate_in_hand_object(self, arm="default"):
         if gm.AG_CLOTH:
@@ -1396,7 +1410,7 @@ class ManipulationRobot(BaseRobot):
             return state
 
         # Include AG_state
-        state["ag_obj_constraint_params"] = self._ag_obj_constraint_params
+        state["ag_obj_constraint_params"] = self._ag_obj_constraint_params.copy()
         return state
 
     def _load_state(self, state):
@@ -1417,8 +1431,7 @@ class ManipulationRobot(BaseRobot):
                 data = state["ag_obj_constraint_params"][arm]
                 obj = og.sim.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                self._ag_data[arm] = (obj, link)
-                self._establish_grasp(arm=arm, ag_data=self._ag_data[arm], contact_pos=data["contact_pos"])
+                self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 
     def _serialize(self, state):
         # Call super first
