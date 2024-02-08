@@ -77,21 +77,6 @@ def get_prim_nested_children(prim):
     return prims
 
 
-def get_semantic_objects_pose():
-    """
-    Get pose of all objects with a semantic label.
-    """
-    stage = lazy.omni.usd.get_context().get_stage()
-    mappings = lazy.omni.syntheticdata.helpers.get_instance_mappings()
-    pose = []
-    for m in mappings:
-        prim_path = m[1]
-        prim = stage.GetPrimAtPath(prim_path)
-        prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
-        pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
-    return pose
-
-
 def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
                  joint_frame_in_parent_frame_pos=None, joint_frame_in_parent_frame_quat=None,
                  joint_frame_in_child_frame_pos=None, joint_frame_in_child_frame_quat=None,
@@ -606,6 +591,82 @@ class FlatcacheAPI:
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
         cls.MODIFIED_PRIMS = set()
+
+class SemanticsAPI:
+    """
+    Monolithic class for accessing Semantic information
+    """
+    _SDI = None
+    
+    @classmethod
+    def get_SDI(cls):
+        if cls._SDI is None:
+            cls._SDI = lazy.omni.syntheticdata._syntheticdata.acquire_syntheticdata_interface()
+        return cls._SDI
+
+    @classmethod
+    def add_class(cls, name):
+        """
+        Adds semantic class @name to the internal synthetic data pipeline. If it already exists, it will return its
+        pre-existing ID, otherwise, a new ID will be generated and returned
+        Args:
+            name (str): Name of class to assign
+        Returns:
+            int: Unique ID for the generated class
+        """
+        return cls.get_SDI().get_semantic_segmentation_id_from_data("class", name)
+
+    @classmethod
+    def get_class_mapping(cls):
+        """
+        Returns:
+            dict: Mapping from semantic ID (int) to semantic class name (str)
+        """
+        raw_mappings = cls.get_SDI().get_instance_mapping_list()
+        ids_to_names = {mapping[2]: mapping[3] for mapping in raw_mappings}
+        ids_to_names["BACKGROUND"] = 0
+        return ids_to_names
+
+    @classmethod
+    def get_semantic_mapping(cls):
+        """
+        Returns:
+            dict: Mapping from object's prim path (str) to its semantic ID (int)
+        """
+        raw_mappings = cls.get_SDI().get_instance_mapping_list()
+        paths_to_ids = {mapping[1]: mapping[2] for mapping in raw_mappings}
+        return paths_to_ids
+
+    @classmethod
+    def get_instance_mapping(cls):
+        """
+        Returns:
+            dict: Mapping from object's prim path (str) to its instance ID (int)
+        """
+        # TODO: Figure out what 2 corresponds to
+        # Raw mapping is incorrect -- 0 is BACKGROUND, 1 is UNSPECIFIED, 2 is UNKNOWN???
+        raw_mappings = cls.get_SDI().get_instance_mapping_list()
+        paths_to_ids = {mapping[1]: mapping[0] + 2 for mapping in raw_mappings}
+        paths_to_ids["BACKGROUND"] = 0
+        paths_to_ids["UNSPECIFIED"] = 1
+        paths_to_ids["TODO"] = 2
+        return paths_to_ids
+
+    @classmethod
+    def get_mesh_instance_mapping(cls):
+        """
+        Returns:
+            dict: Mapping from every object's visual mesh prim path (str) to its unique instance ID (int). Note that if
+                no ID is found (e.g.: if the mesh is invisible), the mesh's corresponding ID will be assigned to -1
+        """
+        # Manually iterate through all objects
+        paths_to_ids = dict()
+        for obj in og.sim.scene.objects:
+            for link in obj.links.values():
+                for vm in link.visual_meshes.values():
+                    raw_info = cls.SDI.get_instance_segmentation_id(vm.prim_path)
+                    paths_to_ids[vm.prim_path] = raw_info[0] if len(raw_info) > 0 else -1
+        return paths_to_ids
 
 
 def clear():
