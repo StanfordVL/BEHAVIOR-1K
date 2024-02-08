@@ -764,6 +764,8 @@ def test_particle_source():
     with pytest.raises(NotImplementedError):
         sink.states[ParticleSource].set_value(True)
 
+    water_system.remove_all_particles()
+
 
 @og_test
 def test_particle_sink():
@@ -790,6 +792,8 @@ def test_particle_sink():
     # Cannot set this state
     with pytest.raises(NotImplementedError):
         sink.states[ParticleSink].set_value(True)
+
+    water_system.remove_all_particles()
 
 
 @og_test
@@ -850,6 +854,7 @@ def test_particle_applier():
     with pytest.raises(NotImplementedError):
         spray_bottle.states[ParticleApplier].set_value(True)
 
+    water_system.remove_all_particles()
 
 @og_test
 def test_particle_remover():
@@ -909,6 +914,8 @@ def test_particle_remover():
     with pytest.raises(NotImplementedError):
         vacuum.states[ParticleRemover].set_value(True)
 
+    water_system.remove_all_particles()
+
 
 @og_test
 def test_saturated():
@@ -937,6 +944,8 @@ def test_saturated():
     # Make sure we can toggle saturated to be true and false
     assert remover_dishtowel.states[Saturated].set_value(water_system, False)
     assert remover_dishtowel.states[Saturated].set_value(water_system, True)
+
+    water_system.remove_all_particles()
 
 
 @og_test
@@ -1079,14 +1088,13 @@ def test_filled():
         # Cannot set Filled state False
         with pytest.raises(NotImplementedError):
             stockpot.states[Filled].set_value(system, False)
+
         system.remove_all_particles()
 
         for _ in range(5):
             og.sim.step()
+
         assert not stockpot.states[Filled].get_value(system)
-
-        system.remove_all_particles()
-
 
 @og_test
 def test_contains():
@@ -1131,6 +1139,7 @@ def test_contains():
         with pytest.raises(NotImplementedError):
             stockpot.states[Contains].set_value(system, True)
 
+        system.remove_all_particles()
 
 @og_test
 def test_covered():
