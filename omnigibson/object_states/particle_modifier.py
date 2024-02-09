@@ -42,7 +42,7 @@ m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP = 10
 m.N_STEPS_PER_APPLICATION = 5
 m.N_STEPS_PER_REMOVAL = 1
 
-# Saturation thresholds -- maximum number of particles that can be applied by a ParticleApplier
+# Application thresholds -- maximum number of particles that can be applied by a ParticleApplier
 m.VISUAL_PARTICLES_APPLICATION_LIMIT = 1000000
 m.PHYSICAL_PARTICLES_APPLICATION_LIMIT = 1000000
 
@@ -221,10 +221,20 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._projection_mesh_params = projection_mesh_params
 
         # Parse conditions
-        self.conditions = self._parse_conditions(conditions=conditions)
-
+        self._conditions = self._parse_conditions(conditions=conditions)
         # Run super method
         super().__init__(obj)
+
+    @property
+    def conditions(self):
+        """
+        dict: Dictionary mapping the names of ParticleSystem (str) to a list of function calls that must evaluate to
+        True in order for this particle modifier to be able to modify particles belonging to @ParticleSystem.
+        The list of functions at least contains the limit condition, which is a function that checks whether the
+        applier has applied or the remover has removed the maximum number of particles allowed. If the systen name is
+        not in the dictionary, then the modifier cannot modify particles of that system.
+        """
+        return self._conditions
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -418,7 +428,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Store check overlap function
         self._check_overlap = check_overlap
 
-        # Update the saturation limit for each system
+        # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
         for system_name in self.conditions.keys():
             system = get_system(system_name, force_active=False)
             limit = self.visual_particle_modification_limit \
@@ -589,7 +599,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
                         system = get_system(system_name)
-                        # Sanity check for oversaturation
+                        # Sanity check to see if the modifier has reached its limit for this system
                         if self.obj.states[Saturated].get_value(system=system):
                             continue
                         # Potentially modify particles within the volume

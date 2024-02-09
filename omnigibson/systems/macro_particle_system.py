@@ -997,6 +997,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         particle_names = list(cls.particles.keys())
         # Add in per-group information
         groups_dict = dict()
+        name2idx = {name: idx for idx, name in enumerate(particle_names)}
         for group_name, group_particles in cls._group_particles.items():
             obj = cls._group_objects[group_name]
             is_cloth = cls._is_cloth_obj(obj=obj)
@@ -1005,7 +1006,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
                 particle_attached_obj_uuid=obj.uuid,
                 n_particles=cls.num_group_particles(group=group_name),
                 particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
-                particle_indices=[particle_names.index(name) for name in group_particles.keys()],
+                particle_indices=[name2idx[name] for name in group_particles.keys()],
                 # If the attached object is a cloth, store the face_id, otherwise, store the link name
                 particle_attached_references=[cls._particles_info[name]["face_id"] for name in group_particles.keys()]
                 if is_cloth else [cls._particles_info[name]["link"].prim_path.split("/")[-1] for name in group_particles.keys()],
@@ -1126,9 +1127,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
     _particle_radius = None
     _particle_offset = None
 
-    # We need to manually call refresh_particles_view the first time when particle count goes from 0 to non-zero
-    _has_refreshed_particles_view = False
-
     @classmethod
     def initialize(cls):
         # Run super method first
@@ -1143,12 +1141,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         # If sim is already playing, refresh particles immediately
         if og.sim.is_playing():
             cls.refresh_particles_view()
-
-    @classmethod
-    def update(cls):
-        if not cls._has_refreshed_particles_view and cls.n_particles > 0:
-            cls.refresh_particles_view()
-            cls._has_refreshed_particles_view = True
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):

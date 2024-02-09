@@ -123,7 +123,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         """
         Loads the raw prim into the simulator. Any post-processing should be done in @self._post_load()
         """
-        pass
+        raise NotImplementedError()
 
     @property
     def loaded(self):

@@ -176,7 +176,7 @@ def test_slicing_rule():
         assert half_apple.states[Cooked].get_value()
 
     # Clean up
-    og.sim.remove_objects(new_half_apples)
+    og.sim.remove_object(new_half_apples)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:
@@ -1101,7 +1101,7 @@ def test_cooking_object_rule_success():
     sesame_seed.remove_all_particles()
     og.sim.step()
 
-    og.sim.remove_objects(new_bagels)
+    og.sim.remove_object(new_bagels)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:
@@ -1546,7 +1546,7 @@ def test_single_toggleable_machine_rule_output_object_success():
         assert dough.states[OnTop].get_value(electric_mixer)
 
     # Clean up
-    og.sim.remove_objects(new_doughs)
+    og.sim.remove_object(new_doughs)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:

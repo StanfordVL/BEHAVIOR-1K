@@ -56,12 +56,9 @@ TransitionResults = namedtuple(
 
 # Mapping from transition rule json files to rule classe names
 _JSON_FILES_TO_RULES = {
-    "dicing.json": ["DicingRule"],
     "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
-    "melting.json": ["MeltingRule"],
     "mixing_stick.json": ["MixingToolRule"],
     "single_toggleable_machine.json": ["ToggleableMachineRule"],
-    "slicing.json": ["SlicingRule"],
     "substance_cooking.json": ["CookingPhysicalParticleRule"],
     "substance_watercooking.json": ["CookingPhysicalParticleRule"],
     "washer.json": ["WasherRule"],
@@ -185,7 +182,7 @@ class TransitionRuleAPI:
         # Process all transition results
         if len(removed_objs) > 0:
             # First remove pre-existing objects
-            og.sim.remove_objects(removed_objs)
+            og.sim.remove_object(removed_objs)
 
         # Then add new objects
         if len(added_obj_attrs) > 0:
@@ -923,10 +920,6 @@ class SlicingRule(BaseTransitionRule):
     def transition(cls, object_candidates):
         objs_to_add, objs_to_remove = [], []
 
-        # Define callback for propagating non-kinematic state from whole objects to half objects
-        def _get_load_non_kin_state_callback(state):
-            return lambda obj: obj.load_non_kin_state(state)
-
         for sliceable_obj in object_candidates["sliceable"]:
             # Object parts offset annotation are w.r.t the base link of the whole object.
             pos, orn = sliceable_obj.get_position_orientation()
@@ -962,13 +955,14 @@ class SlicingRule(BaseTransitionRule):
                     bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
+                sliceable_obj_state = sliceable_obj.dump_state()
                 # Propagate non-physical states of the whole object to the half objects, e.g. cooked, saturated, etc.
                 # Add the new object to the results.
                 new_obj_attrs = ObjectAttrs(
                     obj=part_obj,
                     bb_pos=part_bb_pos,
                     bb_orn=part_bb_orn,
-                    callback=_get_load_non_kin_state_callback(sliceable_obj.dump_state())
+                    callback=lambda obj: obj.load_non_kin_state(sliceable_obj_state),
                 )
                 objs_to_add.append(new_obj_attrs)
 
@@ -1001,6 +995,7 @@ class DicingRule(BaseTransitionRule):
 
         for diceable_obj in object_candidates["diceable"]:
             obj_category = diceable_obj.category
+            # We expect all diced particle systems to follow the naming convention (cooked__)diced__<category>
             system_name = "diced__" + diceable_obj.category.removeprefix("half_")
             if Cooked in diceable_obj.states and diceable_obj.states[Cooked].get_value():
                 system_name = "cooked__" + system_name
@@ -1078,6 +1073,7 @@ class RecipeRule(BaseTransitionRule):
         fillable_categories=None,
         **kwargs,
     ):
+        # TODO: rename to fillable synsets and heatsource sysnets
         """
         Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
         into the outputs
@@ -1433,11 +1429,10 @@ class RecipeRule(BaseTransitionRule):
                     return False
                 num_instances = min(num_instances, num_inst)
 
-            for obj_category, obj_quantity in recipe["input_objects"].items():
-                quantity_used = num_instances * obj_quantity
-                # Pick the first quantity_used objects from the valid indices
-                relevant_objects[obj_category] = set(
-                    cls._OBJECTS[category_to_valid_indices[obj_category][:quantity_used]])
+            # If at least one instance of the recipe can be executed, add all valid objects to be relevant_objects.
+            # This can be considered as a special case of below where there are no binary kinematic states required.
+            for obj_category in recipe["input_objects"]:
+                relevant_objects[obj_category] = set(cls._OBJECTS[category_to_valid_indices[obj_category])
 
         # If multi-instance is True and requires kinematic states between objects
         else:
@@ -1826,7 +1821,9 @@ class RecipeRule(BaseTransitionRule):
             state = OnTop
             # TODO: What to do if setter fails?
             if not obj.states[state].set_value(container, True):
-                log.warning(f"Failed to spawn object {obj.name} in container {container.name}!")
+                log.warning(f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead.")
+                pos = np.array(container.aabb_center) + np.array([0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0])
+                obj.set_bbox_center_position_orientation(position=pos)
 
         # Spawn in new objects
         for category, n_instances in recipe["output_objects"].items():
@@ -1925,7 +1922,7 @@ class RecipeRule(BaseTransitionRule):
 
 class CookingPhysicalParticleRule(RecipeRule):
     """
-    Transition rule to apply to "cook" physicl particles
+    Transition rule to apply to "cook" physical particles
     """
     @classmethod
     def add_recipe(cls, name, input_synsets, output_synsets):
@@ -2003,6 +2000,8 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         return TransitionResults(add=[], remove=[])
 
+
+# TODO: add more rich doc for each class, add example, e.g. stew, bagel, etc
 
 class ToggleableMachineRule(RecipeRule):
     """
@@ -2520,6 +2519,7 @@ def import_recipes():
                     if (rule == CookingObjectRule and has_substance) or (rule == CookingSystemRule and not has_substance):
                         satisfied = False
                     if satisfied:
+                        # TODO: put translation from BDDL to OG into bddl_utils
                         rule.add_recipe(**recipe)
                 log.info(f"All recipes of rule {rule_name} imported successfully.")
 

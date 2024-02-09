@@ -477,56 +477,30 @@ def launch_simulator(*args, **kwargs):
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self.initialize_object_on_next_sim_step(obj=obj)
 
-        def remove_objects(self, objs):
+        def remove_object(self, obj):
             """
-            Remove a list of non-robot object from the simulator.
+            Remove one or a list of non-robot object from the simulator.
 
             Args:
-                objs (List[BaseObject]): list of non-robot objects to remove
+                obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
             """
             state = self.dump_state()
+
+            objs = [obj] if isinstance(obj, BaseObject) else obj
 
             # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
             # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
             # we first move the object to a safe location, then remove it.
             pos = list(m.OBJECT_GRAVEYARD_POS)
-            for obj in objs:
-                obj.set_position_orientation(pos, [0, 0, 0, 1])
-                pos[0] += max(obj.aabb_extent)
+            for ob in objs:
+                ob.set_position_orientation(pos, [0, 0, 0, 1])
+                pos[0] += max(ob.aabb_extent)
 
             # One timestep will elapse
             self.app.update()
 
-            for obj in objs:
-                self._remove_object(obj)
-
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
-
-            # Load the state back
-            self.load_state(state)
-
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
-
-        def remove_object(self, obj):
-            """
-            Remove a non-robot object from the simulator.
-
-            Args:
-                obj (BaseObject): a non-robot object to remove
-            """
-            state = self.dump_state()
-
-            # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
-            # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
-            # we first move the object to a safe location, then remove it.
-            obj.set_position_orientation(m.OBJECT_GRAVEYARD_POS, [0, 0, 0, 1])
-
-            # One timestep will elapse
-            self.app.update()
-
-            self._remove_object(obj)
+            for ob in objs:
+                self._remove_object(ob)
 
             # Update all handles that are now broken because objects have changed
             self.update_handles()
