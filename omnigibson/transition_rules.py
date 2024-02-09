@@ -788,6 +788,7 @@ class WasherDryerRule(BaseTransitionRule):
         classes.add("WasherDryerRule")
         return classes
 
+
 class WasherRule(WasherDryerRule):
     """
     Transition rule to apply to cloth washers.
@@ -1011,6 +1012,7 @@ class DicingRule(BaseTransitionRule):
 class MeltingRule(BaseTransitionRule):
     """
     Transition rule to apply to meltable objects to simulate melting
+    Once the object reaches the melting temperature, remove the object and spawn the melted substance in its place.
     """
     @classproperty
     def candidate_filters(cls):
@@ -1073,7 +1075,6 @@ class RecipeRule(BaseTransitionRule):
         fillable_categories=None,
         **kwargs,
     ):
-        # TODO: rename to fillable synsets and heatsource sysnets
         """
         Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
         into the outputs
@@ -1432,7 +1433,7 @@ class RecipeRule(BaseTransitionRule):
             # If at least one instance of the recipe can be executed, add all valid objects to be relevant_objects.
             # This can be considered as a special case of below where there are no binary kinematic states required.
             for obj_category in recipe["input_objects"]:
-                relevant_objects[obj_category] = set(cls._OBJECTS[category_to_valid_indices[obj_category])
+                relevant_objects[obj_category] = set(cls._OBJECTS[category_to_valid_indices[obj_category]])
 
         # If multi-instance is True and requires kinematic states between objects
         else:
@@ -1922,7 +1923,12 @@ class RecipeRule(BaseTransitionRule):
 
 class CookingPhysicalParticleRule(RecipeRule):
     """
-    Transition rule to apply to "cook" physical particles
+    Transition rule to apply to "cook" physical particles.
+    It comes with two forms of recipes:
+    1. xyz -> cooked__xyz, e.g. diced__chicken -> cooked__diced__chicken
+    2. xyz + cooked__water -> cooked__xyz, e.g. rice + cooked__water -> cooked__rice
+    During execution, we replace the input particles (xyz) with the output particles (cooked__xyz), and remove the
+    cooked__water if it was used as an input.
     """
     @classmethod
     def add_recipe(cls, name, input_synsets, output_synsets):
@@ -2001,12 +2007,13 @@ class CookingPhysicalParticleRule(RecipeRule):
         return TransitionResults(add=[], remove=[])
 
 
-# TODO: add more rich doc for each class, add example, e.g. stew, bagel, etc
-
 class ToggleableMachineRule(RecipeRule):
     """
     Transition mixing rule that leverages a single toggleable machine (e.g. electric mixer, coffee machine, blender),
-    which require toggledOn in order to trigger the recipe event
+    which require toggledOn in order to trigger the recipe event.
+    It comes with two forms of recipes:
+    1. output is a single object, e.g. flour + butter + sugar -> dough, machine is electric mixer
+    2. output is a system, e.g. strawberry + milk -> smoothie, machine is blender
     """
 
     @classmethod
@@ -2086,7 +2093,8 @@ class ToggleableMachineRule(RecipeRule):
 class MixingToolRule(RecipeRule):
     """
     Transition mixing rule that leverages "mixingTool" ability objects, which require touching between a mixing tool
-    and a container in order to trigger the recipe event
+    and a container in order to trigger the recipe event.
+    Example: water + lemon_juice + sugar -> lemonade, mixing tool is spoon
     """
     @classmethod
     def add_recipe(cls, name, input_synsets, output_synsets, input_states=None, output_states=None):
@@ -2141,7 +2149,8 @@ class MixingToolRule(RecipeRule):
 
 class CookingRule(RecipeRule):
     """
-    Transition mixing rule that approximates cooking recipes via a container and heatsource
+    Transition mixing rule that approximates cooking recipes via a container and heatsource.
+    It is subclassed by CookingObjectRule and CookingSystemRule.
     """
     # Counter that increments monotonically
     COUNTER = 0
@@ -2368,6 +2377,11 @@ class CookingRule(RecipeRule):
 
 
 class CookingObjectRule(CookingRule):
+    """
+    Cooking rule when output is objects (e.g. one dough can produce many bagels as output).
+    Example: bagel_dough + egg + sesame_seed -> bagel, heat source is oven, fillable is baking_sheet.
+    This is the only rule where is_multi_instance is True, where multiple copies of the recipe can be executed.
+    """
     @classmethod
     def add_recipe(
             cls,
@@ -2431,6 +2445,10 @@ class CookingObjectRule(CookingRule):
 
 
 class CookingSystemRule(CookingRule):
+    """
+    Cooking rule when output is a system.
+    Example: beef + tomato + chicken_stock -> stew, heat source is stove, fillable is stockpot.
+    """
     @classmethod
     def add_recipe(
             cls,
