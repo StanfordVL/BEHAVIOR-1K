@@ -14,7 +14,7 @@ def test_removal_and_readdition():
 
     # Add an apple
     apple = DatasetObject(
-        name="apple",
+        name="apple_unique",
         category="apple",
         model="agveuv",
     )
@@ -38,11 +38,12 @@ def test_removal_and_readdition():
 
     # Importing should work now
     apple2 = DatasetObject(
-        name="apple",
+        name="apple_unique",
         category="apple",
         model="agveuv",
     )
     og.sim.import_object(apple2)
+    og.sim.step()
 
     # Clear the stuff we added
     og.sim.remove_object(apple2)
@@ -54,7 +55,7 @@ def test_readdition():
 
     # Add an apple
     apple = DatasetObject(
-        name="apple",
+        name="apple_unique",
         category="apple",
         model="agveuv",
     )
@@ -73,7 +74,7 @@ def test_readdition():
     # Creating and importing a new apple should fail
     with pytest.raises(AssertionError):
         apple2 = DatasetObject(
-            name="apple",
+            name="apple_unique",
             category="apple",
             model="agveuv",
         )

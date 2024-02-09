@@ -451,16 +451,12 @@ class StatefulObject(BaseObject):
                 material.diffuse_tint = diffuse_tint
 
     def remove(self):
-        """
-        Removes this prim from omniverse stage.
-        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
-        """
+        # Run super
+        super().remove()
+
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
             state_instance.remove()
-
-        # Run super
-        super().remove()
 
     def _dump_state(self):
         # Grab state from super class
@@ -480,6 +476,10 @@ class StatefulObject(BaseObject):
         # Call super method first
         super()._load_state(state=state)
 
+        # Load non-kinematic states
+        self.load_non_kin_state(state)
+
+    def load_non_kin_state(self, state):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
