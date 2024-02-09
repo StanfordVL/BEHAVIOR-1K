@@ -143,7 +143,6 @@ def main(iterations):
     gm.USE_GPU_DYNAMICS = True
 
     env = og.Environment(configs=cfg)
-    breakpoint()
         
     # Testing primitives with env
     #############################

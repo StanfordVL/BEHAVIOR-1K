@@ -4,7 +4,7 @@ from enum import IntEnum
 from typing import List
 
 from future.utils import with_metaclass
-from omnigibson import Environment
+# from omnigibson.envs.env_base import Environment
 
 from omnigibson.robots import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
@@ -63,7 +63,7 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
             REGISTERED_PRIMITIVE_SETS[cls.__name__] = cls
 
     def __init__(self, env):
-        self.env : Environment = env
+        self.env = env
 
     @property
     def robot(self):

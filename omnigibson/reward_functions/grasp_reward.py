@@ -64,7 +64,7 @@ class GraspReward(BaseRewardFunction):
 
         # Penalize robot for colliding with an object
         if detect_robot_collision_in_sim(robot, filter_objs=[self.obj]):
-            reward += self.collision_penalty
+            reward -= self.collision_penalty
 
         # If we're not currently grasping
         if not current_grasping:
