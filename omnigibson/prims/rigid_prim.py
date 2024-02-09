@@ -1,3 +1,4 @@
+from scipy.spatial import ConvexHull
 import numpy as np
 
 import omnigibson as og
@@ -66,6 +67,8 @@ class RigidPrim(XFormPrim):
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
         self._kinematic_local_pose_cache = None
+        
+        self._points_on_convex_hull_cache = None
 
         # Run super init
         super().__init__(
@@ -289,6 +292,8 @@ class RigidPrim(XFormPrim):
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
+        # Invalidate points on convex hull cache when new pose is set
+        self._points_on_convex_hull_cache = None
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
             self._kinematic_world_pose_cache = None
@@ -596,6 +601,22 @@ class RigidPrim(XFormPrim):
         """
         return self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
 
+    @property
+    def points_on_convex_hull(self):
+        """
+        Returns:
+            np.ndarray: points on the convex hull of all points from child geom prims
+        """
+        if self._points_on_convex_hull_cache is not None:
+            return self._points_on_convex_hull_cache
+        points = []
+        for mesh in self._collision_meshes.values():
+            points.append(mesh.points)
+        points = np.concatenate(points, axis=0)
+        hull_points = ConvexHull(points).simplices
+        self._points_on_convex_hull_cache = hull_points
+        return hull_points
+    
     def enable_gravity(self):
         """
         Enables gravity for this rigid body

@@ -1,10 +1,12 @@
 import numpy as np
+import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 
 class GeomPrim(XFormPrim):
@@ -116,6 +118,17 @@ class GeomPrim(XFormPrim):
             self.material.opacity_constant = opacity
         else:
             self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+    
+    @property
+    def points(self):
+        """
+        Returns:
+            np.ndarray: Local poses of all points
+        """
+        mesh_points = self.prim.GetAttribute("points").Get()
+        pos, ori = self.get_position_orientation()
+        transform = T.pose2mat((pos, ori))
+        return trimesh.transformations.transform_points(mesh_points, transform)
 
 
 class CollisionGeomPrim(GeomPrim):
