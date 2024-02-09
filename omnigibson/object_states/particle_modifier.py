@@ -726,7 +726,7 @@ class ParticleRemover(ParticleModifier):
             specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
             not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
             2-tuples
-        default_physical_conditions (None or list): Condition(s) needed to remove any physical (excluding fluid)
+        default_non_fluid_conditions (None or list): Condition(s) needed to remove any physical (excluding fluid)
             particles not explicitly specified in @conditions. If None, then it is assumed that no other physical
             particles can be removed. If not None, should be in same format as an entry in @conditions, i.e.: list of
             (ParticleModifyCondition, val) 2-tuples
@@ -742,14 +742,14 @@ class ParticleRemover(ParticleModifier):
         method=ParticleModifyMethod.ADJACENCY,
         projection_mesh_params=None,
         default_fluid_conditions=None,
-        default_physical_conditions=None,
+        default_non_fluid_conditions=None,
         default_visual_conditions=None,
     ):
         # Store values
         self._default_fluid_conditions = default_fluid_conditions if default_fluid_conditions is None else \
             [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_fluid_conditions]
-        self._default_physical_conditions = default_physical_conditions if default_physical_conditions is None else \
-            [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_physical_conditions]
+        self._default_non_fluid_conditions = default_non_fluid_conditions if default_non_fluid_conditions is None else \
+            [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_non_fluid_conditions]
         self._default_visual_conditions = default_visual_conditions if default_visual_conditions is None else \
             [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_visual_conditions]
 
@@ -770,7 +770,7 @@ class ParticleRemover(ParticleModifier):
             elif is_fluid_system(system_name):
                 default_system_conditions = self._default_fluid_conditions
             elif is_physical_particle_system(system_name):
-                default_system_conditions = self._default_physical_conditions
+                default_system_conditions = self._default_non_fluid_conditions
             elif is_visual_particle_system(system_name):
                 default_system_conditions = self._default_visual_conditions
             else:

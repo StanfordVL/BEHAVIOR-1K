@@ -174,7 +174,7 @@ class ParticleSink(ParticleRemover):
             specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
             not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
             2-tuples
-        default_physical_conditions (None or list): Condition(s) needed to remove any physical (excluding fluid)
+        default_non_fluid_conditions (None or list): Condition(s) needed to remove any physical (excluding fluid)
             particles not explicitly specified in @conditions. If None, then it is assumed that no other physical
             particles can be removed. If not None, should be in same format as an entry in @conditions, i.e.: list of
             (ParticleModifyCondition, val) 2-tuples
@@ -190,7 +190,7 @@ class ParticleSink(ParticleRemover):
         sink_radius=None,
         sink_height=None,
         default_fluid_conditions=None,
-        default_physical_conditions=None,
+        default_non_fluid_conditions=None,
         default_visual_conditions=None,
     ):
         # Initialize variables that will be filled in at runtime
@@ -214,7 +214,7 @@ class ParticleSink(ParticleRemover):
             method=ParticleModifyMethod.PROJECTION,
             projection_mesh_params=projection_mesh_params,
             default_fluid_conditions=default_fluid_conditions,
-            default_physical_conditions=default_physical_conditions,
+            default_non_fluid_conditions=default_non_fluid_conditions,
             default_visual_conditions=default_visual_conditions,
         )
 
