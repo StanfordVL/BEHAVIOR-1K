@@ -1197,9 +1197,23 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
                                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
-            aabb_lo, aabb_hi = super().aabb
-            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+            points_world = []
+            for link in self._links.values():
+                hull_points = link.points_on_convex_hull
+                if hull_points is not None:
+                    position, orientation = link.get_position_orientation()
+                    scale = link.scale
+                    points_scaled = hull_points * scale
+                    points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+                    points_transformed = points_rotated + position
+                    points_world.append(points_transformed)
 
+            if not points_world:
+                return np.array([0, 0, 0]), np.array([0, 0, 0])
+
+            all_points = np.concatenate(points_world, axis=0)
+            aabb_lo = np.min(all_points, axis=0)
+            aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
 
     def get_coriolis_and_centrifugal_forces(self):

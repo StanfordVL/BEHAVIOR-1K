@@ -125,10 +125,7 @@ class GeomPrim(XFormPrim):
         Returns:
             np.ndarray: Local poses of all points
         """
-        mesh_points = self.prim.GetAttribute("points").Get()
-        pos, ori = self.get_position_orientation()
-        transform = T.pose2mat((pos, ori))
-        return trimesh.transformations.transform_points(mesh_points, transform)
+        return self.prim.GetAttribute("points").Get()
 
 
 class CollisionGeomPrim(GeomPrim):

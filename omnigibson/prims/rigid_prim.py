@@ -609,13 +609,21 @@ class RigidPrim(XFormPrim):
         """
         if self._points_on_convex_hull_cache is not None:
             return self._points_on_convex_hull_cache
-        points = []
-        for mesh in self._collision_meshes.values():
-            points.append(mesh.points)
+
+        points = [mesh.points for mesh in self._collision_meshes.values() if mesh.points is not None and len(mesh.points) > 0]
+        
+        if not points:
+            return None
+
         points = np.concatenate(points, axis=0)
-        hull_points = ConvexHull(points).simplices
-        self._points_on_convex_hull_cache = hull_points
-        return hull_points
+        
+        try:
+            hull = ConvexHull(points)
+            self._points_on_convex_hull_cache = points[hull.vertices, :]
+            return self._points_on_convex_hull_cache
+        except scipy.spatial.qhull.QhullError:
+            # Handle the case where a convex hull cannot be formed (e.g., collinear points)
+            return None
     
     def enable_gravity(self):
         """
