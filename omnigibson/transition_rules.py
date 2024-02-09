@@ -23,15 +23,11 @@ from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
+from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 import bddl
-from bddl.object_taxonomy import ObjectTaxonomy
-from omnigibson.utils.bddl_utils import is_substance_synset, get_system_name_by_synset, SUPPORTED_PREDICATES
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
-
-# Create object taxonomy
-OBJECT_TAXONOMY = ObjectTaxonomy()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -795,7 +791,7 @@ class WasherRule(WasherDryerRule):
     1. remove "dirty" particles from the washer if the necessary solvent is present.
     2. wet the objects inside by making them either Saturated with or Covered by water.
     """
-    _CLEANING_CONDITONS = None
+    cleaning_conditions = None
 
     @classmethod
     def register_cleaning_conditions(cls, conditions):
@@ -803,30 +799,16 @@ class WasherRule(WasherDryerRule):
         Register cleaning conditions for this rule.
 
         Args:
-        conditions (dict): Dictionary mapping the synset of ParticleSystem (str) to None or list of synsets of
-            ParticleSystem (str). None represents "never", empty list represents "always", or non-empty list represents
-            at least one of the systems in the list needs to be present in the washer for the key system to be removed.
-            E.g. "rust.n.01" -> None: "never remove rust.n.01 from the washer"
-            E.g. "dust.n.01" -> []: "always remove dust.n.01 from the washer"
-            E.g. "cooking_oil.n.01" -> ["sodium_carbonate.n.01", "vinegar.n.01"]: "remove cooking_oil.n.01 from the
-            washer if either sodium_carbonate.n.01 or vinegar.n.01 is present"
-            For keys not present in the dictionary, the default is []: "always remove"
+            conditions (dict): ictionary mapping the system name (str) to None or list of system names (str). None
+                represents "never", empty list represents "always", or non-empty list represents at least one of the
+                systems in the list needs to be present in the washer for the key system to be removed.
+                E.g. "rust" -> None: "never remove rust from the washer"
+                E.g. "dust" -> []: "always remove dust from the washer"
+                E.g. "cooking_oil" -> ["sodium_carbonate", "vinegar"]: "remove cooking_oil from the washer if either
+                sodium_carbonate or vinegar is present"
+                For keys not present in the dictionary, the default is []: "always remove"
         """
-        cls._CLEANING_CONDITONS = dict()
-        for solute, solvents in conditions.items():
-            assert OBJECT_TAXONOMY.is_leaf(solute), f"Synset {solute} must be a leaf node in the taxonomy!"
-            assert is_substance_synset(solute), f"Synset {solute} must be a substance synset!"
-            solute_name = get_system_name_by_synset(solute)
-            if solvents is None:
-                cls._CLEANING_CONDITONS[solute_name] = None
-            else:
-                solvent_names = []
-                for solvent in solvents:
-                    assert OBJECT_TAXONOMY.is_leaf(solvent), f"Synset {solvent} must be a leaf node in the taxonomy!"
-                    assert is_substance_synset(solvent), f"Synset {solvent} must be a substance synset!"
-                    solvent_name = get_system_name_by_synset(solvent)
-                    solvent_names.append(solvent_name)
-                cls._CLEANING_CONDITONS[solute_name] = solvent_names
+        cls.cleaning_conditions = conditions
 
     @classproperty
     def candidate_filters(cls):
@@ -843,12 +825,12 @@ class WasherRule(WasherDryerRule):
             systems_to_remove = []
             for system in ParticleRemover.supported_active_systems:
                 # Never remove
-                if system.name in cls._CLEANING_CONDITONS and cls._CLEANING_CONDITONS[system.name] is None:
+                if system.name in cls.cleaning_conditions and cls.cleaning_conditions[system.name] is None:
                     continue
                 if not washer.states[Contains].get_value(system):
                     continue
 
-                solvents = cls._CLEANING_CONDITONS.get(system.name, [])
+                solvents = cls.cleaning_conditions.get(system.name, [])
                 # Always remove
                 if len(solvents) == 0:
                     systems_to_remove.append(system)
@@ -1068,8 +1050,10 @@ class RecipeRule(BaseTransitionRule):
     def add_recipe(
         cls,
         name,
-        input_synsets,
-        output_synsets,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
         input_states=None,
         output_states=None,
         fillable_categories=None,
@@ -1081,147 +1065,53 @@ class RecipeRule(BaseTransitionRule):
 
         Args:
             name (str): Name of the recipe
-            input_synsets (dict): Maps synsets to number of instances required for the recipe
-            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-                or None if no states are required
-            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-                or None if no states are required
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
             fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
                 for this recipe. If None, any fillable is allowed
             kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
         """
-        # Store information for this recipe
-        cls._RECIPES[name] = {
-            "name": name,
-            # Maps object categories to number of instances required for the recipe
-            "input_objects": dict(),
-            # List of system names required for the recipe
-            "input_systems": list(),
-            # Maps object categories to number of instances to be spawned in the container when the recipe executes
-            "output_objects": dict(),
-            # List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
-            "output_systems": list(),
-            # Maps object categories to ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
-            "input_states": defaultdict(lambda: defaultdict(list)),
-            # Maps object categories to ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
-            "output_states": defaultdict(lambda: defaultdict(list)),
-            # Set of fillable categories which are allowed for this recipe
-            "fillable_categories": None,
-            # networkx DiGraph that represents the kinematic dependency graph of the input objects
-            # If input_states has no kinematic states between pairs of objects, this will be None.
-            "input_object_tree": None,
-            **kwargs,
-        }
 
-        cls._populate_input_output_objects_systems(name=name, input_synsets=input_synsets, output_synsets=output_synsets)
-        cls._populate_input_output_states(name=name, input_states=input_states, output_states=output_states)
-        cls._populate_input_object_tree(name=name)
-        cls._populate_fillable_categories(name=name, fillable_categories=fillable_categories)
+        input_states = input_states if input_states is not None else defaultdict(lambda: defaultdict(list))
+        output_states = output_states if output_states is not None else defaultdict(lambda: defaultdict(list))
 
-    @classmethod
-    def _populate_input_output_objects_systems(cls, name, input_synsets, output_synsets):
-        # Map input/output synsets into input/output objects and systems.
-        for synsets, obj_key, system_key in zip((input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")):
-            for synset, count in synsets.items():
-                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
-                if is_substance_synset(synset):
-                    cls._RECIPES[name][system_key].append(get_system_name_by_synset(synset))
-                else:
-                    obj_categories = OBJECT_TAXONOMY.get_categories(synset)
-                    assert len(obj_categories) == 1, f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
-                    cls._RECIPES[name][obj_key][obj_categories[0]] = count
-
-        # Assert only one of output_objects or output_systems is not None
-        assert len(cls._RECIPES[name]["output_objects"]) == 0 or len(cls._RECIPES[name]["output_systems"]) == 0, \
-            "Recipe can only generate output objects or output systems, but not both!"
-
-    @classmethod
-    def _populate_input_output_states(cls, name, input_states, output_states):
-        # Apply post-processing for input/output states if specified
-        for synsets_to_states, states_key in zip((input_states, output_states), ("input_states", "output_states")):
-            if synsets_to_states is None:
-                continue
-            for synsets, states in synsets_to_states.items():
-                # For unary/binary states, synsets is a single synset or a comma-separated pair of synsets, respectively
-                synset_split = synsets.split(",")
-                if len(synset_split) == 1:
-                    first_synset = synset_split[0]
-                    second_synset = None
-                else:
-                    first_synset, second_synset = synset_split
-
-                # Assert the first synset is an object because the systems don't have any states.
-                assert OBJECT_TAXONOMY.is_leaf(first_synset), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
-                assert not is_substance_synset(first_synset), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
-                obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
-                assert len(obj_categories) == 1, f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
-                first_obj_category = obj_categories[0]
-
-                if second_synset is None:
-                    # Unary states for the first synset
-                    for state_type, state_value in states:
-                        state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                        assert issubclass(state_class, AbsoluteObjectState), f"Input/output state type {state_type} must be a unary state!"
-                        # Example: (Cooked, True)
-                        cls._RECIPES[name][states_key][first_obj_category]["unary"].append((state_class, state_value))
-                else:
-                    assert OBJECT_TAXONOMY.is_leaf(second_synset), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
-                    obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
-                    if is_substance_synset(second_synset):
-                        second_obj_category = get_system_name_by_synset(second_synset)
-                        is_substance = True
-                    else:
-                        obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
-                        assert len(obj_categories) == 1, f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
-                        second_obj_category = obj_categories[0]
-                        is_substance = False
-
-                    for state_type, state_value in states:
-                        state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                        assert issubclass(state_class, RelativeObjectState), f"Input/output state type {state_type} must be a binary state!"
-                        assert is_substance == (state_class in get_system_states()), f"Input/output state type {state_type} system state inconsistency found!"
-                        if is_substance:
-                            # Non-kinematic binary states, e.g. Covered, Saturated, Filled, Contains.
-                            # Example: (Covered, "sesame_seed", True)
-                            cls._RECIPES[name][states_key][first_obj_category]["binary_system"].append(
-                                (state_class, second_obj_category, state_value))
-                        else:
-                            # Kinematic binary states w.r.t. the second object.
-                            # Example: (OnTop, "raw_egg", True)
-                            assert cls.is_multi_instance, f"Input/output state type {state_type} can only be used in multi-instance recipes!"
-                            assert states_key != "output_states", f"Output state type {state_type} can only be used in input states!"
-                            cls._RECIPES[name][states_key][first_obj_category]["binary_object"].append(
-                                (state_class, second_obj_category, state_value))
-
-    @classmethod
-    def _populate_input_object_tree(cls, name):
-        if cls.is_multi_instance and len(cls._RECIPES[name]["input_objects"]) > 0:
+        input_object_tree = None
+        if cls.is_multi_instance and len(input_objects) > 0:
             # Build a tree of input object categories according to the kinematic binary states
             # Example: 'raw_egg': {'binary_object': [(OnTop, 'bagel_dough', True)]} results in an edge
             # from 'bagel_dough' to 'raw_egg', i.e. 'bagel_dough' is the parent of 'raw_egg'.
             input_object_tree = nx.DiGraph()
-            for obj_category, state_checks in cls._RECIPES[name]["input_states"].items():
+            for obj_category, state_checks in input_states.items():
                 for state_class, second_obj_category, state_value in state_checks["binary_object"]:
                     input_object_tree.add_edge(second_obj_category, obj_category)
 
-            if not nx.is_empty(input_object_tree):
+            if nx.is_empty(input_object_tree):
+                input_object_tree = None
+            else:
                 assert nx.is_tree(input_object_tree), f"Input object tree must be a tree! Now: {input_object_tree}."
                 root_nodes = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0]
                 assert len(root_nodes) == 1, f"Input object tree must have exactly one root node! Now: {root_nodes}."
-                assert cls._RECIPES[name]["input_objects"][root_nodes[0]] == 1, f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
-                cls._RECIPES[name]["input_object_tree"] = input_object_tree
+                assert input_objects[root_nodes[0]] == 1, f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
 
-    @classmethod
-    def _populate_fillable_categories(cls, name, fillable_categories):
-        # Map fillable synsets to fillable object categories.
-        if fillable_categories is not None:
-            cls._RECIPES[name]["fillable_categories"] = set()
-            for synset in fillable_categories:
-                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
-                assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
-                for category in OBJECT_TAXONOMY.get_categories(synset):
-                    cls._RECIPES[name]["fillable_categories"].add(category)
+        # Store information for this recipe
+        cls._RECIPES[name] = {
+            "name": name,
+            "input_objects": input_objects,
+            "input_systems": input_systems,
+            "output_objects": output_objects,
+            "output_systems": output_systems,
+            "input_states": input_states,
+            "output_states": output_states,
+            "fillable_categories": fillable_categories,
+            "input_object_tree": input_object_tree,
+            **kwargs,
+        }
 
     @classmethod
     def _validate_recipe_container_is_valid(cls, recipe, container):
@@ -1931,23 +1821,29 @@ class CookingPhysicalParticleRule(RecipeRule):
     cooked__water if it was used as an input.
     """
     @classmethod
-    def add_recipe(cls, name, input_synsets, output_synsets):
-        super().add_recipe(
-            name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
-            input_states=None,
-            output_states=None,
-            fillable_categories=None,
-        )
+    def add_recipe(
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        **kwargs,
+    ):
+        """
+        Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
+        into the outputs
 
-        input_objects = cls._RECIPES[name]["input_objects"]
-        output_objects = cls._RECIPES[name]["output_objects"]
+        Args:
+            name (str): Name of the recipe
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+        """
         assert len(input_objects) == 0, f"No input objects can be specified for {cls.__name__}, recipe: {name}!"
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
 
-        input_systems = cls._RECIPES[name]["input_systems"]
-        output_systems = cls._RECIPES[name]["output_systems"]
         assert len(input_systems) == 1 or len(input_systems) == 2, \
             f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
         if len(input_systems) == 2:
@@ -1955,6 +1851,15 @@ class CookingPhysicalParticleRule(RecipeRule):
                 f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
         assert len(output_systems) == 1, \
             f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            **kwargs,
+        )
 
     @classproperty
     def candidate_filters(cls):
@@ -2018,40 +1923,49 @@ class ToggleableMachineRule(RecipeRule):
 
     @classmethod
     def add_recipe(
-            cls,
-            name,
-            input_synsets,
-            output_synsets,
-            fillable_categories,
-            input_states=None,
-            output_states=None,
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        input_states=None,
+        output_states=None,
+        fillable_categories=None,
+        **kwargs,
     ):
         """
-        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
-        will transform into the outputs
+        Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
+        into the outputs
 
         Args:
             name (str): Name of the recipe
-            input_synsets (dict): Maps synsets to number of instances required for the recipe
-            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-            fillable_categories (set of str): Set of toggleable machine categories which are allowed for this recipe
-            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-                or None if no states are required
-            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-                or None if no states are required
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
+            fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
         """
-        super().add_recipe(
-            name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
-            input_states=input_states,
-            output_states=output_states,
-            fillable_categories=fillable_categories
-        )
-        output_objects = cls._RECIPES[name]["output_objects"]
         if len(output_objects) > 0:
             assert len(output_objects) == 1, f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
             assert output_objects[list(output_objects.keys())[0]] == 1, f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
+
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            input_states=input_states,
+            output_states=output_states,
+            fillable_categories=fillable_categories,
+            **kwargs,
+        )
 
     @classproperty
     def candidate_filters(cls):
@@ -2097,24 +2011,47 @@ class MixingToolRule(RecipeRule):
     Example: water + lemon_juice + sugar -> lemonade, mixing tool is spoon
     """
     @classmethod
-    def add_recipe(cls, name, input_synsets, output_synsets, input_states=None, output_states=None):
-        super().add_recipe(
-            name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
-            input_states=input_states,
-            output_states=output_states,
-            fillable_categories=None,
-        )
+    def add_recipe(
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        input_states=None,
+        output_states=None,
+        **kwargs,
+    ):
+        """
+        Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
+        into the outputs
 
-        output_objects = cls._RECIPES[name]["output_objects"]
+        Args:
+            name (str): Name of the recipe
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
+        """
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
-
-        input_systems = cls._RECIPES[name]["input_systems"]
-        output_systems = cls._RECIPES[name]["output_systems"]
         assert len(input_systems) > 0, f"Some input systems need to be specified for {cls.__name__}, recipe: {name}!"
         assert len(output_systems) == 1, \
             f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            input_states=input_states,
+            output_states=output_states,
+            **kwargs,
+        )
 
     @classproperty
     def candidate_filters(cls):
@@ -2287,15 +2224,17 @@ class CookingRule(RecipeRule):
 
     @classmethod
     def add_recipe(
-            cls,
-            name,
-            input_synsets,
-            output_synsets,
-            input_states=None,
-            output_states=None,
-            fillable_categories=None,
-            heatsource_categories=None,
-            timesteps=None,
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        input_states=None,
+        output_states=None,
+        fillable_categories=None,
+        heatsource_categories=None,
+        timesteps=None,
     ):
         """
         Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
@@ -2303,12 +2242,14 @@ class CookingRule(RecipeRule):
 
         Args:
             name (str): Name of the recipe
-            input_synsets (dict): Maps synsets to number of instances required for the recipe
-            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-                or None if no states are required
-            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-                or None if no states are required
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
             fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
                 for this recipe. If None, any fillable is allowed
             heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
@@ -2316,19 +2257,12 @@ class CookingRule(RecipeRule):
             timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
                 it will be set to be 1, i.e.: instantaneous execution
         """
-        if heatsource_categories is not None:
-            heatsource_categories_postprocessed = set()
-            for synset in heatsource_categories:
-                assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
-                assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
-                for category in OBJECT_TAXONOMY.get_categories(synset):
-                    heatsource_categories_postprocessed.add(category)
-            heatsource_categories = heatsource_categories_postprocessed
-
         super().add_recipe(
             name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
             input_states=input_states,
             output_states=output_states,
             fillable_categories=fillable_categories,
@@ -2384,15 +2318,17 @@ class CookingObjectRule(CookingRule):
     """
     @classmethod
     def add_recipe(
-            cls,
-            name,
-            input_synsets,
-            output_synsets,
-            input_states=None,
-            output_states=None,
-            fillable_categories=None,
-            heatsource_categories=None,
-            timesteps=None,
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        input_states=None,
+        output_states=None,
+        fillable_categories=None,
+        heatsource_categories=None,
+        timesteps=None,
     ):
         """
         Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
@@ -2400,12 +2336,14 @@ class CookingObjectRule(CookingRule):
 
         Args:
             name (str): Name of the recipe
-            input_synsets (dict): Maps synsets to number of instances required for the recipe
-            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-                or None if no states are required
-            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-                or None if no states are required
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
             fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
                 for this recipe. If None, any fillable is allowed
             heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
@@ -2413,18 +2351,19 @@ class CookingObjectRule(CookingRule):
             timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
                 it will be set to be 1, i.e.: instantaneous execution
         """
+        assert len(output_systems) == 0, f"No output systems can be specified for {cls.__name__}, recipe: {name}!"
         super().add_recipe(
             name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
             input_states=input_states,
             output_states=output_states,
             fillable_categories=fillable_categories,
             heatsource_categories=heatsource_categories,
             timesteps=timesteps,
         )
-        output_systems = cls._RECIPES[name]["output_systems"]
-        assert len(output_systems) == 0, f"No output systems can be specified for {cls.__name__}, recipe: {name}!"
 
     @classproperty
     def relax_recipe_systems(cls):
@@ -2451,15 +2390,17 @@ class CookingSystemRule(CookingRule):
     """
     @classmethod
     def add_recipe(
-            cls,
-            name,
-            input_synsets,
-            output_synsets,
-            input_states=None,
-            output_states=None,
-            fillable_categories=None,
-            heatsource_categories=None,
-            timesteps=None,
+        cls,
+        name,
+        input_objects,
+        input_systems,
+        output_objects,
+        output_systems,
+        input_states=None,
+        output_states=None,
+        fillable_categories=None,
+        heatsource_categories=None,
+        timesteps=None,
     ):
         """
         Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
@@ -2467,12 +2408,14 @@ class CookingSystemRule(CookingRule):
 
         Args:
             name (str): Name of the recipe
-            input_synsets (dict): Maps synsets to number of instances required for the recipe
-            output_synsets (dict): Maps synsets to number of instances to be spawned in the container when the recipe executes
-            input_states (dict or None): Maps input synsets to states that must be satisfied for the recipe to execute,
-                or None if no states are required
-            otuput_states (dict or None): Map output synsets to states that should be set when spawned when the recipe executes,
-                or None if no states are required
+            input_objects (dict): Maps object categories to number of instances required for the recipe
+            input_systems (list): List of system names required for the recipe
+            output_objects (dict): Maps object categories to number of instances to be spawned in the container when the recipe executes
+            output_systems (list): List of system names to be spawned in the container when the recipe executes. Currently the length is 1.
+            input_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system", "binary_object"] to a list of states that must be satisfied for the recipe to execute
+            output_states (None or defaultdict(lambda: defaultdict(list))): Maps object categories to
+                ["unary", "bianry_system"] to a list of states that should be set after the output objects are spawned
             fillable_categories (None or set of str): If specified, set of fillable categories which are allowed
                 for this recipe. If None, any fillable is allowed
             heatsource_categories (None or set of str): If specified, set of heatsource categories which are allowed
@@ -2480,18 +2423,19 @@ class CookingSystemRule(CookingRule):
             timesteps (None or int): Number of subsequent heating steps required for the recipe to execute. If None,
                 it will be set to be 1, i.e.: instantaneous execution
         """
+        assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
         super().add_recipe(
             name=name,
-            input_synsets=input_synsets,
-            output_synsets=output_synsets,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
             input_states=input_states,
             output_states=output_states,
             fillable_categories=fillable_categories,
             heatsource_categories=heatsource_categories,
             timesteps=timesteps,
         )
-        output_objects = cls._RECIPES[name]["output_objects"]
-        assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
 
     @classproperty
     def relax_recipe_systems(cls):
@@ -2518,27 +2462,27 @@ def import_recipes():
         for rule_name in rule_names:
             rule = REGISTERED_RULES[rule_name]
             if rule == WasherRule:
-                rule.register_cleaning_conditions(rule_recipes)
+                rule.register_cleaning_conditions(translate_bddl_washer_rule_to_og_washer_rule(rule_recipes))
             elif issubclass(rule, RecipeRule):
+                log.info(f"Adding recipes of rule {rule_name}...")
                 for recipe in rule_recipes:
                     if "rule_name" in recipe:
                         recipe["name"] = recipe.pop("rule_name")
                     if "container" in recipe:
-                        recipe["fillable_categories"] = set(recipe.pop("container").keys())
+                        recipe["fillable_synsets"] = set(recipe.pop("container").keys())
                     if "heat_source" in recipe:
-                        recipe["heatsource_categories"] = set(recipe.pop("heat_source").keys())
+                        recipe["heatsource_synsets"] = set(recipe.pop("heat_source").keys())
                     if "machine" in recipe:
-                        recipe["fillable_categories"] = set(recipe.pop("machine").keys())
+                        recipe["fillable_synsets"] = set(recipe.pop("machine").keys())
 
                     # Route the recipe to the correct rule: CookingObjectRule or CookingSystemRule
                     satisfied = True
-                    output_synsets = set(recipe["output_synsets"].keys())
-                    has_substance = any([s for s in output_synsets if is_substance_synset(s)])
-                    if (rule == CookingObjectRule and has_substance) or (rule == CookingSystemRule and not has_substance):
+                    og_recipe = translate_bddl_recipe_to_og_recipe(**recipe)
+                    has_output_system = len(og_recipe["output_systems"]) > 0
+                    if (rule == CookingObjectRule and has_output_system) or (rule == CookingSystemRule and not has_output_system):
                         satisfied = False
                     if satisfied:
-                        # TODO: put translation from BDDL to OG into bddl_utils
-                        rule.add_recipe(**recipe)
+                        rule.add_recipe(**og_recipe)
                 log.info(f"All recipes of rule {rule_name} imported successfully.")
 
 import_recipes()
