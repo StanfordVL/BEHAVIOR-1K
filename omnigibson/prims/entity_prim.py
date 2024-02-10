@@ -897,6 +897,11 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
+        # If kinematic only, clear cache for the root link
+        if self.kinematic_only:
+            self.root_link.clear_kinematic_only_cache()
+        if og.sim.is_stopped():
+            return XFormPrim.set_position_orientation(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
             return self.root_link.set_position_orientation(position=position, orientation=orientation)
@@ -909,6 +914,8 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
+        if og.sim.is_stopped():
+            return XFormPrim.get_position_orientation(self)
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
             return self.root_link.get_position_orientation()
@@ -917,6 +924,11 @@ class EntityPrim(XFormPrim):
         return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
+        # If kinematic only, clear cache for the root link
+        if self.kinematic_only:
+            self.root_link.clear_kinematic_only_cache()
+        if og.sim.is_stopped():
+            return XFormPrim.set_local_pose(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
             return self.root_link.set_local_pose(position=position, orientation=orientation)
@@ -929,6 +941,8 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):
+        if og.sim.is_stopped():
+            return XFormPrim.get_local_pose(self)
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
             return self.root_link.get_local_pose()

@@ -11,6 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import CollisionAPI
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
@@ -170,6 +171,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
+        # Add collision group for fixed objects
+        CollisionAPI.create_collision_group(col_group="fixed_base", filter_self_collisions=True)
         # We just add a ground plane if requested
         if self._use_floor_plane:
             self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
@@ -423,23 +426,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
         prim = obj.load()
-
-        # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
-        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
-        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
-            # TODO: Remove building hotfix once asset collision meshes are fixed!!
-            building_categories = {"walls", "floors", "ceilings"}
-            for fixed_obj in self.fixed_objects.values():
-                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
-                if obj.category in building_categories:
-                    for link in fixed_obj.links.values():
-                        obj.root_link.add_filtered_collision_pair(link)
-                elif fixed_obj.category in building_categories:
-                    for link in obj.links.values():
-                        fixed_obj.root_link.add_filtered_collision_pair(link)
-                else:
-                    # Only filter out root links
-                    obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
 
         # Add this object to our registry based on its type, if we want to register it
         if register:

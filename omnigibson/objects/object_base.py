@@ -5,11 +5,7 @@ from collections.abc import Iterable
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.constants import (
-    DEFAULT_COLLISION_GROUP,
-    SPECIAL_COLLISION_GROUPS,
-    SemanticClass,
-)
+from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
@@ -87,10 +83,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
         self.category = category
         self.fixed_base = fixed_base
-
-        # This sets the collision group of the object. In omnigibson, objects are only permitted to be part of a single
-        # collision group, e.g. collisions are only enabled within a single group
-        self.collision_group = SPECIAL_COLLISION_GROUPS.get(self.category, DEFAULT_COLLISION_GROUP)
 
         # Infer class ID if not specified
         if class_id is None:
@@ -182,6 +174,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self._prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
             self._prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
+        if self.root_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
+            self.root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
+            self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+
         # Potentially add articulation root APIs and also set self collisions
         root_prim = None if self.articulation_root_path is None else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
         if root_prim is not None:
@@ -189,13 +185,13 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
-        # Set the collision group
-        CollisionAPI.add_to_collision_group(
-            col_group=self.collision_group,
-            prim_path=self.prim_path,
-            create_if_not_exist=True,
-        )
+        # Set the collision group if needed
+        # We always filter collision groups between structures and fixed objects
+        if self.fixed_base:
+            CollisionAPI.add_to_collision_group(
+                col_group="fixed_base",
+                prim_path=self.prim_path,
+            )
 
         # Update semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
