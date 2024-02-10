@@ -173,9 +173,9 @@ class MultiFingerGripperController(GripperController):
             )
 
         elif self._mode == "ternary":
-            if command > 0.33:
+            if target[0] > 0.33:
                 u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-            elif command < -0.33:
+            elif target[0] < -0.33:
                 u = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             else:
                 u = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
@@ -186,7 +186,7 @@ class MultiFingerGripperController(GripperController):
             base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
             # Apply the command to the base value.
-            u = base_value + command
+            u = base_value + target[0]
 
         # Otherwise, control is simply the command itself        
         else:
