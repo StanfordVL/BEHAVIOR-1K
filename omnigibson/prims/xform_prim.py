@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 import numpy as np
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -349,7 +350,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) lower corner of the bounding box
                 - 3-array: (x,y,z) upper corner of the bounding box
         """
-        return BoundingBoxAPI.compute_aabb(self)
+        raise NotImplementedError("An XformPrim on its own does not have a bounding box")
 
     @property
     def aabb_extent(self):

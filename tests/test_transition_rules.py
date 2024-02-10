@@ -4,7 +4,6 @@ from omnigibson.systems import get_system, is_physical_particle_system, is_visua
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
 import omnigibson as og

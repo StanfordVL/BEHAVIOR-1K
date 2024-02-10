@@ -6,7 +6,6 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import create_module_logger
 

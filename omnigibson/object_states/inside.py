@@ -1,10 +1,10 @@
+import numpy as np
 import omnigibson as og
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.object_state_utils import sample_kinematics
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.object_state_utils import m as os_m
 
 
@@ -34,9 +34,9 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         # Since we usually check for a small set of outer objects, this is cheap
         aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
         inner_object_pos = (aabb_lower + aabb_upper) / 2.0
-        outer_object_aabb = other.states[AABB].get_value()
-
-        if not BoundingBoxAPI.aabb_contains_point(inner_object_pos, outer_object_aabb):
+        outer_object_aabb_lo, outer_object_aabb_hi = other.states[AABB].get_value()
+        
+        if not (np.less_equal(outer_object_aabb_lo, inner_object_pos).all() and np.less_equal(inner_object_pos, outer_object_aabb_hi).all()):
             return False
 
         # Our definition of inside: an object A is inside an object B if there

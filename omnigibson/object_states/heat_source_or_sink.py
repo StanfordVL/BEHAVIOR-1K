@@ -193,7 +193,10 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
             aabb_lower, aabb_upper = obj.states[AABB].get_value()
             obj_pos = (aabb_lower + aabb_upper) / 2.0
             # Position is either the AABB center of the default link or the metalink position itself
-            heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
+            try:
+                heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
+            except NotImplementedError:
+                heat_source_pos = self.link.get_position()
             if T.l2_distance(heat_source_pos, obj_pos) > self.distance_threshold:
                 return False
 
