@@ -36,6 +36,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Call super first
         super().__init__()
 
+        # Support gymnasium's render mode metadata
+        self.render_mode = "rgb_array"
+        self.metadata = {"render.modes": ["rgb_array"]}
+
         # Launch Isaac Sim
         launch_simulator()
 
