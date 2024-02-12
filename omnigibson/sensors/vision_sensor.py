@@ -5,7 +5,7 @@ import gym
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
-from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE
+from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, CLASS_NAME_TO_CLASS_ID
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
@@ -223,7 +223,29 @@ class VisionSensor(BaseSensor):
             raw_obs = self._annotators[modality].get_data()
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+            if modality == "seg_semantic":
+                id_to_labels = raw_obs['info']['idToLabels']
+                obs[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
         return obs
+    
+    def _remap_semantic_segmentation(self, img, id_to_labels):
+        """
+        Remap the semantic segmentation image to the class IDs defined in CLASS_NAME_TO_CLASS_ID.
+        """
+        # Convert string IDs to integers and find the max ID for array size
+        max_id = max([int(id) for id in id_to_labels.keys()])
+
+        # Initialize the key array with a default value for unmapped IDs
+        key_array = np.full(max_id + 1, -1)
+        
+        # Populate the key array with the new IDs based on class name mappings
+        for str_id, info in id_to_labels.items():
+            class_name = info['class'].lower()
+            if class_name in CLASS_NAME_TO_CLASS_ID:
+                new_id = CLASS_NAME_TO_CLASS_ID[class_name]
+                key_array[int(str_id)] = new_id
+        
+        return key_array[img]
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
