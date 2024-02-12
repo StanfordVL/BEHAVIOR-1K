@@ -572,16 +572,23 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 missing_keys = exp_keys - real_keys
                 extra_keys = real_keys - exp_keys
 
-                log.error("MISSING OBSERVATION KEYS:")
-                log.error(missing_keys)
-                log.error("EXTRA OBSERVATION KEYS:")
-                log.error(extra_keys)
-                log.error("SHARED OBSERVATION KEY DTYPES AND SHAPES:")
+                if missing_keys:
+                    log.error("MISSING OBSERVATION KEYS:")
+                    log.error(missing_keys)
+                if extra_keys:
+                    log.error("EXTRA OBSERVATION KEYS:")
+                    log.error(extra_keys)
+                
+                mismatched_keys = []
                 for k in shared_keys:
-                    log.error(exp_obs[k])
-                    log.error(real_obs[k])
+                    if exp_obs[k][2:] != real_obs[k][2:]:  # Compare dtypes and shapes
+                        mismatched_keys.append(k)
+                        log.error(f"MISMATCHED OBSERVATION FOR KEY '{k}':")
+                        log.error(f"Expected: {exp_obs[k]}")
+                        log.error(f"Received: {real_obs[k]}")
 
                 raise ValueError("Observation space does not match returned observations!")
+
 
         return obs
 
