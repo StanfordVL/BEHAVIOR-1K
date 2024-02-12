@@ -236,7 +236,7 @@ class VisionSensor(BaseSensor):
         max_id = max([int(id) for id in id_to_labels.keys()])
 
         # Initialize the key array with a default value for unmapped IDs
-        key_array = np.full(max_id + 1, -1)
+        key_array = np.full(max_id + 1, -1, dtype=np.int32)
         
         # Populate the key array with the new IDs based on class name mappings
         for str_id, info in id_to_labels.items():
@@ -261,8 +261,6 @@ class VisionSensor(BaseSensor):
     def remove_modality(self, modality):
         # Check if we don't have this modality (if not, no need to remove it explicitly)
         should_remove = modality in self._modalities
-        
-        breakpoint()
 
         # Run super
         super().remove_modality(modality=modality)
@@ -493,7 +491,7 @@ class VisionSensor(BaseSensor):
             depth=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             normal=((self.image_height, self.image_width, 4), -1.0, 1.0, np.float32),
-            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint32),
+            seg_semantic=((self.image_height, self.image_width), -1, MAX_CLASS_COUNT, np.int32),
             seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
             seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
             flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, np.float32),
