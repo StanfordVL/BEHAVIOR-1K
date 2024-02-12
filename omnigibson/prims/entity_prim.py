@@ -900,8 +900,6 @@ class EntityPrim(XFormPrim):
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
-        if og.sim.is_stopped():
-            return XFormPrim.set_position_orientation(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
         if og.sim.is_stopped():
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation)
