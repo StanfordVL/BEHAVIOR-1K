@@ -69,15 +69,6 @@ VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 
 # Structure categories that need to always be loaded for stability purposes
 STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence"})
 
-# Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.
-# Collision groups for objects. For special logic, different categories can be assigned different collision groups.
-ALL_COLLISION_GROUPS_MASK = -1
-DEFAULT_COLLISION_GROUP = "default"
-SPECIAL_COLLISION_GROUPS = {
-    "floors": "floors",
-    "carpet": "carpet",
-}
-
 
 # Joint friction magic values to assign to objects based on their category
 DEFAULT_JOINT_FRICTION = 10.0
