@@ -169,6 +169,7 @@ def main(iterations):
 
     # Testing random actions with env
     #############################
+    import traceback
     for i in tqdm(range(int(iterations))):
         try:
             done = False
@@ -177,10 +178,11 @@ def main(iterations):
                 action = env.action_space.sample()
                 obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
-                # break
+                break
         except Exception as e:
             print("Error in iteration: ", i)
             print(e)
+            traceback.print_exc()
             print('--------------------')
 
 

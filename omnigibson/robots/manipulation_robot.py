@@ -365,10 +365,10 @@ class ManipulationRobot(BaseRobot):
     def release_grasp_immediately(self):
         """
         Magic action to release this robot's grasp for all arms at once.
-        As opposed to @_release_grasp, this method would byupass the release window mechanism and immediately release.
+        As opposed to @_release_grasp, this method would bypass the release window mechanism and immediately release.
         """
         for arm in self.arm_names:
-            if self._ag_obj_in_hand[arm] is not None:
+            if self._ag_obj_constraints[arm] is not None:
                 self._release_grasp(arm=arm)
                 self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
                 self._handle_release_window(arm=arm)
