@@ -30,6 +30,7 @@ from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBre
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
 
 # Create module logger
@@ -40,6 +41,8 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -475,7 +478,41 @@ def launch_simulator(*args, **kwargs):
 
         def remove_object(self, obj):
             """
-            Remove a non-robot object from the simulator.
+            Remove one or a list of non-robot object from the simulator.
+
+            Args:
+                obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
+            """
+            state = self.dump_state()
+
+            objs = [obj] if isinstance(obj, BaseObject) else obj
+
+            # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+            # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+            # we first move the object to a safe location, then remove it.
+            pos = list(m.OBJECT_GRAVEYARD_POS)
+            for ob in objs:
+                ob.set_position_orientation(pos, [0, 0, 0, 1])
+                pos[0] += max(ob.aabb_extent)
+
+            # One timestep will elapse
+            self.app.update()
+
+            for ob in objs:
+                self._remove_object(ob)
+
+            # Update all handles that are now broken because objects have changed
+            self.update_handles()
+
+            # Load the state back
+            self.load_state(state)
+
+            # Refresh all current rules
+            TransitionRuleAPI.prune_active_rules()
+
+        def _remove_object(self, obj):
+            """
+            Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
                 obj (BaseObject): a non-robot object to remove
@@ -493,15 +530,8 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-
             self._scene.remove_object(obj)
-            self.app.update()
 
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
-
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
 
         def remove_prim(self, prim):
             """
@@ -536,6 +566,9 @@ def launch_simulator(*args, **kwargs):
                     # Only need to update if object is already initialized as well
                     if obj.initialized:
                         obj.update_handles()
+                for system in self.scene.systems:
+                    if issubclass(system, MacroPhysicalParticleSystem):
+                        system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()

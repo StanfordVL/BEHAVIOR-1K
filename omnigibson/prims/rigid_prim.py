@@ -201,7 +201,7 @@ class RigidPrim(XFormPrim):
                     # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
                     if not is_volume:
                         log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
-                        mesh.set_collision_approximation("boundingCube")
+                        # mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
