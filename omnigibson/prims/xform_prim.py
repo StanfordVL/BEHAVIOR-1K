@@ -341,40 +341,6 @@ class XFormPrim(BasePrim):
         self.set_attribute("xformOp:scale", scale)
 
     @property
-    def aabb(self):
-        """
-        Get this xform's actual bounding box, axis-aligned in the world frame
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) lower corner of the bounding box
-                - 3-array: (x,y,z) upper corner of the bounding box
-        """
-        raise NotImplementedError("An XformPrim on its own does not have a bounding box")
-
-    @property
-    def aabb_extent(self):
-        """
-        Get this xform's actual bounding box extent
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = self.aabb
-        return max_corner - min_corner
-
-    @property
-    def aabb_center(self):
-        """
-        Get this xform's actual bounding box center
-
-        Returns:
-            3-array: (x,y,z) bounding box center
-        """
-        min_corner, max_corner = self.aabb
-        return (max_corner + min_corner) / 2.0
-
-    @property
     def material(self):
         """
         Returns:

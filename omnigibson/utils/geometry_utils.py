@@ -386,11 +386,11 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
         try: 
-            aabb_volume = np.product(volume_link.aabb_extent)
+            aabb_volume = np.product(volume_link.visual_aabb_extent)
         except NotImplementedError:
             return 0
         sampling_distance = np.cbrt(aabb_volume / min_n_particles)
-        low, high = volume_link.aabb
+        low, high = volume_link.visual_aabb
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
         assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius

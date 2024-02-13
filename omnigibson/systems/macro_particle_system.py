@@ -387,7 +387,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
-                z_extent = cls._particle_object.aabb_extent[2]
+                z_extent = cls._particle_object.extent[2]
                 if not cls._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = np.array([z_extent * particle.scale[2] for particle in cls._group_particles[group].values()]) / 2.0
                     # Shift the particles halfway up
@@ -490,7 +490,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
-        bbox_extents_local = [(cls._particle_object.aabb_extent * scale).tolist() for scale in scales]
+        bbox_extents_local = [(cls._particle_object.extent * scale).tolist() for scale in scales]
 
         # If we're using flatcache, we need to update the object's pose on the USD manually
         if gm.ENABLE_FLATCACHE:
@@ -545,7 +545,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
         avg_scale = np.cbrt(np.product(obj.scale))
-        bbox_extents_global = scales * cls._particle_object.aabb_extent.reshape(1, 3) * avg_scale
+        bbox_extents_global = scales * cls._particle_object.extent.reshape(1, 3) * avg_scale
 
         if obj.prim_type == PrimType.CLOTH:
             # Sample locations based on randomly sampled keyfaces

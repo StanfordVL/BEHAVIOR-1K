@@ -1199,22 +1199,48 @@ class EntityPrim(XFormPrim):
         else:
             points_world = []
             for link in self._links.values():
-                hull_points = link.points_on_convex_hull
-                if hull_points is not None:
-                    position, orientation = link.get_position_orientation()
-                    scale = link.scale
-                    points_scaled = hull_points * scale
-                    points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-                    points_transformed = points_rotated + position
-                    points_world.append(points_transformed)
+                hull_points = link.collision_boundary_points
+                if hull_points is None:
+                    continue
+                
+                position, orientation = link.get_position_orientation()
+                scale = link.scale
+                points_scaled = hull_points * scale
+                points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+                points_transformed = points_rotated + position
+                points_world.append(points_transformed)
 
             if not points_world:
-                return np.array([0, 0, 0]), np.array([0, 0, 0])
+                # TODO: Decide if this is the right thing to do
+                position = self.get_position()
+                return position, position
 
             all_points = np.concatenate(points_world, axis=0)
             aabb_lo = np.min(all_points, axis=0)
             aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
 
     def get_coriolis_and_centrifugal_forces(self):
         """

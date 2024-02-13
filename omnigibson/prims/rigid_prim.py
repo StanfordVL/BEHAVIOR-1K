@@ -1,3 +1,4 @@
+from functools import cached_property
 from scipy.spatial import ConvexHull
 import numpy as np
 
@@ -67,9 +68,7 @@ class RigidPrim(XFormPrim):
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
         self._kinematic_local_pose_cache = None
-        
-        self._points_on_convex_hull_cache = None
-
+    
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -292,8 +291,6 @@ class RigidPrim(XFormPrim):
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
-        # Invalidate points on convex hull cache when new pose is set
-        self._points_on_convex_hull_cache = None
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
             self._kinematic_world_pose_cache = None
@@ -601,16 +598,13 @@ class RigidPrim(XFormPrim):
         """
         return self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
 
-    @property
-    def points_on_convex_hull(self):
+    def _compute_points_on_convex_hull(self, visual):
         """
         Returns:
             np.ndarray: points on the convex hull of all points from child geom prims
         """
-        if self._points_on_convex_hull_cache is not None:
-            return self._points_on_convex_hull_cache
-
-        points = [mesh.points for mesh in self._collision_meshes.values() if mesh.points is not None and len(mesh.points) > 0]
+        meshes = self._visual_meshes if visual else self._collision_meshes
+        points = [mesh.points for mesh in meshes.values() if mesh.points is not None and len(mesh.points) > 0]
         
         if not points:
             return None
@@ -619,11 +613,104 @@ class RigidPrim(XFormPrim):
         
         try:
             hull = ConvexHull(points)
-            self._points_on_convex_hull_cache = points[hull.vertices, :]
-            return self._points_on_convex_hull_cache
+            return points[hull.vertices, :]
         except scipy.spatial.qhull.QhullError:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)
             return None
+        
+    @cached_property
+    def visual_boundary_points(self):
+        """
+        Returns:
+            np.ndarray: points on the convex hull of all points from child geom prims
+        """
+        return self._compute_points_on_convex_hull(visual=True)
+    
+    @cached_property
+    def collision_boundary_points(self):
+        """
+        Returns:
+            np.ndarray: points on the convex hull of all points from child geom prims
+        """
+        return self._compute_points_on_convex_hull(visual=False)
+        
+    @property
+    def aabb(self):
+        position, orientation = self.get_position_orientation()
+        hull_points = self.collision_boundary_points
+        if hull_points is None:
+            # TODO: Decide if this is the right thing to do
+            return position, position
+        
+        scale = self.scale
+        points_scaled = hull_points * scale
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+
+        aabb_lo = np.min(points_transformed, axis=0)
+        aabb_hi = np.max(points_transformed, axis=0)
+        return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
+    
+    @property
+    def visual_aabb(self):
+        position, orientation = self.get_position_orientation()
+        hull_points = self.visual_boundary_points
+        if hull_points is None:
+            # TODO: Decide if this is the right thing to do
+            return position, position
+        
+        scale = self.scale
+        points_scaled = hull_points * scale
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+
+        aabb_lo = np.min(points_transformed, axis=0)
+        aabb_hi = np.max(points_transformed, axis=0)
+        return aabb_lo, aabb_hi
+
+    @property
+    def visual_aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.visual_aabb
+        return max_corner - min_corner
+
+    @property
+    def visual_aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.visual_aabb
+        return (max_corner + min_corner) / 2.0
     
     def enable_gravity(self):
         """

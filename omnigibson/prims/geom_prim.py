@@ -1,3 +1,4 @@
+from functools import cached_property
 import numpy as np
 import trimesh
 
@@ -126,6 +127,15 @@ class GeomPrim(XFormPrim):
             np.ndarray: Local poses of all points
         """
         return self.prim.GetAttribute("points").Get()
+    
+    @cached_property
+    def extent(self):
+        """
+        Returns:
+            np.ndarray: The unscaled 3d extent of the mesh in its local frame.
+        """
+        points = self.points
+        return np.max(points, axis=0) - np.min(points, axis=0)
 
 
 class CollisionGeomPrim(GeomPrim):
