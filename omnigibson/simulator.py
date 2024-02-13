@@ -28,7 +28,7 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
@@ -225,7 +225,7 @@ def launch_simulator(*args, **kwargs):
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = \
-                [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
+                [state for state in self.object_state_types if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))]
             self.object_state_types_on_contact = \
                 {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
             self.object_state_types_on_joint_break = \
@@ -499,6 +499,11 @@ def launch_simulator(*args, **kwargs):
             # One timestep will elapse
             self.app.update()
 
+            # TODO: Make this cleaner!
+            # Remove object from temperature tracking
+            from omnigibson.object_states.temperature import Temperature
+            Temperature.remove_object(obj=obj)
+
             for ob in objs:
                 self._remove_object(ob)
 
@@ -620,10 +625,13 @@ def launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        for obj in self.scene.get_objects_with_state(state_type):
-                            # Only update objects that have been initialized so far
-                            if obj.initialized:
-                                obj.states[state_type].update()
+                        if issubclass(state_type, GlobalUpdateStateMixin):
+                            state_type.global_update()
+                        if issubclass(state_type, UpdateStateMixin):
+                            for obj in self.scene.get_objects_with_state(state_type):
+                                # Only update objects that have been initialized so far
+                                if obj.initialized:
+                                    obj.states[state_type].update()
 
                     for obj in self.scene.objects:
                         # Only update visuals for objects that have been initialized so far
@@ -1041,6 +1049,11 @@ def launch_simulator(*args, **kwargs):
             if self._camera_mover is not None:
                 self._camera_mover.clear()
                 self._camera_mover = None
+
+            # TODO: Make cleaner
+            from omnigibson.object_states.temperature import Temperature
+            Temperature.VALUES = np.array([])
+            Temperature.OBJ_IDXS = dict()
 
             # Clear all transition rules if being used
             if gm.ENABLE_TRANSITION_RULES:

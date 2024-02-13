@@ -16,7 +16,7 @@ from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, get_system, \
+from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, get_system, \
     is_visual_particle_system, is_physical_particle_system, is_fluid_system, is_system_active, REGISTERED_SYSTEMS
 from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, \
@@ -587,15 +587,20 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def _update(self):
         # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
         # so the corresponding visualization and overlap meshes are updated properly
-        if self.method == ParticleModifyMethod.PROJECTION and gm.ENABLE_FLATCACHE:
+        # This is expensive, so only do it if the object is not a fixed object and we have an active projection
+        if (
+                self.method == ParticleModifyMethod.PROJECTION
+                and gm.ENABLE_FLATCACHE
+                and not self.obj.fixed_base
+                and self.projection_is_active
+        ):
             FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
 
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and (not self.requires_overlap or self._check_overlap()):
-            # Iterate over all owned systems for this particle modifier
-            for system_name in self.conditions.keys():
-                # Check if the system is active (for ParticleApplier, the system is always active)
-                if is_system_active(system_name):
+            # Iterate over all active systems
+            for system_name in BaseSystem.get_active_systems():
+                if system_name in self.conditions:
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
                         system = get_system(system_name)
@@ -635,6 +640,16 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             list: All systems used in this state that are active, dynamic across time
         """
         return list(VisualParticleSystem.get_active_systems().values()) + list(PhysicalParticleSystem.get_active_systems().values())
+
+    @property
+    def projection_is_active(self):
+        """
+        Returns:
+            bool: If using ParticleModifyMethod.PROJECTION, should return whether the projection mesh is currently
+                active or not (e.g.: whether all conditions are met for a projection modification to potentially occur)
+        """
+        # Return True by default
+        return True
 
     @property
     def n_steps_per_modification(self):
@@ -777,7 +792,13 @@ class ParticleRemover(ParticleModifier):
                 # Don't process any other systems, continue
                 continue
             if default_system_conditions is not None:
-                all_conditions[system_name] = default_system_conditions + [self._generate_limit_condition(system_name)]
+                # Always make sure to add on condition for checking count of particles (can't remove any particles if
+                # there are 0 particles of the given system!)
+                all_conditions[system_name] = (
+                        [self._generate_nonempty_system_condition(system_name)] +
+                        default_system_conditions +
+                        [self._generate_limit_condition(system_name)]
+                )
 
         # Overwrite conditions based on manually-specified ones
         all_conditions.update(parsed_conditions)
@@ -810,6 +831,26 @@ class ParticleRemover(ParticleModifier):
         n_particles_absorbed = min(len(inbound_idxs), modification_limit - n_modified_particles)
         system.remove_particles(inbound_idxs[:n_particles_absorbed])
         self.obj.states[ModifiedParticles].set_value(system, n_modified_particles + n_particles_absorbed)
+
+    def _generate_nonempty_system_condition(self, system_name):
+        """
+        Internal helper function to programatically generate a condition checker to make sure that at least one
+        particle exists in a given system
+
+        Args:
+            system_name (str): Name of the system
+
+        Returns:
+            function: Generated condition function with signature fcn(obj) --> bool, returning True if there is at least
+                one particle in the given system @system_name
+        """
+        system = get_system(system_name, force_active=False)
+        return lambda obj: system.initialized and system.n_particles > 0
+
+    @property
+    def requires_overlap(self):
+        # Special case adjacency -- no overlap check needed since it can absorb particles at any time
+        return False if self.method == ParticleModifyMethod.ADJACENCY else super().requires_overlap
 
     @classproperty
     def metalink_prefix(cls):
@@ -1032,7 +1073,8 @@ class ParticleApplier(ParticleModifier):
         # If we're about to check for modification, update whether it the visualization should be active or not
         if self.visualize and self._current_step == 0:
             # Only one system in our conditions, so next(iter()) suffices
-            is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
+            # is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
+            is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
             self.projection_emitter.GetProperty("inputs:active").Set(is_active)
 
         # Run super
@@ -1295,6 +1337,11 @@ class ParticleApplier(ParticleModifier):
         """
         # Visualize if projection method is used
         return self.method == ParticleModifyMethod.PROJECTION
+
+    @property
+    def projection_is_active(self):
+        # Only active if the projection mesh is enabled
+        return self.projection_emitter.GetProperty("inputs:active").Get()
 
     @classproperty
     def metalink_prefix(cls):

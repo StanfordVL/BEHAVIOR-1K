@@ -13,7 +13,14 @@ from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxi
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
+m.DEFAULT_SLEEP_THRESHOLD = 0.005
 
 
 class EntityPrim(XFormPrim):
@@ -64,6 +71,9 @@ class EntityPrim(XFormPrim):
     def _initialize(self):
         # Run super method
         super()._initialize()
+
+        # Set the default sleep threshold
+        self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
 
         # Force populate inputs and outputs of the shaders of all materials
         # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,

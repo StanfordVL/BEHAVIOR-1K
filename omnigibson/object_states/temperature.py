@@ -3,7 +3,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
 import omnigibson as og
 
 
@@ -18,7 +18,43 @@ m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
-class Temperature(AbsoluteObjectState, UpdateStateMixin):
+class Temperature(AbsoluteObjectState, GlobalUpdateStateMixin):
+
+    # Numpy array of raw temperature values
+    VALUES = np.array([])
+
+    # Maps object name to index in VALUES
+    OBJ_IDXS = dict()
+
+    def __init__(self, obj):
+        # Run super first
+        super(Temperature, self).__init__(obj)
+
+        # Add this object to the tracked global state
+        self.VALUES = np.concatenate([self.VALUES, np.array([m.DEFAULT_TEMPERATURE])])
+        self.OBJ_IDXS[self.obj.name] = len(self.VALUES) - 1
+
+    @classmethod
+    def remove_object(cls, obj):
+        """
+        Removes a tracked object from the array
+
+        Args:
+            obj (BaseObject): Object to potentially remove from internal global tracked state
+        """
+        if obj in cls.OBJ_IDXS:
+            deleted_idx = cls.OBJ_IDXS.pop(obj.name)
+            new_idxs = dict()
+            for name, old_idx in cls.OBJ_IDXS.items():
+                new_idxs[name] = old_idx - (0 if old_idx < new_idxs else 1)
+            cls.OBJ_IDXS = new_idxs
+            cls.VALUES = np.delete(cls.VALUES, [deleted_idx])
+
+    @classmethod
+    def global_update(cls):
+        # This will globally decay all tracked temperatures
+        cls.VALUES += (m.DEFAULT_TEMPERATURE - cls.VALUES) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
+
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
@@ -31,48 +67,22 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
         deps.add(HeatSourceOrSink)
         return deps
 
-    def __init__(self, obj):
-        super(Temperature, self).__init__(obj)
-
-        self.value = m.DEFAULT_TEMPERATURE
-
     def _get_value(self):
-        return self.value
+        return self.VALUES[self.OBJ_IDXS[self.obj.name]]
 
     def _set_value(self, new_value):
-        self.value = new_value
+        self.VALUES[self.OBJ_IDXS[self.obj.name]] = new_value
         return True
 
-    def _update(self):
-        # Avoid circular import
-        from omnigibson.object_states.on_fire import OnFire
+    def update_temperature_from_heatsource_or_sink(self, temperature, rate):
+        """
+        Updates this object's internal temperature based on @temperature and @rate
 
-        # Start at the current temperature.
-        new_temperature = self.value
-
-        # Find all heat source objects.
-        affected_by_heat_source = False
-        heat_source_objs = og.sim.scene.get_objects_with_state_recursive(HeatSourceOrSink)
-        for obj2 in heat_source_objs:
-            # Only external heat sources will affect the temperature.
-            if obj2 == self.obj:
-                continue
-
-            heat_source = obj2.states.get(OnFire, obj2.states.get(HeatSourceOrSink, None))
-            assert heat_source is not None, "Unknown HeatSourceOrSink subclass"
-
-            # Compute delta to apply if the heat source is actively affecting this object
-            if heat_source.affects_obj(obj=self.obj):
-                new_temperature += (heat_source.temperature - self.value) * heat_source.heating_rate * og.sim.get_rendering_dt()
-                affected_by_heat_source = True
-
-        # Apply temperature decay if not affected by any heat source.
-        if not affected_by_heat_source:
-            new_temperature += (
-                (m.DEFAULT_TEMPERATURE - self.value) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
-            )
-
-        self.value = new_temperature
+        Args:
+            temperature (float): Heat source / sink temperature
+            rate (float): Heating rate of the source / sink
+        """
+        self.VALUES[self.OBJ_IDXS[self.obj.name]] += (temperature - self.VALUES[self.OBJ_IDXS[self.obj.name]]) * rate * og.sim.get_rendering_dt()
 
     @property
     def state_size(self):
@@ -80,10 +90,10 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
 
     # For this state, we simply store its value.
     def _dump_state(self):
-        return dict(temperature=self.value)
+        return dict(temperature=self.VALUES[self.OBJ_IDXS[self.obj.name]])
 
     def _load_state(self, state):
-        self.value = state["temperature"]
+        self.VALUES[self.OBJ_IDXS[self.obj.name]] = state["temperature"]
 
     def _serialize(self, state):
         return np.array([state["temperature"]], dtype=float)

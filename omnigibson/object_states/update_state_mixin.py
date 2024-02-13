@@ -17,4 +17,17 @@ class UpdateStateMixin(BaseObjectState):
         This function will be called once for every simulator step. Must be implemented by subclass.
         """
         # Explicitly raise not implemented error to avoid silent bugs -- update should never be called otherwise
-        raise NotImplementedError()
+        raise NotImplementedError
+
+
+class GlobalUpdateStateMixin(BaseObjectState):
+    """
+    A state-mixin that allows for per-sim-step global updates via the global_update() call
+    """
+
+    @classmethod
+    def global_update(cls):
+        """
+        Executes a global update for this object state. Should be implemented by subclass
+        """
+        pass
