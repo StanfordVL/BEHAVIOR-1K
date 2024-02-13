@@ -32,7 +32,7 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
 # Modifiers denoting a semantic difference in the system
-SYSTEM_PREFIXES = {"diced", "cooked"}
+SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
@@ -139,11 +139,10 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
         # Add to registry
         SYSTEM_REGISTRY.add(obj=cls)
-        # Make sure to refresh any transition rules that require this system
-        # Import now to avoid circular imports
-        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-        system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-        TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+        # Avoid circular import
+        from omnigibson.transition_rules import TransitionRuleAPI
+        TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
         for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
@@ -218,11 +217,10 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
             # Remove from active registry
             SYSTEM_REGISTRY.remove(obj=cls)
-            # Make sure to refresh any transition rules that require this system
-            # Import now to avoid circular imports
-            from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-            system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-            TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+            # Avoid circular import
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
     @classmethod
     def reset(cls):
@@ -531,9 +529,9 @@ class VisualParticleSystem(BaseSystem):
         state_size = super().state_size
 
         # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
-        # particle ids and corresponding link info for each particle (m * 2)
+        # particle ids, particle indices, and corresponding link info for each particle (m * 3)
         return state_size + 1 + 2 * len(cls._group_particles) + \
-               sum(2 * cls.num_group_particles(group) for group in cls.groups)
+               sum(3 * cls.num_group_particles(group) for group in cls.groups)
 
     @classmethod
     def clear(cls):
@@ -544,16 +542,6 @@ class VisualParticleSystem(BaseSystem):
         cls._group_particles = dict()
         cls._group_objects = dict()
         cls._group_scales = dict()
-
-    @classmethod
-    def remove_particle_by_name(cls, name):
-        """
-        Remove particle with name @name from both the simulator and internal state
-
-        Args:
-            name (str): Name of the particle to remove
-        """
-        raise NotImplementedError()
 
     @classmethod
     def remove_all_group_particles(cls, group):
@@ -1213,7 +1201,9 @@ def import_og_systems():
 
 
 def is_system_active(system_name):
-    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    if system_name not in REGISTERED_SYSTEMS:
+        return False
+    # assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return system.initialized
 
@@ -1228,6 +1218,14 @@ def is_physical_particle_system(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return issubclass(system, PhysicalParticleSystem)
+
+
+def is_fluid_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    # Avoid circular imports
+    from omnigibson.systems.micro_particle_system import FluidSystem
+    return issubclass(system, FluidSystem)
 
 
 def get_system(system_name, force_active=True):

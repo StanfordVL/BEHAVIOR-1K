@@ -12,4 +12,5 @@ from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.franka import FrankaPanda
 from omnigibson.robots.franka_allegro import FrankaAllegro
 from omnigibson.robots.franka_leap import FrankaLeap
+from omnigibson.robots.vx300s import VX300S
 from omnigibson.robots.behavior_robot import BehaviorRobot

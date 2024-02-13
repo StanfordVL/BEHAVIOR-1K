@@ -34,7 +34,6 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         self.check_in_volume = None         # Function to check whether particles are in volume for this container
         self._volume = None                 # Volume of this container
         self._compute_info = None           # Intermediate computation information to store
-        self._visual_particle_group = None  # Name corresponding to this object's set of visual particles
 
     @classproperty
     def metalink_prefix(cls):
@@ -61,12 +60,11 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
             # First, we check what type of system
             # Currently, we support VisualParticleSystems and PhysicalParticleSystems
             if is_visual_particle_system(system_name=system.name):
-                if self._visual_particle_group in system.groups:
-                    # Grab global particle poses and offset them in the direction of their orientation
-                    raw_positions, quats = system.get_group_particles_position_orientation(group=self._visual_particle_group)
-                    unit_z = np.zeros((len(raw_positions), 3, 1))
-                    unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
-                    checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
+                # Grab global particle poses and offset them in the direction of their orientation
+                raw_positions, quats = system.get_particles_position_orientation()
+                unit_z = np.zeros((len(raw_positions), 3, 1))
+                unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
+                checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
             elif is_physical_particle_system(system_name=system.name):
                 raw_positions = system.get_particles_position_orientation()[0]
                 checked_positions = raw_positions
@@ -91,9 +89,6 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
         # Calculate volume
         self._volume = calculate_volume()
-
-        # Grab group name
-        self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
     @property
     def volume(self):

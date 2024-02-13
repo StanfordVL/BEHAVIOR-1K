@@ -108,7 +108,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     def remove(self):
         """
         Removes this prim from omniverse stage.
-        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup.
         """
         if not self._loaded:
             raise ValueError("Cannot remove a prim that was never loaded.")
@@ -120,7 +119,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         # Also clear the name so we can reuse this later
         self.remove_names()
 
-    @abstractmethod
     def _load(self):
         """
         Loads the raw prim into the simulator. Any post-processing should be done in @self._post_load()

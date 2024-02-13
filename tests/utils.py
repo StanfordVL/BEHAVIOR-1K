@@ -20,6 +20,18 @@ def og_test(func):
 
 num_objs = 0
 
+def retrieve_obj_cfg(obj):
+    return {
+        "name": obj.name,
+        "category": obj.category,
+        "model": obj.model,
+        "prim_type": obj.prim_type,
+        "position": obj.get_position(),
+        "scale": obj.scale,
+        "abilities": obj.abilities,
+        "visual_only": obj.visual_only,
+    }
+
 def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, bounding_box=None, abilities=None, visual_only=False):
     global num_objs
     num_objs += 1
@@ -61,13 +73,28 @@ def assert_test_scene():
                 get_obj_cfg("bracelet", "bracelet", "thqqmo"),
                 get_obj_cfg("oyster", "oyster", "enzocs"),
                 get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
-                get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}}),
+                get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}, "heatable": {}}),
                 get_obj_cfg("applier_dishtowel", "dishtowel", "dtfspn", abilities={"particleApplier": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
                 get_obj_cfg("remover_dishtowel", "dishtowel", "dtfspn", abilities={"particleRemover": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
                 get_obj_cfg("spray_bottle", "spray_bottle", "asztxi", visual_only=True, abilities={"toggleable": {}, "particleApplier": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
                 get_obj_cfg("vacuum", "vacuum", "bdmsbr", visual_only=True, abilities={"toggleable": {}, "particleRemover": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
-                get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "blender": {}, "toggleable": {}}),
+                get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "toggleable": {}, "heatable": {}}),
                 get_obj_cfg("oven", "oven", "cgtaer", bounding_box=[0.943, 0.837, 1.297]),
+                get_obj_cfg("baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]),
+                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm"),
+                get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
+                get_obj_cfg("food_processor", "food_processor", "gamkbo"),
+                get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
+                get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("chicken", "chicken", "nppsmz"),
+                get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
+                get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
+                get_obj_cfg("apple", "apple", "agveuv"),
+                get_obj_cfg("table_knife", "table_knife", "jxdfyy"),
+                get_obj_cfg("half_apple", "half_apple", "sguztn"),
+                get_obj_cfg("washer", "washer", "dobgmu"),
+                get_obj_cfg("carpet_sweeper", "carpet_sweeper", "xboreo"),
             ],
             "robots": [
                 {
