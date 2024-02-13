@@ -426,12 +426,12 @@ class VisionSensor(BaseSensor):
             gym.spaces.Text(min_length=0, max_length=50, charset=VALID_OMNI_CHARS),  # metadata
             gym.spaces.Sequence(space=gym.spaces.Box(low=0, high=MAX_INSTANCE_COUNT, shape=(), dtype=np.uint)),   # instanceIds
             gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # x_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # y_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # z_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # x_max
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # y_max
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # z_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # x_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # y_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # z_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # x_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # y_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # z_max
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32), # transform
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8, 3), dtype=np.float32), # corners
         )))
