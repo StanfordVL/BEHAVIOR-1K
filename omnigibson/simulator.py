@@ -306,9 +306,9 @@ def launch_simulator(*args, **kwargs):
             """
             assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
             self._physics_context.set_gravity(value=-self.gravity)
-            # Also make sure we invert the collision group filter settings so that different collision groups cannot
-            # collide with each other, and modify settings for speed optimization
-            self._physics_context.set_invert_collision_group_filter(True)
+            # Also make sure we don't invert the collision group filter settings so that different collision groups by
+            # default collide with each other, and modify settings for speed optimization
+            self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
 
             if meets_minimum_isaac_version("2023.0.0"):

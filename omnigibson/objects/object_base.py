@@ -185,14 +185,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        # Set the collision group if needed
-        # We always filter collision groups between structures and fixed objects
-        if self.fixed_base:
-            CollisionAPI.add_to_collision_group(
-                col_group="fixed_base",
-                prim_path=self.prim_path,
-            )
-
         # Update semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=self._prim,

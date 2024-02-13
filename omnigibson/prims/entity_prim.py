@@ -900,11 +900,13 @@ class EntityPrim(XFormPrim):
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
-        # Delegate to RigidPrim if we are not articulated
+        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation)
+        # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
             self.root_link.set_position_orientation(position=position, orientation=orientation)
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
                 position = np.asarray(position)[None, :]
@@ -914,11 +916,13 @@ class EntityPrim(XFormPrim):
             BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
+        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.get_position_orientation(self)
         # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
             return self.root_link.get_position_orientation()
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
             positions, orientations = self._articulation_view.get_world_poses()
             return positions[0], orientations[0][[1, 2, 3, 0]]
@@ -927,11 +931,13 @@ class EntityPrim(XFormPrim):
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
+        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.set_local_pose(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
             self.root_link.set_local_pose(position=position, orientation=orientation)
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
                 position = np.asarray(position)[None, :]
@@ -941,11 +947,13 @@ class EntityPrim(XFormPrim):
             BoundingBoxAPI.clear()
 
     def get_local_pose(self):
+        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.get_local_pose(self)
         # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
             return self.root_link.get_local_pose()
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
             positions, orientations = self._articulation_view.get_local_poses()
             return positions[0], orientations[0][[1, 2, 3, 0]]
