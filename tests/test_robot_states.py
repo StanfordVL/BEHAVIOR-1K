@@ -5,8 +5,20 @@ from omnigibson.macros import gm
 
 from omnigibson.sensors import VisionSensor
 
-
-def test_vision_sensor_pose():
+def setup_environment(flatcache=True):
+    """
+    Sets up the environment with or without flatcache based on the flatcache parameter.
+    """
+    # Ensure any existing simulation is stopped
+    if og.sim is not None:
+        og.sim.stop()
+    
+    # Set global flags
+    gm.ENABLE_OBJECT_STATES = True
+    gm.USE_GPU_DYNAMICS = True
+    gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
+    
+    # Define the environment configuration
     config = {
         "scene": {
             "type": "Scene",
@@ -26,16 +38,12 @@ def test_vision_sensor_pose():
             }
         ]
     }
-    
-    # Make sure sim is stopped
-    if og.sim is not None:
-        og.sim.stop()
-    
-    gm.ENABLE_OBJECT_STATES = True
-    gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_FLATCACHE = True
-    
+
     env = og.Environment(configs=config)
+    return env
+
+def camera_pose_test(flatcache):
+    env = setup_environment(flatcache)
     robot = env.robots[0]
     env.reset()
     
@@ -84,3 +92,8 @@ def test_vision_sensor_pose():
     
     og.sim.clear()
 
+def test_camera_pose_flatcache_on():
+    camera_pose_test(True)
+
+def test_camera_pose_flatcache_off():
+    camera_pose_test(False)

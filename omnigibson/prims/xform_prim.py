@@ -296,7 +296,8 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
-        xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
+        if gm.ENABLE_FLATCACHE:
+            xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
         # assert xformable_prim.HasWorldXform() == False
         properties = self.prim.GetPropertyNames()
         if position is not None:
@@ -320,7 +321,8 @@ class XFormPrim(BasePrim):
             xform_op.Set(rotq)
         PoseAPI.invalidate()
         BoundingBoxAPI.clear()
-        xformable_prim.SetLocalXformFromUsd()
+        if gm.ENABLE_FLATCACHE:
+            xformable_prim.SetLocalXformFromUsd()
         return
 
     def get_world_scale(self):
