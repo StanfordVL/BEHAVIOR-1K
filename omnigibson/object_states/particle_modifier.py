@@ -597,9 +597,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
 
         # Check if there's any overlap and if we're at the correct step
-        if self._current_step == 0 and (not self.requires_overlap or self._check_overlap()):
-            # Iterate over all active systems
-            for system_name in BaseSystem.get_active_systems():
+        if self._current_step == 0:
+            # Iterate over all systems to check
+            for system_name in self.systems_to_check:
                 if system_name in self.conditions:
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
@@ -637,9 +637,18 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def supported_active_systems(cls):
         """
         Returns:
-            list: All systems used in this state that are active, dynamic across time
+            dict: Maps system names to corresponding systems used in this state that are active, dynamic across time
         """
-        return list(VisualParticleSystem.get_active_systems().values()) + list(PhysicalParticleSystem.get_active_systems().values())
+        return dict(**VisualParticleSystem.get_active_systems(), **PhysicalParticleSystem.get_active_systems())
+
+    @property
+    def systems_to_check(self):
+        """
+        Returns:
+            tuple of str: System names that should be actively checked for particle modification at the current timestep
+        """
+        # Default is all supported active systems
+        return tuple(self.supported_active_systems.keys())
 
     @property
     def projection_is_active(self):
@@ -795,9 +804,9 @@ class ParticleRemover(ParticleModifier):
                 # Always make sure to add on condition for checking count of particles (can't remove any particles if
                 # there are 0 particles of the given system!)
                 all_conditions[system_name] = (
-                        [self._generate_nonempty_system_condition(system_name)] +
-                        default_system_conditions +
-                        [self._generate_limit_condition(system_name)]
+                        [self._generate_nonempty_system_condition(system_name),
+                         self._generate_limit_condition(system_name)] +
+                        default_system_conditions
                 )
 
         # Overwrite conditions based on manually-specified ones
@@ -849,8 +858,8 @@ class ParticleRemover(ParticleModifier):
 
     @property
     def requires_overlap(self):
-        # Special case adjacency -- no overlap check needed since it can absorb particles at any time
-        return False if self.method == ParticleModifyMethod.ADJACENCY else super().requires_overlap
+        # No overlap check needed for particle removers
+        return False
 
     @classproperty
     def metalink_prefix(cls):
@@ -946,10 +955,6 @@ class ParticleApplier(ParticleModifier):
         super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
 
     def _initialize(self):
-        # First, sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
-        # can potentially remove multiple types of particles, a ParticleApplier should only apply one type of particle
-        assert len(self.conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
-                                          f"with it! Got: {[system_name for system_name in self.conditions.keys()]}"
         # Run super
         super()._initialize()
 
@@ -1019,6 +1024,22 @@ class ParticleApplier(ParticleModifier):
                 "If not sampling with raycast, ParticleApplier only supports ParticleModifyMethod.PROJECTION method!"
             # Compute particle spawning information once
             self._compute_particle_spawn_information(system=system)
+
+    def _parse_conditions(self, conditions):
+        # Run super first
+        parsed_conditions = super()._parse_conditions(conditions=conditions)
+
+        # sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
+        # can potentially remove multiple types of particles, a ParticleApplier should only apply one type of particle
+        assert len(self.conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
+                                          f"with it! Got: {[system_name for system_name in self.conditions.keys()]}"
+
+        # Append an additional condition for checking overlaps if required
+        if self.requires_overlap:
+            system_name = next(iter(parsed_conditions))
+            parsed_conditions[system_name].append(lambda obj: self._check_overlap())
+
+        return parsed_conditions
 
     def _compute_particle_spawn_information(self, system):
         """
@@ -1337,6 +1358,11 @@ class ParticleApplier(ParticleModifier):
         """
         # Visualize if projection method is used
         return self.method == ParticleModifyMethod.PROJECTION
+
+    @property
+    def systems_to_check(self):
+        # Only should check the systems in the owned conditions
+        return tuple(self.conditions.keys())
 
     @property
     def projection_is_active(self):
