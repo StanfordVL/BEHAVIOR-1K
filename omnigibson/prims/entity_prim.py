@@ -1166,6 +1166,19 @@ class EntityPrim(XFormPrim):
                 link.stabilization_threshold = threshold
 
     @property
+    def is_asleep(self):
+        """
+        Returns:
+            bool: whether this entity is asleep or not
+        """
+        # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
+        if self.kinematic_only:
+            return False
+        else:
+            return og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)) \
+                if self.articulated else self.root_link.is_asleep
+
+    @property
     def sleep_threshold(self):
         """
         Returns:
