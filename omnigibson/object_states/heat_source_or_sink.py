@@ -84,7 +84,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         self.requires_inside = requires_inside
 
         # Internal state that gets cached
-        self._nearby_objects = None
+        self._affected_objects = None
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -188,16 +188,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if not self.get_value():
             return False
 
-        # If the object is not nearby, we return False
-        if obj not in self._nearby_objects:
+        # If the object is not affected, we return False
+        if obj not in self._affected_objects:
             return False
-
-        # Otherwise, check for other edge cases
-        # If we require the object to be inside, make sure the object is inside, otherwise, we return 0
-        # Otherwise, make sure the object is within close proximity of this heat source
-        if self.requires_inside:
-            if not obj.states[Inside].get_value(self.obj):
-                return False
 
         # If all checks pass, we're actively influencing the object!
         return True
@@ -207,16 +200,16 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         from omnigibson.object_states.temperature import Temperature
 
         # Update the internally tracked nearby objects to accelerate filtering for affects_obj
-        nearby_objects = set()
+        affected_objects = set()
 
         # Only update if we're valid
         if self.get_value():
             def overlap_callback(hit):
-                nonlocal nearby_objects
-                # global nearby_objects
+                nonlocal affected_objects
+                # global affected_objects
                 obj = og.sim.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
                 if obj is not None:
-                    nearby_objects.add(obj)
+                    affected_objects.add(obj)
                 # Always continue traversal
                 return True
 
@@ -234,26 +227,26 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
                 # Additionally prune objects based on Inside requirement
-                for obj in tuple(nearby_objects):
+                for obj in tuple(affected_objects):
                     if not obj.states[Inside].get_value(self.obj):
-                        nearby_objects.remove(obj)
+                        affected_objects.remove(obj)
 
             else:
                 # Position is either the AABB center of the default link or the metalink position itself
                 heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
 
                 # Use overlap_sphere check!
-                og.sim.psqi.overlap_box(
+                og.sim.psqi.overlap_sphere(
                     radius=self.distance_threshold,
                     pos=heat_source_pos,
                     reportFn=overlap_callback,
                 )
 
         # Update the internal set of objects
-        self._nearby_objects = nearby_objects
+        self._affected_objects = affected_objects
 
         # For each object, if they have temperature, propagate their temperature
-        for obj in self._nearby_objects:
+        for obj in self._affected_objects:
             if Temperature in obj.states:
                 obj.states[Temperature].update_temperature_from_heatsource_or_sink(temperature=self.temperature, rate=self.heating_rate)
 
