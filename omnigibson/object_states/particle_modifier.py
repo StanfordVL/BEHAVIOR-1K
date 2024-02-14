@@ -1031,7 +1031,7 @@ class ParticleApplier(ParticleModifier):
 
         # sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
         # can potentially remove multiple types of particles, a ParticleApplier should only apply one type of particle
-        assert len(self.conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
+        assert len(parsed_conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
                                           f"with it! Got: {[system_name for system_name in self.conditions.keys()]}"
 
         # Append an additional condition for checking overlaps if required

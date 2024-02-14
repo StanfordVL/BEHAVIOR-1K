@@ -47,10 +47,11 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         cls._finger_overlap_objs = set()
 
         # detect marker and hand interaction
-        cls._robot_finger_paths = set(link.prim_path
-                                     for robot in og.sim.scene.robots if isinstance(robot, ManipulationRobot)
-                                     for finger_links in robot.finger_links.values()
-                                     for link in finger_links)
+        robot_finger_links = set(link
+                                 for robot in og.sim.scene.robots if isinstance(robot, ManipulationRobot)
+                                 for finger_links in robot.finger_links.values()
+                                 for link in finger_links)
+        cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
 
         # If there aren't any valid robot link paths, immediately return
         if len(cls._robot_finger_paths) == 0:
@@ -64,9 +65,11 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             # Always continue traversal
             return True
 
-        for finger_path in cls._robot_finger_paths:
-            projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(finger_path)
-            og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=global_overlap_callback)
+        for finger in robot_finger_links:
+            for col_geom in finger.collision_meshes.values():
+                overlap = og.sim.psqi.overlap_mesh if finger.prim.GetTypeName() == "Mesh" else og.sim.psqi.overlap_shape
+                mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(col_geom.prim_path)
+                overlap(*mesh_ids, reportFn=global_overlap_callback)
 
     @classproperty
     def metalink_prefix(cls):
