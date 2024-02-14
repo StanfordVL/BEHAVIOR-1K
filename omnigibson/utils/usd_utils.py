@@ -597,6 +597,7 @@ class SemanticsAPI:
     Monolithic class for accessing Semantic information
     """
     _semantic_mapping = None
+    _last_instance_mapping = None
 
     @classmethod
     def get_class_mapping(cls):
@@ -618,6 +619,21 @@ class SemanticsAPI:
         for obj in og.sim.scene.objects:
             paths_to_ids[obj.prim_path] = cls.get_class_mapping()[obj.category]
         return paths_to_ids
+    
+    @classmethod
+    def register_instance_labels(cls, instance_labels):
+        """
+        Registers the instance labels for the current scene
+        """
+        cls._last_instance_mapping = instance_labels
+
+    @classmethod
+    def get_instance_mapping(cls):
+        """
+        Returns:
+            dict: Mapping from object's prim path (str) to its instance label (str)
+        """
+        return cls._last_instance_mapping
 
 
 def clear():

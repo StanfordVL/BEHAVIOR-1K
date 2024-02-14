@@ -9,6 +9,7 @@ from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.usd_utils import SemanticsAPI
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -226,6 +227,9 @@ class VisionSensor(BaseSensor):
             if modality == "seg_semantic":
                 id_to_labels = raw_obs['info']['idToLabels']
                 obs[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
+            elif modality == "seg_instance":
+                id_to_labels = raw_obs['info']['idToLabels']
+                SemanticsAPI.register_instance_labels(id_to_labels)
         return obs
     
     def _remap_semantic_segmentation(self, img, id_to_labels):
