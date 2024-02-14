@@ -7,6 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
@@ -111,6 +112,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._registry(key="name", value="system_registry")
 
     @property
+    def material_registry(self):
+        """
+        Returns:
+            SerializableRegistry: Material registry containing all materials in the scene
+        """
+        return self._registry(key="name", value="material_registry")
+
+    @property
     def objects(self):
         """
         Get the objects in the scene.
@@ -157,6 +166,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
         return ["prim_type", "states", "category", "fixed_base", "in_rooms", "abilities"]
+
+    @property
+    def material_registry_unique_keys(self):
+        """
+        Returns:
+            list of str: Keys with which to index into the material registry. These should be valid public attributes of
+                prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, etc.
+        """
+        return ["name", "prim_path"]
 
     @property
     def loaded(self):
@@ -359,6 +377,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             group_keys=self.object_registry_group_keys,
         ))
 
+        # Add registry for materials
+        registry.add(obj=SerializableRegistry(
+            name="material_registry",
+            class_types=MaterialPrim,
+            default_key="name",
+            unique_keys=self.material_registry_unique_keys,
+        ))
+
         return registry
 
     def wake_scene_objects(self):
@@ -474,6 +500,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Remove from omni stage
         obj.remove()
+
+    def remove_material(self, material):
+        """
+        Method to remove a material from the simulator
+
+        Args:
+            material (MaterialPrim): Material to remove
+        """
+        self.material_registry.remove(material)
+
+        # Remove from omni stage
+        material.remove()
 
     def reset(self):
         """

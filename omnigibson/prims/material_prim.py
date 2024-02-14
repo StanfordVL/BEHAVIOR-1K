@@ -37,6 +37,9 @@ class MaterialPrim(BasePrim):
         # Other values that will be filled in at runtime
         self._shader = None
 
+        # Users of this material: should be a list of BaseObject and BaseSystem
+        self._users = []
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -60,6 +63,50 @@ class MaterialPrim(BasePrim):
 
         # Return generated material
         return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._prim_path)
+
+    @property
+    def users(self):
+        """
+        Users of this material: should be a list of BaseObject and BaseSystem
+        """
+        return self._users
+
+    def add_user(self, user):
+        """
+        Adds a user to the material. This can be a BaseObject or BaseSystem.
+
+        Args:
+            user (BaseObject or BaseSystem): User to add to the material
+        """
+        self._users.append(user)
+
+    def remove_user(self, user):
+        """
+        Removes a user from the material. This can be a BaseObject or BaseSystem.
+
+        Args:
+            user (BaseObject or BaseSystem): User to remove from the material
+        """
+        self._users.remove(user)
+
+    @property
+    def has_any_users(self):
+        """
+        Returns True if there are any users of this material, False otherwise
+        """
+        return len(self._users) > 0
+
+    def _dump_state(self):
+        return dict()
+
+    def _load_state(self, state):
+        return
+
+    def _serialize(self, state):
+        return np.array([])
+
+    def _deserialize(self, state):
+        return dict(), 0
 
     def _post_load(self):
         # run super first

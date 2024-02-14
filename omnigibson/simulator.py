@@ -535,6 +535,14 @@ def launch_simulator(*args, **kwargs):
                     break
             self._scene.remove_object(obj, has_registered=has_registered)
 
+        def remove_material(self, material):
+            """
+            Remove a material from the simulator.
+
+            Args:
+                material (MaterialPrim): a material to remove
+            """
+            self._scene.remove_material(material)
 
         def remove_prim(self, prim):
             """

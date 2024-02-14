@@ -424,12 +424,14 @@ class MicroParticleSystem(BaseSystem):
             f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
 
         cls.system_prim = cls._create_particle_system()
-        # Create material
-        cls._material = cls._create_particle_material_template()
-        # Load the material if not already loaded
-        # TODO: Remove this if statement once clearing system completely removes prims from stage
-        if not cls._material.loaded:
-            cls._material.load()
+        # Get or create material
+        material = og.sim.scene.material_registry("prim_path", cls.mat_path)
+        if material is None:
+            material = cls._create_particle_material_template()
+            material.load()
+            og.sim.scene.material_registry.add(material)
+        material.add_user(cls)
+        cls._material = material
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         # Also apply physics to this material
@@ -441,7 +443,9 @@ class MicroParticleSystem(BaseSystem):
 
     @classmethod
     def _clear(cls):
-        og.sim.remove_prim(cls._material)
+        cls._material.remove_user(cls)
+        if not cls._material.has_any_users:
+            og.sim.remove_material(cls._material)
 
         super()._clear()
 

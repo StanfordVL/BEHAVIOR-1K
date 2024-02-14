@@ -117,8 +117,8 @@ class MacroParticleSystem(BaseSystem):
     def _clear(cls):
         # Clear all internal state
         og.sim.remove_object(cls._particle_template, has_registered=False)
-        og.sim.remove_prim(cls._particle_object)
-
+        # No need to call og.sim.remove_prim(cls._particle_object) because cls._particle_object is a visual mesh of
+        # cls._particle_template, and removing cls._particle_template will remove cls._particle_object as well.
         super()._clear()
 
         cls._particle_object = None
