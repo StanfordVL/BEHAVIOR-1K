@@ -30,7 +30,7 @@ SCENE_OFFSET = {
     "Rs_int": [0, 0],
     "Pomaria_0_garden": [0.3, 0],
     "grocery_store_cafe": [-3.5, 3.5],
-    "house_single_floor": [-5, -3],
+    "house_single_floor": [-3, -1],
 }
 
 
