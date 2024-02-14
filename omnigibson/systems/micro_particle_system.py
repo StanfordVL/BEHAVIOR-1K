@@ -429,6 +429,7 @@ class MicroParticleSystem(BaseSystem):
         if material is None:
             material = cls._create_particle_material_template()
             material.load()
+            material.initialize()
             og.sim.scene.material_registry.add(material)
         material.add_user(cls)
         cls._material = material

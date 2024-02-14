@@ -72,6 +72,7 @@ class XFormPrim(BasePrim):
             if material is None:
                 material = MaterialPrim(prim_path=material_prim_path, name=material_name)
                 assert material.loaded, f"Failed to load material at {material_prim_path}"
+                material.initialize()
                 og.sim.scene.material_registry.add(material)
 
             material.add_user(self)
