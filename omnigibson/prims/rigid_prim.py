@@ -291,8 +291,7 @@ class RigidPrim(XFormPrim):
     def set_position_orientation(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
-            self._kinematic_world_pose_cache = None
-            self._kinematic_local_pose_cache = None
+            self.clear_kinematic_only_cache()
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -321,8 +320,7 @@ class RigidPrim(XFormPrim):
     def set_local_pose(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
-            self._kinematic_world_pose_cache = None
-            self._kinematic_local_pose_cache = None
+            self.clear_kinematic_only_cache()
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -621,6 +619,15 @@ class RigidPrim(XFormPrim):
         """
         prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
+
+    def clear_kinematic_only_cache(self):
+        """
+        Clears the internal kinematic only cached pose. Useful if the parent prim's pose
+        changes without explicitly calling this prim's pose setter
+        """
+        assert self.kinematic_only
+        self._kinematic_local_pose_cache = None
+        self._kinematic_world_pose_cache = None
 
     def _dump_state(self):
         # Grab pose from super class

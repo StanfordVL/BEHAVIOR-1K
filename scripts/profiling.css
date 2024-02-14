@@ -10,7 +10,16 @@ h2 {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20vh 0 10vh 0;
+    padding: 20vh 0 0 0;
+}
+
+h5 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1vh 0 9vh 0;
+    font-size: small;
+    font-weight: normal;
 }
 
 .list-group {
