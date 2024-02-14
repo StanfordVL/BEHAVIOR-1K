@@ -30,6 +30,8 @@ class MacroParticleSystem(BaseSystem):
     # Note that this object is NOT part of the actual particle system itself!
     _particle_object = None
 
+    _particle_template = None
+
     # dict, array of particle objects, mapped by their prim names
     particles = None
 
@@ -54,6 +56,7 @@ class MacroParticleSystem(BaseSystem):
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
         og.sim.import_object(obj=particle_template, register=False)
+        cls._particle_template = particle_template
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -111,12 +114,15 @@ class MacroParticleSystem(BaseSystem):
         cls._particle_counter = 0
 
     @classmethod
-    def clear(cls):
-        # Call super first
-        super().clear()
-
+    def _clear(cls):
         # Clear all internal state
+        og.sim.remove_object(cls._particle_template, has_registered=False)
+        og.sim.remove_prim(cls._particle_object)
+
+        super()._clear()
+
         cls._particle_object = None
+        cls._particle_template = None
         cls.particles = None
         cls._color = None
 
@@ -422,9 +428,9 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         super().set_particle_template_object(obj=obj)
 
     @classmethod
-    def clear(cls):
+    def _clear(cls):
         # Run super method first
-        super().clear()
+        super()._clear()
 
         # Clear all groups as well
         cls._particles_info = dict()
@@ -1178,12 +1184,14 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
             cls.particles_view = og.sim.physics_sim_view.create_rigid_body_view(pattern=f"{cls.prim_path}/particles/*")
 
     @classmethod
-    def clear(cls):
+    def _clear(cls):
         # Run super method first
-        super().clear()
+        super()._clear()
 
         # Clear internal variables
         cls.particles_view = None
+        cls._particle_radius = None
+        cls._particle_offset = None
 
     @classmethod
     def remove_particle_by_name(cls, name):

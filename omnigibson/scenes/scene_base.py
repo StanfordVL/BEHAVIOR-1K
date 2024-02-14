@@ -460,15 +460,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         return prim
 
-    def remove_object(self, obj):
+    def remove_object(self, obj, has_registered=True):
         """
         Method to remove an object from the simulator
 
         Args:
             obj (BaseObject): Object to remove
+            has_registered (bool): Whether the object has been registered in the scene's object registry
         """
-        # Remove from the appropriate registry
-        self.object_registry.remove(obj)
+        if has_registered:
+            # Remove from the appropriate registry
+            self.object_registry.remove(obj)
 
         # Remove from omni stage
         obj.remove()

@@ -93,6 +93,8 @@ class PhysxParticleInstancer(BasePrim):
         # Run super method directly
         super().__init__(prim_path=prim_path, name=name)
 
+        self._parent_prim = BasePrim(prim_path=self.prim.GetParent().GetPath().pathString, name=f"{name}_parent")
+
     def _load(self):
         # We raise an error, this should NOT be created from scratch
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
@@ -103,6 +105,10 @@ class PhysxParticleInstancer(BasePrim):
 
         # Store how many particles we have
         self._n_particles = len(self.particle_positions)
+
+    def remove(self):
+        super().remove()
+        self._parent_prim.remove()
 
     def add_particles(
             self,
@@ -433,6 +439,16 @@ class MicroParticleSystem(BaseSystem):
         # Potentially modify the material
         cls._customize_particle_material()
 
+    @classmethod
+    def _clear(cls):
+        og.sim.remove_prim(cls._material)
+
+        super()._clear()
+
+        cls.system_prim = None
+        cls._material = None
+        cls._color = np.array([1.0, 1.0, 1.0])
+
     @classproperty
     def particle_radius(cls):
         # Magic number from omni tutorials
@@ -591,9 +607,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     # Particle instancers -- maps name to particle instancer prims (dict)
     particle_instancers = None
 
-    # Max particle instancer identification number -- this monotonically increases until reset() is called
-    max_instancer_idn = None
-
     @classproperty
     def n_particles(cls):
         return sum([instancer.n_particles for instancer in cls.particle_instancers.values()])
@@ -625,9 +638,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = dict()
 
-        # Initialize max instancer idn
-        cls.max_instancer_idn = -1
+    @classmethod
+    def _clear(cls):
+        for prototype in cls.particle_prototypes:
+            og.sim.remove_prim(prototype)
 
+        super()._clear()
+
+        cls.particle_prototypes = None
+        cls.particle_instancers = None
 
     @classproperty
     def next_available_instancer_idn(cls):
@@ -989,8 +1008,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         assert_valid_key(key=name, valid_keys=cls.particle_instancers, name="particle instancer")
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
-        instancer.remove()
-        og.sim.stage.RemovePrim(f"{cls.prim_path}/{name}")
+        og.sim.remove_prim(instancer)
 
     @classmethod
     def particle_instancer_name_to_idn(cls, name):
@@ -1393,6 +1411,17 @@ class GranularSystem(MicroPhysicalParticleSystem):
     # Cached particle contact offset determined from loaded prototype
     _particle_contact_offset = None
 
+    _particle_template = None
+
+    @classmethod
+    def _clear(cls):
+        og.sim.remove_object(cls._particle_template, has_registered=False)
+
+        super()._clear()
+
+        cls._particle_template = None
+        cls._particle_contact_offset = None
+
     @classproperty
     def particle_contact_offset(cls):
         return cls._particle_contact_offset
@@ -1406,6 +1435,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         # Load the particle template
         particle_template = cls._create_particle_template()
         og.sim.import_object(obj=particle_template, register=False)
+        cls._particle_template = particle_template
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"
