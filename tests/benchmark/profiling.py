@@ -18,7 +18,7 @@ parser.add_argument("-r", "--robot", type=int, default=0)
 parser.add_argument("-s", "--scene", default="")
 parser.add_argument("-c", "--cloth", action='store_true')
 parser.add_argument("-w", "--fluids", action='store_true')
-parser.add_argument("-f", "--fast", action='store_true')
+parser.add_argument("-g", "--gpu_denamics", action='store_true')
 parser.add_argument("-p", "--macro_particle_system", action='store_true')
 
 PROFILING_FIELDS = ["Total frame time", "Omni step time", "Non-omni step time", "Memory usage", "Vram usage"]
@@ -30,7 +30,7 @@ SCENE_OFFSET = {
     "Rs_int": [0, 0],
     "Pomaria_0_garden": [0.3, 0],
     "grocery_store_cafe": [-3.5, 3.5],
-    "house_single_floor": [0, 0],
+    "house_single_floor": [-5, -3],
 }
 
 
@@ -40,8 +40,8 @@ def main():
     gm.ENABLE_HQ_RENDERING = args.fluids
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
-    gm.USE_GPU_DYNAMICS = not args.fast
-    gm.ENABLE_FLATCACHE = args.fast
+    gm.ENABLE_FLATCACHE = True
+    gm.USE_GPU_DYNAMICS = args.gpu_denamics
 
     cfg = {
         "env": {

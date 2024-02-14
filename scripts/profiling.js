@@ -11,12 +11,12 @@ const canvasDict = {
 	'np_non_omni_canvas': 			["Non-omni step time", 		["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_mem_canvas': 				["Memory usage", 			["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_vram_canvas': 				["Vram usage", 				["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
-	// 'scene_total_canvas': 			["Total frame time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	// 'scene_loading_canvas': 		["Loading time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	// 'scene_omni_canvas': 			["Omni step time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	// 'scene_og_canvas': 				["Non-omni step time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	// 'scene_mem_canvas': 			["Memory usage", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	// 'scene_vram_canvas': 			["Vram usage", 				["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_total_canvas': 			["Total frame time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_loading_canvas': 		["Loading time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_omni_canvas': 			["Omni step time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_og_canvas': 				["Non-omni step time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_mem_canvas': 			["Memory usage", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_vram_canvas': 			["Vram usage", 				["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
 }
 
 
