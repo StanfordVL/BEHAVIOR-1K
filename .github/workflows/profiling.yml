@@ -1,6 +1,7 @@
 name: Profiling
 
 on: 
+  workflow_dispatch:
   push:
     branches:
       - og-develop
