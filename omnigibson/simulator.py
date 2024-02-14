@@ -19,7 +19,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import PoseAPI, clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
 from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
                                        print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
@@ -670,6 +670,9 @@ def launch_simulator(*args, **kwargs):
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
+                
+                # During rendering, the Fabric API is updated, so we can mark it as clean
+                PoseAPI.mark_valid()
 
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
@@ -750,6 +753,7 @@ def launch_simulator(*args, **kwargs):
             """
             Step the physics a single step.
             """
+            PoseAPI.invalidate()
             self._physics_context._step(current_time=self.current_time)
             self._omni_update_step()
 

@@ -641,10 +641,32 @@ class FlatcacheAPI:
         cls.MODIFIED_PRIMS = set()
 
 
+class PoseAPI:
+    DIRTY = True
+    
+    @classmethod
+    def invalidate(cls):
+        cls.DIRTY = True
+        
+    @classmethod
+    def mark_valid(cls):
+        cls.DIRTY = False
+        
+    @classmethod
+    def get_world_pose(cls, prim_path):
+        if og.sim is not None and cls.DIRTY:
+            if og.sim._physx_fabric_interface:
+                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            cls.mark_valid()
+            
+        return lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
+    PoseAPI.invalidate()
     CollisionAPI.clear()
     BoundingBoxAPI.clear()
 

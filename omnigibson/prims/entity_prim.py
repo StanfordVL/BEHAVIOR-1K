@@ -11,7 +11,7 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.usd_utils import BoundingBoxAPI, PoseAPI
 
 from omnigibson.macros import gm
 
@@ -608,6 +608,7 @@ class EntityPrim(XFormPrim):
         # Set the DOF states
         if not drive:
             self._articulation_view.set_joint_positions(positions, joint_indices=indices)
+            PoseAPI.invalidate()
             BoundingBoxAPI.clear()
 
         # Also set the target
@@ -906,6 +907,7 @@ class EntityPrim(XFormPrim):
         if orientation is not None:
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._articulation_view.set_world_poses(position, orientation)
+        PoseAPI.invalidate()
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
@@ -926,6 +928,7 @@ class EntityPrim(XFormPrim):
         if orientation is not None:
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._articulation_view.set_local_poses(position, orientation)
+        PoseAPI.invalidate()
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):

@@ -7,7 +7,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import BoundingBoxAPI, get_mesh_volume_and_com
+from omnigibson.utils.usd_utils import BoundingBoxAPI, PoseAPI, get_mesh_volume_and_com
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -300,6 +300,7 @@ class RigidPrim(XFormPrim):
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
+        PoseAPI.invalidate()
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
@@ -328,6 +329,7 @@ class RigidPrim(XFormPrim):
         if orientation is not None:
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_local_poses(position, orientation)
+        PoseAPI.invalidate()
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):

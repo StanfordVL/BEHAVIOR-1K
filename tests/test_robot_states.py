@@ -53,5 +53,34 @@ def test_vision_sensor_pose():
     assert np.allclose(sensor_world_pos, sensor_world_pos_gt)
     assert np.allclose(sensor_world_ori, sensor_world_ori_gt)
     
+    # Now, we want to move the robot and check if the sensor pose is updated
+    old_camera_local_pose = vision_sensor.get_local_pose()
+    old_camera_world_pose = vision_sensor.get_position_orientation()
+    robot.set_position_orientation(position=[100, 100, 100])
+    new_camera_local_pose = vision_sensor.get_local_pose()
+    new_camera_world_pose = vision_sensor.get_position_orientation()
+    assert np.allclose(old_camera_local_pose[0], new_camera_local_pose[0])
+    assert not np.allclose(old_camera_world_pose[0], new_camera_world_pose[0])
+    
+    # Then, we want to move the local pose of the camera and check 
+    # 1) if the world pose is updated 2) if the robot stays in the same position
+    old_camera_world_pose = vision_sensor.get_position_orientation()
+    old_camera_local_pose = vision_sensor.get_local_pose()
+    vision_sensor.set_local_pose(old_camera_local_pose[0]+10, [0, 0, 0, 1])
+    new_camera_world_pose = vision_sensor.get_position_orientation()
+    assert not np.allclose(old_camera_world_pose[0], new_camera_world_pose[0])
+    assert not np.allclose(old_camera_world_pose[1], new_camera_world_pose[1])
+    assert np.allclose(robot.get_position(), [100, 100, 100])
+    
+    # Finally, we want to move the world pose of the camera and check
+    # 1) if the local pose is updated 2) if the robot stays in the same position
+    old_camera_local_pose = vision_sensor.get_local_pose()
+    robot.set_position_orientation(position=[150, 150, 100])
+    old_camera_local_pose = vision_sensor.get_local_pose()
+    vision_sensor.set_position_orientation([150, 150, 101.36912537], [-0.29444987, 0.29444981, 0.64288363, -0.64288352])
+    new_camera_local_pose = vision_sensor.get_local_pose()
+    assert not np.allclose(old_camera_local_pose[0], new_camera_local_pose[0])
+    assert np.allclose(robot.get_position(), [150, 150, 100])
+    
     og.sim.clear()
 
