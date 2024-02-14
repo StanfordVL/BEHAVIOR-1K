@@ -396,6 +396,25 @@ class CollisionAPI:
         cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
 
     @classmethod
+    def add_group_filter(cls, col_group, filter_group):
+        """
+        Adds a new group filter for group @col_group, filtering all collision with group @filter_group
+        Args:
+            col_group (str): Name of the collision group which will have a new filter group added
+            filter_group (str): Name of the group that should be filtered
+        """
+        # Make sure the group doesn't already exist
+        for group_name in (col_group, filter_group):
+            assert group_name in cls.ACTIVE_COLLISION_GROUPS, \
+                (f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
+                 f"does not exist!")
+
+        # Grab the group, and add the filter
+        filter_group_prim_path = f"/World/collision_groups/{filter_group}"
+        group = cls.ACTIVE_COLLISION_GROUPS[col_group]
+        group.GetFilteredGroupsRel().AddTarget(filter_group_prim_path)
+
+    @classmethod
     def clear(cls):
         """
         Clears the internal state of this CollisionAPI
