@@ -1,13 +1,13 @@
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson as og
 
-from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane
+from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane, SYSTEM_EXAMPLES
 
 import pytest
 import numpy as np
@@ -1066,12 +1066,8 @@ def test_draped():
 @og_test
 def test_filled():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
-
-    systems = (
-        get_system("water"),
-        get_system("raspberry"),
-        get_system("diced__apple"),
-    )
+    assert issubclass(system, system_class)
+    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items() if not issubclass(system_class, VisualParticleSystem)]
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
@@ -1100,12 +1096,7 @@ def test_filled():
 def test_contains():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
 
-    systems = (
-        get_system("water"),
-        get_system("stain"),
-        get_system("raspberry"),
-        get_system("diced__apple"),
-    )
+    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
@@ -1147,12 +1138,7 @@ def test_covered():
     oyster = og.sim.scene.object_registry("name", "oyster")
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
 
-    systems = (
-        get_system("water"),
-        get_system("stain"),
-        get_system("raspberry"),
-        get_system("diced__apple"),
-    )
+    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, oyster, breakfast_table):
         for system in systems:
             print(f"Testing Covered {obj.name} with {system.name}")
@@ -1178,7 +1164,6 @@ def test_covered():
             system.remove_all_particles()
 
         obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
-
 
 def test_clear_sim():
     og.sim.clear()

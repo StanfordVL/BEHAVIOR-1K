@@ -2,20 +2,14 @@ import omnigibson as og
 from omnigibson.systems import *
 from omnigibson.object_states import Covered
 
-from utils import og_test
+from utils import og_test, SYSTEM_EXAMPLES
 
 import pytest
 
 @og_test
 def test_system_clear():
-    system_examples = {
-        "water": FluidSystem,
-        "white_rice": GranularSystem,
-        "diced__apple": MacroPhysicalParticleSystem,
-        "sand": MacroVisualParticleSystem,
-    }
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    for system_name, system_class in system_examples.items():
+    for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):
             system = get_system(system_name)
             assert issubclass(system, system_class)

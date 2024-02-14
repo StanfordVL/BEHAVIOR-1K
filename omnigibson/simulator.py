@@ -485,29 +485,31 @@ def launch_simulator(*args, **kwargs):
                 obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
                 has_registered (bool): whether the object has been registered in the scene registry
             """
-            state = self.dump_state()
-
             objs = [obj] if isinstance(obj, BaseObject) else obj
 
-            # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
-            # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
-            # we first move the object to a safe location, then remove it.
-            pos = list(m.OBJECT_GRAVEYARD_POS)
-            for ob in objs:
-                ob.set_position_orientation(pos, [0, 0, 0, 1])
-                pos[0] += max(ob.aabb_extent)
+            if self.is_playing():
+                state = self.dump_state()
 
-            # One timestep will elapse
-            self.app.update()
+                # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+                # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+                # we first move the object to a safe location, then remove it.
+                pos = list(m.OBJECT_GRAVEYARD_POS)
+                for ob in objs:
+                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    pos[0] += max(ob.aabb_extent)
+
+                # One timestep will elapse
+                self.app.update()
 
             for ob in objs:
                 self._remove_object(ob, has_registered=has_registered)
 
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
+            if self.is_playing():
+                # Update all handles that are now broken because objects have changed
+                self.update_handles()
 
-            # Load the state back
-            self.load_state(state)
+                # Load the state back
+                self.load_state(state)
 
             # Refresh all current rules
             TransitionRuleAPI.prune_active_rules()
