@@ -1066,7 +1066,6 @@ def test_draped():
 @og_test
 def test_filled():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
-    assert issubclass(system, system_class)
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items() if not issubclass(system_class, VisualParticleSystem)]
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
@@ -1095,7 +1094,6 @@ def test_filled():
 @og_test
 def test_contains():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
-
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])

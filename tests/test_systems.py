@@ -13,7 +13,7 @@ def test_system_clear():
         for _ in range(3):
             system = get_system(system_name)
             assert issubclass(system, system_class)
-            if system_name == "sand":
+            if issubclass(system_class, VisualParticleSystem):
                 assert breakfast_table.states[Covered].set_value(system, True)
             else:
                 system.generate_particles(positions=[[0, 0, 1]])
