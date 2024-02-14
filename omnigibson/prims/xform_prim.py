@@ -68,13 +68,8 @@ class XFormPrim(BasePrim):
         if self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
-            material = og.sim.scene.material_registry("prim_path", material_prim_path)
-            if material is None:
-                material = MaterialPrim(prim_path=material_prim_path, name=material_name)
-                assert material.loaded, f"Failed to load material at {material_prim_path}"
-                material.initialize()
-                og.sim.scene.material_registry.add(material)
-
+            material = MaterialPrim.get_material(prim_path=material_prim_path, name=material_name)
+            assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
             material.add_user(self)
             self._material = material
 
@@ -86,8 +81,7 @@ class XFormPrim(BasePrim):
         # Remove the material prim if one exists
         if self._material is not None:
             self._material.remove_user(self)
-            if not self._material.has_any_users:
-                og.sim.remove_material(self._material)
+            self._material.remove_if_unused()
 
         # Remove the prim
         super().remove()

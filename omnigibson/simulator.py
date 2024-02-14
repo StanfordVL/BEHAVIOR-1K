@@ -29,6 +29,7 @@ from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubsc
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
@@ -536,15 +537,6 @@ def launch_simulator(*args, **kwargs):
                     self._objects_to_initialize.pop(i)
                     break
             self._scene.remove_object(obj, has_registered=has_registered)
-
-        def remove_material(self, material):
-            """
-            Remove a material from the simulator.
-
-            Args:
-                material (MaterialPrim): a material to remove
-            """
-            self._scene.remove_material(material)
 
         def remove_prim(self, prim):
             """
@@ -1056,6 +1048,9 @@ def launch_simulator(*args, **kwargs):
             if self._camera_mover is not None:
                 self._camera_mover.clear()
                 self._camera_mover = None
+
+            # Clear all materials
+            MaterialPrim.clear()
 
             # Clear all transition rules if being used
             if gm.ENABLE_TRANSITION_RULES:

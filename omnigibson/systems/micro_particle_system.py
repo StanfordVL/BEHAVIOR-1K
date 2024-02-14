@@ -424,13 +424,11 @@ class MicroParticleSystem(BaseSystem):
             f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
 
         cls.system_prim = cls._create_particle_system()
-        # Get or create material
-        material = og.sim.scene.material_registry("prim_path", cls.mat_path)
-        if material is None:
-            material = cls._create_particle_material_template()
+        # Get material
+        material = cls._get_particle_material_template()
+        # Load the material if it's newly created and has never been loaded before
+        if not material.loaded:
             material.load()
-            material.initialize()
-            og.sim.scene.material_registry.add(material)
         material.add_user(cls)
         cls._material = material
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
@@ -445,8 +443,7 @@ class MicroParticleSystem(BaseSystem):
     @classmethod
     def _clear(cls):
         cls._material.remove_user(cls)
-        if not cls._material.has_any_users:
-            og.sim.remove_material(cls._material)
+        cls._material.remove_if_unused()
 
         super()._clear()
 
@@ -501,7 +498,7 @@ class MicroParticleSystem(BaseSystem):
         return dict()
 
     @classmethod
-    def _create_particle_material_template(cls):
+    def _get_particle_material_template(cls):
         """
         Creates the particle material template to be used for this particle system. Prim path does not matter,
         as it will be overridden internally such that it is a child prim of this particle system's prim.
@@ -513,7 +510,7 @@ class MicroParticleSystem(BaseSystem):
             MaterialPrim: The material to apply to all particles
         """
         # Default is PBR material
-        return MaterialPrim(
+        return MaterialPrim.get_material(
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
@@ -1325,9 +1322,9 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return [prototype]
 
     @classmethod
-    def _create_particle_material_template(cls):
+    def _get_particle_material_template(cls):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
-        return MaterialPrim(
+        return MaterialPrim.get_material(
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
