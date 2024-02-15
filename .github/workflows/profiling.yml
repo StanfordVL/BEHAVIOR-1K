@@ -2,7 +2,7 @@ name: Profiling
 
 on: 
   workflow_dispatch:
-  pull_request:
+  push:
     branches:
       - og-develop
 

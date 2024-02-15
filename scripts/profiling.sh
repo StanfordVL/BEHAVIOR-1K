@@ -1,5 +1,5 @@
 # warm up isaac sim
-python tests/benchmark/profiling.py -s Rs_int
+python tests/benchmark/profiling.py -s Rs_int -g
 rm output.json
 # 1st batch: baselines
 python tests/benchmark/profiling.py -g                      # baseline

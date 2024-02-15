@@ -14,7 +14,7 @@ const canvasDict = {
 	'scene_total_canvas': 			["FPS", 					["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 	'scene_loading_canvas': 		["Loading time", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 	'scene_omni_canvas': 			["Omni step time", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
-	'scene_og_canvas': 				["Non-omni step time", 		["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_non_omni_canvas': 		["Non-omni step time", 		["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 	'scene_mem_canvas': 			["Memory usage", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 	'scene_vram_canvas': 			["Vram usage", 				["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 }
