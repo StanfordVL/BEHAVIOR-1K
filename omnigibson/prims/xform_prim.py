@@ -166,22 +166,25 @@ class XFormPrim(BasePrim):
         mat.SetTranslation(lazy.pxr.Gf.Vec3d(*position))
 
         my_world_transform = np.transpose(mat.GetMatrix())
-        
-        # When flatcache is on and when physics is active, we need to use USDRt to get the parent's world transform
-        parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
-        parent_path = str(parent_prim.GetPath())
 
-        parent_pos, parent_ori = PoseAPI.get_world_pose(parent_path)
-        parent_pose = (parent_pos, parent_ori[[1, 2, 3, 0]])
+        if gm.ENABLE_FLATCACHE and og.sim is not None and og.sim.is_playing():
+            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
+            parent_path = str(parent_prim.GetPath())
 
-        # Get the parent scale transform
-        parent_scale = np.array(np.ones(3) if parent_prim.GetAttribute("xformOp:scale").Get() is None else parent_prim.GetAttribute("xformOp:scale").Get())
-        parent_scale_tf = np.eye(4)
-        parent_scale_tf[:3, :3] = np.diag(parent_scale)
+            parent_pos, parent_ori = PoseAPI.get_world_pose(parent_path)
+            parent_pose = (parent_pos, parent_ori[[1, 2, 3, 0]])
 
-        # Combine translation, rotation, and scale to get the parent world transform
-        # translation --> rotation --> scale, for each nested prim
-        parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
+            # Get the parent scale transform
+            parent_scale = np.array(np.ones(3) if parent_prim.GetAttribute("xformOp:scale").Get() is None else parent_prim.GetAttribute("xformOp:scale").Get())
+            parent_scale_tf = np.eye(4)
+            parent_scale_tf[:3, :3] = np.diag(parent_scale)
+
+            # Combine translation, rotation, and scale to get the parent world transform
+            # translation --> rotation --> scale, for each nested prim
+            parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
+        else:
+            parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+            parent_world_transform = np.transpose(parent_world_tf)
 
         # Calculate the local transform from parent to current prim
         # Inverse of parent world transform multiplied by the current world transform

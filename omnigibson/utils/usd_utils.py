@@ -657,8 +657,9 @@ class PoseAPI:
         if og.sim is not None and cls.DIRTY:
             if og.sim._physx_fabric_interface:
                 og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            else:
+                og.sim.psi.fetch_results()
             cls.mark_valid()
-            
         return lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
 
 
