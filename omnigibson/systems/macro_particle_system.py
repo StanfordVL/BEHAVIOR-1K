@@ -326,7 +326,7 @@ class MacroParticleSystem(BaseSystem):
         return np.array(cls._color)
 
 
-class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
+class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
     """
     Particle system class that procedurally generates individual particles that are not subject to physics
     """
@@ -864,8 +864,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         Synchronizes the particle groups based on desired identification numbers @group_idns
 
         Args:
-            group_objects (list of None or BaseObject): Desired unique group objects that should be active for
-            this particle system. Any objects that aren't found will be skipped over
+            group_objects (list of BaseObject): Desired unique group objects that should be active for
+            this particle system.
             particle_idns (list of list of int): Per-group unique id numbers for the particles assigned to that group.
                 List should be same length as @group_idns with sub-entries corresponding to the desired number of
                 particles assigned to that group
@@ -994,16 +994,19 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
-
+        particle_names = list(cls.particles.keys())
         # Add in per-group information
         groups_dict = dict()
+        name2idx = {name: idx for idx, name in enumerate(particle_names)}
         for group_name, group_particles in cls._group_particles.items():
             obj = cls._group_objects[group_name]
             is_cloth = cls._is_cloth_obj(obj=obj)
+
             groups_dict[group_name] = dict(
                 particle_attached_obj_uuid=obj.uuid,
                 n_particles=cls.num_group_particles(group=group_name),
                 particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
+                particle_indices=[name2idx[name] for name in group_particles.keys()],
                 # If the attached object is a cloth, store the face_id, otherwise, store the link name
                 particle_attached_references=[cls._particles_info[name]["face_id"] for name in group_particles.keys()]
                 if is_cloth else [cls._particles_info[name]["link"].prim_path.split("/")[-1] for name in group_particles.keys()],
@@ -1024,12 +1027,29 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             state (dict): Keyword-mapped states of this object to set
         """
         # Synchronize particle groups
+        group_objects = []
+        particle_idns = []
+        particle_attached_references = []
+
+        indices_to_remove = np.array([], dtype=int)
+        for info in state["groups"].values():
+            obj = og.sim.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
+            # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
+            if obj is not None:
+                group_objects.append(obj)
+                particle_idns.append(info["particle_idns"])
+                particle_attached_references.append(info["particle_attached_references"])
+            else:
+                indices_to_remove = np.append(indices_to_remove, np.array(info["particle_indices"], dtype=int))
         cls._sync_particle_groups(
-            group_objects=[og.sim.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
-                           for info in state["groups"].values()],
-            particle_idns=[info["particle_idns"] for info in state["groups"].values()],
-            particle_attached_references=[info["particle_attached_references"] for info in state["groups"].values()],
+            group_objects=group_objects,
+            particle_idns=particle_idns,
+            particle_attached_references=particle_attached_references,
         )
+        state["n_particles"] -= len(indices_to_remove)
+        state["positions"] = np.delete(state["positions"], indices_to_remove, axis=0)
+        state["orientations"] = np.delete(state["orientations"], indices_to_remove, axis=0)
+        state["scales"] = np.delete(state["scales"], indices_to_remove, axis=0)
 
         # Run super
         super()._load_state(state=state)
@@ -1049,6 +1069,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 [group_dict["particle_attached_obj_uuid"]],
                 [group_dict["n_particles"]],
                 group_dict["particle_idns"],
+                group_dict["particle_indices"],
                 (group_dict["particle_attached_references"] if is_cloth else
                  [group_obj_link2id[reference] for reference in group_dict["particle_attached_references"]]),
             ]
@@ -1066,6 +1087,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
             obj = og.sim.scene.object_registry("uuid", obj_uuid)
+            assert obj is not None, f"Object with UUID {obj_uuid} not found in the scene"
             is_cloth = cls._is_cloth_obj(obj=obj)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}
             group_objs.append(obj)
@@ -1073,10 +1095,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_attached_obj_uuid=obj_uuid,
                 n_particles=n_particles,
                 particle_idns=[int(idn) for idn in state[idx + 2 : idx + 2 + n_particles]], # Idx + 2 because the first two are obj_uuid and n_particles
-                particle_attached_references=[int(idn) for idn in state[idx + 2 + n_particles : idx + 2 + n_particles * 2]]
-                if is_cloth else [group_obj_id2link[int(idn)] for idn in state[idx + 2 + n_particles : idx + 2 + n_particles * 2]],
+                particle_indices=[int(idn) for idn in state[idx + 2 + n_particles: idx + 2 + n_particles * 2]],
+                particle_attached_references=[int(idn) for idn in state[idx + 2 + n_particles * 2: idx + 2 + n_particles * 3]]
+                if is_cloth else [group_obj_id2link[int(idn)] for idn in state[idx + 2 + n_particles * 2: idx + 2 + n_particles * 3]],
             )
-            idx += 2 + n_particles * 2
+            idx += 2 + n_particles * 3
+
         log.debug(f"Syncing {cls.name} particles with {n_groups} groups..")
         cls._sync_particle_groups(
             group_objects=group_objs,
@@ -1086,6 +1110,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Get super method
         state_dict, idx_super = super()._deserialize(state=state[idx:])
+        state_dict["n_groups"] = n_groups
         state_dict["groups"] = groups_dict
 
         return state_dict, idx + idx_super
@@ -1111,11 +1136,11 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         og.sim.stage.DefinePrim(f"{cls.prim_path}/particles", "Scope")
 
         # A new view needs to be created every time once sim is playing, so we add a callback now
-        og.sim.add_callback_on_play(name=f"{cls.name}_particles_view", callback=cls._refresh_particles_view)
+        og.sim.add_callback_on_play(name=f"{cls.name}_particles_view", callback=cls.refresh_particles_view)
 
         # If sim is already playing, refresh particles immediately
         if og.sim.is_playing():
-            cls._refresh_particles_view()
+            cls.refresh_particles_view()
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -1142,7 +1167,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
     @classmethod
-    def _refresh_particles_view(cls):
+    def refresh_particles_view(cls):
         """
         Internal helper method to refresh the particles' rigid body view to grab state
 
@@ -1166,7 +1191,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         super().remove_particle_by_name(name=name)
 
         # Refresh particles view
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
     @classmethod
     def add_particle(cls, prim_path, scale, idn=None):
@@ -1174,7 +1199,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         particle = super().add_particle(prim_path=prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
         return particle
 
@@ -1441,7 +1466,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         super()._load_state(state=state)
 
         # Make sure view is refreshed
-        cls._refresh_particles_view()
+        cls.refresh_particles_view()
 
         # Make sure we update all the velocities
         cls.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])

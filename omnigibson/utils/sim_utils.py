@@ -63,6 +63,8 @@ def check_deletable_prim(prim_path):
     Returns:
         bool: Whether the prim can be deleted or not
     """
+    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+        return False
     if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
         return False
     if lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
