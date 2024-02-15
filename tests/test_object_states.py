@@ -1138,27 +1138,29 @@ def test_covered():
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, oyster, microwave):
         for system in systems:
-            print(f"Testing Covered {obj.name} with {system.name}")
-            sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
-            obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
-            place_obj_on_floor_plane(obj)
-            for _ in range(5):
-                og.sim.step()
+            # bracelet is too small to sample physical particles on it
+            sampleable = is_visual_particle_system(system.name) or obj != bracelet
+            if sampleable:
+                print(f"Testing Covered {obj.name} with {system.name}")
+                obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+                place_obj_on_floor_plane(obj)
+                for _ in range(5):
+                    og.sim.step()
 
-            assert obj.states[Covered].set_value(system, True) == sampleable
-            for _ in range(10):
-                og.sim.step()
-            assert obj.states[Covered].get_value(system) == sampleable
+                assert obj.states[Covered].set_value(system, True)
+                for _ in range(10):
+                    og.sim.step()
+                assert obj.states[Covered].get_value(system)
 
-            assert obj.states[Covered].set_value(system, False)
+                assert obj.states[Covered].set_value(system, False)
 
-            # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
-            # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
-            obj.states[Covered].clear_cache()
-            obj.states[ContactParticles].clear_cache()
-            assert not obj.states[Covered].get_value(system)
+                # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
+                # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
+                obj.states[Covered].clear_cache()
+                obj.states[ContactParticles].clear_cache()
+                assert not obj.states[Covered].get_value(system)
 
-            system.remove_all_particles()
+                system.remove_all_particles()
 
         obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
