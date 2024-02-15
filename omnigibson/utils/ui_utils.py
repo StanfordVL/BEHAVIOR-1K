@@ -368,7 +368,7 @@ class CameraMover:
         Returns:
             np.array: (H, W, 3) sized RGB image array
         """
-        return self.cam.get_obs()["rgb"][:, :, :-1]
+        return self.cam.get_obs()[0]["rgb"][:, :, :-1]
 
     def record_image(self, fpath=None):
         """

@@ -218,7 +218,7 @@ class VisionSensor(BaseSensor):
         assert self.initialized, "Cannot grab vision observations without first initializing this VisionSensor!"
 
         # Run super first to grab any upstream obs
-        obs = super()._get_obs()
+        obs, info = super()._get_obs()
 
         for modality in self._modalities:
             raw_obs = self._annotators[modality].get_data()
@@ -227,10 +227,11 @@ class VisionSensor(BaseSensor):
             if modality == "seg_semantic":
                 id_to_labels = raw_obs['info']['idToLabels']
                 obs[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
+                # TODO: add to info
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
-                SemanticsAPI.register_instance_labels(id_to_labels)
-        return obs
+                info[modality] = id_to_labels
+        return obs, info
     
     def _remap_semantic_segmentation(self, img, id_to_labels):
         """

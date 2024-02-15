@@ -70,7 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(np.array([]))
 
     # Grab observations from viewer camera and write them to disk
-    obs = cam.get_obs()
+    obs = cam.get_obs()[0]
 
     for bbox_modality in bbox_modalities:
         # Print out each of the modalities
