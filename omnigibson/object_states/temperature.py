@@ -27,6 +27,20 @@ class Temperature(TensorizedValueState):
         self._set_value(m.DEFAULT_TEMPERATURE)
 
     @classmethod
+    def update_temperature_from_heatsource_or_sink(cls, objs, temperature, rate):
+        """
+        Updates @objs' internal temperatures based on @temperature and @rate
+
+        Args:
+            objs (Iterable of StatefulObject): Objects whose temperatures should be updated
+            temperature (float): Heat source / sink temperature
+            rate (float): Heating rate of the source / sink
+        """
+        # Get idxs for objs
+        idxs = [cls.OBJ_IDXS[obj.name] for obj in objs]
+        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_rendering_dt()
+
+    @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
         deps.add(AABB)
@@ -46,14 +60,3 @@ class Temperature(TensorizedValueState):
     @classproperty
     def value_name(cls):
         return "temperature"
-
-    def update_temperature_from_heatsource_or_sink(self, temperature, rate):
-        """
-        Updates this object's internal temperature based on @temperature and @rate
-
-        Args:
-            temperature (float): Heat source / sink temperature
-            rate (float): Heating rate of the source / sink
-        """
-        old_val = self._get_value()
-        self._set_value(old_val + (temperature - old_val) * rate * og.sim.get_rendering_dt())

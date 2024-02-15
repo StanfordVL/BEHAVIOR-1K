@@ -1,5 +1,6 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 import omnigibson as og
@@ -12,7 +13,7 @@ m = create_module_macros(module_path=__file__)
 m.REACTIVATION_DELAY = 0.5  # number of seconds to wait before reactivating the slicer
 
 
-class SlicerActive(TensorizedValueState):
+class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # int: Keep track of how many steps each object is waiting for
     STEPS_TO_WAIT = None
 

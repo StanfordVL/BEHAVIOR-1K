@@ -198,6 +198,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
     def _update(self):
         # Avoid circular imports
         from omnigibson.object_states.temperature import Temperature
+        from omnigibson.objects.stateful_object import StatefulObject
 
         # Update the internally tracked nearby objects to accelerate filtering for affects_obj
         affected_objects = set()
@@ -243,11 +244,14 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
         # Update the internal set of objects
-        self._affected_objects = affected_objects
+        self._affected_objects = {obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states}
 
-        # For each object, if they have temperature, propagate their temperature
-        for obj in self._affected_objects:
-            if Temperature in obj.states:
-                obj.states[Temperature].update_temperature_from_heatsource_or_sink(temperature=self.temperature, rate=self.heating_rate)
+        # Propagate the affected objects' temperatures
+        if len(self._affected_objects) > 0:
+            Temperature.update_temperature_from_heatsource_or_sink(
+                objs=self._affected_objects,
+                temperature=self.temperature,
+                rate=self.heating_rate,
+            )
 
     # Nothing needs to be done to save/load HeatSource

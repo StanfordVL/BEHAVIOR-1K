@@ -8,7 +8,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.usd_utils import create_primitive_mesh, RigidContactAPI
 
 
 # Create settings for this module
@@ -57,19 +57,17 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         if len(cls._robot_finger_paths) == 0:
             return
 
-        # Update all nearby objects
-        def global_overlap_callback(hit):
-            obj = og.sim.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
-            if obj is not None:
-                cls._finger_overlap_objs.add(obj)
-            # Always continue traversal
-            return True
-
-        for finger in robot_finger_links:
-            for col_geom in finger.collision_meshes.values():
-                overlap = og.sim.psqi.overlap_mesh if finger.prim.GetTypeName() == "Mesh" else og.sim.psqi.overlap_shape
-                mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(col_geom.prim_path)
-                overlap(*mesh_ids, reportFn=global_overlap_callback)
+        finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path) for prim_path in cls._robot_finger_paths]
+        finger_impulses = RigidContactAPI.get_all_impulses()[:, finger_idxs, :]
+        n_bodies = len(finger_impulses)
+        touching_bodies = np.any(finger_impulses.reshape(n_bodies, -1), axis=-1)
+        touching_bodies_idxs = np.where(touching_bodies)[0]
+        if len(touching_bodies_idxs) > 0:
+            for idx in touching_bodies_idxs:
+                body_prim_path = RigidContactAPI.get_row_idx_prim_path(idx=idx)
+                obj = og.sim.scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
+                if obj is not None:
+                    cls._finger_overlap_objs.add(obj)
 
     @classproperty
     def metalink_prefix(cls):
@@ -123,7 +121,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         def overlap_callback(hit):
             nonlocal valid_hit
-            valid_hit = hit.rigid_body in self._robot_link_paths
+            valid_hit = hit.rigid_body in self._robot_finger_paths
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
