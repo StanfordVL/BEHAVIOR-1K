@@ -659,10 +659,10 @@ class SemanticsAPI:
         cls._last_instance_mapping = instance_labels
 
     @classmethod
-    def get_instance_mapping(cls):
+    def get_current_instance_mapping(cls):
         """
         Returns:
-            dict: Mapping from object's prim path (str) to its instance label (str)
+            dict: Mapping from object's prim path (str) to its instance label (str) from the last observation
         """
         return cls._last_instance_mapping
 
