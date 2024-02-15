@@ -2,7 +2,7 @@ name: Profiling
 
 on: 
   workflow_dispatch:
-  push:
+  pull_request:
     branches:
       - og-develop
 
@@ -50,5 +50,5 @@ jobs:
           fail-on-alert: false
           alert-threshold: '200%'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
+          comment-on-alert: false
           auto-push: true

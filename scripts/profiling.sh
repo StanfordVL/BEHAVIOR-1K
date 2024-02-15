@@ -8,7 +8,7 @@ python tests/benchmark/profiling.py -g -s Rs_int -r 1       # for robotics resea
 python tests/benchmark/profiling.py -g -s Rs_int -r 3       # for multi-agent research
 
 # 2nd batch: compare different scenes
-python tests/benchmark/profiling.py -r 1 -s Rs_int
+python tests/benchmark/profiling.py -r 1 -s Ihlen_0_int
 python tests/benchmark/profiling.py -r 1 -s Pomaria_0_garden
 python tests/benchmark/profiling.py -r 1 -s house_single_floor
 python tests/benchmark/profiling.py -r 1 -s grocery_store_cafe
