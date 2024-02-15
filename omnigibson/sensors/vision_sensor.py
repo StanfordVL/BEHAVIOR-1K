@@ -9,7 +9,6 @@ from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
-from omnigibson.utils.usd_utils import SemanticsAPI
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
