@@ -226,8 +226,8 @@ class VisionSensor(BaseSensor):
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
             if modality == "seg_semantic":
                 id_to_labels = raw_obs['info']['idToLabels']
-                obs[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
-                # TODO: add to info
+                obs[modality], corrected_id_to_labels = self._remap_semantic_segmentation(obs[modality], id_to_labels)
+                info[modality] = corrected_id_to_labels
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
@@ -236,6 +236,7 @@ class VisionSensor(BaseSensor):
     def _remap_semantic_segmentation(self, img, id_to_labels):
         """
         Remap the semantic segmentation image to the class IDs defined in CLASS_NAME_TO_CLASS_ID.
+        Also, correct the id_to_labels input with the labels from CLASS_NAME_TO_CLASS_ID and return it.
         """
         # Convert string IDs to integers and find the max ID for array size
         max_id = max([int(id) for id in id_to_labels.keys()])
@@ -243,14 +244,22 @@ class VisionSensor(BaseSensor):
         # Initialize the key array with a default value for unmapped IDs
         key_array = np.full(max_id + 1, -1, dtype=np.int32)
         
+        # Initialize a new dictionary for the corrected id_to_labels
+        corrected_id_to_labels = {}
+        
         # Populate the key array with the new IDs based on class name mappings
         for str_id, info in id_to_labels.items():
             class_name = info['class'].lower()
             if class_name in CLASS_NAME_TO_CLASS_ID:
                 new_id = CLASS_NAME_TO_CLASS_ID[class_name]
                 key_array[int(str_id)] = new_id
+                # Update the corrected_id_to_labels with the new class ID
+                corrected_id_to_labels[new_id] = info['class']
         
-        return key_array[img]
+        # Remap the image
+        remapped_img = key_array[img]
+        
+        return remapped_img, corrected_id_to_labels
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
