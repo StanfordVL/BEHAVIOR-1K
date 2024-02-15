@@ -426,6 +426,11 @@ def launch_simulator(*args, **kwargs):
             # Clear the existing scene if any
             self.clear()
 
+            # Initialize all global updatable object states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
+
             self._scene = scene
             self._scene.load()
 
@@ -498,11 +503,6 @@ def launch_simulator(*args, **kwargs):
 
             # One timestep will elapse
             self.app.update()
-
-            # TODO: Make this cleaner!
-            # Remove object from temperature tracking
-            from omnigibson.object_states.temperature import Temperature
-            Temperature.remove_object(obj=obj)
 
             for ob in objs:
                 self._remove_object(ob)
@@ -1050,10 +1050,10 @@ def launch_simulator(*args, **kwargs):
                 self._camera_mover.clear()
                 self._camera_mover = None
 
-            # TODO: Make cleaner
-            from omnigibson.object_states.temperature import Temperature
-            Temperature.VALUES = np.array([])
-            Temperature.OBJ_IDXS = dict()
+            # Clear all global update states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_clear()
 
             # Clear all transition rules if being used
             if gm.ENABLE_TRANSITION_RULES:

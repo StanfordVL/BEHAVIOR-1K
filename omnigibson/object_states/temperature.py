@@ -1,11 +1,10 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 import omnigibson as og
-
+from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -18,13 +17,14 @@ m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
-class Temperature(AbsoluteObjectState, UpdateStateMixin):
+class Temperature(TensorizedValueState):
 
     def __init__(self, obj):
         # Run super first
         super(Temperature, self).__init__(obj)
 
-        self.value = m.DEFAULT_TEMPERATURE
+        # Set value to be default
+        self._set_value(m.DEFAULT_TEMPERATURE)
 
     @classmethod
     def get_dependencies(cls):
@@ -38,16 +38,14 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
         deps.add(HeatSourceOrSink)
         return deps
 
-    def _get_value(self):
-        return self.value
-
-    def _set_value(self, new_value):
-        self.value = new_value
-        return True
-
-    def _update(self):
+    @classmethod
+    def _update_values(cls, values):
         # Apply temperature decay
-        self.value += (m.DEFAULT_TEMPERATURE - self.value) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
+        return values + (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
+
+    @classproperty
+    def value_name(cls):
+        return "temperature"
 
     def update_temperature_from_heatsource_or_sink(self, temperature, rate):
         """
@@ -57,21 +55,5 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
             temperature (float): Heat source / sink temperature
             rate (float): Heating rate of the source / sink
         """
-        self.value += (temperature - self.value) * rate * og.sim.get_rendering_dt()
-
-    @property
-    def state_size(self):
-        return 1
-
-    # For this state, we simply store its value.
-    def _dump_state(self):
-        return dict(temperature=self.value)
-
-    def _load_state(self, state):
-        self.value = state["temperature"]
-
-    def _serialize(self, state):
-        return np.array([state["temperature"]], dtype=float)
-
-    def _deserialize(self, state):
-        return dict(temperature=state[0]), 1
+        old_val = self._get_value()
+        self._set_value(old_val + (temperature - old_val) * rate * og.sim.get_rendering_dt())
