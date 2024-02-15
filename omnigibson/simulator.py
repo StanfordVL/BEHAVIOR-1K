@@ -540,8 +540,11 @@ def launch_simulator(*args, **kwargs):
             Args:
                 prim (BasePrim): a prim to remove
             """
-            # Remove prim
-            prim.remove()
+            # [omni.physx.tensors.plugin] prim '[prim_path]' was deleted while being used by a shape in a tensor view
+            # class. The physics.tensors simulationView was invalidated.
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                # Remove prim
+                prim.remove()
 
             # Update all handles that are now broken because prims have changed
             self.update_handles()
