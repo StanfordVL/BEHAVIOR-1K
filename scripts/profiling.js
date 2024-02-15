@@ -118,7 +118,7 @@ function renderGraph(canvasName, fieldName, runNames) {
 				},
 				afterLabel: item => {
 					const { extra } = filteredData.values().next().value[item.index].bench;
-					return extra ? '\n' + extra : '';
+					return extra ? '\n' + extra[0] : '';
 				}
 			}
 		},
@@ -127,7 +127,7 @@ function renderGraph(canvasName, fieldName, runNames) {
 				return;
 			}
 			// XXX: Undocumented. How can we know the index?
-			const index = activeElems[0].index;
+			const index = activeElems[0]._index;
 			const url = filteredData.values().next().value[index].commit.url;
 			window.open(url, '_blank');
 		},
