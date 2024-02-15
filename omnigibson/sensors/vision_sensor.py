@@ -467,7 +467,7 @@ class VisionSensor(BaseSensor):
         # Generate the complex space types for special modalities:
         # {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d"}
         bbox_3d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
-            gym.spaces.Box(low=0, high=np.iinfo(np.uint32).max, shape=(), dtype=np.uint32),  # semanticId
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # x_min
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # y_min
             gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32), # z_min

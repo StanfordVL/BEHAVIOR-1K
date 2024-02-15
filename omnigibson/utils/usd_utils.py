@@ -305,35 +305,66 @@ class CollisionAPI:
     """
     Class containing class methods to facilitate collision handling, e.g. collision groups
     """
-    ACTIVE_COLLISION_GROUPS = {}
+    ACTIVE_COLLISION_GROUPS = dict()
 
     @classmethod
-    def add_to_collision_group(cls, col_group, prim_path, create_if_not_exist=False):
+    def create_collision_group(cls, col_group, filter_self_collisions=False):
+        """
+        Creates a new collision group with name @col_group
+
+        Args:
+            col_group (str): Name of the collision group to create
+            filter_self_collisions (bool): Whether to ignore self-collisions within the group. Default is False
+        """
+        # Can only be done when sim is stopped
+        assert og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
+
+        # Make sure the group doesn't already exist
+        assert col_group not in cls.ACTIVE_COLLISION_GROUPS, \
+            f"Cannot create collision group {col_group} because it already exists!"
+
+        # Create the group
+        col_group_prim_path = f"/World/collision_groups/{col_group}"
+        group = lazy.pxr.UsdPhysics.CollisionGroup.Define(og.sim.stage, col_group_prim_path)
+        if filter_self_collisions:
+            # Do not collide with self
+            group.GetFilteredGroupsRel().AddTarget(col_group_prim_path)
+        cls.ACTIVE_COLLISION_GROUPS[col_group] = group
+
+    @classmethod
+    def add_to_collision_group(cls, col_group, prim_path):
         """
         Adds the prim and all nested prims specified by @prim_path to the global collision group @col_group. If @col_group
         does not exist, then it will either be created if @create_if_not_exist is True, otherwise will raise an Error.
         Args:
             col_group (str): Name of the collision group to assign the prim at @prim_path to
             prim_path (str): Prim (and all nested prims) to assign to this @col_group
-            create_if_not_exist (bool): True if @col_group should be created if it does not already exist, otherwise an
-                error will be raised
         """
-        # TODO: This slows things down and / or crashes the sim with large number of objects. Skipping this for now, look into this later
-        pass
-        # # Check if collision group exists or not
-        # if col_group not in cls.ACTIVE_COLLISION_GROUPS:
-        #     # Raise error if we don't explicitly want to create a new group
-        #     if not create_if_not_exist:
-        #         raise ValueError(f"Collision group {col_group} not found in current registry, and create_if_not_exist"
-        #                          f"was set to False!")
-        #     # Otherwise, create the new group
-        #     col_group_name = f"/World/collisionGroup_{col_group}"
-        #     group = UsdPhysics.CollisionGroup.Define(get_current_stage(), col_group_name)
-        #     group.GetFilteredGroupsRel().AddTarget(col_group_name)  # Make sure that we can collide within our own group
-        #     cls.ACTIVE_COLLISION_GROUPS[col_group] = group
-        #
-        # # Add this prim to the collision group
-        # cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
+        # Make sure collision group exists
+        assert col_group in cls.ACTIVE_COLLISION_GROUPS, \
+            f"Cannot add to collision group {col_group} because it does not exist!"
+
+        # Add this prim to the collision group
+        cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
+
+    @classmethod
+    def add_group_filter(cls, col_group, filter_group):
+        """
+        Adds a new group filter for group @col_group, filtering all collision with group @filter_group
+        Args:
+            col_group (str): Name of the collision group which will have a new filter group added
+            filter_group (str): Name of the group that should be filtered
+        """
+        # Make sure the group doesn't already exist
+        for group_name in (col_group, filter_group):
+            assert group_name in cls.ACTIVE_COLLISION_GROUPS, \
+                (f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
+                 f"does not exist!")
+
+        # Grab the group, and add the filter
+        filter_group_prim_path = f"/World/collision_groups/{filter_group}"
+        group = cls.ACTIVE_COLLISION_GROUPS[col_group]
+        group.GetFilteredGroupsRel().AddTarget(filter_group_prim_path)
 
     @classmethod
     def clear(cls):
