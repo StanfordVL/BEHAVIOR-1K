@@ -25,11 +25,9 @@ class MacroParticleSystem(BaseSystem):
     """
     Global system for modeling "macro" level particles, e.g.: dirt, dust, etc.
     """
-    # Template object to use -- this should be some instance of BasePrim. This will be the
-    # object that symbolizes a single particle, and will be duplicated to generate the particle system.
-    # Note that this object is NOT part of the actual particle system itself!
-    _particle_object = None
-
+    # Template object to use -- class particle objet is assumed to be the first and only visual mesh belonging to the
+    # root link of this template object, which symbolizes a single particle, and will be duplicated to generate the
+    # particle system. Note that this object is NOT part of the actual particle system itself!
     _particle_template = None
 
     # dict, array of particle objects, mapped by their prim names
@@ -56,7 +54,6 @@ class MacroParticleSystem(BaseSystem):
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
         og.sim.import_object(obj=particle_template, register=False)
-        cls._particle_template = particle_template
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -65,10 +62,15 @@ class MacroParticleSystem(BaseSystem):
         assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"
         assert len(particle_template.root_link.visual_meshes) == 1, "MacroParticleSystem particle template has more than one visual mesh"
 
+        cls._particle_template = particle_template
+
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
-        template = list(particle_template.root_link.visual_meshes.values())[0]
-        template.material.shader_force_populate(render=True)
-        cls.set_particle_template_object(obj=template)
+        cls.particle_object.material.shader_force_populate(render=True)
+        cls.process_particle_object()
+
+    @classproperty
+    def particle_object(cls):
+        return list(cls._particle_template.root_link.visual_meshes.values())[0]
 
     @classproperty
     def particle_idns(cls):
@@ -116,12 +118,10 @@ class MacroParticleSystem(BaseSystem):
     @classmethod
     def _clear(cls):
         # Clear all internal state
-        og.sim.remove_object(cls._particle_template, has_registered=False)
-        # No need to call og.sim.remove_prim(cls._particle_object) because cls._particle_object is a visual mesh of
-        # cls._particle_template, and removing cls._particle_template will remove cls._particle_object as well.
+        og.sim.remove_object(cls._particle_template, is_registered=False)
+
         super()._clear()
 
-        cls._particle_object = None
         cls._particle_template = None
         cls.particles = None
         cls._color = None
@@ -132,7 +132,7 @@ class MacroParticleSystem(BaseSystem):
 
     @classproperty
     def material(cls):
-        return cls._particle_object.material
+        return cls.particle_object.material
 
     @classproperty
     def particle_name_prefix(cls):
@@ -196,21 +196,16 @@ class MacroParticleSystem(BaseSystem):
         return state_dict, idx + len_scales + 1
 
     @classmethod
-    def set_particle_template_object(cls, obj):
+    def process_particle_object(cls):
         """
-        Sets the template particle object that will be used for duplication purposes. Note that this automatically
-        adds @obj itself to the ongoing array of particles!
-
-        Args:
-            obj (BasePrim): Object to serve as template
+        Perform any necessary processing on the particle object to extract further information.
         """
-        # Update color if it exists and store particle object
+        # Update color if the particle object has any material
         color = np.ones(3)
-        if obj.has_material():
-            diffuse_texture = obj.material.diffuse_texture
-            color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else obj.material.diffuse_color_constant
+        if cls.particle_object.has_material():
+            diffuse_texture = cls.particle_object.material.diffuse_texture
+            color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else cls.particle_object.material.diffuse_color_constant
         cls._color = color
-        cls._particle_object = obj
 
     @classmethod
     def add_particle(cls, prim_path, scale, idn=None):
@@ -289,7 +284,7 @@ class MacroParticleSystem(BaseSystem):
     @classmethod
     def _load_new_particle(cls, prim_path, name):
         """
-        Loads a new particle into the current stage, leveraging @cls._particle_object as a template for the new particle
+        Loads a new particle into the current stage, leveraging @cls.particle_object as a template for the new particle
         to load. This function should be implemented by any subclasses.
 
         Args:
@@ -332,7 +327,7 @@ class MacroParticleSystem(BaseSystem):
         return np.array(cls._color)
 
 
-class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
+class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     """
     Particle system class that procedurally generates individual particles that are not subject to physics
     """
@@ -376,6 +371,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         # Run super first
         super().update()
 
+        z_extent = cls.particle_object.aabb_extent[2]
         # Iterate over all objects, and update all particles belonging to any cloth objects
         for name, obj in cls._group_objects.items():
             group = cls.get_group_name(obj=obj)
@@ -393,7 +389,6 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
-                z_extent = cls._particle_object.aabb_extent[2]
                 if not cls._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = np.array([z_extent * particle.scale[2] for particle in cls._group_particles[group].values()]) / 2.0
                     # Shift the particles halfway up
@@ -402,10 +397,6 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
                 # Set the group particle poses
                 cls.set_group_particles_position_orientation(group=group, positions=positions, orientations=orientations)
 
-    @classproperty
-    def particle_object(cls):
-        return cls._particle_object
-
     @classmethod
     def _load_new_particle(cls, prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
@@ -413,19 +404,10 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
-                path_from=cls._particle_object.prim_path,
+                path_from=cls.particle_object.prim_path,
                 path_to=prim_path,
             )
         return VisualGeomPrim(prim_path=prim_path, name=name)
-
-    @classmethod
-    def set_particle_template_object(cls, obj):
-        # Sanity check to make sure the added object is an instance of VisualGeomPrim
-        assert isinstance(obj, VisualGeomPrim), \
-            f"Particle template object for {cls.name} must be a VisualGeomPrim instance!"
-
-        # Run super method
-        super().set_particle_template_object(obj=obj)
 
     @classmethod
     def _clear(cls):
@@ -496,7 +478,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
-        bbox_extents_local = [(cls._particle_object.aabb_extent * scale).tolist() for scale in scales]
+        bbox_extents_local = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # If we're using flatcache, we need to update the object's pose on the USD manually
         if gm.ENABLE_FLATCACHE:
@@ -551,7 +533,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
         avg_scale = np.cbrt(np.product(obj.scale))
-        bbox_extents_global = scales * cls._particle_object.aabb_extent.reshape(1, 3) * avg_scale
+        bbox_extents_global = scales * cls.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
         if obj.prim_type == PrimType.CLOTH:
             # Sample locations based on randomly sampled keyfaces
@@ -1122,7 +1104,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         return state_dict, idx + idx_super
 
 
-class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
+class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
     """
     Particle system class that procedurally generates individual particles that are subject to physics
     """
@@ -1155,7 +1137,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
-                path_from=cls._particle_object.prim_path,
+                path_from=cls.particle_object.prim_path,
                 path_to=prim_path,
             )
             # Apply RigidBodyAPI to it so it is subject to physics
@@ -1164,12 +1146,12 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
-    def set_particle_template_object(cls, obj):
+    def process_particle_object(cls):
         # Run super method
-        super().set_particle_template_object(obj=obj)
+        super().process_particle_object()
 
         # Compute particle radius
-        vertices = np.array(cls._particle_object.get_attribute("points")) * cls.max_scale.reshape(1, 3)
+        vertices = np.array(cls.particle_object.get_attribute("points")) * cls.max_scale.reshape(1, 3)
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
     @classmethod

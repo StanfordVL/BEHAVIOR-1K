@@ -113,16 +113,12 @@ class MaterialPrim(BasePrim):
     def remove_user(self, user):
         """
         Removes a user from the material. This can be a BaseObject or BaseSystem.
+        If there are no users left, the material will be removed.
 
         Args:
             user (BaseObject or BaseSystem): User to remove from the material
         """
         self._users.remove(user)
-
-    def remove_if_unused(self):
-        """
-        Removes the material if there are no users
-        """
         if len(self._users) == 0:
             self.remove()
 

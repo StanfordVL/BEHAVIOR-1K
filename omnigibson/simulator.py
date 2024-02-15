@@ -478,13 +478,13 @@ def launch_simulator(*args, **kwargs):
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self.initialize_object_on_next_sim_step(obj=obj)
 
-        def remove_object(self, obj, has_registered=True):
+        def remove_object(self, obj, is_registered=True):
             """
             Remove one or a list of non-robot object from the simulator.
 
             Args:
                 obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
-                has_registered (bool): whether the object has been registered in the scene registry
+                is_registered (bool): whether the object has been registered in the scene registry
             """
             objs = [obj] if isinstance(obj, BaseObject) else obj
 
@@ -499,11 +499,11 @@ def launch_simulator(*args, **kwargs):
                     ob.set_position_orientation(pos, [0, 0, 0, 1])
                     pos[0] += max(ob.aabb_extent)
 
-                # One timestep will elapse
-                self.app.update()
+                # One physics timestep will elapse
+                self.step_physics()
 
             for ob in objs:
-                self._remove_object(ob, has_registered=has_registered)
+                self._remove_object(ob, is_registered=is_registered)
 
             if self.is_playing():
                 # Update all handles that are now broken because objects have changed
@@ -515,13 +515,13 @@ def launch_simulator(*args, **kwargs):
             # Refresh all current rules
             TransitionRuleAPI.prune_active_rules()
 
-        def _remove_object(self, obj, has_registered=True):
+        def _remove_object(self, obj, is_registered=True):
             """
             Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
                 obj (BaseObject): a non-robot object to remove
-                has_registered (bool): whether the object has been registered in the scene registry
+                is_registered (bool): whether the object has been registered in the scene registry
             """
             # Run any callbacks
             for callback in self._callbacks_on_remove_obj.values():
@@ -536,7 +536,7 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-            self._scene.remove_object(obj, has_registered=has_registered)
+            self._scene.remove_object(obj, is_registered=is_registered)
 
         def remove_prim(self, prim):
             """

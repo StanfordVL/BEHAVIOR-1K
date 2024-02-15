@@ -81,7 +81,6 @@ class XFormPrim(BasePrim):
         # Remove the material prim if one exists
         if self._material is not None:
             self._material.remove_user(self)
-            self._material.remove_if_unused()
 
         # Remove the prim
         super().remove()

@@ -443,7 +443,6 @@ class MicroParticleSystem(BaseSystem):
     @classmethod
     def _clear(cls):
         cls._material.remove_user(cls)
-        cls._material.remove_if_unused()
 
         super()._clear()
 
@@ -1294,7 +1293,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         Returns:
             bool: True if this material is viscous or not. Default is False
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @classproperty
     def particle_radius(cls):
@@ -1417,7 +1416,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
     @classmethod
     def _clear(cls):
-        og.sim.remove_object(cls._particle_template, has_registered=False)
+        og.sim.remove_object(cls._particle_template, is_registered=False)
 
         super()._clear()
 
