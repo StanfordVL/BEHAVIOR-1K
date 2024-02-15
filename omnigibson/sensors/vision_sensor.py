@@ -208,9 +208,6 @@ class VisionSensor(BaseSensor):
         names = {names} if isinstance(names, str) else set(names)
         for name in names:
             self._add_modality_to_backend(modality=name)
-        render()
-        time.sleep(0.05)
-        render()
 
     def _get_obs(self):
         # Make sure we're initialized
