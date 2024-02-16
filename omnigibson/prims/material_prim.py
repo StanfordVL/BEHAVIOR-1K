@@ -63,8 +63,8 @@ class MaterialPrim(BasePrim):
         # Other values that will be filled in at runtime
         self._shader = None
 
-        # Users of this material: should be a list of BaseObject and BaseSystem
-        self._users = []
+        # Users of this material: should be a set of BaseObject and BaseSystem
+        self._users = set()
 
         # Run super init
         super().__init__(
@@ -108,7 +108,7 @@ class MaterialPrim(BasePrim):
         Args:
             user (BaseObject or BaseSystem): User to add to the material
         """
-        self._users.append(user)
+        self._users.add(user)
 
     def remove_user(self, user):
         """

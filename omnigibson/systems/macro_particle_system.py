@@ -118,7 +118,7 @@ class MacroParticleSystem(BaseSystem):
     @classmethod
     def _clear(cls):
         # Clear all internal state
-        og.sim.remove_object(cls._particle_template, is_registered=False)
+        og.sim.remove_object(cls._particle_template)
 
         super()._clear()
 

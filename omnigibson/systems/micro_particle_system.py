@@ -1416,7 +1416,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
     @classmethod
     def _clear(cls):
-        og.sim.remove_object(cls._particle_template, is_registered=False)
+        og.sim.remove_object(cls._particle_template)
 
         super()._clear()
 
