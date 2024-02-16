@@ -629,9 +629,10 @@ def launch_simulator(*args, **kwargs):
                             state_type.global_update()
                         if issubclass(state_type, UpdateStateMixin):
                             for obj in self.scene.get_objects_with_state(state_type):
-                                # Only update objects that have been initialized so far
-                                if obj.initialized:
-                                    obj.states[state_type].update()
+                                # Update the state (object should already be initialized since
+                                # this step will only occur after objects are initialized and sim
+                                # is playing
+                                obj.states[state_type].update()
 
                     for obj in self.scene.objects:
                         # Only update visuals for objects that have been initialized so far

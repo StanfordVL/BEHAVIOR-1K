@@ -9,6 +9,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState, Bool
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import create_primitive_mesh, RigidContactAPI
+from omnigibson.utils.constants import PrimType
 
 
 # Create settings for this module
@@ -24,8 +25,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     # Set of prim paths defining robot finger links belonging to any manipulation robots
     _robot_finger_paths = None
 
-    # Set of objects that are overlapping any manipulation robots
-    _finger_overlap_objs = None
+    # Set of objects that are contacting any manipulation robots
+    _finger_contact_objs = None
 
     def __init__(self, obj, scale=None):
         self.scale = scale
@@ -43,8 +44,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # Avoid circular imports
         from omnigibson.robots.manipulation_robot import ManipulationRobot
 
-        # Clear finger overlap objects since it will be refreshed now
-        cls._finger_overlap_objs = set()
+        # Clear finger contact objects since it will be refreshed now
+        cls._finger_contact_objs = set()
 
         # detect marker and hand interaction
         robot_finger_links = set(link
@@ -67,7 +68,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                 body_prim_path = RigidContactAPI.get_row_idx_prim_path(idx=idx)
                 obj = og.sim.scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
                 if obj is not None:
-                    cls._finger_overlap_objs.add(obj)
+                    cls._finger_contact_objs.add(obj)
 
     @classproperty
     def metalink_prefix(cls):
@@ -87,6 +88,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
+
+        # Make sure this object is not cloth
+        assert self.obj.prim_type != PrimType.CLOTH, f"Cannot create ToggledOn state for cloth object {self.obj.name}!"
+
         mesh_prim_path = f"{self.link.prim_path}/mesh_0"
         pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
@@ -141,7 +146,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     def _update(self):
         # If we're not nearby any fingers, we automatically can't toggle
-        if self.obj not in self._finger_overlap_objs:
+        if self.obj not in self._finger_contact_objs:
             robot_can_toggle = False
         else:
             # Check to make sure fingers are actually overlapping the toggle button mesh

@@ -39,7 +39,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
         # Initialize other global variables
         cls.STEPS_TO_WAIT = max(1, int(np.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
-        cls.DELAY_COUNTER = np.array([], dtype=np.uint)
+        cls.DELAY_COUNTER = np.array([], dtype=int)
         cls.PREVIOUSLY_TOUCHING = np.array([], dtype=bool)
         cls.SLICER_LINK_PATHS = []
 
@@ -60,8 +60,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super()._add_obj(obj=obj)
 
         # Add to previously touching and delay counter
-        cls.DELAY_COUNTER = np.concatenate([cls.DELAY_COUNTER, [0]], axis=0)
-        cls.PREVIOUSLY_TOUCHING = np.concatenate([cls.PREVIOUSLY_TOUCHING, [False]], axis=0)
+        cls.DELAY_COUNTER = np.concatenate([cls.DELAY_COUNTER, [0]])
+        cls.PREVIOUSLY_TOUCHING = np.concatenate([cls.PREVIOUSLY_TOUCHING, [False]])
 
         # Add this object's prim paths to slicer paths
         cls.SLICER_LINK_PATHS.append([link.prim_path for link in obj.links.values()])
@@ -91,22 +91,21 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
         # If any of our values are False, we need to consider reverting back.
         if not np.all(values):
-            not_active_idxs = np.where(values == False)[0]
-            not_touching_idxs = np.where(currently_touching_sliceables == 0)[0]
+            not_active_not_touching = ~values & ~currently_touching_sliceables
+            not_active_is_touching = ~values & currently_touching_sliceables
 
-            not_active_not_touching_filter = np.in1d(not_active_idxs, not_touching_idxs)
+            not_active_not_touching_idxs = np.where(not_active_not_touching)[0]
+            not_active_is_touching_idxs = np.where(not_active_is_touching)[0]
 
-            not_active_not_touching_idxs = not_active_idxs[np.where(not_active_not_touching_filter == True)[0]]
-            not_active_is_touching_idxs = not_active_idxs[np.where(not_active_not_touching_filter == False)[0]]
-
-            # If we are not touching any sliceable objects, we can revert to True
+            # If we are not touching any sliceable objects, we increment the delay "cooldown" counter that will
+            # eventually re-activate the slicer
             cls.DELAY_COUNTER[not_active_not_touching_idxs] += 1
 
             # If we are touching a sliceable object, reset the counter
             cls.DELAY_COUNTER[not_active_is_touching_idxs] = 0
 
             # If the delay counter is greater than steps to wait, set to True
-            values = np.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, False)
+            values = np.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
 
         # Record if we were touching anything previously
         cls.PREVIOUSLY_TOUCHING = currently_touching_sliceables
@@ -141,6 +140,10 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classproperty
     def value_name(cls):
         return "value"
+
+    @classproperty
+    def value_type(cls):
+        return bool
 
     def __init__(self, obj):
         # Run super first

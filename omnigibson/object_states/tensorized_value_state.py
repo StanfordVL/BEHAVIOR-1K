@@ -10,12 +10,15 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     of this type, i.e.: all values across all object state instances are updated at once, rather than per
     individual instance update() call.
     """
-    # Numpy array of raw temperature values
+    # Numpy array of raw internally tracked values
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
 
     # Dictionary mapping object name to index in VALUES
     OBJ_IDXS = None
+
+    # Dict of callbacks that can be added to when an object is removed
+    CALLBACKS_ON_REMOVE = None
 
     @classmethod
     def global_initialize(cls):
@@ -25,6 +28,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # Initialize the global variables
         cls.VALUES = np.array([], dtype=cls.value_type).reshape(0, *cls.value_shape)
         cls.OBJ_IDXS = dict()
+        cls.CALLBACKS_ON_REMOVE = dict()
 
     @classmethod
     def global_update(cls):
@@ -46,6 +50,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # Clear internal state
         cls.VALUES = None
         cls.OBJ_IDXS = None
+        cls.CALLBACKS_ON_REMOVE = None
 
     @classmethod
     def _update_values(cls, values):
@@ -88,9 +93,32 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         assert obj.name in cls.OBJ_IDXS, \
             f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
         deleted_idx = cls.OBJ_IDXS.pop(obj.name)
-        for name, old_idx in cls.OBJ_IDXS.items():
-            cls.OBJ_IDXS[name] = old_idx - (0 if old_idx < deleted_idx else 1)
+
+        # Re-standardize the indices
+        for i, name in enumerate(cls.OBJ_IDXS.keys()):
+            cls.OBJ_IDXS[name] = i
         cls.VALUES = np.delete(cls.VALUES, [deleted_idx])
+
+    @classmethod
+    def add_callback_on_remove(cls, name, callback):
+        """
+        Adds a callback that will be triggered when @self.remove is called
+
+        Args:
+            name (str): Name of the callback to trigger
+            callback (function): Function to execute. Should have signature callback(obj: BaseObject) --> None
+        """
+        cls.CALLBACKS_ON_REMOVE[name] = callback
+
+    @classmethod
+    def remove_callback_on_remove(cls, name):
+        """
+        Removes callback with name @name from the internal set of callbacks
+
+        Args:
+            name (str): Name of the callback to remove
+        """
+        cls.CALLBACKS_ON_REMOVE.pop(name)
 
     @classproperty
     def value_shape(cls):
@@ -124,12 +152,16 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         self._add_obj(obj=self.obj)
 
     def remove(self):
+        # Execute all callbacks
+        for callback in self.CALLBACKS_ON_REMOVE.values():
+            callback(self.obj)
+
         # Removes this tracked object from the global value array
         self._remove_obj(obj=self.obj)
 
     def _get_value(self):
         # Directly access value from global register
-        return self.VALUES[self.OBJ_IDXS[self.obj.name]]
+        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj.name]])
 
     def _set_value(self, new_value):
         # Directly set value in global register
