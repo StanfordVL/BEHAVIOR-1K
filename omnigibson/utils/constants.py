@@ -8,7 +8,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
 
-MAX_INSTANCE_COUNT = 1024
+MAX_INSTANCE_COUNT = 16384
 MAX_CLASS_COUNT = 4096
 MAX_VIEWER_SIZE = 2048
 
