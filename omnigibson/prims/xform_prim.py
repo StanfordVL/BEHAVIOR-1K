@@ -66,10 +66,12 @@ class XFormPrim(BasePrim):
 
         # Grab the attached material if it exists
         if self.has_material():
-            self._material = MaterialPrim(
-                prim_path=self._binding_api.GetDirectBinding().GetMaterialPath().pathString,
-                name=f"{self.name}:material",
-            )
+            material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
+            material_name = f"{self.name}:material"
+            material = MaterialPrim.get_material(prim_path=material_prim_path, name=material_name)
+            assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
+            material.add_user(self)
+            self._material = material
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
@@ -78,7 +80,7 @@ class XFormPrim(BasePrim):
     def remove(self):
         # Remove the material prim if one exists
         if self._material is not None:
-            self._material.remove()
+            self._material.remove_user(self)
 
         # Remove the prim
         super().remove()
