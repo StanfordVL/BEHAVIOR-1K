@@ -3,11 +3,19 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.object_states import *
 from omnigibson.utils.constants import PrimType, ParticleModifyCondition, ParticleModifyMethod
+from omnigibson.systems import *
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
+
+SYSTEM_EXAMPLES = {
+    "water": FluidSystem,
+    "white_rice": GranularSystem,
+    "diced__apple": MacroPhysicalParticleSystem,
+    "stain": MacroVisualParticleSystem,
+}
 
 def og_test(func):
     def wrapper():

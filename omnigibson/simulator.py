@@ -28,7 +28,8 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
@@ -225,7 +226,7 @@ def launch_simulator(*args, **kwargs):
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = \
-                [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
+                [state for state in self.object_state_types if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))]
             self.object_state_types_on_contact = \
                 {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
             self.object_state_types_on_joint_break = \
@@ -426,6 +427,11 @@ def launch_simulator(*args, **kwargs):
             # Clear the existing scene if any
             self.clear()
 
+            # Initialize all global updatable object states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
+
             self._scene = scene
             self._scene.load()
 
@@ -484,29 +490,31 @@ def launch_simulator(*args, **kwargs):
             Args:
                 obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
             """
-            state = self.dump_state()
-
             objs = [obj] if isinstance(obj, BaseObject) else obj
 
-            # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
-            # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
-            # we first move the object to a safe location, then remove it.
-            pos = list(m.OBJECT_GRAVEYARD_POS)
-            for ob in objs:
-                ob.set_position_orientation(pos, [0, 0, 0, 1])
-                pos[0] += max(ob.aabb_extent)
+            if self.is_playing():
+                state = self.dump_state()
 
-            # One timestep will elapse
-            self.app.update()
+                # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+                # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+                # we first move the object to a safe location, then remove it.
+                pos = list(m.OBJECT_GRAVEYARD_POS)
+                for ob in objs:
+                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    pos[0] += max(ob.aabb_extent)
+
+                # One physics timestep will elapse
+                self.step_physics()
 
             for ob in objs:
                 self._remove_object(ob)
 
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
+            if self.is_playing():
+                # Update all handles that are now broken because objects have changed
+                self.update_handles()
 
-            # Load the state back
-            self.load_state(state)
+                # Load the state back
+                self.load_state(state)
 
             # Refresh all current rules
             TransitionRuleAPI.prune_active_rules()
@@ -532,7 +540,6 @@ def launch_simulator(*args, **kwargs):
                     self._objects_to_initialize.pop(i)
                     break
             self._scene.remove_object(obj)
-
 
         def remove_prim(self, prim):
             """
@@ -623,9 +630,13 @@ def launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        for obj in self.scene.get_objects_with_state(state_type):
-                            # Only update objects that have been initialized so far
-                            if obj.initialized:
+                        if issubclass(state_type, GlobalUpdateStateMixin):
+                            state_type.global_update()
+                        if issubclass(state_type, UpdateStateMixin):
+                            for obj in self.scene.get_objects_with_state(state_type):
+                                # Update the state (object should already be initialized since
+                                # this step will only occur after objects are initialized and sim
+                                # is playing
                                 obj.states[state_type].update()
 
                     for obj in self.scene.objects:
@@ -1044,6 +1055,14 @@ def launch_simulator(*args, **kwargs):
             if self._camera_mover is not None:
                 self._camera_mover.clear()
                 self._camera_mover = None
+
+            # Clear all global update states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_clear()
+
+            # Clear all materials
+            MaterialPrim.clear()
 
             # Clear all transition rules if being used
             if gm.ENABLE_TRANSITION_RULES:

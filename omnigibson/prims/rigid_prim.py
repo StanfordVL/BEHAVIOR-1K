@@ -555,6 +555,16 @@ class RigidPrim(XFormPrim):
         self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
 
     @property
+    def is_asleep(self):
+        """
+        Returns:
+            bool: whether this rigid prim is asleep or not
+        """
+        # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
+        return False if self.kinematic_only \
+            else og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path))
+
+    @property
     def sleep_threshold(self):
         """
         Returns:

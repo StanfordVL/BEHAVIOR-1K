@@ -7,6 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
@@ -467,8 +468,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Args:
             obj (BaseObject): Object to remove
         """
-        # Remove from the appropriate registry
-        self.object_registry.remove(obj)
+        # Remove from the appropriate registry if registered.
+        # Sometimes we don't register objects to the object registry during import_object (e.g. particle templates)
+        if self.object_registry.object_is_registered(obj):
+            self.object_registry.remove(obj)
 
         # Remove from omni stage
         obj.remove()

@@ -823,7 +823,7 @@ class WasherRule(WasherDryerRule):
         for washer in object_candidates["washer"]:
             # Remove the systems if the conditions are met
             systems_to_remove = []
-            for system in ParticleRemover.supported_active_systems:
+            for system in ParticleRemover.supported_active_systems.values():
                 # Never remove
                 if system.name in cls.cleaning_conditions and cls.cleaning_conditions[system.name] is None:
                     continue
