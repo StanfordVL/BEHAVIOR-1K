@@ -1,22 +1,22 @@
 const canvasDict = {
-	'baseline_total_canvas': 		["Total frame time", 		["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
+	'baseline_total_canvas': 		["FPS",				 		["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
 	'baseline_loading_canvas': 		["Loading time", 			["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
 	'baseline_omni_canvas': 		["Omni step time", 			["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
 	'baseline_non_omni_canvas':		["Non-omni step time",		["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
 	'baseline_mem_canvas': 			["Memory usage",			["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
 	'baseline_vram_canvas': 		["Vram usage",				["Empty scene", "Rs_int", "Rs_int, with 1 Fetch", "Rs_int, with 3 Fetch"]],
-	'np_total_canvas': 				["Total frame time", 		["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
+	'np_total_canvas': 				["FPS", 					["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_loading_canvas': 			["Loading time",   			["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_omni_canvas': 				["Omni step time", 			["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_non_omni_canvas': 			["Non-omni step time", 		["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_mem_canvas': 				["Memory usage", 			["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
 	'np_vram_canvas': 				["Vram usage", 				["Empty scene, with 1 Fetch, fluids", "Empty scene, with 1 Fetch, cloth", "Empty scene, with 1 Fetch, macro particles", "Empty scene, with 1 Fetch, cloth, fluids, macro particles"]],
-	'scene_total_canvas': 			["Total frame time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	'scene_loading_canvas': 		["Loading time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	'scene_omni_canvas': 			["Omni step time", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	'scene_og_canvas': 				["Non-omni step time", 		["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	'scene_mem_canvas': 			["Memory usage", 			["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
-	'scene_vram_canvas': 			["Vram usage", 				["Rs_int, with 1 Fetch robot", "house_single_floor, with 1 Fetch robot", "grocery_store_cafe, with 1 Fetch robot", "Pomaria_0_garden, with 1 Fetch robot"]],
+	'scene_total_canvas': 			["FPS", 					["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_loading_canvas': 		["Loading time", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_omni_canvas': 			["Omni step time", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_non_omni_canvas': 		["Non-omni step time", 		["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_mem_canvas': 			["Memory usage", 			["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
+	'scene_vram_canvas': 			["Vram usage", 				["Ihlen_0_int, with 1 Fetch", "Pomaria_0_garden, with 1 Fetch", "house_single_floor, with 1 Fetch", "grocery_store_cafe, with 1 Fetch"]],
 }
 
 
@@ -118,7 +118,7 @@ function renderGraph(canvasName, fieldName, runNames) {
 				},
 				afterLabel: item => {
 					const { extra } = filteredData.values().next().value[item.index].bench;
-					return extra ? '\n' + extra : '';
+					return extra ? '\n' + extra[0] : '';
 				}
 			}
 		},
@@ -127,7 +127,7 @@ function renderGraph(canvasName, fieldName, runNames) {
 				return;
 			}
 			// XXX: Undocumented. How can we know the index?
-			const index = activeElems[0].index;
+			const index = activeElems[0]._index;
 			const url = filteredData.values().next().value[index].commit.url;
 			window.open(url, '_blank');
 		},

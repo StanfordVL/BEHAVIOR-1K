@@ -106,3 +106,10 @@ class LinkBasedStateMixin(BaseObjectState):
                 self._links[name] = link
                 assert np.allclose(link.scale, self.obj.scale), \
                     f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LinkBasedStateMixin")
+        return classes

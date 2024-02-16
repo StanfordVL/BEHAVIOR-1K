@@ -809,7 +809,6 @@ def test_cooking_object_rule_failure_wrong_container():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)
@@ -852,7 +851,6 @@ def test_cooking_object_rule_failure_recipe_objects():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)
@@ -895,7 +893,6 @@ def test_cooking_object_rule_failure_unary_states():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)
@@ -936,9 +933,8 @@ def test_cooking_object_rule_failure_binary_system_states():
     assert raw_egg.states[Cooked].set_value(False)
     og.sim.step()
 
-    # This fails the recipe because it requires the bagel dough and the raw egg to be covered with sesame seed
+    # This fails the recipe because it requires the bagel dough to be covered with sesame seed
     assert bagel_dough.states[Covered].set_value(sesame_seed, False)
-    assert raw_egg.states[Covered].set_value(sesame_seed, False)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)
@@ -981,7 +977,6 @@ def test_cooking_object_rule_failure_binary_object_states():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)
@@ -1024,7 +1019,6 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert stove.states[ToggledOn].set_value(True)
@@ -1072,7 +1066,6 @@ def test_cooking_object_rule_success():
     og.sim.step()
 
     assert bagel_dough.states[Covered].set_value(sesame_seed, True)
-    assert raw_egg.states[Covered].set_value(sesame_seed, True)
     og.sim.step()
 
     assert oven.states[ToggledOn].set_value(True)

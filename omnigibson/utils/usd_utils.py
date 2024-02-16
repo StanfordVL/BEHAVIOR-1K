@@ -166,6 +166,11 @@ class RigidContactAPI:
     _PATH_TO_ROW_IDX = None
     _PATH_TO_COL_IDX = None
 
+    # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
+    # index in the contact view matrix
+    _ROW_IDX_TO_PATH = None
+    _COL_IDX_TO_PATH = None
+
     # Contact view for generating contact matrices at each timestep
     _CONTACT_VIEW = None
 
@@ -213,6 +218,10 @@ class RigidContactAPI:
         # Create deterministic mapping from path to row index
         cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
 
+        # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
+        cls._ROW_IDX_TO_PATH = np.array(list(cls._PATH_TO_ROW_IDX.keys()))
+        cls._COL_IDX_TO_PATH = np.array(list(cls._PATH_TO_COL_IDX.keys()))
+
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         n_bodies = len(cls._PATH_TO_COL_IDX)
         assert cls._CONTACT_VIEW.filter_count == n_bodies, \
@@ -234,6 +243,22 @@ class RigidContactAPI:
             int: col idx assigned to the rigid body defined by @prim_path
         """
         return cls._PATH_TO_COL_IDX[prim_path]
+
+    @classmethod
+    def get_row_idx_prim_path(cls, idx):
+        """
+        Returns:
+            str: @prim_path corresponding to the row idx @idx in the contact matrix
+        """
+        return cls._ROW_IDX_TO_PATH[idx]
+
+    @classmethod
+    def get_col_idx_prim_path(cls, idx):
+        """
+        Returns:
+            str: @prim_path corresponding to the column idx @idx in the contact matrix
+        """
+        return cls._COL_IDX_TO_PATH[idx]
 
     @classmethod
     def get_all_impulses(cls):
