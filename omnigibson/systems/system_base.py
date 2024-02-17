@@ -142,8 +142,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         SYSTEM_REGISTRY.add(obj=cls)
 
         # Avoid circular import
-        from omnigibson.transition_rules import TransitionRuleAPI
-        TransitionRuleAPI.refresh_all_rules()
+        if og.sim.is_playing():
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
         for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
@@ -224,8 +225,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         SYSTEM_REGISTRY.remove(obj=cls)
 
         # Avoid circular import
-        from omnigibson.transition_rules import TransitionRuleAPI
-        TransitionRuleAPI.refresh_all_rules()
+        if og.sim.is_playing():
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
     @classmethod
     def reset(cls):
