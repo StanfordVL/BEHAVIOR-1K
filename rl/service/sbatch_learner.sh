@@ -72,15 +72,25 @@ for i in {0..2}; do
     ENV_KWARGS="${ENV_KWARGS:1}"
     MOUNT_KWARGS="${MOUNT_KWARGS:1}"
 
-    # The last line here is the command you want to run inside the container.
-    # Here I'm running some unit tests.
-    enroot start \
+    if [ i -eq 0 ]; then
+        enroot start \
         --root \
         --rw \
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
         micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$4 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2 --eval_port $3 --sweep_id $5"
+    else
+        hostname = $(srun hostname)
+        enroot start \
+        --root \
+        --rw \
+        ${ENV_KWARGS} \
+        ${MOUNT_KWARGS} \
+        ${CONTAINER_NAME} \
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace python -u /omnigibson-src/rl/service/omni_grpc_worker.py $hostname:$3"
+    fi
+    
 done
 
 wait
