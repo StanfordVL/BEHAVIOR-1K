@@ -25,16 +25,6 @@ ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 # Pick a port using the array index
 BASE_PORT=$2
 for i in {0..2}; do
-    WORKER_PORT=$((BASE_PORT + i + SLURM_ARRAY_TASK_ID*3))
-
-    if netstat -tuln | grep ":$WORKER_PORT" > /dev/null; then
-        echo "Port $WORKER_PORT is in use."
-        exit 1
-    else
-        echo "Using unused port $WORKER_PORT."
-        # Continue your script here
-    fi
-
     # Define env kwargs to pass
     declare -A ENVS=(
         [NVIDIA_DRIVER_CAPABILITIES]=all
@@ -91,7 +81,7 @@ for i in {0..2}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 && cd /omnigibson-src/rl/service && python -u omni_grpc_worker.py $1 ${WORKER_PORT}" \
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 && cd /omnigibson-src/rl/service && python -u omni_grpc_worker.py $1" \
         > "output_${SLURM_ARRAY_TASK_ID}_${i}.txt" 2>&1 &
 done
 

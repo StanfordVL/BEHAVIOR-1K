@@ -29,7 +29,6 @@ from wandb import AlertLevel
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
 parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
-parser.add_argument("--eval_port", type=int, default=None, help="Port to listen at for evaluation.")
 parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
 parser.add_argument(
     "--checkpoint",
@@ -46,6 +45,13 @@ def _get_env_config():
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
 
+def get_open_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
 EVAL_EVERY_N_EPISODES = 10
 NUM_EVAL_EPISODES = 5
 STEPS_PER_EPISODE = _get_env_config()['task']['termination_config']['max_steps']
@@ -57,13 +63,10 @@ def instantiate_envs():
         if args.port is not None:
             local_port = int(args.port)
         else:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("", 0))
-            local_port = s.getsockname()[1]
-            s.close()
+            local_port = get_open_port() 
 
         # Manually specify port for eval env
-        eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
+        eval_env = GRPCClientVecEnv(f"0.0.0.0:{get_open_port()}", 1)
         eval_env = VecFrameStack(eval_env, n_stack=5)
         eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
 
