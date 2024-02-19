@@ -72,23 +72,22 @@ for i in {0..2}; do
     ENV_KWARGS="${ENV_KWARGS:1}"
     MOUNT_KWARGS="${MOUNT_KWARGS:1}"
 
-    if [ i -eq 0 ]; then
+    if [ $i -eq 0 ]; then
         enroot start \
         --root \
         --rw \
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$4 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2 --eval_port $3 --sweep_id $5"
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$4 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2 --eval_port $3 --sweep_id $5" > "output_learner.txt" 2>&1 &
     else
-        hostname = $(srun hostname)
         enroot start \
         --root \
         --rw \
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace python -u /omnigibson-src/rl/service/omni_grpc_worker.py $hostname:$3"
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$3" > "output_eval.txt" 2>&1 &
     fi
     
 done
