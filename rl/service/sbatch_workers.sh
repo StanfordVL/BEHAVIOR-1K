@@ -14,7 +14,7 @@ cd /cvgl2/u/${USER}/OmniGibson/rl/service
 while [ $exit_code -eq 1 ]; do
     python -c "import grpc; from telegym.protos import environment_pb2, environment_pb2_grpc; channel = grpc.insecure_channel(${1}); stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel); request = environment_pb2.Empty(); stub.RegisterEnvironmentAvailable(request)"
     exit_code=$?
-    sleep 5
+    sleep 60
 done
 cd $current_dir
 
