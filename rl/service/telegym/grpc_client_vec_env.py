@@ -40,6 +40,9 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
 
                 return environment_pb2.RegisterEnvironmentResponse(success=True)
         return environment_pb2.RegisterEnvironmentResponse(success=False)
+    
+    def RegisterEnvironmentAvailable(self, request, context):
+        return environment_pb2.Empty()
 
     async def await_workers(self):
         print(f"Waiting for {len(self.envs)} workers to connect.")

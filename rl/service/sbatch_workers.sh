@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=30G
-#SBATCH --gres=gpu:2080ti:1
+#SBATCH --gres=gpu:titanrtx:1
 #SBATCH --array=0-1
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
@@ -30,6 +30,7 @@ declare -A ENVS=(
     [DISPLAY]=""
     [OMNIGIBSON_HEADLESS]=1
 )
+ENV_KWARGS=""
 for env_var in "${!ENVS[@]}"; do
     # Add to env kwargs we'll pass to enroot command later
     ENV_KWARGS="${ENV_KWARGS} --env ${env_var}=${ENVS[${env_var}]}"
@@ -68,6 +69,17 @@ enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
 # Remove leading space in string
 ENV_KWARGS="${ENV_KWARGS:1}"
 MOUNT_KWARGS="${MOUNT_KWARGS:1}"
+
+# Wait for learner
+# while ! netstat -tuln | grep ":$WORKER_PORT" > /dev/null; do
+#     echo "Waiting for learner to start..."
+#     sleep 1
+# done
+exit_code=1
+cd /OmniGibson/rl/service
+while [ $exit_code -eq 1 ]; do
+    python -c "import grpc; from telegym.protos import environment_pb2, environment_pb2_grpc; channel = grpc.insecure_channel(${1}); stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel); request = environment_pb2.Empty(); stub.RegisterEnvironmentAvailable(request)"
+    exit_code=$?
 
 # The last line here is the command you want to run inside the container.
 # Here I'm running some unit tests.

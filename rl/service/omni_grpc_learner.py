@@ -29,6 +29,7 @@ from wandb import AlertLevel
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
 parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
+parser.add_argument("--eval_port", type=int, default=None, help="Port to listen at for evaluation.")
 parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
 parser.add_argument(
     "--checkpoint",
@@ -60,15 +61,17 @@ def instantiate_envs():
             s.bind(("", 0))
             local_port = s.getsockname()[1]
             s.close()
+
+        # Manually specify port for eval env
+        eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
+        eval_env = VecFrameStack(eval_env, n_stack=5)
+        eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
+
         print(f"Listening on port {local_port}")
         env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", n_envs)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
 
-        # Manually specify port for eval env
-        eval_env = GRPCClientVecEnv(f"0.0.0.0:50064", 1)
-        eval_env = VecFrameStack(eval_env, n_stack=5)
-        eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
     else:
         import omnigibson as og
         from omnigibson.macros import gm
