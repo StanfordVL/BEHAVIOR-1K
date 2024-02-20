@@ -11,6 +11,7 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key, get_u
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
+import omnigibson.lazy as lazy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -141,8 +142,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         SYSTEM_REGISTRY.add(obj=cls)
 
         # Avoid circular import
-        from omnigibson.transition_rules import TransitionRuleAPI
-        TransitionRuleAPI.refresh_all_rules()
+        if og.sim.is_playing():
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
         for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
@@ -205,20 +207,25 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Clears this system, so that it may possibly be re-initialized. Useful for, e.g., when loading from a new
         scene during the same sim instance
         """
-        global SYSTEM_REGISTRY, _CALLBACKS_ON_SYSTEM_CLEAR
-
         if cls.initialized:
-            # Run any callbacks
-            for callback in _CALLBACKS_ON_SYSTEM_CLEAR.values():
-                callback(cls)
+            cls._clear()
 
-            cls.reset()
-            cls.initialized = False
+    @classmethod
+    def _clear(cls):
+        global SYSTEM_REGISTRY, _CALLBACKS_ON_SYSTEM_CLEAR
+        # Run any callbacks
+        for callback in _CALLBACKS_ON_SYSTEM_CLEAR.values():
+            callback(cls)
 
-            # Remove from active registry
-            SYSTEM_REGISTRY.remove(obj=cls)
+        cls.reset()
+        lazy.omni.isaac.core.utils.prims.delete_prim(cls.prim_path)
+        cls.initialized = False
 
-            # Avoid circular import
+        # Remove from active registry
+        SYSTEM_REGISTRY.remove(obj=cls)
+
+        # Avoid circular import
+        if og.sim.is_playing():
             from omnigibson.transition_rules import TransitionRuleAPI
             TransitionRuleAPI.refresh_all_rules()
 
@@ -534,9 +541,8 @@ class VisualParticleSystem(BaseSystem):
                sum(3 * cls.num_group_particles(group) for group in cls.groups)
 
     @classmethod
-    def clear(cls):
-        # Run super method first
-        super().clear()
+    def _clear(cls):
+        super()._clear()
 
         # Clear all groups as well
         cls._group_particles = dict()
@@ -1128,7 +1134,7 @@ def _create_system_from_metadata(system_name):
         if not has_asset:
             if system_type == "macro_visual_particle":
                 # Fallback to stain asset
-                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "stain.usd")
+                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "ahkjul.usd")
                 has_asset = True
         if has_asset:
             def generate_particle_template_fcn():

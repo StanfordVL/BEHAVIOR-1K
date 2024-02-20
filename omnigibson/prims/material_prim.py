@@ -28,6 +28,32 @@ class MaterialPrim(BasePrim):
             mtl_name (None or str): If specified, should be the name of the mtl preset to load.
                 None results in default, "OmniPBR"
     """
+    # Persistent dictionary of materials, mapped from prim_path to MaterialPrim
+    MATERIALS = dict()
+
+    @classmethod
+    def get_material(cls, name, prim_path, load_config=None):
+        """
+        Get a material prim from the persistent dictionary of materials, or create a new one if it doesn't exist.
+
+        Args:
+            name (str): Name for the object.
+            prim_path (str): prim path of the MaterialPrim.
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+                @prim_path -- it will be ignored if it already exists.
+        Returns:
+            MaterialPrim: Material prim at the specified path
+        """
+        # If the material already exists, return it
+        if prim_path in cls.MATERIALS:
+            return cls.MATERIALS[prim_path]
+
+        # Otherwise, create a new one and return it
+        new_material = cls(prim_path=prim_path, name=name, load_config=load_config)
+        cls.MATERIALS[prim_path] = new_material
+        return new_material
+
     def __init__(
         self,
         prim_path,
@@ -36,6 +62,9 @@ class MaterialPrim(BasePrim):
     ):
         # Other values that will be filled in at runtime
         self._shader = None
+
+        # Users of this material: should be a set of BaseObject and BaseSystem
+        self._users = set()
 
         # Run super init
         super().__init__(
@@ -61,9 +90,51 @@ class MaterialPrim(BasePrim):
         # Return generated material
         return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._prim_path)
 
+    @classmethod
+    def clear(cls):
+        cls.MATERIALS = dict()
+
+    @property
+    def users(self):
+        """
+        Users of this material: should be a list of BaseObject and BaseSystem
+        """
+        return self._users
+
+    def add_user(self, user):
+        """
+        Adds a user to the material. This can be a BaseObject or BaseSystem.
+
+        Args:
+            user (BaseObject or BaseSystem): User to add to the material
+        """
+        self._users.add(user)
+
+    def remove_user(self, user):
+        """
+        Removes a user from the material. This can be a BaseObject or BaseSystem.
+        If there are no users left, the material will be removed.
+
+        Args:
+            user (BaseObject or BaseSystem): User to remove from the material
+        """
+        self._users.remove(user)
+        if len(self._users) == 0:
+            self.remove()
+
+    def remove(self):
+        # Remove from global sensors dictionary
+        self.MATERIALS.pop(self._prim_path)
+
+        # Run super
+        super().remove()
+
     def _post_load(self):
         # run super first
         super()._post_load()
+
+        # Add this material to the list of global materials
+        self.MATERIALS[self._prim_path] = self
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
