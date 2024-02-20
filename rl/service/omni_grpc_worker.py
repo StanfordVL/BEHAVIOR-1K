@@ -3,6 +3,7 @@ import yaml
 import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
+import wandb
 
 from telegym import serve_env_over_grpc
 
@@ -14,6 +15,8 @@ def main(local_addr, learner_addr):
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     env = og.Environment(configs=config)
+
+    wandb.init(entity="behavior-rl", project="sb3", group="worker")
 
     # Now start servicing!
     serve_env_over_grpc(env, local_addr, learner_addr)
