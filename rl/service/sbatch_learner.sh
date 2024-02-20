@@ -24,7 +24,7 @@ else
     echo "Using unused port $3."
 fi
 
-for i in {0..2}; do
+for i in {0..1}; do
     # Define env kwargs to pass
     declare -A ENVS=(
         [NVIDIA_DRIVER_CAPABILITIES]=all
@@ -94,7 +94,7 @@ done
 
 wait
 
-for i in {0..2}; do
+for i in {0..1}; do
     CONTAINER_NAME=omnigibson_${GPU_ID}_${i}
 
     # Clean up the image if possible.

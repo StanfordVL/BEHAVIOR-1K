@@ -3,16 +3,16 @@
 #SBATCH --partition=svl
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=18
-#SBATCH --mem=90G
+#SBATCH --mem=100G
 #SBATCH --gres=gpu:titanrtx:1
 #SBATCH --array=0-1
 
 # Wait for learner
 current_dir=$(pwd)
 exit_code=1
-cd /cvgl2/u/${USER}/OmniGibson/rl/service
+cd /cvgl2/u/${USER}/OmniGibson/rl/service/telegym
 while [ $exit_code -eq 1 ]; do
-    python -c "import grpc; from telegym.protos import environment_pb2, environment_pb2_grpc; channel = grpc.insecure_channel(${1}); stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel); request = environment_pb2.Empty(); stub.RegisterEnvironmentAvailable(request)"
+    python3 -c "import grpc; from protos import environment_pb2, environment_pb2_grpc; channel = grpc.insecure_channel('${1}'); stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel); request = environment_pb2.Empty(); stub.RegisterEnvironmentAvailable(request)"
     exit_code=$?
     sleep 60
 done
