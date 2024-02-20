@@ -128,6 +128,18 @@ class GeomPrim(XFormPrim):
         """
         return self.prim.GetAttribute("points").Get()
     
+    @property
+    def points_in_parent_frame(self):
+        points = self.points
+        if points is None:
+            return None
+        position, orientation = self.get_local_pose()
+        scale = self.scale
+        points_scaled = points * scale
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+        return points_transformed
+    
     @cached_property
     def extent(self):
         """

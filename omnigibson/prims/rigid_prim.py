@@ -612,7 +612,12 @@ class RigidPrim(XFormPrim):
             np.ndarray: points on the convex hull of all points from child geom prims
         """
         meshes = self._visual_meshes if visual else self._collision_meshes
-        points = [mesh.points for mesh in meshes.values() if mesh.points is not None and len(mesh.points) > 0]
+        points = []
+
+        for mesh in meshes.values():
+            mesh_points = mesh.points_in_parent_frame
+            if mesh_points is not None and len(mesh_points) > 0:
+                points.append(mesh_points)
         
         if not points:
             return None
