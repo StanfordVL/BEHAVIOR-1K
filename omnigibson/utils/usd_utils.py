@@ -684,14 +684,23 @@ class PoseAPI:
         cls.DIRTY = False
         
     @classmethod
-    def get_world_pose(cls, prim_path):
+    def _refresh(cls):
         if og.sim is not None and cls.DIRTY:
             if og.sim._physx_fabric_interface:
                 og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
             else:
                 og.sim.psi.fetch_results()
             cls.mark_valid()
+        
+    @classmethod
+    def get_world_pose(cls, prim_path):
+        cls._refresh()
         return lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+    
+    @classmethod
+    def get_world_pose_with_scale(cls, prim_path):
+        cls._refresh()
+        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path))
 
 
 def clear():

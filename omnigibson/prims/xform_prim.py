@@ -155,36 +155,14 @@ class XFormPrim(BasePrim):
         
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-        
-        orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
         assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
             f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        mat = lazy.pxr.Gf.Transform()
-        # Only set rotation and translation but not scale for the child prim because it's irrelevant for its local transform
-        mat.SetRotation(lazy.pxr.Gf.Rotation(lazy.pxr.Gf.Quatd(*orientation)))
-        mat.SetTranslation(lazy.pxr.Gf.Vec3d(*position))
+        my_world_transform = T.pose2mat((position, orientation))
 
-        my_world_transform = np.transpose(mat.GetMatrix())
-
-        if gm.ENABLE_FLATCACHE and og.sim is not None and og.sim.is_playing():
-            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
-            parent_path = str(parent_prim.GetPath())
-
-            parent_pos, parent_ori = PoseAPI.get_world_pose(parent_path)
-            parent_pose = (parent_pos, parent_ori[[1, 2, 3, 0]])
-
-            # Get the parent scale transform
-            parent_scale = np.array(np.ones(3) if parent_prim.GetAttribute("xformOp:scale").Get() is None else parent_prim.GetAttribute("xformOp:scale").Get())
-            parent_scale_tf = np.eye(4)
-            parent_scale_tf[:3, :3] = np.diag(parent_scale)
-
-            # Combine translation, rotation, and scale to get the parent world transform
-            # translation --> rotation --> scale, for each nested prim
-            parent_world_transform = T.pose2mat(parent_pose) @ parent_scale_tf
-        else:
-            parent_world_tf = lazy.pxr.UsdGeom.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-            parent_world_transform = np.transpose(parent_world_tf)
+        parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
+        parent_path = str(parent_prim.GetPath())
+        parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path).T
 
         # Calculate the local transform from parent to current prim
         # Inverse of parent world transform multiplied by the current world transform
@@ -195,14 +173,7 @@ class XFormPrim(BasePrim):
         #                  = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
         #                    * (Translation(world->me) * Rotation(world->me))
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
-        transform = lazy.pxr.Gf.Transform()
-        transform.SetMatrix(lazy.pxr.Gf.Matrix4d(np.transpose(local_transform)))
-        local_translation = transform.GetTranslation()
-        local_orientation = transform.GetRotation().GetQuat()
-
-        self.set_local_pose(
-            position=np.array(local_translation), orientation=lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(local_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
-        )
+        self.set_local_pose(*T.mat2pose(local_transform))
 
     def get_position_orientation(self):
         """
