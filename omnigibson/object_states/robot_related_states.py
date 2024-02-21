@@ -51,10 +51,14 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 #         return not body_ids.isdisjoint(robot.states[ObjectsInFOVOfRobot].get_value())
 
 
-class ObjectsInFOVOfRobot(AbsoluteObjectState):
+class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
     def _get_value(self):
+        if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
+            raise ValueError("No vision sensors found on robot.")
+        prim_paths = []
+        paths_to_exclude = ['BACKGROUND', 'UNLABELLED']
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
-                return [prim_path for prim_path in info['seg_instance'].values() if prim_path.startswith('/')]
-        raise ValueError("No vision sensor found on robot.")
+                prim_paths.extend([prim_path for prim_path in info['seg_instance'].values() if prim_path not in paths_to_exclude])
+        return prim_paths
