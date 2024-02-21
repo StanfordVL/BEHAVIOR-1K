@@ -87,8 +87,9 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         Get sensor reading. Should generally be extended by subclass.
 
         Returns:
-            dict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
-            dict: Additional information about the observations.
+            2-tuple:
+                dict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
+                dict: Additional information about the observations.
         """
         # Default is returning an empty dict
         return dict(), dict()

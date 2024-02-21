@@ -293,8 +293,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             (e.g.: proprio, rgb, etc.)
 
         Returns:
-            dict: Keyword-mapped dictionary mapping observation modality names to
-                observations (usually np arrays)
+            2-tuple:
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    observations (usually np arrays)
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    additional info
         """
         # Our sensors already know what observation modalities it has, so we simply iterate over all of them
         # and grab their observations, processing them into a flat dict
@@ -313,6 +316,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Returns:
             n-array: numpy array of all robot-specific proprioceptive observations.
+            dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
         return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
@@ -392,7 +396,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         frames = dict()
         remaining_obs_modalities = deepcopy(self.obs_modalities)
         for sensor in self.sensors.values():
-            obs = sensor.get_obs()[0]
+            obs, _ = sensor.get_obs()
             sensor_frames = []
             if isinstance(sensor, VisionSensor):
                 # We check for rgb, depth, normal, seg_instance

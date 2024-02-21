@@ -419,7 +419,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Get the current environment observation.
 
         Returns:
-            dict: Keyword-mapped observations, which are possibly nested
+            2-tuple:
+                dict: Keyword-mapped observations, which are possibly nested
+                dict: Additional information about the observations
         """
         obs = dict()
         info = dict()

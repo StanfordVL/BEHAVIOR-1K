@@ -99,6 +99,9 @@ class VisionSensor(BaseSensor):
         self._annotators = None
         self._render_product = None
         
+        # Amortized set of semantic IDs that we've seen so far
+        self._known_semantic_ids = set()
+        
         self._RAW_SENSOR_TYPES = dict(
             rgb="rgb",
             depth="distance_to_camera",
@@ -234,27 +237,45 @@ class VisionSensor(BaseSensor):
         Remap the semantic segmentation image to the class IDs defined in CLASS_NAME_TO_CLASS_ID.
         Also, correct the id_to_labels input with the labels from CLASS_NAME_TO_CLASS_ID and return it.
         """
-        # Convert string IDs to integers and find the max ID for array size
-        max_id = max([int(id) for id in id_to_labels.keys()])
+        # Convert string IDs to integers
+        int_ids = set(int(id) for id in id_to_labels.keys())
 
-        # Initialize the key array with a default value for unmapped IDs
-        key_array = np.full(max_id + 1, -1, dtype=np.int32)
-        
-        # Initialize a new dictionary for the corrected id_to_labels
+        # Determine if there are any new IDs that were not previously known
+        new_ids = int_ids - self._known_semantic_ids
+
+        # If there are new IDs, update _known_semantic_ids set and rebuild the key array
+        if new_ids:
+            self._known_semantic_ids.update(new_ids)
+            max_id = max(self._known_semantic_ids)
+
+            # Initialize the key array with a default value for unmapped IDs
+            key_array = np.full(max_id + 1, -1, dtype=np.int32)
+
+            # Populate the key array with the new IDs based on class name mappings
+            for int_id in self._known_semantic_ids:
+                str_id = str(int_id)
+                if str_id in id_to_labels:
+                    info = id_to_labels[str_id]
+                    class_name = info['class'].lower()
+                    if class_name in CLASS_NAME_TO_CLASS_ID:
+                        new_id = CLASS_NAME_TO_CLASS_ID[class_name]
+                        key_array[int_id] = new_id
+        else:
+            # Use the existing key_array if no new IDs are found
+            key_array = self.key_array
+
         corrected_id_to_labels = {}
-        
-        # Populate the key array with the new IDs based on class name mappings
-        for str_id, info in id_to_labels.items():
-            class_name = info['class'].lower()
-            if class_name in CLASS_NAME_TO_CLASS_ID:
-                new_id = CLASS_NAME_TO_CLASS_ID[class_name]
-                key_array[int(str_id)] = new_id
-                # Update the corrected_id_to_labels with the new class ID
-                corrected_id_to_labels[new_id] = info['class']
-        
+        # Update with the new class ID
+        for int_id in self._known_semantic_ids:
+            str_id = str(int_id)
+            if str_id in id_to_labels and key_array[int_id] != -1:
+                info = id_to_labels[str_id]
+                corrected_id_to_labels[key_array[int_id]] = info['class']
+
         # Remap the image
         remapped_img = key_array[img]
-        
+
+        self.key_array = key_array
         return remapped_img, corrected_id_to_labels
 
     def add_modality(self, modality):
@@ -314,8 +335,30 @@ class VisionSensor(BaseSensor):
     @property
     def camera_parameters(self):
         """
+        Returns a dictionary of keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
+        The returned dictionary includes the following keys and their corresponding data types:
+
+        - 'cameraAperture': np.ndarray (float32) - Camera aperture dimensions.
+        - 'cameraApertureOffset': np.ndarray (float32) - Offset of the camera aperture.
+        - 'cameraFisheyeLensP': np.ndarray (float32) - Fisheye lens P parameter.
+        - 'cameraFisheyeLensS': np.ndarray (float32) - Fisheye lens S parameter.
+        - 'cameraFisheyeMaxFOV': float - Maximum field of view for fisheye lens.
+        - 'cameraFisheyeNominalHeight': int - Nominal height for fisheye lens.
+        - 'cameraFisheyeNominalWidth': int - Nominal width for fisheye lens.
+        - 'cameraFisheyeOpticalCentre': np.ndarray (float32) - Optical center for fisheye lens.
+        - 'cameraFisheyePolynomial': np.ndarray (float32) - Polynomial parameters for fisheye lens distortion.
+        - 'cameraFocalLength': float - Focal length of the camera.
+        - 'cameraFocusDistance': float - Focus distance of the camera.
+        - 'cameraFStop': float - F-stop value of the camera.
+        - 'cameraModel': str - Camera model identifier.
+        - 'cameraNearFar': np.ndarray (float32) - Near and far plane distances.
+        - 'cameraProjection': np.ndarray (float32) - Camera projection matrix.
+        - 'cameraViewTransform': np.ndarray (float32) - Camera view transformation matrix.
+        - 'metersPerSceneUnit': float - Scale factor from scene units to meters.
+        - 'renderProductResolution': np.ndarray (int32) - Resolution of the rendered product.
+
         Returns:
-            dict: Keyword-mapped relevant instrinsic and extrinsic camera parameters for this vision sensor
+            dict: Keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
         """
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
