@@ -664,7 +664,7 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     rosemary = get_system("rosemary")
     chicken_soup = get_system("cooked__chicken_soup")
 
-    place_obj_on_floor_plane(stove)
+    place_obj_on_floor_plane(stove, y_offset=0.0077189438, z_offset=0.0051004850)
     og.sim.step()
 
     stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
@@ -729,7 +729,7 @@ def test_cooking_system_rule_success():
     deleted_objs = [chicken]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    place_obj_on_floor_plane(stove)
+    place_obj_on_floor_plane(stove, y_offset=0.0077189438, z_offset=0.0051004850)
     og.sim.step()
 
     stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
@@ -789,7 +789,7 @@ def test_cooking_object_rule_failure_wrong_container():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.002, y_offset=0.0015, z_offset=-0.001)
     og.sim.step()
 
     # This fails the recipe because it requires the baking sheet to be inside the oven, not the stockpot
@@ -831,7 +831,7 @@ def test_cooking_object_rule_failure_recipe_objects():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -873,7 +873,7 @@ def test_cooking_object_rule_failure_unary_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -915,7 +915,7 @@ def test_cooking_object_rule_failure_binary_system_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -957,7 +957,7 @@ def test_cooking_object_rule_failure_binary_object_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -1047,7 +1047,7 @@ def test_cooking_object_rule_success():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven)
+    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
