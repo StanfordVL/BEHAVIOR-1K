@@ -271,6 +271,22 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         pass
 
+    def step(self):
+        # Skip this step if our articulation view is not valid
+        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
+            return
+
+        # Before calling super, update the dummy robot's kinematic state based on this robot's kinematic state
+        # This is done prior to any state getter calls, since setting kinematic state results in physx backend
+        # having to re-fetch tensorized state.
+        # We do this so we have more optimal runtime performance
+        if self._use_dummy:
+            self._dummy.set_joint_positions(self.get_joint_positions())
+            self._dummy.set_joint_velocities(self.get_joint_velocities())
+            self._dummy.set_position_orientation(*self.get_position_orientation())
+
+        super().step()
+
     def get_obs(self):
         """
         Grabs all observations from the robot. This is keyword-mapped based on each observation modality
@@ -471,16 +487,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return np.zeros(self.action_dim)
 
-    def get_generalized_gravity_forces(self):
+    def get_generalized_gravity_forces(self, clone=True):
         # Override method based on whether we're using a dummy or not
-        if self._use_dummy:
-            # Update dummy pose and calculate values
-            self._dummy.set_joint_positions(self.get_joint_positions())
-            self._dummy.set_joint_velocities(self.get_joint_velocities())
-            self._dummy.set_position_orientation(*self.get_position_orientation())
-            return self._dummy.get_generalized_gravity_forces()
-        else:
-            return super().get_generalized_gravity_forces()
+        return self._dummy.get_generalized_gravity_forces(clone=clone) \
+            if self._use_dummy else super().get_generalized_gravity_forces(clone=clone)
 
     @property
     def sensors(self):

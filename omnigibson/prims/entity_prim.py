@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from functools import cached_property
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -420,7 +421,7 @@ class EntityPrim(XFormPrim):
             int: Number of joints owned by this articulation
         """
         if self.initialized:
-            num = len(list(self._joints.keys()))
+            num = len(self._joints)
         else:
             # Manually iterate over all links and check for any joints that are not fixed joints!
             num = 0
@@ -433,7 +434,7 @@ class EntityPrim(XFormPrim):
                     num += 1
         return num
 
-    @property
+    @cached_property
     def n_fixed_joints(self):
         """
         Returns:
@@ -616,12 +617,11 @@ class EntityPrim(XFormPrim):
             positions = self._denormalize_positions(positions=positions, indices=indices)
 
         # Set the DOF states
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+        else:
             self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             BoundingBoxAPI.clear()
-
-        # Also set the target
-        self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -648,11 +648,10 @@ class EntityPrim(XFormPrim):
             velocities = self._denormalize_velocities(velocities=velocities, indices=indices)
 
         # Set the DOF states
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
+        else:
             self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
-
-        # Also set the target
-        self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -1287,49 +1286,64 @@ class EntityPrim(XFormPrim):
         min_corner, max_corner = self.aabb
         return (max_corner + min_corner) / 2.0
 
-    def get_coriolis_and_centrifugal_forces(self):
+    def get_coriolis_and_centrifugal_forces(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
         """
         assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
-        return self._articulation_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
+        return self._articulation_view.get_coriolis_and_centrifugal_forces(clone=clone).reshape(self.n_dof)
 
-    def get_generalized_gravity_forces(self):
+    def get_generalized_gravity_forces(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
-        return self._articulation_view.get_generalized_gravity_forces().reshape(self.n_dof)
+        return self._articulation_view.get_generalized_gravity_forces(clone=clone).reshape(self.n_dof)
 
-    def get_mass_matrix(self):
+    def get_mass_matrix(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N, N) shaped per-DOF mass matrix, if articulated
         """
         assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
-        return self._articulation_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
+        return self._articulation_view.get_mass_matrices(clone=clone).reshape(self.n_dof, self.n_dof)
 
-    def get_jacobian(self):
+    def get_jacobian(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link jacobian, if articulated. Note that the first
                 dimension is +1 and the final dimension is +6 if the entity does not have a fixed base
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        return self._articulation_view.get_jacobians().squeeze(axis=0)
+        return self._articulation_view.get_jacobians(clone=clone).squeeze(axis=0)
 
-    def get_relative_jacobian(self):
+    def get_relative_jacobian(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link relative jacobian, if articulated (expressed in
                 this entity's base frame). Note that the first dimension is +1 and the final dimension is +6 if the
                 entity does not have a fixed base (i.e.: there is an additional "floating" joint tying the robot to
                 the world frame)
         """
-        jac = self.get_jacobian()
+        jac = self.get_jacobian(clone=clone)
         ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
         tf = np.zeros((1, 6, 6), dtype=np.float32)
         tf[:, :3, :3] = ori_t

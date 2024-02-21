@@ -404,7 +404,7 @@ class ManipulationRobot(BaseRobot):
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
+        fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[eef_link_idx, :, -self.n_joints:]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()

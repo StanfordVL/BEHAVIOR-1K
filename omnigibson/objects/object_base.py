@@ -165,6 +165,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     body1=f"{self._prim_path}/{self._root_link_name}",
                 )
 
+            # Delete n_fixed_joints cached property if it exists since the number of fixed joints has now changed
+            # See https://stackoverflow.com/questions/59899732/python-cached-property-how-to-delete and
+            # https://docs.python.org/3/library/functools.html#functools.cached_property
+            if "n_fixed_joints" in self.__dict__:
+                del self.n_fixed_joints
+
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]

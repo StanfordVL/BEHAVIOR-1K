@@ -633,6 +633,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                         # get the transform, and not obj.get_local_pose() which will give us the local pose of the
                         # root link!
                         link_tfs[obj] = T.pose2mat(XFormPrim.get_local_pose(obj))
+                    link = obj
                 else:
                     link = cls._particles_info[name]["link"]
                     if link not in link_tfs:

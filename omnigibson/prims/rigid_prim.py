@@ -9,7 +9,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import BoundingBoxAPI, get_mesh_volume_and_com
+from omnigibson.utils.usd_utils import BoundingBoxAPI, get_mesh_volume_and_com, check_extent_radius_ratio
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -200,10 +200,11 @@ class RigidPrim(XFormPrim):
                     # We need to translate the center of mass from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
-                    if not is_volume:
-                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
-                        # mesh.set_collision_approximation("boundingCube")
+                    # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
+                    # boundingCube approximation for the underlying collision approximation for GPU compatibility
+                    if not check_extent_radius_ratio(mesh_prim):
+                        log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
+                        mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 

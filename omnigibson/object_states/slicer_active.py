@@ -163,8 +163,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # For this state, we simply store its value.
     def _dump_state(self):
         state = super()._dump_state()
-        state["previously_touching"] = self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]]
-        state["delay_counter"] = self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]]
+        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]])
+        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]])
 
         return state
 

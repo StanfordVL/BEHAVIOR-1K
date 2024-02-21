@@ -512,9 +512,9 @@ class ControllableObject(BaseObject):
         fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
         fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
         fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
-        fcns["mass_matrix"] = self.get_mass_matrix
-        fcns["gravity_force"] = self.get_generalized_gravity_forces
-        fcns["cc_force"] = self.get_coriolis_and_centrifugal_forces
+        fcns["mass_matrix"] = lambda: self.get_mass_matrix(clone=False)
+        fcns["gravity_force"] = lambda: self.get_generalized_gravity_forces(clone=False)
+        fcns["cc_force"] = lambda: self.get_coriolis_and_centrifugal_forces(clone=False)
 
         return fcns
 
