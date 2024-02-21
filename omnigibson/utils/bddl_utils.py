@@ -370,7 +370,8 @@ class BDDLEntity(Wrapper):
         self.is_system = is_substance_synset(self.synset)
 
         # Infer the correct category to assign
-        self.og_categories = OBJECT_TAXONOMY.get_subtree_categories(self.synset)
+        self.og_categories = OBJECT_TAXONOMY.get_subtree_substances(self.synset) \
+            if self.is_system else OBJECT_TAXONOMY.get_subtree_categories(self.synset)
 
         super().__init__(obj=entity)
 
@@ -741,6 +742,7 @@ class BDDLSampler:
                 obj_synset = self._object_instance_to_synset[obj_inst]
 
                 # We allow burners to be used as if they are stoves
+                # No need to safeguard check for subtree_substances because inroom objects will never be substances
                 categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
                 abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
 
@@ -921,7 +923,7 @@ class BDDLSampler:
             if is_substance_synset(obj_synset):
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
-                system_name = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)[0]
+                system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
                     entity=None if obj_inst in self._future_obj_instances else get_system(system_name),

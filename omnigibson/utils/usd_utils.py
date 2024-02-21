@@ -214,6 +214,11 @@ class RigidContactAPI:
     _PATH_TO_ROW_IDX = None
     _PATH_TO_COL_IDX = None
 
+    # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
+    # index in the contact view matrix
+    _ROW_IDX_TO_PATH = None
+    _COL_IDX_TO_PATH = None
+
     # Contact view for generating contact matrices at each timestep
     _CONTACT_VIEW = None
 
@@ -261,6 +266,10 @@ class RigidContactAPI:
         # Create deterministic mapping from path to row index
         cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
 
+        # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
+        cls._ROW_IDX_TO_PATH = np.array(list(cls._PATH_TO_ROW_IDX.keys()))
+        cls._COL_IDX_TO_PATH = np.array(list(cls._PATH_TO_COL_IDX.keys()))
+
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         n_bodies = len(cls._PATH_TO_COL_IDX)
         assert cls._CONTACT_VIEW.filter_count == n_bodies, \
@@ -282,6 +291,22 @@ class RigidContactAPI:
             int: col idx assigned to the rigid body defined by @prim_path
         """
         return cls._PATH_TO_COL_IDX[prim_path]
+
+    @classmethod
+    def get_row_idx_prim_path(cls, idx):
+        """
+        Returns:
+            str: @prim_path corresponding to the row idx @idx in the contact matrix
+        """
+        return cls._ROW_IDX_TO_PATH[idx]
+
+    @classmethod
+    def get_col_idx_prim_path(cls, idx):
+        """
+        Returns:
+            str: @prim_path corresponding to the column idx @idx in the contact matrix
+        """
+        return cls._COL_IDX_TO_PATH[idx]
 
     @classmethod
     def get_all_impulses(cls):
@@ -888,6 +913,37 @@ def get_mesh_volume_and_com(mesh_prim):
 
     return is_volume, volume, com
 
+def check_extent_radius_ratio(mesh_prim):
+    """
+    Checks if the extent radius ratio of @mesh_prim is within the acceptable range for PhysX GPU acceleration (not too oblong)
+
+    Ref: https://github.com/NVIDIA-Omniverse/PhysX/blob/561a0df858d7e48879cdf7eeb54cfe208f660f18/physx/source/geomutils/src/convex/GuConvexMeshData.h#L183-L190
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to check the extent radius ratio for
+
+    Returns:
+        bool: True if the extent radius ratio is within the acceptable range, False otherwise
+    """
+
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
+
+    if mesh_type != "Mesh":
+        return True
+
+    is_volume, _, com = get_mesh_volume_and_com(mesh_prim)
+
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
+    if not is_volume:
+        trimesh_mesh = trimesh_mesh.convex_hull
+
+    max_radius = trimesh_mesh.extents.max() / 2.0
+    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([com]))[1][0]
+    ratio = max_radius / min_radius
+
+    # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
+    return ratio < 95.0
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """

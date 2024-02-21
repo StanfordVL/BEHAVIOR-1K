@@ -33,7 +33,7 @@ setup(
         "trimesh~=4.0.8",
         "h5py~=3.10.0",
         "cryptography~=41.0.7",
-        "bddl~=3.4.0b3",
+        "bddl~=3.4.0b4",
         "opencv-python~=4.8.1",
         "nest_asyncio~=1.5.8",
         "imageio~=2.33.1",
@@ -43,6 +43,7 @@ setup(
         "pymeshlab~=2022.2",
         "click~=8.1.7",
         "aenum~=3.1.15",
+        "rtree~=1.2.0"
     ],
     tests_require=[],
     python_requires=">=3",

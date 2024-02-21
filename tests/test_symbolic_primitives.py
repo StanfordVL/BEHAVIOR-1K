@@ -13,6 +13,7 @@ from omnigibson.systems import get_system
 
 
 def start_env():
+  og.sim.stop()
   config = {
     "env": {
       "initial_pos_z_offset": 0.1
