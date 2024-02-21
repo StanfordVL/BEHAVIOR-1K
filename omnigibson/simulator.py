@@ -699,6 +699,9 @@ def launch_simulator(*args, **kwargs):
                             if robot.initialized:
                                 robot.update_controller_mode()
 
+                        # Also refresh any transition rules that became stale while sim was stopped
+                        TransitionRuleAPI.refresh_all_rules()
+
                 # Additionally run non physics things
                 self._non_physics_step()
 

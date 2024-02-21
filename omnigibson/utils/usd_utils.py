@@ -833,6 +833,37 @@ def get_mesh_volume_and_com(mesh_prim):
 
     return is_volume, volume, com
 
+def check_extent_radius_ratio(mesh_prim):
+    """
+    Checks if the extent radius ratio of @mesh_prim is within the acceptable range for PhysX GPU acceleration (not too oblong)
+
+    Ref: https://github.com/NVIDIA-Omniverse/PhysX/blob/561a0df858d7e48879cdf7eeb54cfe208f660f18/physx/source/geomutils/src/convex/GuConvexMeshData.h#L183-L190
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to check the extent radius ratio for
+
+    Returns:
+        bool: True if the extent radius ratio is within the acceptable range, False otherwise
+    """
+
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
+
+    if mesh_type != "Mesh":
+        return True
+
+    is_volume, _, com = get_mesh_volume_and_com(mesh_prim)
+
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
+    if not is_volume:
+        trimesh_mesh = trimesh_mesh.convex_hull
+
+    max_radius = trimesh_mesh.extents.max() / 2.0
+    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([com]))[1][0]
+    ratio = max_radius / min_radius
+
+    # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
+    return ratio < 95.0
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """
