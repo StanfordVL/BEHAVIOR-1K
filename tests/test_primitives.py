@@ -5,6 +5,8 @@ from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.simulator import launch_simulator as launch
+launch()
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
@@ -32,7 +34,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
         },
         "robots": [
             {
-                "type": "Tiago",
+                "type": "Fetch",
                 "obs_modalities": ["scan", "rgb", "depth"],
                 "scale": 1.0,
                 "self_collisions": True,
@@ -44,31 +46,31 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                 "default_trunk_offset": 0.365,
                 "controller_config": {
                     "base": {
-                        "name": "JointController",
-                        "motor_type": "velocity"
+                        "name": "DifferentialDriveController",
+                        # "motor_type": "velocity"
                     },
-                    "arm_left": {
+                    "arm_0": {
                         "name": "JointController",
-                        "motor_type": "position",
+                        "motor_type": "velocity",
                         "command_input_limits": None,
                         "command_output_limits": None, 
-                        "use_delta_commands": False
+                        "mode": "pose_delta_ori",
                     },
-                    "arm_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
-                    },
-                    "gripper_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                        "use_delta_commands": True
-                    },
-                    "gripper_right": {
+                    # "arm_right": {
+                    #     "name": "JointController",
+                    #     "motor_type": "position",
+                    #     "command_input_limits": None,
+                    #     "command_output_limits": None, 
+                    #     "use_delta_commands": False
+                    # },
+                    # "gripper_left": {
+                    #     "name": "JointController",
+                    #     "motor_type": "position",
+                    #     "command_input_limits": [-1, 1],
+                    #     "command_output_limits": None,
+                    #     "use_delta_commands": True
+                    # },
+                    "gripper_0": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
@@ -94,12 +96,12 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     gm.ENABLE_OBJECT_STATES = True
     gm.USE_GPU_DYNAMICS = False
     gm.ENABLE_FLATCACHE = False
-
+    # breakpoint()
     # Create the environment
     env = og.Environment(configs=cfg)
     robot = env.robots[0]
     env.reset()
-
+    # breakpoint()
     for obj in objects:
         og.sim.import_object(obj['object'])
         obj['object'].set_position_orientation(obj['position'], obj['orientation'])
@@ -235,3 +237,5 @@ def test_open_revolute():
     primitives_args = [(obj_1['object'],)]    
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
+test_grasp()
