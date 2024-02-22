@@ -423,7 +423,8 @@ class JointPrim(BasePrim):
         Returns:
             float: friction for this joint
         """
-        return self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0]
+        return self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0] \
+            if og.sim.is_playing() else self.get_attribute("physxJoint:jointFriction")
 
     @friction.setter
     def friction(self, friction):
@@ -433,7 +434,9 @@ class JointPrim(BasePrim):
         Args:
             friction (float): friction to set
         """
-        self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
+        self.set_attribute("physxJoint:jointFriction", friction)
+        if og.sim.is_playing():
+            self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
 
     @property
     def lower_limit(self):
