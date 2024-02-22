@@ -6,7 +6,6 @@ import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
 
 
@@ -301,7 +300,6 @@ class XFormPrim(BasePrim):
             else:
                 rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
-        BoundingBoxAPI.clear()
         return
 
     def get_world_scale(self):
