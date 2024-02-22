@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from typing import Iterable, Optional, Tuple, Dict
+from typing import Iterable, Optional, Tuple
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -9,8 +9,10 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from real_tiago.user_interfaces.teleop_core import TeleopAction, TeleopObservation
-from real_tiago.user_interfaces.teleop_policy import TeleopPolicy
+from telemoma.input_interface.teleop_core import TeleopAction, TeleopObservation
+from telemoma.input_interface.teleop_policy import TeleopPolicy
+from telemoma.utils.general_utils import AttrDict
+from telemoma.configs.base_config import teleop_config
 
 m = create_module_macros(module_path=__file__)
 m.movement_speed = 0.2  # the speed of the robot base movement
@@ -19,10 +21,11 @@ class TeleopSystem(TeleopPolicy):
     """
     Base class for teleop policy
     """
-    def __init__(self, config, robot: BaseRobot, show_control_marker: bool = True, *args, **kwargs) -> None:
+    def __init__(self, config: AttrDict, robot: BaseRobot, show_control_marker: bool = False) -> None:
         """
-        Initializes the VR system
+        Initializes the Teleoperatin System
         Args:
+            config (AttrDict): configuration dictionary
             robot (BaseRobot): the robot that will be controlled.
             show_control_marker (bool): whether to show a visual marker that indicates the target pose of the control.
         """
@@ -52,13 +55,19 @@ class TeleopSystem(TeleopPolicy):
         robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
         robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
-        for arm in self.robot_arms:
+        for i, arm in enumerate(self.robot_arms):
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn) 
+            gripper_pos = np.mean(
+                self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[i]]]
+            )
+            # if we are grasping, we manually set the gripper position to be at most 0.5
+            if self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"].is_grasping():
+                gripper_pos = min(gripper_pos, 0.5)
             robot_obs[arm] = np.r_[
                 rel_cur_pos, 
                 rel_cur_orn,
-                np.mean(self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[self.robot_arms.index(arm)]]])
+                gripper_pos
             ]
         return robot_obs
 
@@ -78,6 +87,7 @@ class TeleopSystem(TeleopPolicy):
                 delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
+                base_pos, base_orn = self.robot.get_position_orientation()
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
                 self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
@@ -90,22 +100,21 @@ class TeleopSystem(TeleopPolicy):
         self.robot_obs = TeleopObservation()
         super().reset_state()
 
+
 class OVXRSystem(TeleopSystem):
     """
-    VR Teleoperation System build on top of Omniverse XR extension
+    VR Teleoperation System build on top of Omniverse XR extension and TeleMoMa's TeleopSystem
     """
 
     def __init__(
             self,
             robot: BaseRobot,
-            show_control_marker: bool = True,
+            show_control_marker: bool = False,
             system: str = "SteamVR",
             disable_display_output: bool = False,
             enable_touchpad_movement: bool = False,
             align_anchor_to_robot_base: bool = False,
             use_hand_tracking: bool = False,
-            *args,
-            **kwargs
     ) -> None:
         """
         Initializes the VR system
@@ -126,7 +135,7 @@ class OVXRSystem(TeleopSystem):
         lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
         # run super method
-        super().__init__(robot, show_control_marker)
+        super().__init__(teleop_config, robot, show_control_marker)
         # we want to further slow down the movement speed if we are using touchpad movement
         if enable_touchpad_movement:
             self.movement_speed *= 0.1
@@ -143,7 +152,7 @@ class OVXRSystem(TeleopSystem):
             self.vr_profile.set_avatar(lazy.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
         else:
             self.vr_profile.set_avatar(lazy.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
-        # # set anchor mode to be custom anchor
+        # set anchor mode to be custom anchor
         lazy.carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene origin")
         # set vr system
         lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
@@ -281,6 +290,17 @@ class OVXRSystem(TeleopSystem):
         if self.align_anchor_to_robot_base:
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
+
+    def teleop_data_to_action(self) -> np.ndarray:
+        """
+        Generate action data from VR input for robot teleoperation
+        Returns:
+            np.ndarray: array of action data
+        """
+        # optionally update control marker
+        if self.show_control_marker:
+            self.update_control_marker()
+        return self.robot.teleop_data_to_action(self.teleop_data)
 
     def reset_transform_mapping(self, arm: str = "right") -> None:
         """

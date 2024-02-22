@@ -10,32 +10,36 @@ import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.teleop_utils import TeleopSystem
 
-from real_tiago.utils.general_utils import AttrDict
-# from real_tiago.utils.camera_utils import RealSenseCamera
+from telemoma.utils.general_utils import AttrDict
+from telemoma.utils.camera_utils import RealSenseCamera
+from telemoma.configs.base_config import teleop_config
 
-TELEOP_METHOD = "oculus"
-teleop_config = AttrDict(
-    arm_left_controller=TELEOP_METHOD,
-    arm_right_controller=TELEOP_METHOD,
-    base_controller=TELEOP_METHOD,
-    torso_controller=TELEOP_METHOD,
-
-    interface_kwargs=AttrDict(
-        oculus={},
-        # human_kpt={"camera": RealSenseCamera()},
-        keyboard={},
-        spacemouse={}
-    )
-)
 ROBOTS = {
     "FrankaPanda": "Franka Emika Panda (default)",
     "Fetch": "Mobile robot with one arm",
     "Tiago": "Mobile robot with two arms",
 }
-
+TELEOP_METHOD = {
+    "keyboard": "Keyboard (default)",
+    "spacemouse": "SpaceMouse",
+    "oculus": "Oculus Quest",
+    "human_kpt": "Human Keypoints with Camera",
+}
 
 def main():
     robot_name = choose_from_options(options=ROBOTS, name="robot")
+    arm_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot arm teleop method")
+    if robot_name != "FrankaPanda":
+        base_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot base teleop method")
+    else:
+        base_teleop_method = "keyboard" # Dummy value since FrankaPanda does not have a base
+    # Generate teleop config
+    teleop_config.arm_left_controller = arm_teleop_method
+    teleop_config.arm_right_controller = arm_teleop_method
+    teleop_config.interface_kwargs[arm_teleop_method] = {} if arm_teleop_method != "human_kpt" else {"camera": RealSenseCamera()}
+    teleop_config.base_controller = base_teleop_method
+    teleop_config.interface_kwargs[base_teleop_method] = {} if base_teleop_method != "human_kpt" else {"camera": RealSenseCamera()}
+
     # Create the config for generating the environment we want
     env_cfg = {"action_timestep": 1 / 50., "physics_timestep": 1 / 300.}
     scene_cfg = {"type": "Scene"}
@@ -76,7 +80,7 @@ def main():
             "category": "frail",
             "model": "zmjovr",
             "scale": [2, 2, 2],
-            "position": [0.6, -0.3, 0.5],
+            "position": [0.6, -0.35, 0.5],
         },
         {
             "type": "DatasetObject",
@@ -94,7 +98,7 @@ def main():
             "category": "toy_figure",
             "model": "nncqfn",
             "scale": [0.75, 0.75, 0.75],
-            "position": [0.6, 0.1, 0.5],
+            "position": [0.6, 0.15, 0.5],
         },
         {
             "type": "DatasetObject",
@@ -103,26 +107,8 @@ def main():
             "category": "toy_figure",
             "model": "eulekw",
             "scale": [0.25, 0.25, 0.25],
-            "position": [0.6, 0.2, 0.5],
-        },
-        {
-            "type": "DatasetObject",
-            "prim_path": "/World/toy_figure4",
-            "name": "toy_figure4",
-            "category": "toy_figure",
-            "model": "yxiksm",
-            "scale": [0.25, 0.25, 0.25],
             "position": [0.6, 0.3, 0.5],
-        },
-        {
-            "type": "DatasetObject",
-            "prim_path": "/World/toy_figure5",
-            "name": "toy_figure5",
-            "category": "toy_figure",
-            "model": "wvpqbf",
-            "scale": [0.75, 0.75, 0.75],
-            "position": [0.6, 0.4, 0.5],
-        },
+        }
     ]
     cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot_cfg], objects=object_cfg)
 
@@ -131,17 +117,18 @@ def main():
     env.reset()
     # update viewer camera pose
     og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
-
     # Start teleoperation system
     robot = env.robots[0]
 
     # Initialize teleoperation system
-    teleop_sys = TeleopSystem(config=teleop_config, robot=robot, disable_display_output=True, align_anchor_to_robot_base=True)
+    teleop_sys = TeleopSystem(config=teleop_config, robot=robot, show_control_marker=True)
     teleop_sys.start()
+    
     # main simulation loop
     for _ in range(10000):
         action = teleop_sys.get_action(teleop_sys.get_obs())
         env.step(action) 
+    
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
     env.close()

@@ -47,7 +47,7 @@ robots:
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
-    reset_joint_pos: tuck
+    default_reset_mode: tuck
     sensor_config:
       VisionSensor:
         sensor_kwargs:
@@ -62,7 +62,6 @@ robots:
         name: DifferentialDriveController
       arm_0:
         name: InverseKinematicsController
-        kv: 2.0
       gripper_0:
         name: MultiFingerGripperController
         mode: binary

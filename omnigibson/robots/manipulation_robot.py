@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from real_tiago.user_interfaces.teleop_core import TeleopAction, TeleopObservation
+from telemoma.input_interface.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy

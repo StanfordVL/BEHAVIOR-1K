@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import gym
 import numpy as np
-from real_tiago.user_interfaces.teleop_core import TeleopAction 
+from telemoma.input_interface.teleop_core import TeleopAction 
 
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
@@ -162,6 +162,6 @@ class TwoWheelRobot(LocomotionRobot):
         """
         action = super().teleop_data_to_action(teleop_action)
         assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
-        action[self.base_action_idx] = np.array([teleop_action.base[0], teleop_action.base[2]]) * 0.2
+        action[self.base_action_idx] = np.array([teleop_action.base[0], teleop_action.base[2]]) * 0.3
         return action
 
