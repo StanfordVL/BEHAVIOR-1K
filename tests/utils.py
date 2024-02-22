@@ -157,7 +157,7 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
     objA.set_position(target_objA_aabb_pos + objA_aabb_offset)
 
 
-def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.001):
+def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj.keep_still()
     # Reset pose if cloth object
     if obj.prim_type == PrimType.CLOTH:
