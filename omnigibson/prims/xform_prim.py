@@ -166,14 +166,6 @@ class XFormPrim(BasePrim):
         parent_path = str(parent_prim.GetPath())
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path).T
 
-        # Calculate the local transform from parent to current prim
-        # Inverse of parent world transform multiplied by the current world transform
-        # Note: only the parent's scale matters for the local transform
-        # Notation: Pose(X) = Translation(X) * Rotation(X) * Scale(X)
-        #
-        # Pose(parent->me) = inv(Pose(world->parent)) * Pose(world->me)
-        #                  = inv(Translation(world->parent) * Rotation(world->parent) * Scale(parent))
-        #                    * (Translation(world->me) * Rotation(world->me))
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         self.set_local_pose(*T.mat2pose(local_transform))
 
@@ -274,7 +266,6 @@ class XFormPrim(BasePrim):
         """
         if gm.ENABLE_FLATCACHE:
             xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
-        # assert xformable_prim.HasWorldXform() == False
         properties = self.prim.GetPropertyNames()
         if position is not None:
             position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))

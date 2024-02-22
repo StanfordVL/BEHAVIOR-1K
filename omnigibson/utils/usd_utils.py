@@ -725,7 +725,8 @@ class PoseAPI:
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
         """
-        This is needed only when accessing the parent transform of a prim.
+        This is used when information about the prim's global scale is needed, 
+        e.g. when converting points in the prim frame to the world frame.
         """
         cls._refresh()
         return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path))
