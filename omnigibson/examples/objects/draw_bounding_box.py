@@ -1,12 +1,8 @@
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
-import colorsys
-import random
 
 import numpy as np
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.ui_utils import colorize_bboxes
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -79,6 +75,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:
+            from omnigibson.utils.deprecated_utils import colorize_bboxes
             colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
             fpath = f"{bbox_modality}_img.png"
             plt.imsave(fpath, colorized_img)

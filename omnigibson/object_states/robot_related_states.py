@@ -56,7 +56,7 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
         if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
             raise ValueError("No vision sensors found on robot.")
         prim_paths = []
-        paths_to_exclude = ['BACKGROUND', 'UNLABELLED']
+        paths_to_exclude = set(['BACKGROUND', 'UNLABELLED'])
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()

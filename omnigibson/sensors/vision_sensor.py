@@ -71,6 +71,10 @@ class VisionSensor(BaseSensor):
 
     # Persistent dictionary of sensors, mapped from prim_path to sensor
     SENSORS = dict()
+    
+    # Amortized set of semantic IDs that we've seen so far
+    KNOWN_SEMANTIC_IDS = set()
+    KEY_ARRAY = None
 
     def __init__(
         self,
@@ -98,9 +102,6 @@ class VisionSensor(BaseSensor):
         self._viewport = None       # Viewport from which to grab data
         self._annotators = None
         self._render_product = None
-        
-        # Amortized set of semantic IDs that we've seen so far
-        self._known_semantic_ids = set()
         
         self._RAW_SENSOR_TYPES = dict(
             rgb="rgb",
@@ -236,23 +237,27 @@ class VisionSensor(BaseSensor):
         """
         Remap the semantic segmentation image to the class IDs defined in CLASS_NAME_TO_CLASS_ID.
         Also, correct the id_to_labels input with the labels from CLASS_NAME_TO_CLASS_ID and return it.
+        
+        Args:
+            img (np.ndarray): Semantic segmentation image to remap
+            id_to_labels (dict): Dictionary of semantic IDs to class labels
         """
         # Convert string IDs to integers
         int_ids = set(int(id) for id in id_to_labels.keys())
 
         # Determine if there are any new IDs that were not previously known
-        new_ids = int_ids - self._known_semantic_ids
+        new_ids = int_ids - VisionSensor.KNOWN_SEMANTIC_IDS
 
         # If there are new IDs, update _known_semantic_ids set and rebuild the key array
         if new_ids:
-            self._known_semantic_ids.update(new_ids)
-            max_id = max(self._known_semantic_ids)
+            VisionSensor.KNOWN_SEMANTIC_IDS.update(new_ids)
+            max_id = max(VisionSensor.KNOWN_SEMANTIC_IDS)
 
             # Initialize the key array with a default value for unmapped IDs
             key_array = np.full(max_id + 1, -1, dtype=np.int32)
 
             # Populate the key array with the new IDs based on class name mappings
-            for int_id in self._known_semantic_ids:
+            for int_id in VisionSensor.KNOWN_SEMANTIC_IDS:
                 str_id = str(int_id)
                 if str_id in id_to_labels:
                     info = id_to_labels[str_id]
@@ -262,11 +267,11 @@ class VisionSensor(BaseSensor):
                         key_array[int_id] = new_id
         else:
             # Use the existing key_array if no new IDs are found
-            key_array = self.key_array
+            key_array = VisionSensor.KEY_ARRAY
 
         corrected_id_to_labels = {}
         # Update with the new class ID
-        for int_id in self._known_semantic_ids:
+        for int_id in VisionSensor.KNOWN_SEMANTIC_IDS:
             str_id = str(int_id)
             if str_id in id_to_labels and key_array[int_id] != -1:
                 info = id_to_labels[str_id]
@@ -275,7 +280,7 @@ class VisionSensor(BaseSensor):
         # Remap the image
         remapped_img = key_array[img]
 
-        self.key_array = key_array
+        VisionSensor.KEY_ARRAY = key_array
         return remapped_img, corrected_id_to_labels
 
     def add_modality(self, modality):
@@ -567,6 +572,8 @@ class VisionSensor(BaseSensor):
         render()
 
         cls.SENSORS = dict()
+        cls.KNOWN_SEMANTIC_IDS = set()
+        cls.KEY_ARRAY = None
 
     @classproperty
     def all_modalities(cls):
