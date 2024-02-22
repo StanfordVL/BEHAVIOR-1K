@@ -770,9 +770,9 @@ def launch_simulator(*args, **kwargs):
             """
             Step the physics a single step.
             """
-            PoseAPI.invalidate()
             self._physics_context._step(current_time=self.current_time)
             self._omni_update_step()
+            PoseAPI.invalidate()
 
         def _on_contact(self, contact_headers, contact_data):
             """

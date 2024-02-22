@@ -698,22 +698,32 @@ class FlatcacheAPI:
 
 
 class PoseAPI:
-    DIRTY = True
+    """
+    This is a singleton class for getting world poses.
+    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
+    After that, if we need to access the pose of a prim without stepping physics, 
+    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    """
+    VALID = False
     
     @classmethod
     def invalidate(cls):
-        cls.DIRTY = True
+        cls.VALID = False
         
     @classmethod
     def mark_valid(cls):
-        cls.DIRTY = False
+        cls.VALID = True
         
     @classmethod
     def _refresh(cls):
-        if og.sim is not None and cls.DIRTY:
+        if og.sim is not None and not cls.VALID:
+            # when flatcache is on
             if og.sim._physx_fabric_interface:
+                # no time step is taken here
                 og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            # when flatcache is off
             else:
+                # no time step is taken here
                 og.sim.psi.fetch_results()
             cls.mark_valid()
         
