@@ -222,4 +222,4 @@ def get_class_name_to_class_id():
     return class_name_to_class_id
 
 
-CLASS_NAME_TO_CLASS_ID = get_class_name_to_class_id()
+CLASS_NAME_TO_SEMANTIC_CLASS_ID = get_class_name_to_class_id()
