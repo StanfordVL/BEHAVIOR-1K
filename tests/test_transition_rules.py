@@ -549,11 +549,11 @@ def test_cooking_system_rule_failure_recipe_systems():
 
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because chicken broth (recipe system) is not in the stockpot
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 1.95]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.95]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.95]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.95]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.95]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 1.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -610,11 +610,11 @@ def test_cooking_system_rule_failure_nonrecipe_systems():
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because water (nonrecipe system) is inside the stockpot
     water.generate_particles(positions=[[-0.24, 0.11, 0.95]])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.95]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.95]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.95]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.95]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.95]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -674,11 +674,11 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because the bowl (nonrecipe object) is inside the stockpot
     bowl.set_position_orientation([-0.24, 0.11, 0.95], [0, 0, 0, 1])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.95]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.95]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.95]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.95]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.95]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -737,11 +737,11 @@ def test_cooking_system_rule_success():
     assert stockpot.states[OnTop].get_value(stove)
 
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.95]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.95]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.95]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.95]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.95]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
