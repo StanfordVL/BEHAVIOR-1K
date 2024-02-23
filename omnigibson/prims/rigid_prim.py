@@ -608,7 +608,7 @@ class RigidPrim(XFormPrim):
     def _compute_points_on_convex_hull(self, visual):
         """
         Returns:
-            np.ndarray: points on the convex hull of all points from child geom prims
+            np.ndarray or None: points on the convex hull of all points from child geom prims
         """
         meshes = self._visual_meshes if visual else self._collision_meshes
         points = []
@@ -628,7 +628,8 @@ class RigidPrim(XFormPrim):
             return points[hull.vertices, :]
         except scipy.spatial.qhull.QhullError:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)
-            return None
+            # return all the points in this case
+            return points
         
     @cached_property
     def visual_boundary_points(self):
@@ -650,9 +651,6 @@ class RigidPrim(XFormPrim):
     def aabb(self):
         position, orientation = self.get_position_orientation()
         hull_points = self.collision_boundary_points
-        if hull_points is None:
-            # TODO: Decide if this is the right thing to do
-            return position, position
         
         scale = self.scale
         points_scaled = hull_points * scale

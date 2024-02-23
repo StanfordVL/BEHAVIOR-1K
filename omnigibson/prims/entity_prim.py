@@ -1250,11 +1250,6 @@ class EntityPrim(XFormPrim):
                 points_transformed = points_rotated + position
                 points_world.append(points_transformed)
 
-            if not points_world:
-                # TODO: Decide if this is the right thing to do
-                position = self.get_position()
-                return position, position
-
             all_points = np.concatenate(points_world, axis=0)
             aabb_lo = np.min(all_points, axis=0)
             aabb_hi = np.max(all_points, axis=0)
