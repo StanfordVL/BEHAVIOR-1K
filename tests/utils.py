@@ -90,7 +90,7 @@ def assert_test_scene():
                 get_obj_cfg("oven", "oven", "cgtaer", bounding_box=[0.943, 0.837, 1.297]),
                 get_obj_cfg("baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]),
                 get_obj_cfg("bagel_dough", "bagel_dough", "iuembm"),
-                get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("raw_egg", "raw_egg", "ydgivr", prim_type=PrimType.CLOTH),
                 get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
@@ -134,6 +134,12 @@ def assert_test_scene():
         # Create the environment
         env = og.Environment(configs=cfg)
 
+        # Additional processing for the tests to pass more deterministically
+        og.sim.stop()
+        bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
+        bagel_dough.root_link.collision_meshes["collisions"].set_collision_approximation("boundingCube")
+        og.sim.play()
+
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = np.random.uniform(pos_low, pos_hi, 3)
@@ -141,7 +147,7 @@ def get_random_pose(pos_low=10.0, pos_hi=20.0):
     return pos, orn
 
 
-def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.001):
     objA.keep_still()
     objB.keep_still()
     # Reset pose if cloth object
