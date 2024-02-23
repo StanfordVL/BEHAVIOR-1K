@@ -134,6 +134,15 @@ def assert_test_scene():
         # Create the environment
         env = og.Environment(configs=cfg)
 
+        # Additional processing for the tests to pass more deterministically
+        og.sim.stop()
+        bounding_box_object_names = ["bagel_dough", "raw_egg"]
+        for name in bounding_box_object_names:
+            obj = og.sim.scene.object_registry("name", name)
+            for collision_mesh in obj.root_link.collision_meshes.values():
+                collision_mesh.set_collision_approximation("boundingCube")
+        og.sim.play()
+
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = np.random.uniform(pos_low, pos_hi, 3)
@@ -141,7 +150,7 @@ def get_random_pose(pos_low=10.0, pos_hi=20.0):
     return pos, orn
 
 
-def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.001):
     objA.keep_still()
     objB.keep_still()
     # Reset pose if cloth object

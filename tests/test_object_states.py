@@ -4,7 +4,6 @@ from omnigibson.systems import get_system, is_physical_particle_system, is_visua
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson as og
 
 from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane, SYSTEM_EXAMPLES
@@ -232,7 +231,7 @@ def test_aabb():
     # Need to take one sim step
     og.sim.step()
 
-    assert np.allclose(breakfast_table.states[AABB].get_value(), BoundingBoxAPI.compute_aabb(breakfast_table))
+    assert np.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
     assert np.all((breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1]))
 
     pp = dishtowel.root_link.compute_particle_positions()

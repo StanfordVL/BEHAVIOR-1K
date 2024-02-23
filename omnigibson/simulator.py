@@ -19,7 +19,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI
 from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
                                        print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
@@ -652,7 +652,6 @@ def launch_simulator(*args, **kwargs):
             Step any omni-related things
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            BoundingBoxAPI.clear()
             RigidContactAPI.clear()
 
         def play(self):
