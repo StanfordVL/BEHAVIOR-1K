@@ -87,7 +87,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$3" > "output_eval.txt" 2>&1 &
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$3 --render" > "output_eval.txt" 2>&1 &
     fi
     
 done
