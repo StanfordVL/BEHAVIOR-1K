@@ -413,11 +413,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                try: 
-                    aabb = self.link.visual_aabb
-                except NotImplementedError:
-                    # If the link doesn't have an AABB, we can't check for overlaps
-                    return False
+                aabb = self.link.visual_aabb
                 og.sim.psqi.overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
