@@ -241,6 +241,9 @@ class VisionSensor(BaseSensor):
         Args:
             img (np.ndarray): Semantic segmentation image to remap
             id_to_labels (dict): Dictionary of semantic IDs to class labels
+        Returns:
+            np.ndarray: Remapped semantic segmentation image
+            dict: Corrected id_to_labels dictionary
         """
         # Convert string IDs to integers
         int_ids = set(int(id) for id in id_to_labels.keys())
