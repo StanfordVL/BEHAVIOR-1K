@@ -4,15 +4,20 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 import wandb
+import argparse
 
 from telegym import serve_env_over_grpc
 
 gm.USE_FLATCACHE = True
 
-def main(local_addr, learner_addr):
+def main(local_addr, learner_addr, render):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     config_path = os.path.join(script_dir, "omni_grpc.yaml")
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
+
+    if not render:
+        gm.ENABLE_RENDERING = False
+        del config['env']['external_sensors']
 
     env = og.Environment(configs=config)
 
@@ -24,13 +29,19 @@ def main(local_addr, learner_addr):
 if __name__ == "__main__":
     import sys, socket
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("learner_addr", type=str)
+    parser.add_argument("--port", type=int, default=None)
+    parser.add_argument("--render", action="store_true")
+    args = parser.parse_args()
+
     # Obtain an unused port
-    if len(sys.argv) > 2:
-        local_port = int(sys.argv[2])
+    if args.port is not None:
+        local_port = args.port
     else:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(("", 0))
         local_port = s.getsockname()[1]
         s.close()
 
-    main("0.0.0.0:" + str(local_port), sys.argv[1])
+    main("0.0.0.0:" + str(local_port), args.learner_addr, args.render)

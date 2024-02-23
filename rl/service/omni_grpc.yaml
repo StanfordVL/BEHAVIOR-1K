@@ -1,6 +1,6 @@
 env:
-  action_timestep: 0.1
-  physics_timestep: 0.01666666666
+  action_frequency: 10
+  physics_frequency: 60
   flatten_obs_space: true
   flatten_action_space: true
   external_sensors:
