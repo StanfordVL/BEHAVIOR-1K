@@ -388,6 +388,9 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         aabb_volume = np.product(volume_link.visual_aabb_extent)
         sampling_distance = np.cbrt(aabb_volume / min_n_particles)
         low, high = volume_link.visual_aabb
+        if np.all(low == high):
+            # If the AABB doesn't exist, then the volume is 0
+            return 0.0
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
         assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius

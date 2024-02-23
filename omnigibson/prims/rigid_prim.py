@@ -690,18 +690,8 @@ class RigidPrim(XFormPrim):
         points_to_transform = []
 
         if self.visual_boundary_points is None:
-            # TODO: Decide if this is the right thing to do
-            # No predefined hull points, gather corners from mesh extents
-            for mesh in self._visual_meshes.values():
-                extent = mesh.prim.GetAttribute("extent").Get()
-                lo, hi = np.array(extent[0]), np.array(extent[1])
-                # Append corners of the bounding box
-                points_to_transform.extend([
-                    [lo[0], lo[1], lo[2]], [hi[0], lo[1], lo[2]],
-                    [lo[0], hi[1], lo[2]], [hi[0], hi[1], lo[2]],
-                    [lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]],
-                    [lo[0], hi[1], hi[2]], [hi[0], hi[1], hi[2]]
-                ])
+            # When there's no points on the visual meshes
+            return position, position
         else:
             # Use predefined hull points directly
             points_to_transform.extend(self.visual_boundary_points)

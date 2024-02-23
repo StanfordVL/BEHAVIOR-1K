@@ -389,7 +389,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
-                z_extent = cls._particle_object.extent[2]
                 if not cls._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = np.array([z_extent * particle.scale[2] for particle in cls._group_particles[group].values()]) / 2.0
                     # Shift the particles halfway up
