@@ -713,7 +713,6 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     rosemary.remove_all_particles()
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_system_rule_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -903,7 +902,6 @@ def test_cooking_object_rule_failure_unary_states():
     # Clean up
     sesame_seed.remove_all_particles()
 
-@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_object_rule_failure_binary_system_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1392,7 +1390,6 @@ def test_single_toggleable_machine_rule_output_system_success():
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_single_toggleable_machine_rule_output_object_failure_unary_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
