@@ -402,7 +402,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Define the function for checking whether points are within the adjacency mesh
             def check_in_adjacency_mesh(particle_positions):
                 # Define the AABB bounds
-                lower, upper = self.link.aabb
+                lower, upper = self.link.visual_aabb
                 # Add the margin
                 lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
                 upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
@@ -413,7 +413,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                aabb = self.link.aabb
+                aabb = self.link.visual_aabb
                 og.sim.psqi.overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
@@ -1120,7 +1120,7 @@ class ParticleApplier(ParticleModifier):
                     system.create_attachment_group(obj=self.obj)
                 avg_scale = np.cbrt(np.product(self.obj.scale))
                 scales = system.sample_scales_by_group(group=group, n=len(start_points))
-                cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
+                cuboid_dimensions = scales * system.particle_object.extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
                 cuboid_dimensions = np.zeros(3)
@@ -1317,7 +1317,7 @@ class ParticleApplier(ParticleModifier):
         """
         # Randomly sample end points from within the object's AABB
         n_samples = self._get_max_particles_limit_per_step(system=system)
-        lower, upper = self.link.aabb
+        lower, upper = self.link.visual_aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         lower_upper = np.concatenate([lower, upper], axis=0)

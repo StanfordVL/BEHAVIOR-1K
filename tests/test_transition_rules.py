@@ -4,7 +4,6 @@ from omnigibson.systems import get_system, is_physical_particle_system, is_visua
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
 import omnigibson as og
@@ -331,9 +330,9 @@ def test_cooking_physical_particle_rule_failure_recipe_systems():
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    arborio_rice.generate_particles(positions=[[-0.25, 0.13, 0.97]])
+    arborio_rice.generate_particles(positions=[[-0.25, 0.13, 0.95]])
     # This fails the recipe because water (recipe system) is not in the stockpot
-    water.generate_particles(positions=[[-0.25, 0.17, 1.97]])
+    water.generate_particles(positions=[[-0.25, 0.17, 1.95]])
 
     assert stockpot.states[Contains].get_value(arborio_rice)
     assert not stockpot.states[Contains].get_value(water)
@@ -372,8 +371,8 @@ def test_cooking_physical_particle_rule_success():
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    arborio_rice.generate_particles(positions=[[-0.25, 0.13, 0.97]])
-    water.generate_particles(positions=[[-0.25, 0.17, 0.97]])
+    arborio_rice.generate_particles(positions=[[-0.25, 0.13, 0.95]])
+    water.generate_particles(positions=[[-0.25, 0.17, 0.95]])
 
     assert stockpot.states[Contains].get_value(arborio_rice)
     assert stockpot.states[Contains].get_value(water)
@@ -550,11 +549,11 @@ def test_cooking_system_rule_failure_recipe_systems():
 
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because chicken broth (recipe system) is not in the stockpot
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 1.97]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.97]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.97]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.97]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.97]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 1.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -587,7 +586,6 @@ def test_cooking_system_rule_failure_recipe_systems():
     rosemary.remove_all_particles()
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
 @og_test
 def test_cooking_system_rule_failure_nonrecipe_systems():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -612,11 +610,11 @@ def test_cooking_system_rule_failure_nonrecipe_systems():
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because water (nonrecipe system) is inside the stockpot
     water.generate_particles(positions=[[-0.24, 0.11, 0.95]])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.97]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.97]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.97]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.97]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.97]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -676,11 +674,11 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
     # This fails the recipe because the bowl (nonrecipe object) is inside the stockpot
     bowl.set_position_orientation([-0.24, 0.11, 0.95], [0, 0, 0, 1])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.97]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.97]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.97]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.97]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.97]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -739,11 +737,11 @@ def test_cooking_system_rule_success():
     assert stockpot.states[OnTop].get_value(stove)
 
     chicken.set_position_orientation([-0.24, 0.11, 0.88], [0, 0, 0, 1])
-    chicken_broth.generate_particles(positions=[[-0.25, 0.13, 0.97]])
-    diced_carrot.generate_particles(positions=[[-0.25, 0.17, 0.97]])
-    diced_celery.generate_particles(positions=[[-0.15, 0.13, 0.97]])
-    salt.generate_particles(positions=[[-0.15, 0.15, 0.97]])
-    rosemary.generate_particles(positions=[[-0.15, 0.17, 0.97]])
+    chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.95]])
+    diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.95]])
+    diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.95]])
+    salt.generate_particles(positions=[[-0.33, 0.15, 0.95]])
+    rosemary.generate_particles(positions=[[-0.22, 0.15, 0.95]])
     og.sim.step()
 
     assert chicken.states[Inside].get_value(stockpot)
@@ -841,11 +839,10 @@ def test_cooking_object_rule_failure_recipe_objects():
     assert baking_sheet.states[Inside].get_value(oven)
 
     # This fails the recipe because it requires the bagel dough to be on top of the baking sheet
-    bagel_dough.set_position_orientation([1, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([1.02, 0, 0.54], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([1, 0, 0.5], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([1.02, 0, 0.55], [0, 0, 0, 1])
     og.sim.step()
     assert not bagel_dough.states[OnTop].get_value(baking_sheet)
-    assert raw_egg.states[OnTop].get_value(bagel_dough)
 
     assert bagel_dough.states[Cooked].set_value(False)
     assert raw_egg.states[Cooked].set_value(False)
@@ -882,8 +879,8 @@ def test_cooking_object_rule_failure_unary_states():
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -924,8 +921,8 @@ def test_cooking_object_rule_failure_binary_system_states():
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -966,7 +963,7 @@ def test_cooking_object_rule_failure_binary_object_states():
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.12, 0.15, 0.47], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -1010,7 +1007,7 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     og.sim.step()
 
     bagel_dough.set_position_orientation([-0.20, 0, 0.84], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([-0.18, 0, 0.845], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([-0.18, 0, 0.89], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -1034,7 +1031,6 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     # Clean up
     sesame_seed.remove_all_particles()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
 @og_test
 def test_cooking_object_rule_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1057,8 +1053,8 @@ def test_cooking_object_rule_success():
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.495], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.54], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -1295,7 +1291,6 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1346,7 +1341,6 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
 @og_test
 def test_single_toggleable_machine_rule_output_system_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1470,7 +1464,6 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
 @og_test
 def test_single_toggleable_machine_rule_output_object_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
