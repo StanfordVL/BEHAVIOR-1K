@@ -682,7 +682,7 @@ class VisualParticleSystem(BaseSystem):
         )
 
         # Convert these into scaling factors for the x and y axes for our particle object
-        particle_bbox = cls.particle_object.aabb_extent
+        particle_bbox = cls.particle_object.extent
         minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
         maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
 
@@ -948,8 +948,8 @@ class PhysicalParticleSystem(BaseSystem):
         # Grab the link's AABB (or fallback to obj AABB if link does not have a valid AABB),
         # and generate a grid of points based on the sampling distance
         try:
-            low, high = link.aabb
-            extent = link.aabb_extent
+            low, high = link.visual_aabb
+            extent = link.visual_aabb_extent
         except ValueError:
             low, high = obj.aabb
             extent = obj.aabb_extent
