@@ -601,15 +601,6 @@ class BDDLSampler:
 
                 self._inroom_object_instances.add(obj_inst)
 
-        for obj_synset in self._activity_conditions.parsed_objects:
-            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
-            if "sceneObject" not in abilities:
-                continue
-            for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
-                if obj_inst not in self._inroom_object_instances:
-                    # Missing room assignment
-                    return f"All non-sampleable (scene) objects should have room assignment. [{obj_inst}] does not have one."
-
     def _build_sampling_order(self):
         """
         Sampling orders is a list of lists: [[batch_1_inst_1, ... batch_1_inst_N], [batch_2_inst_1, batch_2_inst_M], ...]
@@ -914,10 +905,6 @@ class BDDLSampler:
             # Don't populate agent
             if obj_synset == "agent.n.01":
                 continue
-            # Don't populate synsets that can't be sampled
-            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
-            if "sceneObject" in abilities:
-                continue
 
             # Populate based on whether it's a substance or not
             if is_substance_synset(obj_synset):
@@ -939,6 +926,9 @@ class BDDLSampler:
                     # Don't explicitly sample if future
                     if obj_inst in self._future_obj_instances:
                         self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
+                        continue
+                    # Don't sample if already in room
+                    if obj_inst in self._inroom_object_instances:
                         continue
 
                     category = np.random.choice(categories)
