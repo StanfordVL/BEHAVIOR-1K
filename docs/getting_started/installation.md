@@ -91,7 +91,7 @@ There are two ways to setup **`OmniGibson`**:
 
                 1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) and NVIDIA's [Omniverse Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html) 
 
-                    !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large **`OmniGibson`** scenes. Please install 2022.2.0 instead."
+                    !!! warning "Please make sure you have the latest version of Isaac Sim (2023.1.1) installed."
 
                     For Ubuntu 22.04, you need to [install FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) to run the Omniverse Launcher AppImage.
 
@@ -112,7 +112,7 @@ There are two ways to setup **`OmniGibson`**:
                     ./scripts/setup.sh # (1)!
                     ```
 
-                    1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `~/.local/share/ov/pkg/isaac_sim-2022.2.0`
+                    1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `~/.local/share/ov/pkg/isaac_sim-2023.1.1`
 
                     This will create a conda environment with `omnigibson` installed. Simply call `conda activate` to activate it.
 
@@ -132,7 +132,7 @@ There are two ways to setup **`OmniGibson`**:
 
                 1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) and NVIDIA's [Omniverse Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html)
 
-                    !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large **`OmniGibson`** scenes. Please install 2022.2.0 instead."
+                    !! warning "Please make sure you have the latest version of Isaac Sim (2023.1.1) installed."
 
                 2. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
 
@@ -151,7 +151,7 @@ There are two ways to setup **`OmniGibson`**:
                     .\scripts\setup.bat # (1)!
                     ```
 
-                    1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2022.2.0`
+                    1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2023.1.1`
 
                     This will create a conda env with `omnigibson` installed. Simply call `conda activate` to activate it.
 
@@ -169,10 +169,6 @@ There are two ways to setup **`OmniGibson`**:
 !!! warning annotate "Expect slowdown during first execution"
 
     Omniverse requires some one-time startup setup when **`OmniGibson`** is imported for the first time.
-    
-    ```
-    [Warning] [gpu.foundation.plugin] Waiting for compilation of ray tracing shaders by GPU driver
-    ```
     
     The process could take up to 5 minutes. This is expected behavior, and should only occur once!
 
@@ -203,7 +199,7 @@ python -m omnigibson.examples.robots.robot_control_example # (1)!
 
     You probably need to [install FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) to run the Omniverse Launcher AppImage.
 
-??? question "OmniGibson is stuck at shader compilation upon startup"
+??? question "OmniGibson is stuck upon first startup"
 
     The process could take up to 5 minutes. This is expected behavior, and should only occur once when you import OmniGibson for the first time.
 
