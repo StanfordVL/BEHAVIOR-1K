@@ -700,8 +700,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_frequency": 60,
-                "physics_frequency": 60,
+                "action_frequency": 30,
+                "physics_frequency": 120,
                 "device": None,
                 "automatic_reset": False,
                 "flatten_action_space": False,
