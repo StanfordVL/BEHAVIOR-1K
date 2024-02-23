@@ -71,10 +71,9 @@ function init() {
 
 	// Render footer
 	document.getElementById('dl-button').onclick = () => {
-		const dataUrl = 'data:,' + JSON.stringify(data, null, 2);
 		const a = document.createElement('a');
-		a.href = dataUrl;
-		a.download = 'OmniGibson_profiling.json';
+		a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: "application/json"}));
+		a.download = 'OmniGibson Profiling.json';
 		a.click();
 	};
 
