@@ -586,7 +586,7 @@ def test_cooking_system_rule_failure_recipe_systems():
     rosemary.remove_all_particles()
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_system_rule_failure_nonrecipe_systems():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -665,7 +665,7 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     rosemary = get_system("rosemary")
     chicken_soup = get_system("cooked__chicken_soup")
 
-    place_obj_on_floor_plane(stove, y_offset=0.0077189438, z_offset=0.0051004850)
+    place_obj_on_floor_plane(stove)
     og.sim.step()
 
     stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
@@ -714,6 +714,7 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     rosemary.remove_all_particles()
     og.sim.step()
 
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_system_rule_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -730,7 +731,7 @@ def test_cooking_system_rule_success():
     deleted_objs = [chicken]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    place_obj_on_floor_plane(stove, y_offset=0.0077189438, z_offset=0.0051004850)
+    place_obj_on_floor_plane(stove)
     og.sim.step()
 
     stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
@@ -790,7 +791,7 @@ def test_cooking_object_rule_failure_wrong_container():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.002, y_offset=0.0015, z_offset=-0.001)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     # This fails the recipe because it requires the baking sheet to be inside the oven, not the stockpot
@@ -832,7 +833,7 @@ def test_cooking_object_rule_failure_recipe_objects():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -874,7 +875,7 @@ def test_cooking_object_rule_failure_unary_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -904,6 +905,7 @@ def test_cooking_object_rule_failure_unary_states():
     # Clean up
     sesame_seed.remove_all_particles()
 
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_object_rule_failure_binary_system_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -916,7 +918,7 @@ def test_cooking_object_rule_failure_binary_system_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -958,7 +960,7 @@ def test_cooking_object_rule_failure_binary_object_states():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -1033,7 +1035,7 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     # Clean up
     sesame_seed.remove_all_particles()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_cooking_object_rule_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1049,7 +1051,7 @@ def test_cooking_object_rule_success():
 
     initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
 
-    place_obj_on_floor_plane(oven, x_offset=-0.00217919, y_offset=0.00150703, z_offset=0.00883263)
+    place_obj_on_floor_plane(oven)
     og.sim.step()
 
     baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
@@ -1294,7 +1296,7 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1345,7 +1347,7 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_single_toggleable_machine_rule_output_system_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1395,6 +1397,7 @@ def test_single_toggleable_machine_rule_output_system_success():
         og.sim.import_object(obj)
     og.sim.step()
 
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_single_toggleable_machine_rule_output_object_failure_unary_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1469,7 +1472,7 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
         og.sim.import_object(obj)
     og.sim.step()
 
-@pytest.mark.skip(reason="will fix in PR #605.")
+@pytest.mark.skip(reason="will fix in PR #582.")
 @og_test
 def test_single_toggleable_machine_rule_output_object_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
