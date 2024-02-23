@@ -649,13 +649,14 @@ class RigidPrim(XFormPrim):
         
     @property
     def aabb(self):
-        position, orientation = self.get_position_orientation()
+        position, _ = self.get_position_orientation()
         hull_points = self.collision_boundary_points
         
-        scale = self.scale
-        points_scaled = hull_points * scale
-        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-        points_transformed = points_rotated + position
+        if hull_points is None:
+            # When there's no points on the collision meshes
+            return position, position
+        
+        points_transformed = self._transform_points_to_world(hull_points)
 
         aabb_lo = np.min(points_transformed, axis=0)
         aabb_hi = np.max(points_transformed, axis=0)
@@ -685,21 +686,8 @@ class RigidPrim(XFormPrim):
     
     @property
     def visual_aabb(self):
-        position, orientation = self.get_position_orientation()
-        scale = self.scale
-        points_to_transform = []
-
-        if self.visual_boundary_points is None:
-            # When there's no points on the visual meshes
-            return position, position
-        else:
-            # Use predefined hull points directly
-            points_to_transform.extend(self.visual_boundary_points)
-
-        # Convert to numpy array for efficient operations
-        points_to_transform = np.array(points_to_transform) * scale
-        rotation_matrix = T.quat2mat(orientation)
-        points_transformed = np.dot(points_to_transform, rotation_matrix.T) + position
+        assert self.visual_boundary_points is not None, "No visual boundary points found for this rigid prim"
+        points_transformed = self._transform_points_to_world(np.array(self.visual_boundary_points))
 
         # Calculate and return the AABB
         aabb_lo = np.min(points_transformed, axis=0)
@@ -798,3 +786,11 @@ class RigidPrim(XFormPrim):
         state_dic["ang_vel"] = state[idx + 3: idx + 6]
 
         return state_dic, idx + 6
+
+    def _transform_points_to_world(self, points):
+        scale = self.scale
+        points_scaled = points * scale
+        position, orientation = self.get_position_orientation()
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+        return points_transformed
