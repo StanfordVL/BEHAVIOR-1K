@@ -14,7 +14,6 @@ from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.macros import gm, create_module_macros
@@ -530,10 +529,8 @@ class DatasetObject(USDObject):
                     # If we're visual and the mesh is not visible, there is no fallback so continue
                     if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
                         continue
-                    # If no BB annotation is available, get the AABB for this link.
-                    aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
-                    aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                            aabb_extent / 2
+                    aabb_vertices_in_world = link.aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
+                            link.aabb_extent / 2
                     )
                     aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
                         aabb_vertices_in_world, world_to_base_frame
