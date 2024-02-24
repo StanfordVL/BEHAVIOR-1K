@@ -1012,7 +1012,7 @@ class MeltingRule(BaseTransitionRule):
         # Convert the meltable object into its melted substance
         for meltable_obj in object_candidates["meltable"]:
             # All meltable xyz, half_xyz and diced__xyz transform into melted__xyz
-            root_category = meltable_obj.category.removeprefix("half_").remove_prefix("diced__")
+            root_category = meltable_obj.category.removeprefix("half_").removeprefix("diced__")
             system_name = f"melted__{root_category}"
             system = get_system(system_name)
             system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False)
