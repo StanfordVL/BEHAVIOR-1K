@@ -95,7 +95,7 @@ def assert_test_scene():
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
                 get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
-                get_obj_cfg("chicken", "chicken", "nppsmz"),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.8),
                 get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
                 get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
                 get_obj_cfg("apple", "apple", "agveuv"),
@@ -110,14 +110,6 @@ def assert_test_scene():
                     "obs_modalities": [],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
-                    "controller_config": {
-                        # Make sure to use null joint controller for the arm so that we can move the arm qpos
-                        # accordingly
-                        "arm_0": {
-                            "name": "NullJointController",
-                            "motor_type": "position",
-                        },
-                    },
                 }
             ]
         }
@@ -177,3 +169,8 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
 
     target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
+
+def remove_all_systems():
+    for system in ParticleRemover.supported_active_systems.values():
+        system.remove_all_particles()
+    og.sim.step()
