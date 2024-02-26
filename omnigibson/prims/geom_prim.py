@@ -7,6 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.usd_utils import PoseAPI
 import omnigibson.utils.transform_utils as T
 
 
@@ -130,7 +131,7 @@ class GeomPrim(XFormPrim):
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
-            return self.prim.GetAttribute("points").Get()
+            return np.array(self.prim.GetAttribute("points").Get())
         
         # Generate a trimesh for other shapes
         if mesh_type == "Sphere":
@@ -155,8 +156,8 @@ class GeomPrim(XFormPrim):
             raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
     
         # Return the vertices of the trimesh
-        return mesh.vertices
-    
+        return np.array(mesh.vertices)
+
     @property
     def points_in_parent_frame(self):
         points = self.points
@@ -168,7 +169,42 @@ class GeomPrim(XFormPrim):
         points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
         points_transformed = points_rotated + position
         return points_transformed
-    
+
+    @property
+    def aabb(self):
+        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+        
+        # transform self.points into world frame
+        points = self.points
+        points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
+        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:,:3]
+
+        aabb_lo = np.min(points_transformed, axis=0)
+        aabb_hi = np.max(points_transformed, axis=0)
+        return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Bounding box extent of this geom prim
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Bounding box center of this geom prim
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
+
     @cached_property
     def extent(self):
         """

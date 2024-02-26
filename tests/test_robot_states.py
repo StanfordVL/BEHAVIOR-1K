@@ -55,7 +55,7 @@ def camera_pose_test(flatcache):
     # Get vision sensor world pose via directly calling get_position_orientation
     sensor_world_pos, sensor_world_ori = vision_sensor.get_position_orientation()
 
-    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.36912537])
+    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.3833847])
     sensor_world_ori_gt = np.array([-0.29444987, 0.29444981, 0.64288363, -0.64288352])
     
     assert np.allclose(sensor_world_pos, sensor_world_pos_gt)
