@@ -82,7 +82,6 @@ def instantiate_envs():
         gm.USE_FLATCACHE = True
 
         og_env = og.Environment(configs=_get_env_config())
-        from IPython import embed; embed()
         env = DummyVecEnv([lambda: og_env])
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))

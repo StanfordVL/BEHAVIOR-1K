@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=60G
-#SBATCH --gres=gpu:titanrtx:1
+#SBATCH --gres=gpu:titanrtx:2
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
@@ -87,7 +87,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$3 --render" > "output_eval.txt" 2>&1 &
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$4 python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$3 --render" > "output_eval.txt" 2>&1 &
     fi
     
 done

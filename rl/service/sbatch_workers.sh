@@ -81,7 +81,7 @@ for i in {0..2}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 && cd /omnigibson-src/rl/service && python -u omni_grpc_worker.py $1" \
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb && cd /omnigibson-src/rl/service && WANDB_API_KEY=$2 python -u omni_grpc_worker.py $1" \
         > "output_${SLURM_ARRAY_TASK_ID}_${i}.txt" 2>&1 &
 done
 
