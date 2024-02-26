@@ -582,8 +582,8 @@ class PoseAPI:
     @classmethod
     def get_world_pose(cls, prim_path):
         cls._refresh()
-        return lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-    
+        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
         """
@@ -591,7 +591,7 @@ class PoseAPI:
         e.g. when converting points in the prim frame to the world frame.
         """
         cls._refresh()
-        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path))
+        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
 def clear():

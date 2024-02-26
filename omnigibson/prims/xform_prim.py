@@ -165,7 +165,7 @@ class XFormPrim(BasePrim):
 
         parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
         parent_path = str(parent_prim.GetPath())
-        parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path).T
+        parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         self.set_local_pose(*T.mat2pose(local_transform))
@@ -179,8 +179,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        position, orientation = PoseAPI.get_world_pose(self._prim_path)
-        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+        return PoseAPI.get_world_pose(self._prim_path)
 
     def set_position(self, position):
         """
@@ -293,7 +292,6 @@ class XFormPrim(BasePrim):
             xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
             # We also need to clear the fabric's world pose (potentially set by physx) to force fabric to use
             # the local pose we just set, because world pose takes precendence over local pose.
-            # if xformable_prim.HasWorldXform():
             assert not xformable_prim.HasWorldXform(), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
             xformable_prim.SetLocalXformFromUsd()
         return
@@ -309,6 +307,13 @@ class XFormPrim(BasePrim):
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
         return np.array(transform.GetScale())
+    
+    @property
+    def scaled_transform(self):
+        """
+        Returns the scaled transform of this prim.
+        """
+        return PoseAPI.get_world_pose_with_scale(self._prim_path)
 
     @property
     def scale(self):
