@@ -1,10 +1,13 @@
+from functools import cached_property
 import numpy as np
+import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 
 class GeomPrim(XFormPrim):
@@ -116,6 +119,64 @@ class GeomPrim(XFormPrim):
             self.material.opacity_constant = opacity
         else:
             self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+    
+    @property
+    def points(self):
+        """
+        Returns:
+            np.ndarray: Local poses of all points
+        """
+        # If the geom is a mesh we can directly return its points.
+        mesh = self.prim
+        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+        if mesh_type == "Mesh":
+            return self.prim.GetAttribute("points").Get()
+        
+        # Generate a trimesh for other shapes
+        if mesh_type == "Sphere":
+            radius = mesh.GetAttribute("radius").Get()
+            mesh = trimesh.creation.icosphere(subdivision=3, radius=radius)
+        elif mesh_type == "Cube":
+            extent = mesh.GetAttribute("size").Get()
+            mesh = trimesh.creation.box([extent]*3)
+        elif mesh_type == "Cone":
+            radius = mesh.GetAttribute("radius").Get()
+            height = mesh.GetAttribute("height").Get()
+            mesh = trimesh.creation.cone(radius=radius, height=height)
+            
+            # Trimesh cones are centered at the base. We'll move them down by half the height.
+            transform = trimesh.transformations.translation_matrix([0, 0, -height / 2])
+            mesh.apply_transform(transform)
+        elif mesh_type == "Cylinder":
+            radius = mesh.GetAttribute("radius").Get()
+            height = mesh.GetAttribute("height").Get()
+            mesh = trimesh.creation.cylinder(radius=radius, height=height)
+        else:
+            raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
+    
+        # Return the vertices of the trimesh
+        return mesh.vertices
+    
+    @property
+    def points_in_parent_frame(self):
+        points = self.points
+        if points is None:
+            return None
+        position, orientation = self.get_local_pose()
+        scale = self.scale
+        points_scaled = points * scale
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+        return points_transformed
+    
+    @cached_property
+    def extent(self):
+        """
+        Returns:
+            np.ndarray: The unscaled 3d extent of the mesh in its local frame.
+        """
+        points = self.points
+        return np.max(points, axis=0) - np.min(points, axis=0)
 
 
 class CollisionGeomPrim(GeomPrim):

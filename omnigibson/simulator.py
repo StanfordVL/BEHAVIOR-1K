@@ -19,7 +19,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import PoseAPI, clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
 from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
                                        print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
@@ -163,10 +163,10 @@ def launch_simulator(*args, **kwargs):
 
         Args:
             gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+            physics_dt (float): dt between physics steps. Defaults to 1.0 / 120.0.
             rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
                 application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 30.0.
             stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
                 Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
@@ -178,8 +178,8 @@ def launch_simulator(*args, **kwargs):
         def __init__(
                 self,
                 gravity=9.81,
-                physics_dt=1.0 / 60.0,
-                rendering_dt=1.0 / 60.0,
+                physics_dt=1.0 / 120.0,
+                rendering_dt=1.0 / 30.0,
                 stage_units_in_meters=1.0,
                 viewer_width=gm.DEFAULT_VIEWER_WIDTH,
                 viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -254,8 +254,8 @@ def launch_simulator(*args, **kwargs):
         def __new__(
             cls,
             gravity=9.81,
-            physics_dt=1.0 / 60.0,
-            rendering_dt=1.0 / 60.0,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -653,7 +653,6 @@ def launch_simulator(*args, **kwargs):
             Step any omni-related things
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            BoundingBoxAPI.clear()
             RigidContactAPI.clear()
 
         def play(self):
@@ -1199,12 +1198,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1 / 60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1 / 120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1235,12 +1234,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1/60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1/120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage

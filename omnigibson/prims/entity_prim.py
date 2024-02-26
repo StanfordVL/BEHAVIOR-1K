@@ -12,7 +12,7 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import BoundingBoxAPI, PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI
 
 from omnigibson.macros import gm, create_module_macros
 
@@ -622,7 +622,6 @@ class EntityPrim(XFormPrim):
         else:
             self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             PoseAPI.invalidate()
-            BoundingBoxAPI.clear()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -924,7 +923,6 @@ class EntityPrim(XFormPrim):
                 orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_world_poses(position, orientation)
             PoseAPI.invalidate()
-            BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
@@ -956,7 +954,6 @@ class EntityPrim(XFormPrim):
                 orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_local_poses(position, orientation)
             PoseAPI.invalidate()
-            BoundingBoxAPI.clear()
 
     def get_local_pose(self):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
@@ -1244,10 +1241,45 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
                                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
-            aabb_lo, aabb_hi = super().aabb
-            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+            points_world = []
+            for link in self._links.values():
+                hull_points = link.collision_boundary_points
+                if hull_points is None:
+                    continue
+                
+                position, orientation = link.get_position_orientation()
+                scale = link.scale
+                points_scaled = hull_points * scale
+                points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+                points_transformed = points_rotated + position
+                points_world.append(points_transformed)
 
+            all_points = np.concatenate(points_world, axis=0)
+            aabb_lo = np.min(all_points, axis=0)
+            aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
 
     def get_coriolis_and_centrifugal_forces(self, clone=True):
         """

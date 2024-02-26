@@ -1,11 +1,12 @@
 from collections.abc import Iterable
 import numpy as np
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler
-from omnigibson.utils.usd_utils import BoundingBoxAPI, PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI
 import omnigibson.utils.transform_utils as T
 from scipy.spatial.transform import Rotation as R
 from omnigibson.macros import gm
@@ -285,7 +286,6 @@ class XFormPrim(BasePrim):
                 rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
         PoseAPI.invalidate()
-        BoundingBoxAPI.clear()
         if gm.ENABLE_FLATCACHE:
             # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
             # Ideally we should call usdrt's set local pose directly, but there is no such API.
@@ -335,40 +335,6 @@ class XFormPrim(BasePrim):
         if "xformOp:scale" not in properties:
             lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
-
-    @property
-    def aabb(self):
-        """
-        Get this xform's actual bounding box, axis-aligned in the world frame
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) lower corner of the bounding box
-                - 3-array: (x,y,z) upper corner of the bounding box
-        """
-        return BoundingBoxAPI.compute_aabb(self)
-
-    @property
-    def aabb_extent(self):
-        """
-        Get this xform's actual bounding box extent
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = self.aabb
-        return max_corner - min_corner
-
-    @property
-    def aabb_center(self):
-        """
-        Get this xform's actual bounding box center
-
-        Returns:
-            3-array: (x,y,z) bounding box center
-        """
-        min_corner, max_corner = self.aabb
-        return (max_corner + min_corner) / 2.0
 
     @property
     def material(self):

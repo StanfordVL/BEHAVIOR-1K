@@ -8,7 +8,6 @@ from omnigibson.utils.usd_utils import PoseAPI, create_joint
 from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 from omnigibson.controllers.controller_base import ControlType
 
@@ -735,7 +734,6 @@ class JointPrim(BasePrim):
         if not drive:
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             PoseAPI.invalidate()
-            BoundingBoxAPI.clear()
 
         # Also set the target
         self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
