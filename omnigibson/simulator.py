@@ -561,6 +561,11 @@ def launch_simulator(*args, **kwargs):
             """
             Reset internal variables when a new stage is loaded
             """
+        
+        def render(self):
+            super().render()
+            # During rendering, the Fabric API is updated, so we can mark it as clean
+            PoseAPI.mark_valid()
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -683,9 +688,6 @@ def launch_simulator(*args, **kwargs):
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
-                
-                # During rendering, the Fabric API is updated, so we can mark it as clean
-                PoseAPI.mark_valid()
 
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
