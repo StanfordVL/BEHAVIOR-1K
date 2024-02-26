@@ -1,11 +1,11 @@
 from collections.abc import Iterable
 import numpy as np
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.transform_utils import quat2euler
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
 
 
@@ -300,7 +300,6 @@ class XFormPrim(BasePrim):
             else:
                 rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
-        BoundingBoxAPI.clear()
         return
 
     def get_world_scale(self):
@@ -340,40 +339,6 @@ class XFormPrim(BasePrim):
         if "xformOp:scale" not in properties:
             lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
-
-    @property
-    def aabb(self):
-        """
-        Get this xform's actual bounding box, axis-aligned in the world frame
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) lower corner of the bounding box
-                - 3-array: (x,y,z) upper corner of the bounding box
-        """
-        return BoundingBoxAPI.compute_aabb(self)
-
-    @property
-    def aabb_extent(self):
-        """
-        Get this xform's actual bounding box extent
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = self.aabb
-        return max_corner - min_corner
-
-    @property
-    def aabb_center(self):
-        """
-        Get this xform's actual bounding box center
-
-        Returns:
-            3-array: (x,y,z) bounding box center
-        """
-        min_corner, max_corner = self.aabb
-        return (max_corner + min_corner) / 2.0
 
     @property
     def material(self):

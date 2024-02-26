@@ -95,7 +95,7 @@ def assert_test_scene():
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
                 get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
-                get_obj_cfg("chicken", "chicken", "nppsmz"),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.8),
                 get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
                 get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
                 get_obj_cfg("apple", "apple", "agveuv"),
@@ -110,14 +110,6 @@ def assert_test_scene():
                     "obs_modalities": [],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
-                    "controller_config": {
-                        # Make sure to use null joint controller for the arm so that we can move the arm qpos
-                        # accordingly
-                        "arm_0": {
-                            "name": "NullJointController",
-                            "motor_type": "position",
-                        },
-                    },
                 }
             ]
         }
@@ -134,6 +126,15 @@ def assert_test_scene():
         # Create the environment
         env = og.Environment(configs=cfg)
 
+        # Additional processing for the tests to pass more deterministically
+        og.sim.stop()
+        bounding_box_object_names = ["bagel_dough", "raw_egg"]
+        for name in bounding_box_object_names:
+            obj = og.sim.scene.object_registry("name", name)
+            for collision_mesh in obj.root_link.collision_meshes.values():
+                collision_mesh.set_collision_approximation("boundingCube")
+        og.sim.play()
+
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = np.random.uniform(pos_low, pos_hi, 3)
@@ -141,7 +142,7 @@ def get_random_pose(pos_low=10.0, pos_hi=20.0):
     return pos, orn
 
 
-def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.001):
     objA.keep_still()
     objB.keep_still()
     # Reset pose if cloth object
@@ -168,3 +169,8 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
 
     target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
+
+def remove_all_systems():
+    for system in ParticleRemover.supported_active_systems.values():
+        system.remove_all_particles()
+    og.sim.step()
