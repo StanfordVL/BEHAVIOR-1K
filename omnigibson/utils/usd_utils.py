@@ -668,7 +668,7 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
     """
-    mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
     face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
     vertices = np.array(mesh_prim.GetAttribute("points").Get())
@@ -701,23 +701,23 @@ def mesh_prim_shape_to_trimesh_mesh(mesh_prim):
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
     """
-    mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     if mesh_type == "Sphere":
-        radius = mesh.GetAttribute("radius").Get()
+        radius = mesh_prim.GetAttribute("radius").Get()
         trimesh_mesh = trimesh.creation.icosphere(subdivision=3, radius=radius)
     elif mesh_type == "Cube":
-        extent = mesh.GetAttribute("size").Get()
+        extent = mesh_prim.GetAttribute("size").Get()
         trimesh_mesh = trimesh.creation.box([extent] * 3)
     elif mesh_type == "Cone":
-        radius = mesh.GetAttribute("radius").Get()
-        height = mesh.GetAttribute("height").Get()
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
         trimesh_mesh = trimesh.creation.cone(radius=radius, height=height)
         # Trimesh cones are centered at the base. We'll move them down by half the height.
         transform = trimesh.transformations.translation_matrix([0, 0, -height / 2])
         trimesh_mesh.apply_transform(transform)
     elif mesh_type == "Cylinder":
-        radius = mesh.GetAttribute("radius").Get()
-        height = mesh.GetAttribute("height").Get()
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
         trimesh_mesh = trimesh.creation.cylinder(radius=radius, height=height)
     else:
         raise ValueError(f"Expected mesh prim to have type Sphere, Cube, Cone or Cylinder, got {mesh_type}")
@@ -740,7 +740,7 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
     """
     mesh_type = mesh_prim.GetTypeName()
     if mesh_type == "Mesh":
-        trimesh_mesh =- mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals, include_texcoord)
+        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals, include_texcoord)
     else:
         trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
 
@@ -832,7 +832,7 @@ def check_extent_radius_ratio(mesh_prim):
     Returns:
         bool: True if the extent radius ratio is within the acceptable range, False otherwise
     """
-    mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     # Non-mesh prims are always considered to be within the acceptable range
     if mesh_type != "Mesh":
         return True

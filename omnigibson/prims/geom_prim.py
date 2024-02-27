@@ -6,9 +6,8 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.geometry_utils import mesh_prim_shape_to_trimesh
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
 import omnigibson.utils.transform_utils as T
 
 
@@ -136,7 +135,7 @@ class GeomPrim(XFormPrim):
             return np.array(self.prim.GetAttribute("points").Get())
         else:
             # Return the vertices of the trimesh
-            return np.array(mesh_prim_shape_to_trimesh(mesh).vertices)
+            return np.array(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
 
     @property
     def points_in_parent_frame(self):
