@@ -162,10 +162,10 @@ def launch_simulator(*args, **kwargs):
 
         Args:
             gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+            physics_dt (float): dt between physics steps. Defaults to 1.0 / 120.0.
             rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
                 application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 30.0.
             stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
                 Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
@@ -177,8 +177,8 @@ def launch_simulator(*args, **kwargs):
         def __init__(
                 self,
                 gravity=9.81,
-                physics_dt=1.0 / 60.0,
-                rendering_dt=1.0 / 60.0,
+                physics_dt=1.0 / 120.0,
+                rendering_dt=1.0 / 30.0,
                 stage_units_in_meters=1.0,
                 viewer_width=gm.DEFAULT_VIEWER_WIDTH,
                 viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -253,8 +253,8 @@ def launch_simulator(*args, **kwargs):
         def __new__(
             cls,
             gravity=9.81,
-            physics_dt=1.0 / 60.0,
-            rendering_dt=1.0 / 60.0,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -1193,12 +1193,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1 / 60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1 / 120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1229,12 +1229,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1/60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1/120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage

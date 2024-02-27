@@ -633,7 +633,7 @@ def test_toggled_on():
     robot = og.sim.scene.object_registry("name", "robot0")
 
     stove.set_position_orientation([1.46, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
-    robot.set_position_orientation([0.01, 0.38, 0.01], [0, 0, 0, 1])
+    robot.set_position_orientation([0.0, 0.38, 0.01], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
@@ -641,7 +641,7 @@ def test_toggled_on():
     jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
     q[jnt_idxs["torso_lift_joint"]] = 0.0
     q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
-    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(8.0)
+    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(9.0)
     q[jnt_idxs["upperarm_roll_joint"]] = 0.0
     q[jnt_idxs["elbow_flex_joint"]] = 0.0
     q[jnt_idxs["forearm_roll_joint"]] = 0.0
@@ -1147,12 +1147,10 @@ def test_covered():
                     og.sim.step()
 
                 assert obj.states[Covered].set_value(system, True)
-                for _ in range(10):
-                    og.sim.step()
+                og.sim.step()
                 assert obj.states[Covered].get_value(system)
 
                 assert obj.states[Covered].set_value(system, False)
-
                 # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
                 # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
                 obj.states[Covered].clear_cache()

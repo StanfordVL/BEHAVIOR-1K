@@ -46,8 +46,8 @@ def main():
 
     cfg = {
         "env": {
-            "action_frequency": 60,
-            "physics_frequency": 300,
+            "action_frequency": 30,
+            "physics_frequency": 120,
         }
     }
     if args.robot > 0:
