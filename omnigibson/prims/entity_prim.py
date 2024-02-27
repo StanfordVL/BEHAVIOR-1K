@@ -12,6 +12,7 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import PoseAPI
 
 from omnigibson.macros import gm, create_module_macros
 
@@ -620,6 +621,7 @@ class EntityPrim(XFormPrim):
             self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
         else:
             self._articulation_view.set_joint_positions(positions, joint_indices=indices)
+            PoseAPI.invalidate()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -920,6 +922,7 @@ class EntityPrim(XFormPrim):
             if orientation is not None:
                 orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_world_poses(position, orientation)
+            PoseAPI.invalidate()
 
     def get_position_orientation(self):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
@@ -950,6 +953,7 @@ class EntityPrim(XFormPrim):
             if orientation is not None:
                 orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_local_poses(position, orientation)
+            PoseAPI.invalidate()
 
     def get_local_pose(self):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly

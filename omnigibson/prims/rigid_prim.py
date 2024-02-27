@@ -1,5 +1,5 @@
 from functools import cached_property
-from scipy.spatial import ConvexHull
+import scipy
 import numpy as np
 
 import omnigibson as og
@@ -9,7 +9,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import get_mesh_volume_and_com, check_extent_radius_ratio
+from omnigibson.utils.usd_utils import PoseAPI, get_mesh_volume_and_com, check_extent_radius_ratio
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -302,6 +302,7 @@ class RigidPrim(XFormPrim):
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
+        PoseAPI.invalidate()
 
     def get_position_orientation(self):
         # Return cached pose if we're kinematic-only
@@ -328,6 +329,7 @@ class RigidPrim(XFormPrim):
         if orientation is not None:
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_local_poses(position, orientation)
+        PoseAPI.invalidate()
 
     def get_local_pose(self):
         # Return cached pose if we're kinematic-only
@@ -624,7 +626,7 @@ class RigidPrim(XFormPrim):
         points = np.concatenate(points, axis=0)
         
         try:
-            hull = ConvexHull(points)
+            hull = scipy.spatial.ConvexHull(points)
             return points[hull.vertices, :]
         except scipy.spatial.qhull.QhullError:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)

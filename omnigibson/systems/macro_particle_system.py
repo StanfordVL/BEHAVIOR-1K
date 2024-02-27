@@ -371,7 +371,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # Run super first
         super().update()
 
-        z_extent = cls.particle_object.extent[2]
+        z_extent = cls.particle_object.aabb_extent[2]
         # Iterate over all objects, and update all particles belonging to any cloth objects
         for name, obj in cls._group_objects.items():
             group = cls.get_group_name(obj=obj)
@@ -479,7 +479,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
 
-        bbox_extents_local = [(cls.particle_object.extent * scale).tolist() for scale in scales]
+        bbox_extents_local = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # If we're using flatcache, we need to update the object's pose on the USD manually
         if gm.ENABLE_FLATCACHE:
@@ -535,7 +535,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # which is what we would get naively if we directly use @scales
         avg_scale = np.cbrt(np.product(obj.scale))
 
-        bbox_extents_global = scales * cls.particle_object.extent.reshape(1, 3) * avg_scale
+        bbox_extents_global = scales * cls.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
         if obj.prim_type == PrimType.CLOTH:
             # Sample locations based on randomly sampled keyfaces
