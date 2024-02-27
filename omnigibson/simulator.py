@@ -19,7 +19,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
 from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
                                        print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
@@ -560,6 +560,11 @@ def launch_simulator(*args, **kwargs):
             """
             Reset internal variables when a new stage is loaded
             """
+        
+        def render(self):
+            super().render()
+            # During rendering, the Fabric API is updated, so we can mark it as clean
+            PoseAPI.mark_valid()
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -767,6 +772,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
             self._omni_update_step()
+            PoseAPI.invalidate()
 
         def _on_contact(self, contact_headers, contact_data):
             """

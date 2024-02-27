@@ -501,10 +501,57 @@ class FlatcacheAPI:
         cls.MODIFIED_PRIMS = set()
 
 
+class PoseAPI:
+    """
+    This is a singleton class for getting world poses.
+    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
+    After that, if we need to access the pose of a prim without stepping physics, 
+    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    """
+    VALID = False
+    
+    @classmethod
+    def invalidate(cls):
+        cls.VALID = False
+        
+    @classmethod
+    def mark_valid(cls):
+        cls.VALID = True
+        
+    @classmethod
+    def _refresh(cls):
+        if og.sim is not None and not cls.VALID:
+            # when flatcache is on
+            if og.sim._physx_fabric_interface:
+                # no time step is taken here
+                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            # when flatcache is off
+            else:
+                # no time step is taken here
+                og.sim.psi.fetch_results()
+            cls.mark_valid()
+        
+    @classmethod
+    def get_world_pose(cls, prim_path):
+        cls._refresh()
+        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+    @classmethod
+    def get_world_pose_with_scale(cls, prim_path):
+        """
+        This is used when information about the prim's global scale is needed, 
+        e.g. when converting points in the prim frame to the world frame.
+        """
+        cls._refresh()
+        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
+    PoseAPI.invalidate()
     CollisionAPI.clear()
 
 
