@@ -258,7 +258,7 @@ def train(env, eval_env):
         log.debug(model.policy)
         log.info(f"model: {model}")
         log.info("Starting training...")
-        # wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
+        wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
             total_timesteps=4_000_000,
             callback=callback,
