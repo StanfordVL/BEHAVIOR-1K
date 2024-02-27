@@ -146,18 +146,6 @@ class PrimitiveObject(StatefulObject):
         return prim
 
     def _post_load(self):
-        # Run super first
-        super()._post_load()
-
-        # Set the collision approximation appropriately
-        if self._primitive_type == "Sphere":
-            col_approximation = "boundingSphere"
-        elif self._primitive_type == "Cube":
-            col_approximation = "boundingCube"
-        else:
-            col_approximation = "convexHull"
-        self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
-
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
             log.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
@@ -168,6 +156,21 @@ class PrimitiveObject(StatefulObject):
                 self.height = self._load_config["height"]
             if self._load_config["size"] is not None:
                 self.size = self._load_config["size"]
+
+        # This step might will perform cloth remeshing if self._prim_type == PrimType.CLOTH.
+        # Therefore, we need to apply size, radius, and height before this to scale the points properly.
+        super()._post_load()
+
+        # Cloth primitive does not have collision meshes
+        if self._prim_type != PrimType.CLOTH:
+            # Set the collision approximation appropriately
+            if self._primitive_type == "Sphere":
+                col_approximation = "boundingSphere"
+            elif self._primitive_type == "Cube":
+                col_approximation = "boundingCube"
+            else:
+                col_approximation = "convexHull"
+            self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
 
     def _initialize(self):
         # Run super first

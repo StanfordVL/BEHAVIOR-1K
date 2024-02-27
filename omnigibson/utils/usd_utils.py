@@ -773,7 +773,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
         np.random.seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
-    tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False, world_frame=False)
+    tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
     n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
     faces_flat = tm.faces.flatten()
     n_vertices = len(faces_flat)

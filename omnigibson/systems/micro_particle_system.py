@@ -9,7 +9,7 @@ from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, R
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, PoseAPI
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 
@@ -1558,7 +1558,9 @@ class Cloth(MicroParticleSystem):
         if remesh:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
-            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True)
+            scaled_world_transform = PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString)
+            # Convert to trimesh mesh (in world frame)
+            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=True)
             # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
             tmp_name = str(uuid.uuid4())
             tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
@@ -1567,8 +1569,7 @@ class Cloth(MicroParticleSystem):
             tm.export(tmp_fpath)
 
             # Start with the default particle distance
-            particle_distance = cls.particle_contact_offset * 2 / (1.5 * np.mean(mesh_prim.GetAttribute("xformOp:scale").Get())) \
-                if particle_distance is None else particle_distance
+            particle_distance = cls.particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
             for _ in range(3):
@@ -1615,6 +1616,15 @@ class Cloth(MicroParticleSystem):
             mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
             mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(new_normals))
             mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
+
+            # Load the new mesh into trimesh and apply the inverse of the world transform
+            tm_new = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False)
+            tm_new.apply_transform(np.linalg.inv(scaled_world_transform))
+
+            # Update the mesh prim with the new vertices and normals. We don't need to update the faceVertexCounts,
+            # faceVertexIndices, or texcoords because they are unaffected by transforms.
+            mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertices))
+            mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertex_normals))
 
         # Convert into particle cloth
         lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
