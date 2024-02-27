@@ -584,6 +584,7 @@ class PoseAPI:
         cls._refresh()
         position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
         return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
         """
