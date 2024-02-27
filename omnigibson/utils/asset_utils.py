@@ -216,7 +216,7 @@ def get_all_object_category_models(category):
 
 def get_all_object_category_models_with_abilities(category, abilities):
     """
-    Get all object models from @category whose assets are properly annotated with necessary metalinks to support
+    Get all object models from @category whose assets are properly annotated with necessary requirements to support
     abilities @abilities
 
     Args:
@@ -226,44 +226,52 @@ def get_all_object_category_models_with_abilities(category, abilities):
             models
 
     Returns:
-        list of str: all object models belonging to @category which are properly annotated with necessary metalinks
+        list of str: all object models belonging to @category which are properly annotated with necessary requirements
             to support the requested list of @abilities
     """
     # Avoid circular imports
     from omnigibson.objects.dataset_object import DatasetObject
-    from omnigibson.object_states.factory import get_states_for_ability
-    from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+    from omnigibson.object_states.factory import get_requirements_for_ability, get_states_for_ability
 
     # Get all valid models
     all_models = get_all_object_category_models(category=category)
 
     # Generate all object states required per object given the requested set of abilities
-    state_types_and_params = [(state_type, params) for ability, params in abilities.items()
-                              for state_type in get_states_for_ability(ability)]
-    for state_type, _ in state_types_and_params:
-        # Add each state's dependencies, too. Note that only required dependencies are added.
-        for dependency in state_type.get_dependencies():
-            if all(other_state != dependency for other_state, _ in state_types_and_params):
-                state_types_and_params.append((dependency, dict()))
+    abilities_info = {ability: [(state_type, params) for state_type in get_states_for_ability(ability)]
+                              for ability, params in abilities.items()}
 
     # Get mapping for class init kwargs
     state_init_default_kwargs = dict()
-    for state_type, _ in state_types_and_params:
-        default_kwargs = inspect.signature(state_type.__init__).parameters
-        state_init_default_kwargs[state_type] = \
-            {kwarg: val.default for kwarg, val in default_kwargs.items()
-             if kwarg != "self" and val.default != inspect._empty}
+
+    for ability, state_types_and_params in abilities_info.items():
+        for state_type, _ in state_types_and_params:
+            # Add each state's dependencies, too. Note that only required dependencies are added.
+            for dependency in state_type.get_dependencies():
+                if all(other_state != dependency for other_state, _ in state_types_and_params):
+                    state_types_and_params.append((dependency, dict()))
+
+        for state_type, _ in state_types_and_params:
+            default_kwargs = inspect.signature(state_type.__init__).parameters
+            state_init_default_kwargs[state_type] = \
+                {kwarg: val.default for kwarg, val in default_kwargs.items()
+                 if kwarg != "self" and val.default != inspect._empty}
 
     # Iterate over all models and sanity check each one, making sure they satisfy all the requested @abilities
     valid_models = []
 
-    def supports_state_types(states_and_params, obj_prim):
-        # Check all link states
-        for state_type, params in states_and_params:
-            kwargs = deepcopy(state_init_default_kwargs[state_type])
-            kwargs.update(params)
-            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
-                return False
+    def supports_abilities(info, obj_prim):
+        for ability, states_and_params in info.items():
+            # Check ability requirements
+            for requirement in get_requirements_for_ability(ability):
+                if not requirement.is_compatible_asset(prim=obj_prim):
+                    return False
+
+            # Check all link states
+            for state_type, params in states_and_params:
+                kwargs = deepcopy(state_init_default_kwargs[state_type])
+                kwargs.update(params)
+                if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
+                    return False
         return True
 
     for model in all_models:
@@ -272,7 +280,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
         with decrypted(usd_path) as fpath:
             stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
-            if supports_state_types(state_types_and_params, prim):
+            if supports_abilities(abilities_info, prim):
                 valid_models.append(model)
 
     return valid_models
