@@ -290,8 +290,6 @@ class XFormPrim(BasePrim):
             # Ideally we should call usdrt's set local pose directly, but there is no such API.
             # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
             xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
-            # We also need to clear the fabric's world pose (potentially set by physx) to force fabric to use
-            # the local pose we just set, because world pose takes precendence over local pose.
             assert not xformable_prim.HasWorldXform(), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
             xformable_prim.SetLocalXformFromUsd()
         return
