@@ -101,15 +101,16 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
             # and then proceed with an additional offset before shooting rays
             shooting_offset = 0.01
 
-            direction_extent = directions * (aabb_higher - aabb_lower).reshape(1, 3) / 2.0
-            pre_start = object_position.reshape(1, 3) - (direction_extent + np.ones((1, 3)) * shooting_offset)
-            pre_end = object_position.reshape(1, 3) + direction_extent
+            direction_half_extent = directions * (aabb_higher - aabb_lower).reshape(1, 3) / 2.0
+            pre_start = object_position.reshape(1, 3) + (direction_half_extent + directions * shooting_offset)
+            pre_end = object_position.reshape(1, 3) - direction_half_extent
 
             idx = 0
+            obj_link_paths = {link.prim_path for link in obj.links.values()}
             def _ray_callback(hit):
                 # Check for self-hit -- if so, record the position and terminate early
                 should_continue = True
-                if obj.prim_path in hit.rigid_body:
+                if hit.rigid_body in obj_link_paths:
                     ray_starts[idx] = np.array(hit.position)
                     should_continue = False
                 return should_continue
