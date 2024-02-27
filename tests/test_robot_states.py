@@ -3,7 +3,10 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 
+import omnigibson.lazy as lazy
 from omnigibson.sensors import VisionSensor
+from omnigibson.utils.transform_utils import pose2mat, mat2pose, relative_pose_transform
+from omnigibson.utils.usd_utils import PoseAPI
 
 def setup_environment(flatcache=True):
     """
@@ -46,14 +49,16 @@ def camera_pose_test(flatcache):
     env = setup_environment(flatcache)
     robot = env.robots[0]
     env.reset()
-    
-    # robot = og.sim.scene.object_registry("name", "robot0")
+
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
     vision_sensor = sensors[0]
 
     # Get vision sensor world pose via directly calling get_position_orientation
+    robot_world_pos, robot_world_ori = robot.get_position_orientation()
     sensor_world_pos, sensor_world_ori = vision_sensor.get_position_orientation()
+    
+    robot_to_sensor_mat = pose2mat(relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori))
 
     sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.3833847])
     sensor_world_ori_gt = np.array([-0.29444987, 0.29444981, 0.64288363, -0.64288352])
@@ -61,34 +66,49 @@ def camera_pose_test(flatcache):
     assert np.allclose(sensor_world_pos, sensor_world_pos_gt)
     assert np.allclose(sensor_world_ori, sensor_world_ori_gt)
     
-    # Now, we want to move the robot and check if the sensor pose is updated
+    # Now, we want to move the robot and check if the sensor pose has been updated
     old_camera_local_pose = vision_sensor.get_local_pose()
-    old_camera_world_pose = vision_sensor.get_position_orientation()
+
     robot.set_position_orientation(position=[100, 100, 100])
     new_camera_local_pose = vision_sensor.get_local_pose()
     new_camera_world_pose = vision_sensor.get_position_orientation()
+    robot_pose_mat = pose2mat(robot.get_position_orientation())
+    expected_camera_world_pos, expected_camera_world_ori = mat2pose(robot_pose_mat @ robot_to_sensor_mat)
     assert np.allclose(old_camera_local_pose[0], new_camera_local_pose[0])
-    assert not np.allclose(old_camera_world_pose[0], new_camera_world_pose[0])
+    assert np.allclose(new_camera_world_pose[0], expected_camera_world_pos)
+    assert np.allclose(new_camera_world_pose[1], expected_camera_world_ori)
     
     # Then, we want to move the local pose of the camera and check 
     # 1) if the world pose is updated 2) if the robot stays in the same position
-    old_camera_world_pose = vision_sensor.get_position_orientation()
     old_camera_local_pose = vision_sensor.get_local_pose()
-    vision_sensor.set_local_pose(old_camera_local_pose[0]+10, [0, 0, 0, 1])
+    vision_sensor.set_local_pose(position=[10, 10, 10], orientation=[0, 0, 0, 1])
     new_camera_world_pose = vision_sensor.get_position_orientation()
-    assert not np.allclose(old_camera_world_pose[0], new_camera_world_pose[0])
-    assert not np.allclose(old_camera_world_pose[1], new_camera_world_pose[1])
+    camera_parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(vision_sensor.prim)
+    camera_parent_path = str(camera_parent_prim.GetPath())
+    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(camera_parent_world_transform @ pose2mat([[10, 10, 10], [0, 0, 0, 1]]))
+    assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos)
+    assert np.allclose(new_camera_world_pose[1], expected_new_camera_world_ori)
     assert np.allclose(robot.get_position(), [100, 100, 100])
+
     
     # Finally, we want to move the world pose of the camera and check
     # 1) if the local pose is updated 2) if the robot stays in the same position
-    old_camera_local_pose = vision_sensor.get_local_pose()
     robot.set_position_orientation(position=[150, 150, 100])
     old_camera_local_pose = vision_sensor.get_local_pose()
     vision_sensor.set_position_orientation([150, 150, 101.36912537], [-0.29444987, 0.29444981, 0.64288363, -0.64288352])
     new_camera_local_pose = vision_sensor.get_local_pose()
     assert not np.allclose(old_camera_local_pose[0], new_camera_local_pose[0])
+    assert not np.allclose(old_camera_local_pose[1], new_camera_local_pose[1])
     assert np.allclose(robot.get_position(), [150, 150, 100])
+    
+    # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
+    camera_parent_prim.GetAttribute('xformOp:scale').Set(lazy.pxr.Gf.Vec3d([2.0, 2.0, 2.0]))
+    camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
+    camera_local_pose = vision_sensor.get_local_pose()
+    expected_new_camera_world_pos, _ = mat2pose(camera_parent_world_transform @ pose2mat(camera_local_pose))
+    new_camera_world_pose = vision_sensor.get_position_orientation()
+    assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos)
     
     og.sim.clear()
 
