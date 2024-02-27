@@ -263,7 +263,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
         for ability, states_and_params in info.items():
             # Check ability requirements
             for requirement in get_requirements_for_ability(ability):
-                if not requirement.is_compatible_asset(prim=obj_prim):
+                if not requirement.is_compatible_asset(prim=obj_prim)[0]:
                     return False
 
             # Check all link states
