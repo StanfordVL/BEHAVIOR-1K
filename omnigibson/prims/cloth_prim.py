@@ -15,7 +15,6 @@ from omnigibson.systems import get_system
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
-from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
 
@@ -338,26 +337,8 @@ class ClothPrim(GeomPrim):
 
     @property
     def volume(self):
-        mesh = self.prim
-        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
-        assert mesh_type in GEOM_TYPES, f"Invalid collision mesh type: {mesh_type}"
-        if mesh_type == "Mesh":
-            # We construct a trimesh object from this mesh in order to infer its volume
-            trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-            mesh_volume = trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
-        elif mesh_type == "Sphere":
-            mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
-        elif mesh_type == "Cube":
-            mesh_volume = mesh.GetAttribute("size").Get() ** 3
-        elif mesh_type == "Cone":
-            mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3
-        elif mesh_type == "Cylinder":
-            mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
-        else:
-            raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
-
-        mesh_volume *= np.product(self.get_world_scale())
-        return mesh_volume
+        mesh = mesh_prim_to_trimesh_mesh(self.prim, include_normals=False, include_texcoord=False, world_frame=True)
+        return mesh.volume if mesh.is_volume else mesh.convex_hull.volume
 
     @volume.setter
     def volume(self, volume):

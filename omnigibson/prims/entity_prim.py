@@ -10,7 +10,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
+from omnigibson.utils.constants import PrimType, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI
 
