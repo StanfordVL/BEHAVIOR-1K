@@ -7,6 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import pose2mat, mat2pose, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.constants import CLASS_NAME_TO_SEMANTIC_CLASS_ID
 
 def setup_environment(flatcache=True):
     """
@@ -29,7 +30,7 @@ def setup_environment(flatcache=True):
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": [],
+                "obs_modalities": 'all',
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
                 "controller_config": {
@@ -117,3 +118,19 @@ def test_camera_pose_flatcache_on():
 
 def test_camera_pose_flatcache_off():
     camera_pose_test(False)
+
+def test_camera_semantic_segmentation():
+    env = setup_environment(False)
+    robot = env.robots[0]
+    env.reset()
+    sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
+    assert len(sensors) > 0
+    vision_sensor = sensors[0]
+    env.reset()
+    all_observation, all_info = vision_sensor.get_obs()
+    seg_semantic = all_observation['seg_semantic']
+    seg_semantic_info = all_info['seg_semantic']
+    agent_label = CLASS_NAME_TO_SEMANTIC_CLASS_ID['agent']
+    background_label = CLASS_NAME_TO_SEMANTIC_CLASS_ID['background']
+    assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
+    assert set(seg_semantic_info.keys()) == {agent_label, background_label}

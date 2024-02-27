@@ -278,7 +278,7 @@ class VisionSensor(BaseSensor):
             str_id = str(int_id)
             if str_id in id_to_labels and key_array[int_id] != -1:
                 info = id_to_labels[str_id]
-                corrected_id_to_labels[key_array[int_id]] = info['class']
+                corrected_id_to_labels[key_array[int_id]] = info['class'].lower()
 
         # Remap the image
         remapped_img = key_array[img]
