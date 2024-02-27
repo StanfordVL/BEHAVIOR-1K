@@ -1611,20 +1611,28 @@ class Cloth(MicroParticleSystem):
             new_normals = cm.vertex_normal_matrix()
             n_faces = len(cm.face_matrix())
 
-            mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(n_faces, dtype=int) * 3)
-            mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(new_vertices))
-            mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
-            mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(new_normals))
-            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
+            face_vertex_counts = np.ones(n_faces, dtype=int) * 3
+            faces = []
+            i = 0
+            for count in face_vertex_counts:
+                for j in range(count - 2):
+                    faces.append([new_face_vertex_ids[i], new_face_vertex_ids[i + j + 1], new_face_vertex_ids[i + j + 2]])
+                i += count
 
-            # Load the new mesh into trimesh and apply the inverse of the world transform
-            tm_new = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False)
+            tm_new = trimesh.Trimesh(
+                vertices=new_vertices,
+                faces=faces,
+                vertex_normals=new_normals,
+            )
+            # Apply the inverse of the world transform to get the mesh back into its local frame
             tm_new.apply_transform(np.linalg.inv(scaled_world_transform))
 
-            # Update the mesh prim with the new vertices and normals. We don't need to update the faceVertexCounts,
-            # faceVertexIndices, or texcoords because they are unaffected by transforms.
+            # Update the mesh prim
+            mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
             mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertices))
+            mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
             mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertex_normals))
+            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
 
         # Convert into particle cloth
         lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
