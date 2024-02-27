@@ -21,6 +21,13 @@ def main(local_addr, learner_addr, render):
 
     env = og.Environment(configs=config)
 
+    # Calculate fps
+    # import time
+    # while True:
+    #     start_time = time.time()
+    #     env.step(env.action_space.sample())
+    #     print("fps", 1/(time.time() - start_time))
+
     wandb.init(entity="behavior-rl", project="sb3", group="worker")
 
     # Now start servicing!

@@ -105,7 +105,7 @@ gm.FORCE_LIGHT_INTENSITY = 150000
 gm.FORCE_ROUGHNESS = 0.7
 
 # Macro for rendering
-gm.ENABLE_RENDERING = False
+gm.ENABLE_RENDERING = True
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):

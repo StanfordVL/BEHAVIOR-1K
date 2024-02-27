@@ -27,7 +27,7 @@ from wandb import AlertLevel
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
-parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
+parser.add_argument("--n_envs", type=int, default=0, help="Number of parallel environments to wait for. 0 to run a local environment.")
 parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
 parser.add_argument("--eval_port", type=int, default=None, help="Port to listen at for evaluation.")
 parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
@@ -81,8 +81,7 @@ def instantiate_envs():
         from omnigibson.macros import gm
         gm.USE_FLATCACHE = True
 
-        og_env = og.Environment(configs=_get_env_config())
-        env = DummyVecEnv([lambda: og_env])
+        env = GRPCClientVecEnv(f"0.0.0.0:{get_open_port()}", 1)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
         eval_env = env
@@ -259,7 +258,7 @@ def train(env, eval_env):
         log.debug(model.policy)
         log.info(f"model: {model}")
         log.info("Starting training...")
-        wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
+        # wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
             total_timesteps=4_000_000,
             callback=callback,
