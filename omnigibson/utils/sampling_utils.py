@@ -251,7 +251,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     return results
 
 
-def raytest_batch(start_points, end_points, only_closest=True, ignore_bodies=None, ignore_collisions=None):
+def raytest_batch(start_points, end_points, only_closest=True, ignore_bodies=None, ignore_collisions=None, callback=None):
     """
     Computes raytest collisions for a set of rays cast from @start_points to @end_points.
 
@@ -265,6 +265,9 @@ def raytest_batch(start_points, end_points, only_closest=True, ignore_bodies=Non
             whose collisions should be ignored
         ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
             whose collisions should be ignored
+        callback (None or function): If specified and @only_closest is False, the custom callback to use per-hit.
+            This can be efficient if raytests are meant to terminate early. If None, no custom callback will be used.
+            Expected signature is callback(hit) -> bool, which returns True if the raycast should continue or not
 
     Returns:
         list of dict or list of list of dict: Results for all rays, where each entry corresponds to the result for the
@@ -289,6 +292,7 @@ def raytest_batch(start_points, end_points, only_closest=True, ignore_bodies=Non
             only_closest=only_closest,
             ignore_bodies=ignore_bodies,
             ignore_collisions=ignore_collisions,
+            callback=callback,
         ))
 
     return results
@@ -300,6 +304,7 @@ def raytest(
     only_closest=True,
     ignore_bodies=None,
     ignore_collisions=None,
+    callback=None,
 ):
     """
     Computes raytest collision for ray cast from @start_point to @end_point
@@ -312,6 +317,9 @@ def raytest(
             whose collisions should be ignored
         ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
             whose collisions should be ignored
+        callback (None or function): If specified and @only_closest is False, the custom callback to use per-hit.
+            This can be efficient if raytests are meant to terminate early. If None, no custom callback will be used.
+            Expected signature is callback(hit) -> bool, which returns True if the raycast should continue or not
 
     Returns:
         dict or list of dict: Results for this raytest. If @only_closest=True, then we only return the information from
@@ -346,7 +354,7 @@ def raytest(
         ignore_bodies = set() if ignore_bodies is None else set(ignore_bodies)
         ignore_collisions = set() if ignore_collisions is None else set(ignore_collisions)
 
-        def callback(hit):
+        def hit_callback(hit):
             # Only add to hits if we're not ignoring this body or collision
             if hit.rigid_body not in ignore_bodies and hit.collision not in ignore_collisions:
                 hits.append({
@@ -358,14 +366,14 @@ def raytest(
                     "rigidBody": hit.rigid_body,
                 })
             # We always want to continue traversing to collect all hits
-            return True
+            return True if callback is None else callback(hit)
 
         # Grab all collisions
         og.sim.psqi.raycast_all(
             origin=start_point,
             dir=direction,
             distance=distance,
-            reportFn=callback,
+            reportFn=hit_callback,
         )
 
         # If we only want the closest, we need to sort these hits, otherwise we return them all

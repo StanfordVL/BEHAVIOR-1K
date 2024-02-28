@@ -6,7 +6,8 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.utils.sampling_utils import raytest_batch
+from omnigibson.utils.sampling_utils import raytest_batch, raytest
+from omnigibson.utils.constants import PrimType
 
 
 # Create settings for this module
@@ -60,15 +61,20 @@ def get_equidistant_coordinate_planes(n_planes):
     return np.stack([first_axes[:, None, :], second_axes[:, None, :]], axis=1)
 
 
-def compute_adjacencies(obj, axes, max_distance):
+def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
     """
     Given an object and a list of axes, find the adjacent objects in the axes'
     positive and negative directions.
+
+    If @obj is of PrimType.CLOTH, then adjacent objects are found with respect to the
+    @obj's centroid particle position
 
     Args:
         obj (StatefulObject): The object to check adjacencies of.
         axes (2D-array): (n_axes, 3) array defining the axes to check in.
             Note that each axis will be checked in both its positive and negative direction.
+        use_aabb_center (bool): If True and @obj is not of PrimType.CLOTH, will shoot rays from @obj's aabb center.
+            Otherwise, will dynamically compute starting points based on the requested @axes
 
     Returns:
         list of AxisAdjacencyList: List of length len(axes) containing the adjacencies.
@@ -80,17 +86,49 @@ def compute_adjacencies(obj, axes, max_distance):
     directions[1::2] = -axes
 
     # Prepare this object's info for ray casting.
-    # Use AABB center instead of position because we cannot get valid position
-    # for fixed objects if fixed links are merged.
-    aabb_lower, aabb_higher = obj.states[AABB].get_value()
-    object_position = (aabb_lower + aabb_higher) / 2.0
-    prim_paths = obj.link_prim_paths
+    if obj.prim_type == PrimType.CLOTH:
+        ray_starts = np.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
+
+    else:
+        aabb_lower, aabb_higher = obj.states[AABB].get_value()
+        object_position = (aabb_lower + aabb_higher) / 2.0
+        ray_starts = np.tile(object_position, (len(directions), 1))
+
+        if not use_aabb_center:
+            # Dynamically compute start points by iterating over the directions and pre-shooting rays from
+            # which to shoot back from
+            # For a given direction, we go in the negative (opposite) direction to the edge of the object extent,
+            # and then proceed with an additional offset before shooting rays
+            shooting_offset = 0.01
+
+            direction_half_extent = directions * (aabb_higher - aabb_lower).reshape(1, 3) / 2.0
+            pre_start = object_position.reshape(1, 3) + (direction_half_extent + directions * shooting_offset)
+            pre_end = object_position.reshape(1, 3) - direction_half_extent
+
+            idx = 0
+            obj_link_paths = {link.prim_path for link in obj.links.values()}
+            def _ray_callback(hit):
+                # Check for self-hit -- if so, record the position and terminate early
+                should_continue = True
+                if hit.rigid_body in obj_link_paths:
+                    ray_starts[idx] = np.array(hit.position)
+                    should_continue = False
+                return should_continue
+
+            for ray_start, ray_end in zip(pre_start, pre_end):
+                raytest(
+                    start_point=ray_start,
+                    end_point=ray_end,
+                    only_closest=False,
+                    callback=_ray_callback,
+                )
+                idx += 1
 
     # Prepare the rays to cast.
-    ray_starts = np.tile(object_position, (len(directions), 1))
     ray_endpoints = ray_starts + (directions * max_distance)
 
     # Cast time.
+    prim_paths = obj.link_prim_paths
     ray_results = raytest_batch(
         ray_starts,
         ray_endpoints,
@@ -130,7 +168,7 @@ class VerticalAdjacency(AbsoluteObjectState):
 
     def _get_value(self):
         # Call the adjacency computation with th Z axis.
-        bodies_by_axis = compute_adjacencies(self.obj, np.array([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL)
+        bodies_by_axis = compute_adjacencies(self.obj, np.array([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False)
 
         # Return the adjacencies from the only axis we passed in.
         return bodies_by_axis[0]
@@ -168,7 +206,7 @@ class HorizontalAdjacency(AbsoluteObjectState):
         coordinate_planes = get_equidistant_coordinate_planes(m.HORIZONTAL_AXIS_COUNT)
 
         # Flatten the axis dimension and input into compute_adjacencies.
-        bodies_by_axis = compute_adjacencies(self.obj, coordinate_planes.reshape(-1, 3), m.MAX_DISTANCE_HORIZONTAL)
+        bodies_by_axis = compute_adjacencies(self.obj, coordinate_planes.reshape(-1, 3), m.MAX_DISTANCE_HORIZONTAL, use_aabb_center=True)
 
         # Now reshape the bodies_by_axis to group by coordinate planes.
         bodies_by_plane = list(zip(bodies_by_axis[::2], bodies_by_axis[1::2]))

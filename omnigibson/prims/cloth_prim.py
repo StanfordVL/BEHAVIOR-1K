@@ -61,6 +61,7 @@ class ClothPrim(GeomPrim):
         load_config=None,
     ):
         # Internal vars stored
+        self._centroid_idx = None
         self._keypoint_idx = None
         self._keyface_idx = None
 
@@ -114,6 +115,12 @@ class ClothPrim(GeomPrim):
                 success = True
                 break
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
+
+        # Compute centroid particle idx based on AABB
+        aabb_min, aabb_max = np.min(positions, axis=0), np.max(positions, axis=0)
+        aabb_center = (aabb_min + aabb_max) / 2.0
+        dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), axis=-1)
+        self._centroid_idx = np.argmin(dists)
 
     def _initialize(self):
         super()._initialize()
@@ -242,6 +249,16 @@ class ClothPrim(GeomPrim):
                 cartesian coordinates relative to the world frame
         """
         return self.compute_particle_positions(idxs=self._keypoint_idx)
+
+    @property
+    def centroid_particle_position(self):
+        """
+        Grabs the individual particle that was pre-computed to be the closest to the centroid of this cloth prim.
+
+        Returns:
+            np.array: centroid particle's (x,y,z) cartesian coordinates relative to the world frame
+        """
+        return self.compute_particle_positions(idxs=[self._centroid_idx])[0]
 
     @property
     def particle_velocities(self):
@@ -534,12 +551,10 @@ class ClothPrim(GeomPrim):
 
         # Set values appropriately
         self._n_particles = state["n_particles"]
-        for attr in ("positions", "velocities"):
-            attr_name = f"particle_{attr}"
-            # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
-            # JSON-serialization
-            attr_val = np.array(state[attr_name]) if not isinstance(attr_name, np.ndarray) else state[attr_name]
-            setattr(self, attr_name, attr_val)
+        # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
+        # JSON-serialization
+        self.particle_velocities = np.array(state["particle_velocities"]) if not isinstance(state["particle_velocities"], np.ndarray) else state["particle_velocities"]
+        self.set_particle_positions(positions=np.array(state["particle_positions"]) if not isinstance(state["particle_positions"], np.ndarray) else state["particle_positions"])
 
     def _serialize(self, state):
         # Run super first
