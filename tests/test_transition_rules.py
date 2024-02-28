@@ -1509,5 +1509,3 @@ def test_single_toggleable_machine_rule_output_object_success():
         obj = DatasetObject(**obj_cfg)
         og.sim.import_object(obj)
     og.sim.step()
-
-test_single_toggleable_machine_rule_output_system_failure_wrong_container()
