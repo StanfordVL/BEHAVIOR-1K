@@ -682,7 +682,7 @@ class VisualParticleSystem(BaseSystem):
         )
 
         # Convert these into scaling factors for the x and y axes for our particle object
-        particle_bbox = cls.particle_object.extent
+        particle_bbox = cls.particle_object.aabb_extent
         minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
         maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
 

@@ -4,7 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import PoseAPI, create_joint
 from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
@@ -736,6 +736,7 @@ class JointPrim(BasePrim):
         # Set the DOF(s) in this joint
         if not drive:
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
+            PoseAPI.invalidate()
 
         # Also set the target
         self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
