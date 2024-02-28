@@ -1120,7 +1120,7 @@ class ParticleApplier(ParticleModifier):
                     system.create_attachment_group(obj=self.obj)
                 avg_scale = np.cbrt(np.product(self.obj.scale))
                 scales = system.sample_scales_by_group(group=group, n=len(start_points))
-                cuboid_dimensions = scales * system.particle_object.extent.reshape(1, 3) * avg_scale
+                cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
                 cuboid_dimensions = np.zeros(3)
