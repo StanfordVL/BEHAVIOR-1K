@@ -254,11 +254,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         Returns:
              float: Cumulative volume of this potentially articulated object.
         """
-        volume = 0.0
-        for link in self._links.values():
-            volume += link.volume
-
-        return volume
+        return sum(link.volume for link in self._links.values())
 
     @volume.setter
     def volume(self, volume):

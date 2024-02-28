@@ -9,7 +9,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
 
@@ -549,10 +549,57 @@ class FlatcacheAPI:
         cls.MODIFIED_PRIMS = set()
 
 
+class PoseAPI:
+    """
+    This is a singleton class for getting world poses.
+    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
+    After that, if we need to access the pose of a prim without stepping physics, 
+    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    """
+    VALID = False
+    
+    @classmethod
+    def invalidate(cls):
+        cls.VALID = False
+        
+    @classmethod
+    def mark_valid(cls):
+        cls.VALID = True
+        
+    @classmethod
+    def _refresh(cls):
+        if og.sim is not None and not cls.VALID:
+            # when flatcache is on
+            if og.sim._physx_fabric_interface:
+                # no time step is taken here
+                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            # when flatcache is off
+            else:
+                # no time step is taken here
+                og.sim.psi.fetch_results()
+            cls.mark_valid()
+        
+    @classmethod
+    def get_world_pose(cls, prim_path):
+        cls._refresh()
+        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+    @classmethod
+    def get_world_pose_with_scale(cls, prim_path):
+        """
+        This is used when information about the prim's global scale is needed, 
+        e.g. when converting points in the prim frame to the world frame.
+        """
+        cls._refresh()
+        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
+    PoseAPI.invalidate()
     CollisionAPI.clear()
 
 
@@ -608,9 +655,9 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
-def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
+def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
     """
-    Generates trimesh mesh from @mesh_prim
+    Generates trimesh mesh from @mesh_prim if mesh_type is "Mesh"
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
@@ -621,6 +668,8 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
     """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
     face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
     vertices = np.array(mesh_prim.GetAttribute("points").Get())
     face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())
@@ -642,6 +691,63 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
 
     return trimesh.Trimesh(**kwargs)
 
+def mesh_prim_shape_to_trimesh_mesh(mesh_prim):
+    """
+    Generates trimesh mesh from @mesh_prim if mesh_type is "Sphere", "Cube", "Cone" or "Cylinder"
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+
+    Returns:
+        trimesh.Trimesh: Generated trimesh mesh
+    """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    if mesh_type == "Sphere":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        trimesh_mesh = trimesh.creation.icosphere(subdivision=3, radius=radius)
+    elif mesh_type == "Cube":
+        extent = mesh_prim.GetAttribute("size").Get()
+        trimesh_mesh = trimesh.creation.box([extent] * 3)
+    elif mesh_type == "Cone":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
+        trimesh_mesh = trimesh.creation.cone(radius=radius, height=height)
+        # Trimesh cones are centered at the base. We'll move them down by half the height.
+        transform = trimesh.transformations.translation_matrix([0, 0, -height / 2])
+        trimesh_mesh.apply_transform(transform)
+    elif mesh_type == "Cylinder":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
+        trimesh_mesh = trimesh.creation.cylinder(radius=radius, height=height)
+    else:
+        raise ValueError(f"Expected mesh prim to have type Sphere, Cube, Cone or Cylinder, got {mesh_type}")
+
+    return trimesh_mesh
+
+def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True, world_frame=False):
+    """
+    Generates trimesh mesh from @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+        include_normals (bool): Whether to include the normals in the resulting trimesh or not
+        include_texcoord (bool): Whether to include the corresponding 2D-texture coordinates in the resulting
+            trimesh or not
+        world_frame (bool): Whether to convert the mesh to the world frame or not
+
+    Returns:
+        trimesh.Trimesh: Generated trimesh mesh
+    """
+    mesh_type = mesh_prim.GetTypeName()
+    if mesh_type == "Mesh":
+        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals, include_texcoord)
+    else:
+        trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
+
+    if world_frame:
+        trimesh_mesh.apply_transform(PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString))
+
+    return trimesh_mesh
 
 def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
@@ -667,7 +773,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
         np.random.seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
-    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
     n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
     faces_flat = tm.faces.flatten()
     n_vertices = len(faces_flat)
@@ -685,52 +791,34 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     return keypoint_idx, keyface_idx
 
 
-def get_mesh_volume_and_com(mesh_prim):
+def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     """
     Computes the volume and center of mass for @mesh_prim
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
+        world_frame (bool): Whether to return the volume and CoM in the world frame
 
     Returns:
-        Tuple[bool, float, np.array]: Tuple containing the (is_volume, volume, center_of_mass) in the mesh
-            frame of @mesh_prim
+        Tuple[float, np.array]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
-    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
-    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
-    # Default volume and com
-    volume = 0.0
-    com = np.zeros(3)
-    is_volume = True
-    if mesh_type == "Mesh":
-        # We construct a trimesh object from this mesh in order to infer its volume
-        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
-        is_volume = trimesh_mesh.is_volume
-        if is_volume:
-            volume = trimesh_mesh.volume
-            com = trimesh_mesh.center_mass
-        else:
-            # If the mesh is not a volume, we compute its convex hull and use that instead
-            try:
-                trimesh_mesh_convex = trimesh_mesh.convex_hull
-                volume = trimesh_mesh_convex.volume
-                com = trimesh_mesh_convex.center_mass
-            except:
-                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
-                pass
-    elif mesh_type == "Sphere":
-        volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
-    elif mesh_type == "Cube":
-        volume = mesh_prim.GetAttribute("size").Get() ** 3
-    elif mesh_type == "Cone":
-        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
-        com = np.array([0, 0, mesh_prim.GetAttribute("height").Get() / 4])
-    elif mesh_type == "Cylinder":
-        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
-    else:
-        raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
 
-    return is_volume, volume, com
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=world_frame)
+    if trimesh_mesh.is_volume:
+        volume = trimesh_mesh.volume
+        com = trimesh_mesh.center_mass
+    else:
+        # If the mesh is not a volume, we compute its convex hull and use that instead
+        try:
+            trimesh_mesh_convex = trimesh_mesh.convex_hull
+            volume = trimesh_mesh_convex.volume
+            com = trimesh_mesh_convex.center_mass
+        except:
+            # if convex hull computation fails, it usually means the mesh is degenerated: use trivial values.
+            volume = 0.0
+            com = np.zeros(3)
+
+    return volume, com
 
 def check_extent_radius_ratio(mesh_prim):
     """
@@ -744,21 +832,17 @@ def check_extent_radius_ratio(mesh_prim):
     Returns:
         bool: True if the extent radius ratio is within the acceptable range, False otherwise
     """
-
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
-    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
-
+    # Non-mesh prims are always considered to be within the acceptable range
     if mesh_type != "Mesh":
         return True
 
-    is_volume, _, com = get_mesh_volume_and_com(mesh_prim)
-
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
-    if not is_volume:
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=False)
+    if not trimesh_mesh.is_volume:
         trimesh_mesh = trimesh_mesh.convex_hull
 
     max_radius = trimesh_mesh.extents.max() / 2.0
-    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([com]))[1][0]
+    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([trimesh_mesh.center_mass]))[1][0]
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.

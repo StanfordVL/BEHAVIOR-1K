@@ -4,7 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import PoseAPI, create_joint
 from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
@@ -422,7 +422,8 @@ class JointPrim(BasePrim):
         Returns:
             float: friction for this joint
         """
-        return self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0]
+        return self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0] \
+            if og.sim.is_playing() else self.get_attribute("physxJoint:jointFriction")
 
     @friction.setter
     def friction(self, friction):
@@ -432,7 +433,9 @@ class JointPrim(BasePrim):
         Args:
             friction (float): friction to set
         """
-        self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
+        self.set_attribute("physxJoint:jointFriction", friction)
+        if og.sim.is_playing():
+            self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
 
     @property
     def lower_limit(self):
@@ -733,6 +736,7 @@ class JointPrim(BasePrim):
         # Set the DOF(s) in this joint
         if not drive:
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
+            PoseAPI.invalidate()
 
         # Also set the target
         self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
