@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
 import omnigibson.utils.transform_utils as T
 
 
@@ -131,32 +131,11 @@ class GeomPrim(XFormPrim):
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
+            # If the geom is a mesh we can directly return its points.
             return np.array(self.prim.GetAttribute("points").Get())
-        
-        # Generate a trimesh for other shapes
-        if mesh_type == "Sphere":
-            radius = mesh.GetAttribute("radius").Get()
-            mesh = trimesh.creation.icosphere(subdivision=3, radius=radius)
-        elif mesh_type == "Cube":
-            extent = mesh.GetAttribute("size").Get()
-            mesh = trimesh.creation.box([extent]*3)
-        elif mesh_type == "Cone":
-            radius = mesh.GetAttribute("radius").Get()
-            height = mesh.GetAttribute("height").Get()
-            mesh = trimesh.creation.cone(radius=radius, height=height)
-            
-            # Trimesh cones are centered at the base. We'll move them down by half the height.
-            transform = trimesh.transformations.translation_matrix([0, 0, -height / 2])
-            mesh.apply_transform(transform)
-        elif mesh_type == "Cylinder":
-            radius = mesh.GetAttribute("radius").Get()
-            height = mesh.GetAttribute("height").Get()
-            mesh = trimesh.creation.cylinder(radius=radius, height=height)
         else:
-            raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
-    
-        # Return the vertices of the trimesh
-        return np.array(mesh.vertices)
+            # Return the vertices of the trimesh
+            return np.array(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
 
     @property
     def points_in_parent_frame(self):

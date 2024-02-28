@@ -3,7 +3,7 @@ A set of helper utility functions for dealing with 3D geometry
 """
 import numpy as np
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh
 
 
 def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
@@ -238,7 +238,7 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
                 USD mesh
     """
     # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
+    trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
     assert trimesh_mesh.is_convex, \
         f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
     face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
