@@ -53,12 +53,18 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 
 class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
     def _get_value(self):
+        """
+        Gets all objects in the robot's field of view.
+        
+        Returns:
+            list: List of object names in the robot's field of view
+        """
         if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
             raise ValueError("No vision sensors found on robot.")
-        prim_paths = []
-        paths_to_exclude = set(['BACKGROUND', 'UNLABELLED'])
+        obj_names = []
+        names_to_exclude = set(['background', 'unlabelled'])
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
-                prim_paths.extend([prim_path for prim_path in info['seg_instance'].values() if prim_path not in paths_to_exclude])
-        return prim_paths
+                obj_names.extend([name for name in info['seg_instance'].values() if name not in names_to_exclude])
+        return obj_names
