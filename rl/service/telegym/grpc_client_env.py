@@ -5,6 +5,8 @@ from telegym.protos import environment_pb2_grpc
 
 import gymnasium as gym
 import asyncio
+import time
+import wandb
 
 class GRPCClientEnv(gym.Env):
   def __init__(self, url):
@@ -37,6 +39,7 @@ class GRPCClientEnv(gym.Env):
     return self._stub
 
   def step(self, action):
+    start_time = time.time()
     response = self.stub.Step(environment_pb2.StepRequest(action=pickle.dumps(action)))
     obs = pickle.loads(response.observation)
     reward = response.reward
@@ -50,7 +53,7 @@ class GRPCClientEnv(gym.Env):
     if done:
       info["terminal_observation"] = obs
       obs, reset_infos = self.reset()
-
+    wandb.log({self.url: time.time() - start_time})
     return obs, reward, done, info, reset_infos
   
   def reset(self, seed=None, options=None):

@@ -8,6 +8,8 @@ from telegym.protos import environment_pb2
 from telegym.protos import environment_pb2_grpc
 
 import gymnasium as gym
+import time
+import wandb
 
 def _unwrap_wrapper(env: gym.Env, wrapper_class: str) -> Optional[gym.Wrapper]:
     """
@@ -51,10 +53,11 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
         return self._env
 
     def Step(self, request, unused_context):
+        start_time = time.time()
         action = pickle.loads(request.action)
         assert self.env.action_space.contains(action), "Action must be contained in action space."
         observation, reward, terminated, truncated, info = self.env.step(action)
-
+        wandb.log({"step_time": time.time() - start_time})
         return environment_pb2.StepResponse(
             observation=pickle.dumps(observation),
             reward=reward,
