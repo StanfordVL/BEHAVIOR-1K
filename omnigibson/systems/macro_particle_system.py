@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import SemanticClass, PrimType
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T

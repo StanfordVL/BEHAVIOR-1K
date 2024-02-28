@@ -5,7 +5,7 @@ import gym
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
-from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, CLASS_NAME_TO_SEMANTIC_CLASS_ID
+from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, semantic_class_name_to_id, semantic_class_id_to_name
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
@@ -108,8 +108,11 @@ class VisionSensor(BaseSensor):
             depth="distance_to_camera",
             depth_linear="distance_to_image_plane",
             normal="normals",
+            # Semantic segmentation shows the category each pixel belongs to
             seg_semantic="semantic_segmentation",
+            # Instance segmentation shows the name of the object each pixel belongs to
             seg_instance="instance_segmentation",
+            # Instance ID segmentation shows the prim path of the mesh each pixel belongs to
             seg_instance_id="instance_id_segmentation",
             flow="motion_vectors",
             bbox_2d_tight="bounding_box_2d_tight",
@@ -230,13 +233,22 @@ class VisionSensor(BaseSensor):
                 info[modality] = corrected_id_to_labels
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
+                for key, value in id_to_labels.items():
+                    obj = og.sim.scene.object_registry("prim_path", value)
+                    if obj is not None:
+                        id_to_labels[key] = obj.name
+                    else:
+                        id_to_labels[key] = value.lower()
+                info[modality] = id_to_labels
+            elif modality == "seg_instance_id":
+                id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
         return obs, info
     
     def _remap_semantic_segmentation(self, img, id_to_labels):
         """
-        Remap the semantic segmentation image to the class IDs defined in CLASS_NAME_TO_SEMANTIC_CLASS_ID.
-        Also, correct the id_to_labels input with the labels from CLASS_NAME_TO_SEMANTIC_CLASS_ID and return it.
+        Remap the semantic segmentation image to the class IDs defined in semantic_class_name_to_id().
+        Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
         
         Args:
             img (np.ndarray): Semantic segmentation image to remap
@@ -256,35 +268,28 @@ class VisionSensor(BaseSensor):
             VisionSensor.KNOWN_SEMANTIC_IDS.update(new_ids)
             max_id = max(VisionSensor.KNOWN_SEMANTIC_IDS)
 
-            # Initialize the key array with a default value for unmapped IDs
-            key_array = np.full(max_id + 1, -1, dtype=np.int32)
+            # Initialize the key array with a default value for unmapped IDs & remember old mappings.
+            key_array = np.full(max_id + 1, semantic_class_name_to_id()['object'], dtype=np.uint32)
+            if VisionSensor.KEY_ARRAY is not None:
+                key_array[:len(VisionSensor.KEY_ARRAY)] = VisionSensor.KEY_ARRAY
 
             # Populate the key array with the new IDs based on class name mappings
-            for int_id in VisionSensor.KNOWN_SEMANTIC_IDS:
+            for int_id in new_ids:
                 str_id = str(int_id)
-                if str_id in id_to_labels:
-                    info = id_to_labels[str_id]
-                    class_name = info['class'].lower()
-                    if class_name in CLASS_NAME_TO_SEMANTIC_CLASS_ID:
-                        new_id = CLASS_NAME_TO_SEMANTIC_CLASS_ID[class_name]
-                        key_array[int_id] = new_id
+                info = id_to_labels[str_id]
+                class_name = info['class'].lower()
+                new_id = semantic_class_name_to_id()[class_name]
+                key_array[int_id] = new_id
         else:
             # Use the existing key_array if no new IDs are found
             key_array = VisionSensor.KEY_ARRAY
 
-        corrected_id_to_labels = {}
-        # Update with the new class ID
-        for int_id in VisionSensor.KNOWN_SEMANTIC_IDS:
-            str_id = str(int_id)
-            if str_id in id_to_labels and key_array[int_id] != -1:
-                info = id_to_labels[str_id]
-                corrected_id_to_labels[key_array[int_id]] = info['class'].lower()
-
-        # Remap the image
+        # Remap the image and the labels
         remapped_img = key_array[img]
+        remapped_id_to_labels = {str(x): semantic_class_id_to_name()[x] for x in np.unique(key_array[sorted(int_ids)])}
 
         VisionSensor.KEY_ARRAY = key_array
-        return remapped_img, corrected_id_to_labels
+        return remapped_img, remapped_id_to_labels
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
@@ -304,7 +309,6 @@ class VisionSensor(BaseSensor):
         # Run super
         super().remove_modality(modality=modality)
 
-        # We also need to initialize this new modality
         if should_remove:
             self._remove_modality_from_backend(modality=modality)
     
@@ -536,7 +540,7 @@ class VisionSensor(BaseSensor):
         )))
 
         bbox_2d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
-            gym.spaces.Box(low=0, high=np.iinfo(np.uint32).max, shape=(), dtype=np.uint32),  # semanticId
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
             gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_min
             gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_min
             gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_max
@@ -549,7 +553,7 @@ class VisionSensor(BaseSensor):
             depth=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             normal=((self.image_height, self.image_width, 4), -1.0, 1.0, np.float32),
-            seg_semantic=((self.image_height, self.image_width), -1, MAX_CLASS_COUNT, np.int32),
+            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint32),
             seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
             seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
             flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, np.float32),

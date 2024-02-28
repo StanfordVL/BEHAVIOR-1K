@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import omnigibson as og
-import omnigibson.lazy as lazy
 
 
 def main(random_selection=False, headless=False, short_exec=False):

@@ -192,6 +192,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self._skybox = LightObject(
                 prim_path="/World/skybox",
                 name="skybox",
+                category="background",
                 light_type="Dome",
                 intensity=1500,
                 fixed_base=True,
