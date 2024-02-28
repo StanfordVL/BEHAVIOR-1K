@@ -1605,30 +1605,24 @@ class Cloth(MicroParticleSystem):
                 raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
 
             # Re-write data to @mesh_prim
-            new_face_vertex_ids = cm.face_matrix().flatten()
+            new_faces = cm.face_matrix()
+            new_face_vertex_ids = new_faces.flatten()
             new_texcoord = cm.wedge_tex_coord_matrix()
             new_vertices = cm.vertex_matrix()
             new_normals = cm.vertex_normal_matrix()
             n_faces = len(cm.face_matrix())
-
-            face_vertex_counts = np.ones(n_faces, dtype=int) * 3
-            faces = []
-            i = 0
-            for count in face_vertex_counts:
-                for j in range(count - 2):
-                    faces.append([new_face_vertex_ids[i], new_face_vertex_ids[i + j + 1], new_face_vertex_ids[i + j + 2]])
-                i += count
+            new_face_vertex_counts = np.ones(n_faces, dtype=int) * 3
 
             tm_new = trimesh.Trimesh(
                 vertices=new_vertices,
-                faces=faces,
+                faces=new_faces,
                 vertex_normals=new_normals,
             )
             # Apply the inverse of the world transform to get the mesh back into its local frame
             tm_new.apply_transform(np.linalg.inv(scaled_world_transform))
 
             # Update the mesh prim
-            mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+            mesh_prim.GetAttribute("faceVertexCounts").Set(new_face_vertex_counts)
             mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertices))
             mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
             mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertex_normals))
