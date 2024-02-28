@@ -278,6 +278,7 @@ class VisionSensor(BaseSensor):
                 str_id = str(int_id)
                 info = id_to_labels[str_id]
                 class_name = info['class'].lower()
+                if class_name == 'unlabelled': class_name = 'object'
                 new_id = semantic_class_name_to_id()[class_name]
                 key_array[int_id] = new_id
         else:
