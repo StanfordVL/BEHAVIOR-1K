@@ -278,6 +278,10 @@ class VisionSensor(BaseSensor):
                 str_id = str(int_id)
                 info = id_to_labels[str_id]
                 class_name = info['class'].lower()
+                if ',' in class_name:
+                    # If there are multiple class names, use the last one
+                    # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
+                    class_name = class_name.split(',')[-1]
                 if class_name == 'unlabelled': class_name = 'object'
                 new_id = semantic_class_name_to_id()[class_name]
                 key_array[int_id] = new_id

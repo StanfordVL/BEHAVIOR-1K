@@ -237,6 +237,16 @@ class MacroParticleSystem(BaseSystem):
         # Increment counter
         cls._particle_counter += 1
 
+        # Update semantics
+        # semantic_label is equal to name until the first caputal letter, e.g. stainParticle0 -> stain
+        for i, c in enumerate(name):
+            if c.isupper(): semantic_label = name[:i]; break
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=new_particle.prim,
+            semantic_label=semantic_label,
+            type_label="class",
+        )
+
         return new_particle
 
     @classmethod
