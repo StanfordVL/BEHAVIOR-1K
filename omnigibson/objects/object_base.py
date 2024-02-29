@@ -191,12 +191,13 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.self_collisions = self._load_config["self_collisions"]
 
         for link in self.links.values():
-            for vmesh in link.visual_meshes.values():
-                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-                    prim=vmesh._prim,
-                    semantic_label=self.category,
-                    type_label="class",
-                )
+            if hasattr(link, 'visual_meshes'):
+                for vmesh in link.visual_meshes.values():
+                    lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                        prim=vmesh._prim,
+                        semantic_label=self.category,
+                        type_label="class",
+                    )
 
     def _initialize(self):
         # Run super first
