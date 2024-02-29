@@ -300,7 +300,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Run sanity check to make sure compatibility with omniverse physx
             if self.method == ParticleModifyMethod.PROJECTION and self.obj.scale.max() != self.obj.scale.min():
                 raise ValueError(f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "
-                                 f"created with non-uniform scale and sample_with_raycast! Got scale: {self.obj.scale}")
+                                 f"created with non-uniform scale and requires_overlap! Got scale: {self.obj.scale}")
 
         # Initialize internal variables
         self._current_step = 0
@@ -631,7 +631,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         Returns:
             bool: Whether overlap checks should be executed as a guard condition against modifying particles
         """
-        return True
+        raise NotImplementedError()
 
     @classproperty
     def supported_active_systems(cls):
