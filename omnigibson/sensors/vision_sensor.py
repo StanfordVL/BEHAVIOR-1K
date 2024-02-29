@@ -60,9 +60,9 @@ class VisionSensor(BaseSensor):
         "depth",
         "depth_linear",
         "normal",
-        "seg_semantic",
-        "seg_instance",
-        "seg_instance_id",
+        "seg_semantic",  # Semantic segmentation shows the category each pixel belongs to
+        "seg_instance",  # Instance segmentation shows the name of the object each pixel belongs to
+        "seg_instance_id",  # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
         "flow",
         "bbox_2d_tight",
         "bbox_2d_loose",
@@ -113,7 +113,7 @@ class VisionSensor(BaseSensor):
             seg_semantic="semantic_segmentation",
             # Instance segmentation shows the name of the object each pixel belongs to
             seg_instance="instance_segmentation",
-            # Instance ID segmentation shows the prim path of the mesh each pixel belongs to
+            # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
             seg_instance_id="instance_id_segmentation",
             flow="motion_vectors",
             bbox_2d_tight="bounding_box_2d_tight",
