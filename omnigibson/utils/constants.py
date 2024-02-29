@@ -89,7 +89,7 @@ PRIMITIVE_MESH_TYPES = {
 }
 
 # Valid geom types
-GEOM_TYPES = {"Sphere", "Cube", "Capsule", "Cone", "Cylinder", "Mesh"}
+GEOM_TYPES = {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
 
 # Valid joint axis
 JointAxis = ["X", "Y", "Z"]
