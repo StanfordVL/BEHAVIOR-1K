@@ -5,6 +5,7 @@ import gym
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS
 from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, semantic_class_name_to_id, semantic_class_id_to_name
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
@@ -279,9 +280,9 @@ class VisionSensor(BaseSensor):
                 info = id_to_labels[str_id]
                 class_name = info['class'].lower()
                 if ',' in class_name:
-                    # If there are multiple class names, use the last one
+                    # If there are multiple class names, grab the one that is a registered system
                     # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
-                    class_name = class_name.split(',')[-1]
+                    class_name = next((cat for cat in class_name.split(',') if cat in REGISTERED_SYSTEMS), class_name)
                 if class_name == 'unlabelled': class_name = 'object'
                 new_id = semantic_class_name_to_id()[class_name]
                 key_array[int_id] = new_id
