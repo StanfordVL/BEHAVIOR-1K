@@ -57,7 +57,7 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
         Gets all objects in the robot's field of view.
         
         Returns:
-            list: List of object names in the robot's field of view
+            list: List of objects in the robot's field of view
         """
         if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
             raise ValueError("No vision sensors found on robot.")
@@ -67,4 +67,4 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
                 obj_names.extend([name for name in info['seg_instance'].values() if name not in names_to_exclude])
-        return obj_names
+        return [x for x in [og.sim.scene.object_registry("name", x) for x in obj_names] if x is not None]

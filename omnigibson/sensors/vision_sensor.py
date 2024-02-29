@@ -239,7 +239,12 @@ class VisionSensor(BaseSensor):
                     if obj is not None:
                         id_to_labels[key] = obj.name
                     else:
-                        id_to_labels[key] = value.lower()
+                        if value in ['BACKGROUND','UNLABELLED']:
+                            id_to_labels[key] = value.lower()
+                        else:
+                            # we split the path and take the last part
+                            # e.g. '/World/breakfast_table_skczfi_0/base_link/stainParticle0' -> 'stainParticle0'
+                            id_to_labels[key] = value.split('/')[-1]
                 info[modality] = id_to_labels
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
@@ -280,6 +285,10 @@ class VisionSensor(BaseSensor):
                 info = id_to_labels[str_id]
                 class_name = info['class'].lower()
                 if class_name == 'unlabelled': class_name = 'object'
+                if ',' in class_name:
+                    # If there are multiple class names, grab the one that is a registered system
+                    # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
+                    class_name = next((cat for cat in class_name.split(',') if cat in REGISTERED_SYSTEMS), class_name)
                 new_id = semantic_class_name_to_id()[class_name]
                 key_array[int_id] = new_id
         else:

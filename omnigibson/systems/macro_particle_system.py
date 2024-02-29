@@ -407,6 +407,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 path_from=cls.particle_object.prim_path,
                 path_to=prim_path,
             )
+            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
+            )
         return VisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
@@ -1146,6 +1152,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
+            )
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod

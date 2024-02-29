@@ -190,14 +190,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        for link in self.links.values():
-            if hasattr(link, 'visual_meshes'):
-                for vmesh in link.visual_meshes.values():
-                    lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-                        prim=vmesh._prim,
-                        semantic_label=self.category,
-                        type_label="class",
-                    )
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=self._prim,
+            semantic_label=self.category,
+            type_label="class",
+        )
 
     def _initialize(self):
         # Run super first

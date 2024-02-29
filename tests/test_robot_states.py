@@ -141,7 +141,7 @@ def test_object_in_FOV_of_robot():
     env = setup_environment(False)
     robot = env.robots[0]
     env.reset()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == ['robot0']
+    assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
     vision_sensor = sensors[0]
