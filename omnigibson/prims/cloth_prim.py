@@ -19,6 +19,7 @@ from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
 
 import numpy as np
+from collections.abc import Iterable
 
 
 # Create settings for this module
@@ -63,6 +64,7 @@ class ClothPrim(GeomPrim):
         self._centroid_idx = None
         self._keypoint_idx = None
         self._keyface_idx = None
+        self._mesh_scale = None
 
         # Run super init
         super().__init__(
@@ -72,6 +74,9 @@ class ClothPrim(GeomPrim):
         )
 
     def _post_load(self):
+        # Cache the original scale of the visual mesh
+        self._mesh_scale = np.array(self.get_attribute("xformOp:scale"))
+
         # run super first
         super()._post_load()
 
@@ -121,6 +126,50 @@ class ClothPrim(GeomPrim):
         dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), axis=-1)
         self._centroid_idx = np.argmin(dists)
 
+    @property
+    def usd_scale(self):
+        """
+        Gets prim's scale with respect to the local frame (the parent's frame).
+
+        Returns:
+            np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
+        """
+        return np.array(self.get_attribute("xformOp:scale"))
+
+    @property
+    def scale(self):
+        """
+        Gets prim's scale with respect to the local frame (the parent's frame), divided by the original mesh scale.
+        This represents the scale of the ClothPrim as a link (useful from an external user's point of view).
+        For example, if the user loads the cloth object at scale [1, 1, 1], this function will return [1, 1, 1],
+        rather than the original mesh scale of the visual mesh.
+
+        Returns:
+            np.ndarray: scale applied to the prim's dimensions in the local frame, divided by the original mesh scale.
+                The shape is (3,).
+        """
+        return self.usd_scale / self._mesh_scale
+
+    @scale.setter
+    def scale(self, scale):
+        """
+        Sets prim's scale with respect to the local frame (the prim's parent frame) by treating the ClothPrim as a link.
+        This represents the scale of the ClothPrim as a link (useful from an external user's point of view).
+        For example, if the user sets the scale of the cloth object as [1, 2, 3], this function will set the actual
+        scale as [1, 2, 3] * the original mesh scale.
+
+        Args:
+            scale (float or np.ndarray): scale to be applied to the prim's dimensions, to be multiplied by the original
+                mesh scale. shape is (3,).
+        """
+        scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
+        scale *= self._mesh_scale
+        scale = lazy.pxr.Gf.Vec3d(*scale)
+        properties = self.prim.GetPropertyNames()
+        if "xformOp:scale" not in properties:
+            lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
+        self.set_attribute("xformOp:scale", scale)
+
     def _initialize(self):
         super()._initialize()
         # TODO (eric): hacky way to get cloth rendering to work (otherwise, there exist some rendering artifacts).
@@ -163,7 +212,7 @@ class ClothPrim(GeomPrim):
         """
         t, r = self.get_position_orientation()
         r = T.quat2mat(r)
-        s = self.scale
+        s = self.usd_scale
 
         # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
         p_local = np.array(self.get_attribute(attr="points"), copy=False)
@@ -187,7 +236,7 @@ class ClothPrim(GeomPrim):
 
         r = T.quat2mat(self.get_orientation())
         t = self.get_position()
-        s = self.scale
+        s = self.usd_scale
         p_local = (r.T @ (positions - t).T).T / s
 
         # Fill the idxs if requested

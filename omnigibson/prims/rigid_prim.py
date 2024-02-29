@@ -1,5 +1,5 @@
 from functools import cached_property
-import scipy
+from scipy.spatial import ConvexHull, QhullError
 import numpy as np
 
 import omnigibson as og
@@ -623,9 +623,9 @@ class RigidPrim(XFormPrim):
         points = np.concatenate(points, axis=0)
         
         try:
-            hull = scipy.spatial.ConvexHull(points)
+            hull = ConvexHull(points)
             return points[hull.vertices, :]
-        except scipy.spatial.qhull.QhullError:
+        except QhullError:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)
             # return all the points in this case
             return points
