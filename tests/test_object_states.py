@@ -1095,6 +1095,7 @@ def test_contains():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
+        print(f"Testing Contains {stockpot.name} with {system.name}")
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
@@ -1113,7 +1114,7 @@ def test_contains():
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 
-        for _ in range(10):
+        for _ in range(3):
             og.sim.step()
 
         assert stockpot.states[Contains].get_value(system)
