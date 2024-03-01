@@ -630,7 +630,7 @@ class RigidPrim(XFormPrim):
         try:
             hull = ConvexHull(points)
             return points[hull.vertices, :]
-        except QhullError:
+        except:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)
             # return all the points in this case
             return points
