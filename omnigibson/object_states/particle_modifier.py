@@ -298,7 +298,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Sanity check scale if requested
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
-            if self.method == ParticleModifyMethod.PROJECTION and self.obj.scale.max() != self.obj.scale.min():
+            if self.method == ParticleModifyMethod.PROJECTION and not np.isclose(self.obj.scale.max(), self.obj.scale.min(), atol=1e-04):
                 raise ValueError(f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "
                                  f"created with non-uniform scale and requires_overlap! Got scale: {self.obj.scale}")
 
