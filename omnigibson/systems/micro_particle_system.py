@@ -805,6 +805,13 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 scales=scales,
                 prototype_indices=prototype_indices,
             )
+        
+        # Update semantics
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=cls.prim_path),
+            semantic_label=cls.name,
+            type_label="class",
+        )
 
         return inst
 
@@ -862,6 +869,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)
 
+        # /World/water
+        # /World/water/system
+        # /World/water/instancer_0
+        
         # Create the instancer
         instance = create_physx_particleset_pointinstancer(
             name=name,
@@ -1315,6 +1326,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
         prototype = VisualGeomPrim(prim_path=prototype.GetPath().pathString, name=prototype.GetPath().pathString)
         prototype.visible = False
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=prototype.prim,
+            semantic_label=cls.name,
+            type_label="class",
+        )
         return [prototype]
 
     @classmethod
@@ -1461,6 +1477,11 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
         prototype.scale = cls.max_scale
         prototype.visible = False
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=prototype.prim,
+            semantic_label=cls.name,
+            type_label="class",
+        )
 
         # Store the contact offset based on a minimum sphere
         vertices = np.array(prototype.get_attribute("points")) * prototype.scale

@@ -77,54 +77,6 @@ def get_prim_nested_children(prim):
     return prims
 
 
-def get_camera_params(viewport):
-    """
-    Get active camera intrinsic and extrinsic parameters.
-
-    Returns:
-        dict: Keyword-mapped values of the active camera's parameters:
-
-            pose (numpy.ndarray): camera position in world coordinates,
-            fov (float): horizontal field of view in radians
-            focal_length (float)
-            horizontal_aperture (float)
-            view_projection_matrix (numpy.ndarray(dtype=float64, shape=(4, 4)))
-            resolution (dict): resolution as a dict with 'width' and 'height'.
-            clipping_range (tuple(float, float)): Near and Far clipping values.
-    """
-    stage = lazy.omni.usd.get_context().get_stage()
-    prim = stage.GetPrimAtPath(viewport.get_active_camera())
-    prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
-    view_params = lazy.omni.syntheticdata.helpers.get_view_params(viewport)
-    fov = 2 * math.atan(view_params["horizontal_aperture"] / (2 * view_params["focal_length"]))
-    view_proj_mat = lazy.omni.syntheticdata.helpers.get_view_proj_mat(view_params)
-
-    return {
-        "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
-        "fov": fov,
-        "focal_length": view_params["focal_length"],
-        "horizontal_aperture": view_params["horizontal_aperture"],
-        "view_projection_matrix": view_proj_mat,
-        "resolution": {"width": view_params["width"], "height": view_params["height"]},
-        "clipping_range": np.array(view_params["clipping_range"]),
-    }
-
-
-def get_semantic_objects_pose():
-    """
-    Get pose of all objects with a semantic label.
-    """
-    stage = lazy.omni.usd.get_context().get_stage()
-    mappings = lazy.omni.syntheticdata.helpers.get_instance_mappings()
-    pose = []
-    for m in mappings:
-        prim_path = m[1]
-        prim = stage.GetPrimAtPath(prim_path)
-        prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
-        pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
-    return pose
-
-
 def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
                  joint_frame_in_parent_frame_pos=None, joint_frame_in_parent_frame_quat=None,
                  joint_frame_in_child_frame_pos=None, joint_frame_in_child_frame_quat=None,

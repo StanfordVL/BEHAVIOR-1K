@@ -5,11 +5,10 @@ from collections.abc import Iterable
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
-from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
+from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 
@@ -86,7 +85,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Infer class ID if not specified
         if class_id is None:
-            class_id = CLASS_NAME_TO_CLASS_ID.get(category, SemanticClass.USER_ADDED_OBJS)
+            class_id = semantic_class_name_to_id()[category]
         self.class_id = class_id
 
         # Values to be created at runtime
@@ -191,7 +190,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        # Update semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
