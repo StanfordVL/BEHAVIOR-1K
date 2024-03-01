@@ -1133,10 +1133,10 @@ def test_contains():
 @og_test
 def test_covered():
     bracelet = og.sim.scene.object_registry("name", "bracelet")
-    oyster = og.sim.scene.object_registry("name", "oyster")
+    bowl = og.sim.scene.object_registry("name", "bowl")
     microwave = og.sim.scene.object_registry("name", "microwave")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
-    for obj in (bracelet, oyster, microwave):
+    for obj in (bracelet, bowl, microwave):
         for system in systems:
             # bracelet is too small to sample physical particles on it
             sampleable = is_visual_particle_system(system.name) or obj != bracelet
