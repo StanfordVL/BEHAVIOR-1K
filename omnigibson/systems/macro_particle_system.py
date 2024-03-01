@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import SemanticClass, PrimType
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
@@ -406,6 +406,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 "CopyPrim",
                 path_from=cls.particle_object.prim_path,
                 path_to=prim_path,
+            )
+            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
             )
         return VisualGeomPrim(prim_path=prim_path, name=name)
 
@@ -1146,6 +1152,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
+            )
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod

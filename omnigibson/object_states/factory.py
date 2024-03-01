@@ -4,7 +4,7 @@ from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {
-    "robot": [IsGrasping],
+    "robot": [IsGrasping, ObjectsInFOVOfRobot],
     "attachable": [AttachedTo],
     "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],

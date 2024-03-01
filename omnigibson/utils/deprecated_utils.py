@@ -19,6 +19,8 @@ import warp as wp
 import math
 from omni.isaac.core.articulations import ArticulationView as _ArticulationView
 from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
+from PIL import Image, ImageDraw
+from omni.replicator.core import random_colours
 
 DEG2RAD = math.pi / 180.0
 
@@ -685,3 +687,38 @@ class RigidPrimView(_RigidPrimView):
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(True)
             return
+
+def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
+    """Colorizes 2D bounding box data for visualization.
+
+    We are overriding the replicator native version of this function to fix a bug.
+    In their version of this function, the ordering of the rectangle corners is incorrect and we fix it here.
+
+    Args:
+        bboxes_2d_data (numpy.ndarray): 2D bounding box data from the sensor.
+        bboxes_2d_rgb (numpy.ndarray): RGB data from the sensor to embed bounding box.
+        num_channels (int): Specify number of channels i.e. 3 or 4.
+    """
+    semantic_id_list = []
+    bbox_2d_list = []
+    rgb_img = Image.fromarray(bboxes_2d_rgb)
+    rgb_img_draw = ImageDraw.Draw(rgb_img)
+    for bbox_2d in bboxes_2d_data:
+        semantic_id_list.append(bbox_2d['semanticId'])
+        bbox_2d_list.append(bbox_2d)
+    semantic_id_list_np = np.unique(np.array(semantic_id_list))
+    color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
+    for bbox_2d in bbox_2d_list:
+        index = np.where(semantic_id_list_np == bbox_2d['semanticId'])[0][0]
+        bbox_color = color_list[index]
+        outline = (bbox_color[0], bbox_color[1], bbox_color[2])
+        if num_channels == 4:
+            outline = (
+                bbox_color[0],
+                bbox_color[1],
+                bbox_color[2],
+                bbox_color[3],
+            )
+        rgb_img_draw.rectangle([(bbox_2d['x_min'], bbox_2d['y_min']), (bbox_2d['x_max'], bbox_2d['y_max'])], outline=outline, width=2)
+    bboxes_2d_rgb = np.array(rgb_img)
+    return bboxes_2d_rgb

@@ -419,13 +419,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Get the current environment observation.
 
         Returns:
-            dict: Keyword-mapped observations, which are possibly nested
+            2-tuple:
+                dict: Keyword-mapped observations, which are possibly nested
+                dict: Additional information about the observations
         """
         obs = dict()
+        info = dict()
 
         # Grab all observations from each robot
         for robot in self.robots:
-            obs[robot.name] = robot.get_obs()
+            obs[robot.name], info[robot.name] = robot.get_obs()
 
         # Add task observations
         obs["task"] = self._task.get_obs(env=self)
@@ -433,15 +436,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Add external sensor observations if they exist
         if self._external_sensors is not None:
             external_obs = dict()
+            external_info = dict()
             for sensor_name, sensor in self._external_sensors.items():
-                external_obs[sensor_name] = sensor.get_obs()
+                external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
             obs["external"] = external_obs
+            info["external"] = external_info
 
         # Possibly flatten obs if requested
         if self._flatten_obs_space:
             obs = recursively_generate_flat_dict(dic=obs)
 
-        return obs
+        return obs, info
     
     def get_scene_graph(self):
         """
@@ -506,7 +511,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             og.sim.step()
 
             # Grab observations
-            obs = self.get_obs()
+            obs, obs_info = self.get_obs()
 
             # Step the scene graph builder if necessary
             if self._scene_graph_builder is not None:
@@ -515,6 +520,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Grab reward, done, and info, and populate with internal info
             reward, done, info = self.task.step(self, action)
             self._populate_info(info)
+            info["obs_info"] = obs_info
 
             if done and self._automatic_reset:
                 # Add lost observation to our information dict, and reset
@@ -550,7 +556,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.step()
 
         # Grab and return observations
-        obs = self.get_obs()
+        obs, obs_info = self.get_obs()
 
         if self._loaded:
             # Sanity check to make sure received observations match expected observation space
@@ -572,18 +578,25 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 missing_keys = exp_keys - real_keys
                 extra_keys = real_keys - exp_keys
 
-                log.error("MISSING OBSERVATION KEYS:")
-                log.error(missing_keys)
-                log.error("EXTRA OBSERVATION KEYS:")
-                log.error(extra_keys)
-                log.error("SHARED OBSERVATION KEY DTYPES AND SHAPES:")
+                if missing_keys:
+                    log.error("MISSING OBSERVATION KEYS:")
+                    log.error(missing_keys)
+                if extra_keys:
+                    log.error("EXTRA OBSERVATION KEYS:")
+                    log.error(extra_keys)
+                
+                mismatched_keys = []
                 for k in shared_keys:
-                    log.error(exp_obs[k])
-                    log.error(real_obs[k])
+                    if exp_obs[k][2:] != real_obs[k][2:]:  # Compare dtypes and shapes
+                        mismatched_keys.append(k)
+                        log.error(f"MISMATCHED OBSERVATION FOR KEY '{k}':")
+                        log.error(f"Expected: {exp_obs[k]}")
+                        log.error(f"Received: {real_obs[k]}")
 
                 raise ValueError("Observation space does not match returned observations!")
 
-        return obs
+
+        return obs, obs_info
 
     @property
     def episode_steps(self):
