@@ -1414,6 +1414,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
     @classproperty
     def self_collision(cls):
         # Don't self-collide to improve physics stability
+        # For whatever reason, granular (non-fluid) particles tend to explode when sampling Filled states, and it seems
+        # the only way to avoid this unstable behavior is to disable self-collisions. This actually enables the granular
+        # particles to converge to zero velocity.
         return False
 
     @classmethod
