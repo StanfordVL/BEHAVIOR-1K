@@ -628,6 +628,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         return [inst.idn for inst in cls.particle_instancers.values()]
 
+    @classproperty
+    def self_collision(cls):
+        """
+        Returns:
+            bool: Whether this system's particle should have self collisions enabled or not
+        """
+        # Default is True
+        return True
+
     @classmethod
     def initialize(cls):
         # Create prototype before running super!
@@ -738,7 +747,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             velocities=None,
             orientations=None,
             scales=None,
-            self_collision=True,
             prototype_indices=None,
     ):
         """
@@ -753,15 +761,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 active instancer that matches the requested idn, a new one will be created.
                 If None, this system will add particles to the default particle instancer
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
-                with each other. Particles in the same group will have collision behavior dictated by @self_collision
+                with each other. Particles in the same group will have collision behavior dictated by
+                @cls.self_collision
             velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
                 If not specified, all will be set to 0
             orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
             scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (cls.min_scale, cls.max_scale)
-            self_collision (bool): Whether to enable particle-particle collision within the set
-                (as defined by @particle_group) or not
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
 
@@ -789,7 +796,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 orientations=orientations,
                 scales=scales,
                 prototype_indices=prototype_indices,
-                self_collision=self_collision,
             )
         else:
             inst.add_particles(
@@ -812,7 +818,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             velocities=None,
             orientations=None,
             scales=None,
-            self_collision=True,
             prototype_indices=None,
     ):
         """
@@ -825,7 +830,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 delete / add additional ones at runtime during simulation. If None, this system will generate a unique
                 identifier automatically.
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
-                with each other. Particles in the same group will have collision behavior dictated by @self_collision
+                with each other. Particles in the same group will have collision behavior dictated by
+                @cls.self_collision
             positions (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
                 If not specified, will be set to the origin by default
             velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
@@ -834,8 +840,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
             scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (cls.min_scale, cls.max_scale)
-            self_collision (bool): Whether to enable particle-particle collision within the set
-                (as defined by @particle_group) or not
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will use all 0s (i.e.: the first prototype created)
 
@@ -865,7 +869,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             physx_particle_system_path=cls.system_prim_path,
             particle_group=particle_group,
             positions=np.zeros((n_particles, 3)) if positions is None else positions,
-            self_collision=self_collision,
+            self_collision=cls.self_collision,
             fluid=cls.is_fluid,
             particle_mass=None,
             particle_density=cls.particle_density,
@@ -901,7 +905,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_group=0,
             sampling_distance=None,
             max_samples=5e5,
-            self_collision=True,
             prototype_indices=None,
     ):
         """
@@ -923,13 +926,12 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 active instancer that matches the requested idn, a new one will be created.
                 If None, this system will add particles to the default particle instancer
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
-                with each other. Particles in the same group will have collision behavior dictated by @self_collision.
+                with each other. Particles in the same group will have collision behavior dictated by
+                @cls.self_collision.
                 Only used if a new particle instancer is created!
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
             max_samples (int): Maximum number of particles to sample
-            self_collision (bool): Whether to enable particle-particle collision within the set
-                (as defined by @particle_group) or not. Only used if a new particle instancer is created!
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
         """
@@ -943,7 +945,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_group=particle_group,
             sampling_distance=sampling_distance,
             max_samples=max_samples,
-            self_collision=self_collision,
             prototype_indices=prototype_indices,
         )
 
@@ -956,7 +957,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             sampling_distance=None,
             max_samples=5e5,
             min_samples_for_success=1,
-            self_collision=True,
             prototype_indices=None,
     ):
         """
@@ -977,8 +977,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             max_samples (int): Maximum number of particles to sample
             min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
-            self_collision (bool): Whether to enable particle-particle collision within the set
-                (as defined by @particle_group) or not. Only used if a new particle instancer is created!
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
 
@@ -993,7 +991,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             sampling_distance=sampling_distance,
             max_samples=max_samples,
             min_samples_for_success=min_samples_for_success,
-            self_collision=self_collision,
             prototype_indices=prototype_indices,
         )
 
@@ -1413,6 +1410,11 @@ class GranularSystem(MicroPhysicalParticleSystem):
     _particle_contact_offset = None
 
     _particle_template = None
+
+    @classproperty
+    def self_collision(cls):
+        # Don't self-collide to improve physics stability
+        return False
 
     @classmethod
     def _clear(cls):
