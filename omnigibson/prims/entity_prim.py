@@ -234,6 +234,8 @@ class EntityPrim(XFormPrim):
         # Now actually create the links
         self._links = dict()
         for link_name, (link_cls, prim) in links_to_create.items():
+            # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
+            # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
             link_load_config = {
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
