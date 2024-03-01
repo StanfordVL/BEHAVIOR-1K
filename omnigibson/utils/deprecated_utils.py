@@ -690,6 +690,10 @@ class RigidPrimView(_RigidPrimView):
 
 def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
     """Colorizes 2D bounding box data for visualization.
+
+    We are overriding the replicator native version of this function to fix a bug.
+    In their version of this function, the ordering of the rectangle corners is incorrect and we fix it here.
+
     Args:
         bboxes_2d_data (numpy.ndarray): 2D bounding box data from the sensor.
         bboxes_2d_rgb (numpy.ndarray): RGB data from the sensor to embed bounding box.
