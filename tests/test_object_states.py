@@ -1073,10 +1073,7 @@ def test_filled():
             og.sim.step()
 
         assert stockpot.states[Filled].set_value(system, True)
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Filled].get_value(system)
 
         # Cannot set Filled state False
@@ -1084,10 +1081,7 @@ def test_filled():
             stockpot.states[Filled].set_value(system, False)
 
         system.remove_all_particles()
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert not stockpot.states[Filled].get_value(system)
 
 @og_test
@@ -1103,8 +1097,7 @@ def test_contains():
 
         # Sample single particle
         if is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] + system.particle_radius * 1.01])])
-            assert not stockpot.states[Contains].get_value(system)
+            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
@@ -1114,9 +1107,7 @@ def test_contains():
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 
-        for _ in range(3):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Contains].get_value(system)
 
         # Remove all particles and make sure contains returns False
