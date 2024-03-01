@@ -95,7 +95,7 @@ def assert_test_scene():
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
                 get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
-                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.8),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.7),
                 get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
                 get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
                 get_obj_cfg("apple", "apple", "agveuv"),
