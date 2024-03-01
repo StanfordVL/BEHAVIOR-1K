@@ -123,6 +123,10 @@ class EntityPrim(XFormPrim):
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links()
 
+        # Optionally set the scale
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
+
         # Prepare the articulation view.
         if self.n_joints > 0:
             # Import now to avoid too-eager load of Omni classes due to inheritance
@@ -1084,16 +1088,19 @@ class EntityPrim(XFormPrim):
 
     @property
     def scale(self):
-        # Since all rigid bodies owned by this object prim have the same scale, we simply grab it from the root prim
-        return self.root_link.scale
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
+        return self.root_link.scale / self.root_link.original_scale
 
     @scale.setter
     def scale(self, scale):
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
         # We iterate over all rigid bodies owned by this object prim and set their individual scales
         # We do this because omniverse cannot scale orientation of an articulated prim, so we get mesh mismatches as
-        # they rotate in the world
+        # they rotate in the world.
         for link in self._links.values():
-            link.scale = scale
+            link.scale = scale * link.original_scale
 
     @property
     def solver_position_iteration_count(self):

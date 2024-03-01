@@ -75,10 +75,6 @@ class XFormPrim(BasePrim):
             material.add_user(self)
             self._material = material
 
-        # Optionally set the scale and visibility
-        if "scale" in self._load_config and self._load_config["scale"] is not None:
-            self.scale = self._load_config["scale"]
-
     def remove(self):
         # Remove the material prim if one exists
         if self._material is not None:
