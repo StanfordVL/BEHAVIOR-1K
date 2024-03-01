@@ -148,7 +148,6 @@ class JointType:
 
 # Object category specs
 AVERAGE_OBJ_DENSITY = 67.0
-AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
 
 
 def get_collision_group_mask(groups_to_exclude=[]):

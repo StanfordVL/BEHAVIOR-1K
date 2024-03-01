@@ -24,9 +24,6 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Default texture to use for skybox
-m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
-
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
 
@@ -192,13 +189,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self._skybox = LightObject(
                 prim_path="/World/skybox",
                 name="skybox",
+                category="background",
                 light_type="Dome",
                 intensity=1500,
                 fixed_base=True,
             )
             og.sim.import_object(self._skybox, register=False)
             self._skybox.color = (1.07, 0.85, 0.61)
-            self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
+            # Default texture to use for skybox
+            default_skybox_texture = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+            self._skybox.texture_file_path = default_skybox_texture
 
     def _load_objects_from_scene_file(self):
         """

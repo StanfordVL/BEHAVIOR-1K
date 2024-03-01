@@ -150,6 +150,9 @@ def _launch_app():
     return app
 
 
+
+    log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
+
 def launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = _launch_app()
@@ -1375,6 +1378,10 @@ def launch_simulator(*args, **kwargs):
             return self._scene.deserialize(state=state), self._scene.state_size
 
     if not og.sim:
+        
+        from omnigibson.systems.system_base import import_og_systems
+        # Import all OG systems from dataset
+        import_og_systems()
         og.sim = Simulator(*args, **kwargs)
 
         print()
