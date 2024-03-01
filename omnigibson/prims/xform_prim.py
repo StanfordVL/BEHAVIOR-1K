@@ -40,6 +40,7 @@ class XFormPrim(BasePrim):
         self._binding_api = None
         self._material = None
         self._collision_filter_api = None
+        self.original_scale = None
 
         # Run super method
         super().__init__(
@@ -58,6 +59,10 @@ class XFormPrim(BasePrim):
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
 
+        # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
+        # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
+        self.original_scale = np.array(self.get_attribute("xformOp:scale"))
+
         # Create collision filter API
         self._collision_filter_api = lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim) if \
             self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI) else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
@@ -74,6 +79,10 @@ class XFormPrim(BasePrim):
             assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
             material.add_user(self)
             self._material = material
+
+        # Optionally set the scale and visibility
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
 
     def remove(self):
         # Remove the material prim if one exists

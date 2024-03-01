@@ -64,8 +64,6 @@ class RigidPrim(XFormPrim):
         self._collision_meshes = None
         self._visual_meshes = None
 
-        self.original_scale = None
-        
         # Caches for kinematic-only objects
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
@@ -88,9 +86,6 @@ class RigidPrim(XFormPrim):
         kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
         self.set_attribute("physics:kinematicEnabled", kinematic_only)
         self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
-
-        # Cache the original scale from the USD before setting the scale in XFormPrim's post_load
-        self.original_scale = np.array(self.get_attribute("xformOp:scale"))
 
         # run super first
         super()._post_load()

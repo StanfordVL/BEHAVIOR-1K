@@ -189,10 +189,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        load_config = {
-            "scale": self._load_config.get("scale", None),
-        }
-
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
             for link in self._links.values():
@@ -242,7 +238,6 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
             }
-            link_load_config.update(load_config)
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),
                 name=f"{self._name}:{link_name}",

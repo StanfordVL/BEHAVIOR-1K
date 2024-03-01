@@ -64,7 +64,6 @@ class ClothPrim(GeomPrim):
         self._centroid_idx = None
         self._keypoint_idx = None
         self._keyface_idx = None
-        self.original_scale = None
 
         # Run super init
         super().__init__(
@@ -74,9 +73,6 @@ class ClothPrim(GeomPrim):
         )
 
     def _post_load(self):
-        # Cache the original scale of the visual mesh
-        self.original_scale = np.array(self.get_attribute("xformOp:scale"))
-
         # run super first
         super()._post_load()
 
