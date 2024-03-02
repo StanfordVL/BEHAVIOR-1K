@@ -21,6 +21,45 @@ def render():
     og.app.update()
     set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", True)
 
+class Remapper:
+    def __init__(self):
+        self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
+
+    def clear(self):
+        """Resets the key_array to empty."""
+        self.key_array = np.array([], dtype=np.uint32)
+
+    def remap(self, old_mapping, new_mapping, image):
+        """
+        Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
+        
+        Args:
+            old_mapping (dict): The old mapping dictionary.
+            new_mapping (dict): The new mapping dictionary.
+            image (np.ndarray): The 2D image to remap.
+        
+        Returns:
+            np.ndarray: The remapped image.
+        """
+        # Convert old_mapping keys to integers if they aren't already
+        old_keys = np.array(list(map(int, old_mapping.keys())), dtype=np.uint32)
+        
+        # If key_array is empty or does not cover all old keys, rebuild it
+        if self.key_array.size == 0 or np.max(old_keys) >= self.key_array.size: # TODO: this is wrong because there might be gaps in the old keys
+            max_key = max(np.max(old_keys), max(map(int, new_mapping.keys())))
+            self.key_array = np.full(max_key + 1, -1, dtype=np.uint32)  # Use -1 as a placeholder for unmapped values
+        
+        # Update key_array based on new_mapping
+        for str_key, value in new_mapping.items():
+            int_key = int(str_key)
+            # Assuming the new_mapping values are integers or can be uniquely mapped to integers
+            # This can be adjusted based on the actual mapping required
+            self.key_array[int_key] = int(value) if value.isdigit() else hash(value)
+        
+        # Apply remapping
+        remapped_image = np.where(self.key_array[image] != -1, self.key_array[image], image)
+        
+        return remapped_image
 
 class VisionSensor(BaseSensor):
     """
