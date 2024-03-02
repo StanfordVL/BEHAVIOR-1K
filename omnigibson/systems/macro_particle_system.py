@@ -228,7 +228,7 @@ class MacroParticleSystem(BaseSystem):
         new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
         # Set the scale and make sure the particle is visible
-        new_particle.scale = scale
+        new_particle.scale *= scale
         new_particle.visible = True
 
         # Track this particle as well
@@ -1165,7 +1165,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super().process_particle_object()
 
         # Compute particle radius
-        vertices = np.array(cls.particle_object.get_attribute("points")) * cls.max_scale.reshape(1, 3)
+        vertices = np.array(cls.particle_object.get_attribute("points")) * cls.particle_object.scale * cls.max_scale.reshape(1, 3)
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
     @classmethod

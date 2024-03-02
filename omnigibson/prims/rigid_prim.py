@@ -1,5 +1,5 @@
 from functools import cached_property
-import scipy
+from scipy.spatial import ConvexHull, QhullError
 import numpy as np
 
 import omnigibson as og
@@ -63,7 +63,7 @@ class RigidPrim(XFormPrim):
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
-        
+
         # Caches for kinematic-only objects
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
@@ -623,7 +623,7 @@ class RigidPrim(XFormPrim):
         points = np.concatenate(points, axis=0)
         
         try:
-            hull = scipy.spatial.ConvexHull(points)
+            hull = ConvexHull(points)
             return points[hull.vertices, :]
         except:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)

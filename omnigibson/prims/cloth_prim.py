@@ -19,6 +19,7 @@ from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
 
 import numpy as np
+from collections.abc import Iterable
 
 
 # Create settings for this module
