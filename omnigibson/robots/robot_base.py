@@ -293,28 +293,33 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             (e.g.: proprio, rgb, etc.)
 
         Returns:
-            dict: Keyword-mapped dictionary mapping observation modality names to
-                observations (usually np arrays)
+            2-tuple:
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    observations (usually np arrays)
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    additional info
         """
         # Our sensors already know what observation modalities it has, so we simply iterate over all of them
         # and grab their observations, processing them into a flat dict
         obs_dict = dict()
+        info_dict = dict()
         for sensor_name, sensor in self._sensors.items():
-            obs_dict[sensor_name] = sensor.get_obs()
+            obs_dict[sensor_name], info_dict[sensor_name] = sensor.get_obs()
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
-            obs_dict["proprio"] = self.get_proprioception()
+            obs_dict["proprio"], info_dict["proprio"] = self.get_proprioception()
 
-        return obs_dict
+        return obs_dict, info_dict
 
     def get_proprioception(self):
         """
         Returns:
             n-array: numpy array of all robot-specific proprioceptive observations.
+            dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
-        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs])
+        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
 
     def _get_proprioception_dict(self):
         """
@@ -391,7 +396,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         frames = dict()
         remaining_obs_modalities = deepcopy(self.obs_modalities)
         for sensor in self.sensors.values():
-            obs = sensor.get_obs()
+            obs, _ = sensor.get_obs()
             sensor_frames = []
             if isinstance(sensor, VisionSensor):
                 # We check for rgb, depth, normal, seg_instance
@@ -515,7 +520,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Returns:
             int: Size of self.get_proprioception() vector
         """
-        return len(self.get_proprioception())
+        return len(self.get_proprioception()[0])
 
     @property
     def _default_sensor_config(self):

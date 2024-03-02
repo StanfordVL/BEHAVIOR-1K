@@ -83,7 +83,6 @@ def _launch_app():
     # Enable additional extensions we need
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":

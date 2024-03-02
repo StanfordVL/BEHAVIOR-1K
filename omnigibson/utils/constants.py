@@ -1,15 +1,18 @@
 """
 Constant Definitions
 """
+from functools import cache
+import hashlib
 import os
+import numpy as np
 from enum import Enum, IntEnum
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_og_avg_category_specs
+from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_all_object_categories
 
-MAX_INSTANCE_COUNT = 16384
-MAX_CLASS_COUNT = 4096
+MAX_INSTANCE_COUNT = np.iinfo(np.uint32).max
+MAX_CLASS_COUNT = np.iinfo(np.uint32).max
 MAX_VIEWER_SIZE = 2048
 
 
@@ -32,21 +35,6 @@ class SimulatorMode(IntEnum):
     GUI = 1
     HEADLESS = 2
     VR = 3
-
-
-class SemanticClass(IntEnum):
-    BACKGROUND = 0
-    ROBOTS = 1
-    USER_ADDED_OBJS = 2
-    SCENE_OBJS = 3
-    # The following class ids count backwards from MAX_CLASS_COUNT (instead of counting forward from 4) because we want
-    # to maintain backward compatibility
-    GRASS = 506
-    DIRT = 507
-    STAIN = 508
-    WATER = 509
-    HEAT_SOURCE_MARKER = 510
-    TOGGLE_MARKER = 511
 
 
 # Specific methods for applying / removing particles
@@ -189,37 +177,31 @@ UNDER_OBJECTS = [
     "bench",
 ]
 
-hdr_texture = os.path.join(gm.DATASET_PATH, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(gm.DATASET_PATH, "scenes", "background", "probe_03.hdr")
-light_modulation_map_filename = os.path.join(
-    gm.DATASET_PATH, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
-)
-background_texture = os.path.join(gm.DATASET_PATH, "scenes", "background", "urban_street_01.jpg")
-
-
-def get_class_name_to_class_id():
+@cache
+def semantic_class_name_to_id():
     """
     Get mapping from semantic class name to class id
 
     Returns:
-        dict: starting class id for scene objects
+        dict: class name to class id
     """
-    existing_classes = {item.value for item in SemanticClass}
-    category_txt = os.path.join(gm.DATASET_PATH, "metadata/categories.txt")
-    class_name_to_class_id = {"agent": SemanticClass.ROBOTS}  # Agents should have the robot semantic class.
-    starting_class_id = 0
-    if os.path.isfile(category_txt):
-        with open(category_txt) as f:
-            for line in f.readlines():
-                while starting_class_id in existing_classes:
-                    starting_class_id += 1
-                assert starting_class_id < MAX_CLASS_COUNT, "Class ID overflow: MAX_CLASS_COUNT is {}.".format(
-                    MAX_CLASS_COUNT
-                )
-                class_name_to_class_id[line.strip()] = starting_class_id
-                starting_class_id += 1
+    categories = get_all_object_categories()
+    from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+    systems = sorted(REGISTERED_SYSTEMS)
+    all_semantics = sorted(set(categories + systems + ['agent', 'background', 'object', 'light']))
+    
+    # Assign a unique class id to each class name with hashing
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32) for s in all_semantics}
 
     return class_name_to_class_id
 
+@cache
+def semantic_class_id_to_name():
+    """
+    Get mapping from semantic class id to class name
 
-CLASS_NAME_TO_CLASS_ID = get_class_name_to_class_id()
+    Returns:
+        dict: class id to class name
+    """
+    return {v: k for k, v in semantic_class_name_to_id().items()}
+
