@@ -868,10 +868,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)
-
-        # /World/water
-        # /World/water/system
-        # /World/water/instancer_0
         
         # Create the instancer
         instance = create_physx_particleset_pointinstancer(
