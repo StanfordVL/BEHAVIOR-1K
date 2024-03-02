@@ -60,6 +60,7 @@ class VisionSensor(BaseSensor):
         "depth",
         "depth_linear",
         "normal",
+        # Note: we need to get semantic segmentation before instance segmentation for ID remapping purposes
         "seg_semantic",  # Semantic segmentation shows the category each pixel belongs to
         "seg_instance",  # Instance segmentation shows the name of the object each pixel belongs to
         "seg_instance_id",  # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
@@ -76,6 +77,8 @@ class VisionSensor(BaseSensor):
     # Amortized set of semantic IDs that we've seen so far
     KNOWN_SEMANTIC_IDS = set()
     KEY_ARRAY = None
+    INSTANCE_REGISTRY = dict()
+    INSTANCE_ID_REGISTRY = dict()
 
     def __init__(
         self,
@@ -230,10 +233,10 @@ class VisionSensor(BaseSensor):
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
             if modality == "seg_semantic":
                 id_to_labels = raw_obs['info']['idToLabels']
-                obs[modality], corrected_id_to_labels = self._remap_semantic_segmentation(obs[modality], id_to_labels)
-                info[modality] = corrected_id_to_labels
+                obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
+                # Remap instance segmentation labels
                 for key, value in id_to_labels.items():
                     obj = og.sim.scene.object_registry("prim_path", value)
                     if obj is not None:
@@ -242,10 +245,17 @@ class VisionSensor(BaseSensor):
                         if value in ['BACKGROUND','UNLABELLED']:
                             id_to_labels[key] = value.lower()
                         else:
-                            # we split the path and take the last part
+                            # For macro particle systems, we split the path and take the last part
                             # e.g. '/World/breakfast_table_skczfi_0/base_link/stainParticle0' -> 'stainParticle0'
                             id_to_labels[key] = value.split('/')[-1]
-                info[modality] = id_to_labels
+                    if id_to_labels[key] not in self.INSTANCE_REGISTRY:
+                        VisionSensor.INSTANCE_REGISTRY[id_to_labels[key]] = len(VisionSensor.INSTANCE_REGISTRY)
+                # Add new micro particle systems to the instance registry
+                # TODO: filter for micro particle systems
+                for cat in info['seg_semantic'].values():
+                    if cat not in VisionSensor.INSTANCE_REGISTRY:
+                        VisionSensor.INSTANCE_REGISTRY[cat] = len(VisionSensor.INSTANCE_REGISTRY)
+                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
@@ -592,6 +602,8 @@ class VisionSensor(BaseSensor):
         cls.SENSORS = dict()
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None
+        cls.INSTANCE_REGISTRY = dict()
+        cls.INSTANCE_ID_REGISTRY = dict()
 
     @classproperty
     def all_modalities(cls):
