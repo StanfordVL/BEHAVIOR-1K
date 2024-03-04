@@ -36,21 +36,18 @@ class Remapper:
         Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
         
         Args:
-            old_mapping (dict): The old mapping dictionary that maps a set of image values to labels, e.g. {'1':'desk','2':'chair'}.
-            new_mapping (dict): The new mapping dictionary that maps another set of image values to labels, e.g. {'5':'desk','7':'chair','9':'sofa'}.
+            old_mapping (dict): The old mapping dictionary that maps a set of image values to labels, e.g. {1:'desk',2:'chair'}.
+            new_mapping (dict): The new mapping dictionary that maps another set of image values to labels, e.g. {5:'desk',7:'chair',9:'sofa'}.
             image (np.ndarray): The 2D image to remap, e.g. [[1,1],[1,2]].
         
         Returns:
             np.ndarray: The remapped image, e.g. [[5,5],[5,7]].
-            dict: The remapped labels dictionary, e.g. {'5':'desk','7':'chair'}.
+            dict: The remapped labels dictionary, e.g. {5:'desk',7:'chair'}.
         """
-        assert np.all([str(x) in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
-        assert np.all([old_mapping[str(x)] in new_mapping.values() for x in np.unique(image)]), "Not all values in the old mapping are in the new mapping!"
-        
-        # Convert old_mapping keys to integers if they aren't already
-        old_keys = np.array(list(map(int, old_mapping.keys())), dtype=np.uint32)
+        assert np.all([x in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
+        assert np.all([old_mapping[x] in new_mapping.values() for x in np.unique(image)]), "Not all values in the old mapping are in the new mapping!"
 
-        new_keys = old_keys - self.known_ids
+        new_keys = old_mapping.keys() - self.known_ids
 
         # If key_array is empty or does not cover all old keys, rebuild it
         if new_keys:
@@ -59,23 +56,24 @@ class Remapper:
             
             # Using max uint32 as a placeholder for unmapped values may not be safe
             assert np.all(self.key_array != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
+            prev_key_array = self.key_array.copy()
             self.key_array = np.full(max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
 
-            if self.key_array.size > 0:
-                self.key_array[:len(self.key_array)] = self.key_array
+            if prev_key_array.size > 0:
+                self.key_array[:len(prev_key_array)] = prev_key_array
             
             for key in new_keys:
-                key = str(key)
                 label = old_mapping[key]
                 new_key = next((k for k, v in new_mapping.items() if v == label), None)
                 assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
-                assert new_key.isdigit(), f"New key {new_key} is not a digit!"
-                self.key_array[int(key)] = int(new_key)
-        
+                self.key_array[key] = new_key
+
         # Apply remapping
         remapped_img = self.key_array[image]
         assert np.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
-        remapped_labels = {str(x): new_mapping[str(self.key_array[x])] for x in np.unique(image)}
+        remapped_labels = {}
+        for key in np.unique(remapped_img):
+            remapped_labels[key] = new_mapping[key]
         
         return remapped_img, remapped_labels
 
@@ -131,9 +129,9 @@ class VisionSensor(BaseSensor):
     # Persistent dictionary of sensors, mapped from prim_path to sensor
     SENSORS = dict()
     
-    # Amortized set of semantic IDs that we've seen so far
-    KNOWN_SEMANTIC_IDS = set()
-    KEY_ARRAY = None
+    SEMANTIC_REMAPPER = Remapper()
+    INSTANCE_REMAPPER = Remapper()
+    INSTANCE_ID_REMAPPER = Remapper()
     INSTANCE_REGISTRY = dict()
     INSTANCE_ID_REGISTRY = dict()
 
@@ -293,6 +291,7 @@ class VisionSensor(BaseSensor):
                 obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
+                id_to_semantiics = raw_obs['info']['idToSemantics']
                 # Remap instance segmentation labels
                 for key, value in id_to_labels.items():
                     obj = og.sim.scene.object_registry("prim_path", value)
@@ -309,10 +308,13 @@ class VisionSensor(BaseSensor):
                         VisionSensor.INSTANCE_REGISTRY[id_to_labels[key]] = len(VisionSensor.INSTANCE_REGISTRY)
                 # Add new micro particle systems to the instance registry
                 # TODO: filter for micro particle systems
-                for cat in info['seg_semantic'].values():
+                for cat in id_to_semantiics.values():
+                    cat = cat['class'].lower()
                     if cat not in VisionSensor.INSTANCE_REGISTRY:
                         VisionSensor.INSTANCE_REGISTRY[cat] = len(VisionSensor.INSTANCE_REGISTRY)
-                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
+                obs[modality], info[modality] = obs[modality], id_to_labels
+                # TODO: implement this
+                # obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
@@ -330,43 +332,24 @@ class VisionSensor(BaseSensor):
             np.ndarray: Remapped semantic segmentation image
             dict: Corrected id_to_labels dictionary
         """
-        # Convert string IDs to integers
-        int_ids = set(int(id) for id in id_to_labels.keys())
+        # Preprocess id_to_labels to feed into the remapper
+        replicator_mapping = {}
+        for key, val in id_to_labels.items():
+            key = int(key)
+            replicator_mapping[key] = val['class'].lower()
+            if replicator_mapping[key] == 'unlabelled':
+                # for unlabelled pixels, we use the 'object' class 
+                replicator_mapping[key] = 'object'
+            elif ',' in replicator_mapping[key]:
+                # If there are multiple class names, grab the one that is a registered system
+                # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
+                replicator_mapping[key] = next((cat for cat in replicator_mapping[key].split(',') if cat in REGISTERED_SYSTEMS), None)
+                assert replicator_mapping[key] is not None, f"Could not find a registered system for class {val['class']}!"
+            else:
+                assert replicator_mapping[key] in semantic_class_id_to_name().values(), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        # Determine if there are any new IDs that were not previously known
-        new_ids = int_ids - VisionSensor.KNOWN_SEMANTIC_IDS
-
-        # If there are new IDs, update _known_semantic_ids set and rebuild the key array
-        if new_ids:
-            VisionSensor.KNOWN_SEMANTIC_IDS.update(new_ids)
-            max_id = max(VisionSensor.KNOWN_SEMANTIC_IDS)
-
-            # Initialize the key array with a default value for unmapped IDs & remember old mappings.
-            key_array = np.full(max_id + 1, semantic_class_name_to_id()['object'], dtype=np.uint32)
-            if VisionSensor.KEY_ARRAY is not None:
-                key_array[:len(VisionSensor.KEY_ARRAY)] = VisionSensor.KEY_ARRAY
-
-            # Populate the key array with the new IDs based on class name mappings
-            for int_id in new_ids:
-                str_id = str(int_id)
-                info = id_to_labels[str_id]
-                class_name = info['class'].lower()
-                if class_name == 'unlabelled': class_name = 'object'
-                if ',' in class_name:
-                    # If there are multiple class names, grab the one that is a registered system
-                    # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
-                    class_name = next((cat for cat in class_name.split(',') if cat in REGISTERED_SYSTEMS), class_name)
-                new_id = semantic_class_name_to_id()[class_name]
-                key_array[int_id] = new_id
-        else:
-            # Use the existing key_array if no new IDs are found
-            key_array = VisionSensor.KEY_ARRAY
-
-        # Remap the image and the labels
-        remapped_img = key_array[img]
-        remapped_id_to_labels = {str(x): semantic_class_id_to_name()[x] for x in np.unique(key_array[sorted(int_ids)])}
-
-        VisionSensor.KEY_ARRAY = key_array
+        remapped_img, remapped_id_to_labels = VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img)
+        
         return remapped_img, remapped_id_to_labels
 
     def add_modality(self, modality):
