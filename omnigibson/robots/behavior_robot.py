@@ -5,7 +5,7 @@ import numpy as np
 import os
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
-from telemoma.input_interface.teleop_core import TeleopAction
+from telemoma.human_interface.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy

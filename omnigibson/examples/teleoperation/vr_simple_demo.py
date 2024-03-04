@@ -6,8 +6,7 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 
 def main():
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
-    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int"}
+    scene_cfg = {"type": "Scene"}#, "scene_model": "Rs_int"}
     robot0_cfg = {
         "type": "BehaviorRobot",
         "controller_config": {
@@ -15,7 +14,7 @@ def main():
             "gripper_1": {"command_input_limits": "default"},
         }
     }
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)

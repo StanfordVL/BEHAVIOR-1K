@@ -10,7 +10,6 @@ import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.teleop_utils import TeleopSystem
 
-from telemoma.utils.general_utils import AttrDict
 from telemoma.utils.camera_utils import RealSenseCamera
 from telemoma.configs.base_config import teleop_config
 
@@ -41,7 +40,6 @@ def main():
     teleop_config.interface_kwargs[base_teleop_method] = {} if base_teleop_method != "human_kpt" else {"camera": RealSenseCamera()}
 
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 50., "physics_timestep": 1 / 300.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot_cfg = {
@@ -110,7 +108,7 @@ def main():
             "position": [0.6, 0.3, 0.5],
         }
     ]
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot_cfg], objects=object_cfg)
+    cfg = dict(scene=scene_cfg, robots=[robot_cfg], objects=object_cfg)
 
     # Create the environment
     env = og.Environment(configs=cfg)

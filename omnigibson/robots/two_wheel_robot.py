@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import gym
 import numpy as np
-from telemoma.input_interface.teleop_core import TeleopAction 
+from telemoma.human_interface.teleop_core import TeleopAction 
 
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot

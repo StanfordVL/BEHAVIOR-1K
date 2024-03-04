@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from telemoma.input_interface.teleop_core import TeleopAction
+from telemoma.human_interface.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy

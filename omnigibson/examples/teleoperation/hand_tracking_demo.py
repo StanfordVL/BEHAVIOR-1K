@@ -9,7 +9,6 @@ DEBUG_MODE = True  # set to True to visualize the landmarks of the hands
 
 def main():
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
     scene_cfg = {"type": "Scene"}
     robot0_cfg = {
         "type": "BehaviorRobot",
@@ -57,7 +56,7 @@ def main():
             "rgba": [0.0, 1.0, 0.0, 1.0],
         } for i in range(52)])
 
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
     # Create the environment
     env = og.Environment(configs=cfg)
     env.reset()

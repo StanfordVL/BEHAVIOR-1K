@@ -9,8 +9,8 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from telemoma.input_interface.teleop_core import TeleopAction, TeleopObservation
-from telemoma.input_interface.teleop_policy import TeleopPolicy
+from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
+from telemoma.human_interface.teleop_policy import TeleopPolicy
 from telemoma.utils.general_utils import AttrDict
 from telemoma.configs.base_config import teleop_config
 
