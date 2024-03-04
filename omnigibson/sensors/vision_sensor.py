@@ -24,42 +24,60 @@ def render():
 class Remapper:
     def __init__(self):
         self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
+        self.known_ids = set()
 
     def clear(self):
         """Resets the key_array to empty."""
         self.key_array = np.array([], dtype=np.uint32)
+        self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image):
         """
         Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
         
         Args:
-            old_mapping (dict): The old mapping dictionary.
-            new_mapping (dict): The new mapping dictionary.
-            image (np.ndarray): The 2D image to remap.
+            old_mapping (dict): The old mapping dictionary that maps a set of image values to labels, e.g. {'1':'desk','2':'chair'}.
+            new_mapping (dict): The new mapping dictionary that maps another set of image values to labels, e.g. {'5':'desk','7':'chair','9':'sofa'}.
+            image (np.ndarray): The 2D image to remap, e.g. [[1,1],[1,2]].
         
         Returns:
-            np.ndarray: The remapped image.
+            np.ndarray: The remapped image, e.g. [[5,5],[5,7]].
+            dict: The remapped labels dictionary, e.g. {'5':'desk','7':'chair'}.
         """
+        assert np.all([str(x) in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
+        assert np.all([old_mapping[str(x)] in new_mapping.values() for x in np.unique(image)]), "Not all values in the old mapping are in the new mapping!"
+        
         # Convert old_mapping keys to integers if they aren't already
         old_keys = np.array(list(map(int, old_mapping.keys())), dtype=np.uint32)
-        
+
+        new_keys = old_keys - self.known_ids
+
         # If key_array is empty or does not cover all old keys, rebuild it
-        if self.key_array.size == 0 or np.max(old_keys) >= self.key_array.size: # TODO: this is wrong because there might be gaps in the old keys
-            max_key = max(np.max(old_keys), max(map(int, new_mapping.keys())))
-            self.key_array = np.full(max_key + 1, -1, dtype=np.uint32)  # Use -1 as a placeholder for unmapped values
-        
-        # Update key_array based on new_mapping
-        for str_key, value in new_mapping.items():
-            int_key = int(str_key)
-            # Assuming the new_mapping values are integers or can be uniquely mapped to integers
-            # This can be adjusted based on the actual mapping required
-            self.key_array[int_key] = int(value) if value.isdigit() else hash(value)
+        if new_keys:
+            self.known_ids.update(new_keys)
+            max_key = max(self.known_ids)
+            
+            # Using max uint32 as a placeholder for unmapped values may not be safe
+            assert np.all(self.key_array != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
+            self.key_array = np.full(max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
+
+            if self.key_array.size > 0:
+                self.key_array[:len(self.key_array)] = self.key_array
+            
+            for key in new_keys:
+                key = str(key)
+                label = old_mapping[key]
+                new_key = next((k for k, v in new_mapping.items() if v == label), None)
+                assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
+                assert new_key.isdigit(), f"New key {new_key} is not a digit!"
+                self.key_array[int(key)] = int(new_key)
         
         # Apply remapping
-        remapped_image = np.where(self.key_array[image] != -1, self.key_array[image], image)
+        remapped_img = self.key_array[image]
+        assert np.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
+        remapped_labels = {str(x): new_mapping[str(self.key_array[x])] for x in np.unique(image)}
         
-        return remapped_image
+        return remapped_img, remapped_labels
 
 class VisionSensor(BaseSensor):
     """
