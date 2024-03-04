@@ -332,13 +332,13 @@ def launch_simulator(*args, **kwargs):
 
         def _set_renderer_settings(self):
             # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   # Can be True with a fps penalty
+            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)               # Can be True with a fps penalty
+            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)                         # "Performance", can be others with a fps penalty
+            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)              # Can be True with a fps penalty
+            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) # Can be False with a fps penalty
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-            # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
-            # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
 
         @property
         def viewer_visibility(self):
