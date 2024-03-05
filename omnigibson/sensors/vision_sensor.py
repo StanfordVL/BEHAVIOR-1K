@@ -48,25 +48,34 @@ class Remapper:
         assert np.all([x in new_mapping.values() for x in old_mapping.values()]), "Not all values in the old mapping are in the new mapping!"
 
         new_keys = old_mapping.keys() - self.known_ids
+        max_key = np.max(image)
 
         # If key_array is empty or does not cover all old keys, rebuild it
-        if new_keys:
+        if new_keys or max_key >= len(self.key_array):
             self.known_ids.update(new_keys)
-            max_key = max(self.known_ids)
             
             # Using max uint32 as a placeholder for unmapped values may not be safe
-            assert np.all(self.key_array != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
+            assert np.all(new_mapping != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
             prev_key_array = self.key_array.copy()
+            # we are doing this because there are numbers in image that don't necessarily show up in the old_mapping i.e. particle systems
             self.key_array = np.full(max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
 
             if prev_key_array.size > 0:
                 self.key_array[:len(prev_key_array)] = prev_key_array
             
+            # populate key_array with new keys
             for key in new_keys:
                 label = old_mapping[key]
                 new_key = next((k for k, v in new_mapping.items() if v == label), None)
                 assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
                 self.key_array[key] = new_key
+            
+            # for all the labels that exist in np.unique(image) but not in old_mapping.keys(), we map them to whichever key in new_mapping that equals to 'unlabelled'
+            for key in np.unique(image):
+                if key not in old_mapping.keys():
+                    new_key = next((k for k, v in new_mapping.items() if v == 'unlabelled'), None)
+                    assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
+                    self.key_array[key] = new_key
 
         # Apply remapping
         remapped_img = self.key_array[image]
@@ -132,7 +141,7 @@ class VisionSensor(BaseSensor):
     SEMANTIC_REMAPPER = Remapper()
     INSTANCE_REMAPPER = Remapper()
     INSTANCE_ID_REMAPPER = Remapper()
-    INSTANCE_REGISTRY = dict()
+    INSTANCE_REGISTRY = {0: 'unlabelled'}
     INSTANCE_ID_REGISTRY = dict()
 
     def __init__(
@@ -375,6 +384,11 @@ class VisionSensor(BaseSensor):
         # TODO: run semantic segmentation if we don't have it yet to get information about micro particle system
         # 1. we need to register these in the instance registry
         # 2. we need to map all of the water instance numbers e.g. 7,9,10,11 to their water instance label e.g. 5
+        # if len(micro_particle_systems) > 0:
+        #     # fetch semantic segmentation result
+        #     raw_obs = self._annotators['seg_semantic'].get_data()
+        #     data, idToLabels = raw_obs['data'], raw_obs['info']['idToLabels']
+        #     semantic_map, semantic_labels = self._remap_semantic_segmentation(data, idToLabels)
         
         remapped_img, remapped_id_to_labels = VisionSensor.INSTANCE_REMAPPER.remap(replicator_mapping, VisionSensor.INSTANCE_REGISTRY, img)
         
@@ -674,7 +688,7 @@ class VisionSensor(BaseSensor):
         cls.SENSORS = dict()
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None
-        cls.INSTANCE_REGISTRY = dict()
+        cls.INSTANCE_REGISTRY = {0: 'unlabelled'}
         cls.INSTANCE_ID_REGISTRY = dict()
 
     @classproperty
