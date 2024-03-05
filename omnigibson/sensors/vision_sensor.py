@@ -352,7 +352,6 @@ class VisionSensor(BaseSensor):
         """
         # Preprocess id_to_labels and update instance registry
         replicator_mapping = {}
-        micro_particle_systems = set()
         for key, value in id_to_labels.items():
             key = int(key)
             obj = og.sim.scene.object_registry("prim_path", value)
@@ -364,31 +363,23 @@ class VisionSensor(BaseSensor):
                     instance_name = value.lower()
                 else:
                     assert '/' in value, f"Instance segmentation label {value} is not a valid prim path!"
-                    # For macro particle systems, we split the path and take the last part
-                    # e.g. '/World/breakfast_table_skczfi_0/base_link/stainParticle0' -> 'stainParticle0'
-                    splitted_path = value.split('/')
-                    instance_name = splitted_path[-1]
-                    # For micro particle systems, we can't register them here because 
-                    # sometimes not all water particles show up correctly in the instance segmentation info
-                    # e.g. {'0': 'BACKGROUND', '1': 'UNLABELLED', '3': '/World/robot0', '10': '/World/water/waterInstancer0/prototype0_2'}, where in fact there are five water particles
-                    for part in splitted_path:
-                        if part in REGISTERED_SYSTEMS:
-                            # If this is a micro particle system, we skip this for now
-                            micro_particle_systems.add(part)
-                            instance_name = None
-                            break
-            if instance_name is not None:
-                self._register_instance(instance_name)
-                replicator_mapping[key] = instance_name
+                    # For particle systems, we skip for now and will include them in the instance registry later
+                    continue
+            self._register_instance(instance_name)
+            replicator_mapping[key] = instance_name
 
-        # TODO: run semantic segmentation if we don't have it yet to get information about micro particle system
-        # 1. we need to register these in the instance registry
-        # 2. we need to map all of the water instance numbers e.g. 7,9,10,11 to their water instance label e.g. 5
-        # if len(micro_particle_systems) > 0:
-        #     # fetch semantic segmentation result
-        #     raw_obs = self._annotators['seg_semantic'].get_data()
-        #     data, idToLabels = raw_obs['data'], raw_obs['info']['idToLabels']
-        #     semantic_map, semantic_labels = self._remap_semantic_segmentation(data, idToLabels)
+        # Run semantic segmentation to find where the particles are and register them in the instance registry
+        raw_obs = self._annotators['seg_semantic'].get_data()
+        data, idToLabels = raw_obs['data'], raw_obs['info']['idToLabels']
+        semantic_map, semantic_labels = self._remap_semantic_segmentation(data, idToLabels)
+        for i in range(len(semantic_map)):
+            for j in range(len(semantic_map[i])):
+                assert semantic_map[i][j] in semantic_labels, f"Semantic map value {semantic_map[i][j]} is not in the semantic labels!"
+                class_name = semantic_labels[semantic_map[i][j]]
+                # If this is a registered system and not yet in the instance registry, register it
+                if class_name in REGISTERED_SYSTEMS and img[i][j] not in replicator_mapping:
+                    replicator_mapping[img[i][j]] = class_name
+                    self._register_instance(class_name)
         
         remapped_img, remapped_id_to_labels = VisionSensor.INSTANCE_REMAPPER.remap(replicator_mapping, VisionSensor.INSTANCE_REGISTRY, img)
         
