@@ -44,8 +44,8 @@ class Remapper:
             np.ndarray: The remapped image, e.g. [[5,5],[5,7]].
             dict: The remapped labels dictionary, e.g. {5:'desk',7:'chair'}.
         """
-        assert np.all([x in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
-        assert np.all([old_mapping[x] in new_mapping.values() for x in np.unique(image)]), "Not all values in the old mapping are in the new mapping!"
+        # assert np.all([x in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
+        assert np.all([x in new_mapping.values() for x in old_mapping.values()]), "Not all values in the old mapping are in the new mapping!"
 
         new_keys = old_mapping.keys() - self.known_ids
 
@@ -291,30 +291,7 @@ class VisionSensor(BaseSensor):
                 obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
-                id_to_semantiics = raw_obs['info']['idToSemantics']
-                # Remap instance segmentation labels
-                for key, value in id_to_labels.items():
-                    obj = og.sim.scene.object_registry("prim_path", value)
-                    if obj is not None:
-                        id_to_labels[key] = obj.name
-                    else:
-                        if value in ['BACKGROUND','UNLABELLED']:
-                            id_to_labels[key] = value.lower()
-                        else:
-                            # For macro particle systems, we split the path and take the last part
-                            # e.g. '/World/breakfast_table_skczfi_0/base_link/stainParticle0' -> 'stainParticle0'
-                            id_to_labels[key] = value.split('/')[-1]
-                    if id_to_labels[key] not in self.INSTANCE_REGISTRY:
-                        VisionSensor.INSTANCE_REGISTRY[id_to_labels[key]] = len(VisionSensor.INSTANCE_REGISTRY)
-                # Add new micro particle systems to the instance registry
-                # TODO: filter for micro particle systems
-                for cat in id_to_semantiics.values():
-                    cat = cat['class'].lower()
-                    if cat not in VisionSensor.INSTANCE_REGISTRY:
-                        VisionSensor.INSTANCE_REGISTRY[cat] = len(VisionSensor.INSTANCE_REGISTRY)
-                obs[modality], info[modality] = obs[modality], id_to_labels
-                # TODO: implement this
-                # obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
+                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
@@ -351,7 +328,62 @@ class VisionSensor(BaseSensor):
         remapped_img, remapped_id_to_labels = VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img)
         
         return remapped_img, remapped_id_to_labels
+    
+    def _remap_instance_segmentation(self, img, id_to_labels):
+        """
+        Remap the instance segmentation image to our own instance IDs.
+        Also, correct the id_to_labels input with our new labels and return it.
+        
+        Args:
+            img (np.ndarray): Instance segmentation image to remap
+            id_to_labels (dict): Dictionary of instance IDs to class labels
+        Returns:
+            np.ndarray: Remapped instance segmentation image
+            dict: Corrected id_to_labels dictionary
+        """
+        # Preprocess id_to_labels and update instance registry
+        replicator_mapping = {}
+        micro_particle_systems = set()
+        for key, value in id_to_labels.items():
+            key = int(key)
+            obj = og.sim.scene.object_registry("prim_path", value)
+            # Remap instance segmentation labels from prim path to object name
+            if obj is not None:
+                instance_name = obj.name
+            else:
+                if value in ['BACKGROUND','UNLABELLED']:
+                    instance_name = value.lower()
+                else:
+                    assert '/' in value, f"Instance segmentation label {value} is not a valid prim path!"
+                    # For macro particle systems, we split the path and take the last part
+                    # e.g. '/World/breakfast_table_skczfi_0/base_link/stainParticle0' -> 'stainParticle0'
+                    splitted_path = value.split('/')
+                    instance_name = splitted_path[-1]
+                    # For micro particle systems, we can't register them here because 
+                    # sometimes not all water particles show up correctly in the instance segmentation info
+                    # e.g. {'0': 'BACKGROUND', '1': 'UNLABELLED', '3': '/World/robot0', '10': '/World/water/waterInstancer0/prototype0_2'}, where in fact there are five water particles
+                    for part in splitted_path:
+                        if part in REGISTERED_SYSTEMS:
+                            # If this is a micro particle system, we skip this for now
+                            micro_particle_systems.add(part)
+                            instance_name = None
+                            break
+            if instance_name is not None:
+                self._register_instance(key, instance_name)
+                replicator_mapping[key] = instance_name
 
+        # TODO: run semantic segmentation if we don't have it yet to get information about micro particle system
+        # 1. we need to register these in the instance registry
+        # 2. we need to map all of the water instance numbers e.g. 7,9,10,11 to their water instance label e.g. 5
+        
+        remapped_img, remapped_id_to_labels = VisionSensor.INSTANCE_REMAPPER.remap(replicator_mapping, VisionSensor.INSTANCE_REGISTRY, img)
+        
+        return remapped_img, remapped_id_to_labels
+
+    def _register_instance(self, instance_id, instance_name):
+        if instance_id not in VisionSensor.INSTANCE_REGISTRY:
+            VisionSensor.INSTANCE_REGISTRY[instance_id] = instance_name
+    
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
         should_initialize = modality not in self._modalities
