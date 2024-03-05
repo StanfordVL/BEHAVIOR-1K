@@ -291,7 +291,13 @@ class VisionSensor(BaseSensor):
         # Run super first to grab any upstream obs
         obs, info = super()._get_obs()
 
-        for modality in self._modalities:
+        # Reorder modalities to ensure that seg_semantic is always ran before seg_instance
+        if 'seg_semantic' in self._modalities:
+            reordered_modalities = ['seg_semantic'] + [modality for modality in self._modalities if modality != 'seg_semantic']
+        else:
+            reordered_modalities = self._modalities
+
+        for modality in reordered_modalities:
             raw_obs = self._annotators[modality].get_data()
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
@@ -300,7 +306,10 @@ class VisionSensor(BaseSensor):
                 obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs['info']['idToLabels']
-                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], id_to_labels)
+                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], 
+                                                                                  id_to_labels,
+                                                                                  obs['seg_semantic'] if 'seg_semantic' in obs else None,
+                                                                                  info['seg_semantic'] if 'seg_semantic' in info else None)
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
                 info[modality] = id_to_labels
@@ -338,7 +347,7 @@ class VisionSensor(BaseSensor):
         
         return remapped_img, remapped_id_to_labels
     
-    def _remap_instance_segmentation(self, img, id_to_labels):
+    def _remap_instance_segmentation(self, img, id_to_labels, semantic_img=None, semantic_labels=None):
         """
         Remap the instance segmentation image to our own instance IDs.
         Also, correct the id_to_labels input with our new labels and return it.
@@ -346,6 +355,8 @@ class VisionSensor(BaseSensor):
         Args:
             img (np.ndarray): Instance segmentation image to remap
             id_to_labels (dict): Dictionary of instance IDs to class labels
+            semantic_img (np.ndarray): Semantic segmentation image to use for instance registry
+            semantic_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
             np.ndarray: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
@@ -369,13 +380,14 @@ class VisionSensor(BaseSensor):
             replicator_mapping[key] = instance_name
 
         # Run semantic segmentation to find where the particles are and register them in the instance registry
-        raw_obs = self._annotators['seg_semantic'].get_data()
-        data, idToLabels = raw_obs['data'], raw_obs['info']['idToLabels']
-        semantic_map, semantic_labels = self._remap_semantic_segmentation(data, idToLabels)
-        for i in range(len(semantic_map)):
-            for j in range(len(semantic_map[i])):
-                assert semantic_map[i][j] in semantic_labels, f"Semantic map value {semantic_map[i][j]} is not in the semantic labels!"
-                class_name = semantic_labels[semantic_map[i][j]]
+        if semantic_img is None or semantic_labels is None:
+            raw_obs = self._annotators['seg_semantic'].get_data()
+            data, idToLabels = raw_obs['data'], raw_obs['info']['idToLabels']
+            semantic_img, semantic_labels = self._remap_semantic_segmentation(data, idToLabels)
+        for i in range(len(semantic_img)):
+            for j in range(len(semantic_img[i])):
+                assert semantic_img[i][j] in semantic_labels, f"Semantic map value {semantic_img[i][j]} is not in the semantic labels!"
+                class_name = semantic_labels[semantic_img[i][j]]
                 # If this is a registered system and not yet in the instance registry, register it
                 if class_name in REGISTERED_SYSTEMS and img[i][j] not in replicator_mapping:
                     replicator_mapping[img[i][j]] = class_name
