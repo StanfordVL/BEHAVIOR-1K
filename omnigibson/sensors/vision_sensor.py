@@ -369,7 +369,7 @@ class VisionSensor(BaseSensor):
                             instance_name = None
                             break
             if instance_name is not None:
-                self._register_instance(key, instance_name)
+                self._register_instance(instance_name)
                 replicator_mapping[key] = instance_name
 
         # TODO: run semantic segmentation if we don't have it yet to get information about micro particle system
@@ -380,9 +380,9 @@ class VisionSensor(BaseSensor):
         
         return remapped_img, remapped_id_to_labels
 
-    def _register_instance(self, instance_id, instance_name):
-        if instance_id not in VisionSensor.INSTANCE_REGISTRY:
-            VisionSensor.INSTANCE_REGISTRY[instance_id] = instance_name
+    def _register_instance(self, instance_name):
+        if instance_name not in VisionSensor.INSTANCE_REGISTRY.values():
+            VisionSensor.INSTANCE_REGISTRY[len(VisionSensor.INSTANCE_REGISTRY)] = instance_name
     
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
