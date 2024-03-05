@@ -173,6 +173,8 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+        assert np.allclose(local_transform[3, :3] @ local_transform[3, :3].T, np.eye(4), atol=1e-4), \
+            f"{self.prim_path} local transform is not orthogonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
     def get_position_orientation(self):
@@ -338,6 +340,7 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
+        assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
