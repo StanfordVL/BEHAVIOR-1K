@@ -19,6 +19,10 @@ SYSTEMS = {
 
 
 def main():
+    """
+    Spawn a robot in an empty scene with a breakfast table and some toys.
+    Users can try pick and place the toy into the basket using selected external devices and robot of their choice.
+    """
     teleop_system = choose_from_options(options=SYSTEMS, name="system")
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want

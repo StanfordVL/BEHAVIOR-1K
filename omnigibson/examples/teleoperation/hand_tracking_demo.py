@@ -8,6 +8,10 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 DEBUG_MODE = True  # set to True to visualize the landmarks of the hands
 
 def main():
+    """
+    Hand tracking demo with selection. Windows only.
+    Spawn a BehaviorRobot in an empty scene with a breakfast table and two fruits.
+    """
     # Create the config for generating the environment we want
     env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
     scene_cfg = {"type": "Scene"}
