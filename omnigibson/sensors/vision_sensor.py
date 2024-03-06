@@ -60,7 +60,6 @@ class VisionSensor(BaseSensor):
         "depth",
         "depth_linear",
         "normal",
-        # Note: we need to get semantic segmentation before instance segmentation for ID remapping purposes
         "seg_semantic",  # Semantic segmentation shows the category each pixel belongs to
         "seg_instance",  # Instance segmentation shows the name of the object each pixel belongs to
         "seg_instance_id",  # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to

@@ -130,9 +130,6 @@ class Remapper:
             np.ndarray: The remapped image, e.g. [[5,5],[5,7]].
             dict: The remapped labels dictionary, e.g. {5:'desk',7:'chair'}.
         """
-        # assert np.all([x in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
-        # assert np.all([x in new_mapping.values() for x in old_mapping.values()]), "Not all values in the old mapping are in the new mapping!"
-
         new_keys = old_mapping.keys() - self.known_ids
         max_key = max(np.max(image), len(self.key_array))
 
