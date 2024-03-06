@@ -10,6 +10,7 @@ from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.vision_utils import Remapper
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -20,71 +21,6 @@ def render():
     set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", False)
     og.app.update()
     set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", True)
-
-class Remapper:
-    def __init__(self):
-        self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
-        self.known_ids = set()
-
-    def clear(self):
-        """Resets the key_array to empty."""
-        self.key_array = np.array([], dtype=np.uint32)
-        self.known_ids = set()
-
-    def remap(self, old_mapping, new_mapping, image):
-        """
-        Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
-        
-        Args:
-            old_mapping (dict): The old mapping dictionary that maps a set of image values to labels, e.g. {1:'desk',2:'chair'}.
-            new_mapping (dict): The new mapping dictionary that maps another set of image values to labels, e.g. {5:'desk',7:'chair',9:'sofa'}.
-            image (np.ndarray): The 2D image to remap, e.g. [[1,1],[1,2]].
-        
-        Returns:
-            np.ndarray: The remapped image, e.g. [[5,5],[5,7]].
-            dict: The remapped labels dictionary, e.g. {5:'desk',7:'chair'}.
-        """
-        # assert np.all([x in old_mapping for x in np.unique(image)]), "Not all keys in the image are in the old mapping!"
-        assert np.all([x in new_mapping.values() for x in old_mapping.values()]), "Not all values in the old mapping are in the new mapping!"
-
-        new_keys = old_mapping.keys() - self.known_ids
-        max_key = np.max(image)
-
-        # If key_array is empty or does not cover all old keys, rebuild it
-        if new_keys or max_key >= len(self.key_array):
-            self.known_ids.update(new_keys)
-            
-            # Using max uint32 as a placeholder for unmapped values may not be safe
-            assert np.all(new_mapping != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
-            prev_key_array = self.key_array.copy()
-            # we are doing this because there are numbers in image that don't necessarily show up in the old_mapping i.e. particle systems
-            self.key_array = np.full(max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
-
-            if prev_key_array.size > 0:
-                self.key_array[:len(prev_key_array)] = prev_key_array
-            
-            # populate key_array with new keys
-            for key in new_keys:
-                label = old_mapping[key]
-                new_key = next((k for k, v in new_mapping.items() if v == label), None)
-                assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
-                self.key_array[key] = new_key
-            
-            # for all the labels that exist in np.unique(image) but not in old_mapping.keys(), we map them to whichever key in new_mapping that equals to 'unlabelled'
-            for key in np.unique(image):
-                if key not in old_mapping.keys():
-                    new_key = next((k for k, v in new_mapping.items() if v == 'unlabelled'), None)
-                    assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
-                    self.key_array[key] = new_key
-
-        # Apply remapping
-        remapped_img = self.key_array[image]
-        assert np.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
-        remapped_labels = {}
-        for key in np.unique(remapped_img):
-            remapped_labels[key] = new_mapping[key]
-        
-        return remapped_img, remapped_labels
 
 class VisionSensor(BaseSensor):
     """
@@ -142,7 +78,7 @@ class VisionSensor(BaseSensor):
     INSTANCE_REMAPPER = Remapper()
     INSTANCE_ID_REMAPPER = Remapper()
     INSTANCE_REGISTRY = {0: 'unlabelled'}
-    INSTANCE_ID_REGISTRY = dict()
+    INSTANCE_ID_REGISTRY = {0: 'unlabelled'}
 
     def __init__(
         self,
@@ -312,7 +248,11 @@ class VisionSensor(BaseSensor):
                                                                                   info['seg_semantic'] if 'seg_semantic' in info else None)
             elif modality == "seg_instance_id":
                 id_to_labels = raw_obs['info']['idToLabels']
-                info[modality] = id_to_labels
+                obs[modality], info[modality] = self._remap_instance_segmentation(obs[modality], 
+                                                                                  id_to_labels,
+                                                                                  obs['seg_semantic'] if 'seg_semantic' in obs else None,
+                                                                                  info['seg_semantic'] if 'seg_semantic' in info else None,
+                                                                                  id=True)
         return obs, info
     
     def _remap_semantic_segmentation(self, img, id_to_labels):
@@ -347,7 +287,7 @@ class VisionSensor(BaseSensor):
         
         return remapped_img, remapped_id_to_labels
     
-    def _remap_instance_segmentation(self, img, id_to_labels, semantic_img=None, semantic_labels=None):
+    def _remap_instance_segmentation(self, img, id_to_labels, semantic_img=None, semantic_labels=None, id=False):
         """
         Remap the instance segmentation image to our own instance IDs.
         Also, correct the id_to_labels input with our new labels and return it.
@@ -357,6 +297,7 @@ class VisionSensor(BaseSensor):
             id_to_labels (dict): Dictionary of instance IDs to class labels
             semantic_img (np.ndarray): Semantic segmentation image to use for instance registry
             semantic_labels (dict): Dictionary of semantic IDs to class labels
+            id (bool): Whether to remap for instance ID segmentation
         Returns:
             np.ndarray: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
@@ -365,19 +306,29 @@ class VisionSensor(BaseSensor):
         replicator_mapping = {}
         for key, value in id_to_labels.items():
             key = int(key)
-            obj = og.sim.scene.object_registry("prim_path", value)
-            # Remap instance segmentation labels from prim path to object name
-            if obj is not None:
-                instance_name = obj.name
-            else:
-                if value in ['BACKGROUND','UNLABELLED']:
-                    instance_name = value.lower()
+            if not id:
+                # For instance segmentation:
+                obj = og.sim.scene.object_registry("prim_path", value)
+                # Remap instance segmentation labels from prim path to object name
+                if obj is not None:
+                    instance_name = obj.name
                 else:
-                    assert '/' in value, f"Instance segmentation label {value} is not a valid prim path!"
-                    # For particle systems, we skip for now and will include them in the instance registry later
-                    continue
-            self._register_instance(instance_name)
-            replicator_mapping[key] = instance_name
+                    if value in ['BACKGROUND','UNLABELLED']:
+                        instance_name = value.lower()
+                    else:
+                        assert '/' in value, f"Instance segmentation label {value} is not a valid prim path!"
+                        # For particle systems, we skip for now and will include them in the instance registry below
+                        continue
+                self._register_instance(instance_name)
+                replicator_mapping[key] = instance_name
+            else:
+                # For instance ID segmentation:
+                splitted_path = value.split('/')
+                if splitted_path[-1] == 'visuals':
+                    # Since this is not a particle system, we will register it now
+                    # For particle systems, we skip for now and will include them in the instance registry below
+                    self._register_instance(value, id=True)
+                    replicator_mapping[key] = value
 
         # Run semantic segmentation to find where the particles are and register them in the instance registry
         if semantic_img is None or semantic_labels is None:
@@ -391,15 +342,18 @@ class VisionSensor(BaseSensor):
                 # If this is a registered system and not yet in the instance registry, register it
                 if class_name in REGISTERED_SYSTEMS and img[i][j] not in replicator_mapping:
                     replicator_mapping[img[i][j]] = class_name
-                    self._register_instance(class_name)
+                    self._register_instance(class_name, id=id)
         
-        remapped_img, remapped_id_to_labels = VisionSensor.INSTANCE_REMAPPER.remap(replicator_mapping, VisionSensor.INSTANCE_REGISTRY, img)
+        registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
+        remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
+        remapped_img, remapped_id_to_labels = remapper.remap(replicator_mapping, registry, img)
         
         return remapped_img, remapped_id_to_labels
 
-    def _register_instance(self, instance_name):
-        if instance_name not in VisionSensor.INSTANCE_REGISTRY.values():
-            VisionSensor.INSTANCE_REGISTRY[len(VisionSensor.INSTANCE_REGISTRY)] = instance_name
+    def _register_instance(self, instance_name, id=False):
+        registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
+        if instance_name not in registry.values():
+            registry[len(registry)] = instance_name
     
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
@@ -692,7 +646,7 @@ class VisionSensor(BaseSensor):
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None
         cls.INSTANCE_REGISTRY = {0: 'unlabelled'}
-        cls.INSTANCE_ID_REGISTRY = dict()
+        cls.INSTANCE_ID_REGISTRY = {0: 'unlabelled'}
 
     @classproperty
     def all_modalities(cls):
