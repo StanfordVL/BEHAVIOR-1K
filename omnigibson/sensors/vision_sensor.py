@@ -278,8 +278,9 @@ class VisionSensor(BaseSensor):
             elif ',' in replicator_mapping[key]:
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {'11': {'class': 'breakfast_table,stain'}}
-                replicator_mapping[key] = next((cat for cat in replicator_mapping[key].split(',') if cat in REGISTERED_SYSTEMS), None)
-                assert replicator_mapping[key] is not None, f"Could not find a registered system for class {val['class']}!"
+                categories = [cat for cat in replicator_mapping[key].split(',') if cat in REGISTERED_SYSTEMS]
+                assert len(categories) == 1, "There should be exactly one category that belongs to REGISTERED_SYSTEMS"
+                replicator_mapping[key] = categories[0]
             else:
                 assert replicator_mapping[key] in semantic_class_id_to_name().values(), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
