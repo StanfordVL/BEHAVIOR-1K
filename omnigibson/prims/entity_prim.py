@@ -10,7 +10,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
+from omnigibson.utils.constants import PrimType, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI
 
@@ -123,6 +123,10 @@ class EntityPrim(XFormPrim):
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links()
 
+        # Optionally set the scale
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
+
         # Prepare the articulation view.
         if self.n_joints > 0:
             # Import now to avoid too-eager load of Omni classes due to inheritance
@@ -185,10 +189,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        load_config = {
-            "scale": self._load_config.get("scale", None),
-        }
-
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
             for link in self._links.values():
@@ -234,11 +234,12 @@ class EntityPrim(XFormPrim):
         # Now actually create the links
         self._links = dict()
         for link_name, (link_cls, prim) in links_to_create.items():
+            # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
+            # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
             link_load_config = {
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
             }
-            link_load_config.update(load_config)
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),
                 name=f"{self._name}:{link_name}",
@@ -1084,16 +1085,19 @@ class EntityPrim(XFormPrim):
 
     @property
     def scale(self):
-        # Since all rigid bodies owned by this object prim have the same scale, we simply grab it from the root prim
-        return self.root_link.scale
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
+        return self.root_link.scale / self.root_link.original_scale
 
     @scale.setter
     def scale(self, scale):
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
         # We iterate over all rigid bodies owned by this object prim and set their individual scales
         # We do this because omniverse cannot scale orientation of an articulated prim, so we get mesh mismatches as
-        # they rotate in the world
+        # they rotate in the world.
         for link in self._links.values():
-            link.scale = scale
+            link.scale = scale * link.original_scale
 
     @property
     def solver_position_iteration_count(self):

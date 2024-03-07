@@ -225,7 +225,7 @@ class ScanSensor(BaseSensor):
 
     def _get_obs(self):
         # Run super first to grab any upstream obs
-        obs = super()._get_obs()
+        obs, info = super()._get_obs()
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
@@ -238,7 +238,7 @@ class ScanSensor(BaseSensor):
             if "occupancy_grid" in self._modalities:
                 obs["occupancy_grid"] = self.get_local_occupancy_grid(scan=obs["scan"])
 
-        return obs
+        return obs, info
 
     @property
     def n_horizontal_rays(self):

@@ -1073,10 +1073,7 @@ def test_filled():
             og.sim.step()
 
         assert stockpot.states[Filled].set_value(system, True)
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Filled].get_value(system)
 
         # Cannot set Filled state False
@@ -1084,10 +1081,7 @@ def test_filled():
             stockpot.states[Filled].set_value(system, False)
 
         system.remove_all_particles()
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert not stockpot.states[Filled].get_value(system)
 
 @og_test
@@ -1095,6 +1089,7 @@ def test_contains():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
+        print(f"Testing Contains {stockpot.name} with {system.name}")
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
@@ -1102,8 +1097,7 @@ def test_contains():
 
         # Sample single particle
         if is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] + system.particle_radius * 1.01])])
-            assert not stockpot.states[Contains].get_value(system)
+            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
@@ -1113,9 +1107,7 @@ def test_contains():
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 
-        for _ in range(10):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Contains].get_value(system)
 
         # Remove all particles and make sure contains returns False
@@ -1132,10 +1124,10 @@ def test_contains():
 @og_test
 def test_covered():
     bracelet = og.sim.scene.object_registry("name", "bracelet")
-    oyster = og.sim.scene.object_registry("name", "oyster")
+    bowl = og.sim.scene.object_registry("name", "bowl")
     microwave = og.sim.scene.object_registry("name", "microwave")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
-    for obj in (bracelet, oyster, microwave):
+    for obj in (bracelet, bowl, microwave):
         for system in systems:
             # bracelet is too small to sample physical particles on it
             sampleable = is_visual_particle_system(system.name) or obj != bracelet

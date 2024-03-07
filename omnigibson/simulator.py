@@ -83,7 +83,6 @@ def _launch_app():
     # Enable additional extensions we need
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":
@@ -680,10 +679,6 @@ def launch_simulator(*args, **kwargs):
                     channels.append("omni.physx.plugin")
                 with suppress_omni_log(channels=channels):
                     super().play()
-
-                # If we're stopped, take a physics step and update the physics sim view. This must happen BEFORE the
-                # handles are updated, since updating the physics view makes the per-object physics view invalid
-                self.step_physics()
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.

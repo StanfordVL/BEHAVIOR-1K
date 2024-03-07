@@ -11,7 +11,7 @@ AbilityDependencies = namedtuple("AbilityDependencies", ("states", "requirements
 # Maps ability name to list of Object States and / or Ability Requirements that determine
 # whether the given ability can be instantiated for a requested object
 _ABILITY_DEPENDENCIES = {
-    "robot": AbilityDependencies(states=[IsGrasping], requirements=[]),
+    "robot": AbilityDependencies(states=[IsGrasping, ObjectsInFOVOfRobot], requirements=[]),
     "attachable": AbilityDependencies(states=[AttachedTo], requirements=[]),
     "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[]),
     "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[]),

@@ -1,5 +1,5 @@
 from functools import cached_property
-import scipy
+from scipy.spatial import ConvexHull, QhullError
 import numpy as np
 
 import omnigibson as og
@@ -63,7 +63,7 @@ class RigidPrim(XFormPrim):
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
-        
+
         # Caches for kinematic-only objects
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
@@ -182,7 +182,8 @@ class RigidPrim(XFormPrim):
             for child in prim.GetChildren():
                 prims_to_check.append(child)
         for prim in prims_to_check:
-            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+            mesh_type = prim.GetPrimTypeInfo().GetTypeName()
+            if mesh_type in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
@@ -195,10 +196,10 @@ class RigidPrim(XFormPrim):
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                     self._collision_meshes[mesh_name] = mesh
 
-                    is_volume, volume, com = get_mesh_volume_and_com(mesh_prim)
-                    vols.append(volume)
-                    # We need to translate the center of mass from the mesh's local frame to the link's local frame
+                    volume, com = get_mesh_volume_and_com(mesh_prim)
+                    # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
+                    vols.append(volume * np.product(mesh.scale))
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                     # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                     # boundingCube approximation for the underlying collision approximation for GPU compatibility
@@ -207,6 +208,7 @@ class RigidPrim(XFormPrim):
                         mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
@@ -429,12 +431,7 @@ class RigidPrim(XFormPrim):
             float: total volume of all the collision meshes of the rigid body in m^3.
         """
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
-        volume = 0.0
-        for collision_mesh in self._collision_meshes.values():
-            _, mesh_volume, _ = get_mesh_volume_and_com(collision_mesh.prim)
-            volume += mesh_volume * np.product(collision_mesh.get_world_scale())
-
-        return volume
+        return sum(get_mesh_volume_and_com(collision_mesh.prim, world_frame=True)[0] for collision_mesh in self._collision_meshes.values())
 
     @volume.setter
     def volume(self, volume):
@@ -626,9 +623,9 @@ class RigidPrim(XFormPrim):
         points = np.concatenate(points, axis=0)
         
         try:
-            hull = scipy.spatial.ConvexHull(points)
+            hull = ConvexHull(points)
             return points[hull.vertices, :]
-        except scipy.spatial.qhull.QhullError:
+        except:
             # Handle the case where a convex hull cannot be formed (e.g., collinear points)
             # return all the points in this case
             return points
