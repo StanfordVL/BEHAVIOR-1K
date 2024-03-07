@@ -86,6 +86,10 @@ nav:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
     - Building Blocks: getting_started/building_blocks.md
+  - Modules:
+    - Prim: modules/prim.md
+    - Sensor: modules/sensor.md
+    - Environment: modules/environment.md
   - API Reference: reference/*
 
 extra:
