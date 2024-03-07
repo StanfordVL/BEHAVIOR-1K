@@ -220,7 +220,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create desired systems
         for system_name in init_systems:
-            get_system(system_name)
+            if gm.USE_GPU_DYNAMICS:
+                get_system(system_name)
+            else:
+                log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly
