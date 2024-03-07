@@ -683,10 +683,6 @@ def launch_simulator(*args, **kwargs):
                 with suppress_omni_log(channels=channels):
                     super().play()
 
-                # If we're stopped, take a physics step and update the physics sim view. This must happen BEFORE the
-                # handles are updated, since updating the physics view makes the per-object physics view invalid
-                self.step_physics()
-
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()

@@ -1475,7 +1475,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
-        prototype.scale = cls.max_scale
+        prototype.scale *= cls.max_scale
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
