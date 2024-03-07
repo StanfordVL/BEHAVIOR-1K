@@ -35,7 +35,6 @@ class TeleopSystem(TeleopPolicy):
         self.robot = robot
         self.robot_arms = ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         # robot parameters
-        self.robot_attached = False
         self.movement_speed = m.movement_speed
         self.show_control_marker = show_control_marker
         self.control_markers = {}
@@ -98,7 +97,8 @@ class TeleopSystem(TeleopPolicy):
         """
         self.teleop_action = TeleopAction()
         self.robot_obs = TeleopObservation()
-        super().reset_state()
+        for interface in self.interfaces.values():
+            interface.reset_state()
 
 
 class OVXRSystem(TeleopSystem):
@@ -131,6 +131,7 @@ class OVXRSystem(TeleopSystem):
         NOTE: enable_touchpad_movement and align_anchor_to_robot_base cannot be enabled at the same time. 
             The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
         """
+        self.raw_data = {}
         # enable xr extension
         lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
@@ -165,14 +166,14 @@ class OVXRSystem(TeleopSystem):
         self.hmd = None
         self.controllers = {}
         self.trackers = {}
-        self.reset_button_pressed = False
         self.xr2og_orn_offset = np.array([0.5, -0.5, -0.5, -0.5])
         self.og2xr_orn_offset = np.array([-0.5, 0.5, 0.5, -0.5])
         # setup event subscriptions
+        self.reset()
         self.use_hand_tracking = use_hand_tracking
         if use_hand_tracking:
             self.raw_data["hand_data"] = {}
-            self.teleop_data.hand_data = {}
+            self.teleop_action.hand_data = {}
             self._hand_tracking_subscription = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
                 lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
@@ -202,6 +203,16 @@ class OVXRSystem(TeleopSystem):
         """
         orn = T.quat_multiply(self.og2xr_orn_offset, orn)
         return T.pose2mat((pos, orn)).T.astype(np.float64)
+
+    def reset(self) -> None:
+        """
+        Reset the teleop policy
+        """
+        super().reset()
+        self.raw_data = {}
+        self.teleop_action.is_valid = {"left": False, "right": False, "head": False}
+        self.teleop_action.reset = {"left": False, "right": False}
+        self.teleop_action.head = np.zeros(6)
 
     @property
     def is_enabled(self) -> bool:
@@ -238,7 +249,7 @@ class OVXRSystem(TeleopSystem):
 
     def update(self) -> None:
         """
-        Steps the VR system and update self.teleop_data
+        Steps the VR system and update self.teleop_action
         """
         # update raw data
         self._update_devices()
@@ -246,47 +257,40 @@ class OVXRSystem(TeleopSystem):
         self._update_button_data()
         # Update teleop data based on controller input if not using hand tracking
         if not self.use_hand_tracking:
-            self.teleop_data.transforms["base"] = np.zeros(4)
+            self.teleop_action.base = np.zeros(3)
+            self.teleop_action.torso = 0.0
             # update right hand related info
-            for arm in self.robot_arms:
+            for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
-                    self.teleop_data.transforms[arm] = (
+                    self.teleop_action[arm_name] = np.r_[
                         self.raw_data["transforms"]["controllers"][arm][0],
-                        T.quat_multiply(
+                        T.quat2euler(T.quat_multiply(
                             self.raw_data["transforms"]["controllers"][arm][1],
                             self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(arm)]]
-                        )
-                    )
-                    self.teleop_data.grippers[arm] = self.raw_data["button_data"][arm]["axis"]["trigger"]
-                    self.teleop_data.is_valid[arm] = self._is_valid_transform(self.raw_data["transforms"]["controllers"][arm])
+                        )),
+                        [self.raw_data["button_data"][arm]["axis"]["trigger"]]
+                    ]
+                    self.teleop_action.is_valid[arm_name] = self._is_valid_transform(self.raw_data["transforms"]["controllers"][arm])
                 else:
-                    self.teleop_data.is_valid[arm] = False
+                    self.teleop_action.is_valid[arm_name] = False
             # update base and reset info
             if "right" in self.controllers:
-                self.teleop_data.reset["right"] = self.raw_data["button_data"]["right"]["press"]["grip"]
+                self.teleop_action.reset["right"] = self.raw_data["button_data"]["right"]["press"]["grip"]
                 right_axis = self.raw_data["button_data"]["right"]["axis"]
-                self.teleop_data.transforms["base"][0] = right_axis["touchpad_y"] * self.movement_speed
-                self.teleop_data.transforms["base"][3] = -right_axis["touchpad_x"] * self.movement_speed
+                self.teleop_action.base[0] = right_axis["touchpad_y"] * self.movement_speed
+                self.teleop_action.torso = -right_axis["touchpad_x"] * self.movement_speed
             if "left" in self.controllers:
-                self.teleop_data.reset["left"] = self.raw_data["button_data"]["left"]["press"]["grip"]
+                self.teleop_action.reset["left"] = self.raw_data["button_data"]["left"]["press"]["grip"]
                 left_axis = self.raw_data["button_data"]["left"]["axis"]
-                self.teleop_data.transforms["base"][1] = -left_axis["touchpad_x"] * self.movement_speed
-                self.teleop_data.transforms["base"][2] = left_axis["touchpad_y"] * self.movement_speed
+                self.teleop_action.base[1] = -left_axis["touchpad_x"] * self.movement_speed
+                self.teleop_action.base[2] = left_axis["touchpad_y"] * self.movement_speed
         # update head related info
-        self.teleop_data.transforms["head"] = self.raw_data["transforms"]["head"]
-        self.teleop_data.is_valid["head"] = self._is_valid_transform(self.teleop_data.transforms["head"])
-        # update robot reset and attachment info
-        if "right" in self.controllers and self.raw_data["button_data"]["right"]["press"]["grip"]:
-            if not self.reset_button_pressed:
-                self.reset_button_pressed = True
-                self.robot_attached = not self.robot_attached
-        else:
-            self.reset_button_pressed = False
-        self.teleop_data.robot_attached = self.robot_attached
+        self.teleop_action.head = np.r_[self.raw_data["transforms"]["head"][0], T.quat2euler(self.raw_data["transforms"]["head"][1])]
+        self.teleop_action.is_valid["head"] = self._is_valid_transform(self.raw_data["transforms"]["head"])
         # Optionally move anchor    
         if self.enable_touchpad_movement:
             # we use x, y from right controller for 2d movement and y from left controller for z movement
-            self._move_anchor(pos_offset=self.teleop_data.transforms["base"][[3, 0, 2]])
+            self._move_anchor(pos_offset=np.r_[[self.teleop_action.torso], self.teleop_action.base[[0, 2]]])
         if self.align_anchor_to_robot_base:
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
@@ -300,7 +304,7 @@ class OVXRSystem(TeleopSystem):
         # optionally update control marker
         if self.show_control_marker:
             self.update_control_marker()
-        return self.robot.teleop_data_to_action(self.teleop_data)
+        return self.robot.teleop_data_to_action(self.teleop_action)
 
     def reset_transform_mapping(self, arm: str = "right") -> None:
         """
@@ -404,9 +408,9 @@ class OVXRSystem(TeleopSystem):
         """
         e.consume()
         data_dict = e.payload
-        for hand in self.robot_arms:
+        for hand_name, hand in zip(["left, right"], self.robot_arms):
             if data_dict[f"joint_count_{hand}"] != 0:
-                self.teleop_data.is_valid[hand] = True
+                self.teleop_action.is_valid[hand_name] = True
                 self.raw_data["hand_data"][hand] = {"pos": [], "orn": []}
                 # hand_joint_matrices is an array of flattened 4x4 transform matrices for the 26 hand markers
                 hand_joint_matrices = data_dict[f"joint_matrices_{hand}"]
@@ -415,13 +419,14 @@ class OVXRSystem(TeleopSystem):
                     pos, orn = self.xr2og(np.reshape(hand_joint_matrices[16 * i: 16 * (i + 1)], (4, 4)))
                     self.raw_data["hand_data"][hand]["pos"].append(pos)
                     self.raw_data["hand_data"][hand]["orn"].append(orn)
-                self.teleop_data.transforms[hand] = (
+                self.teleop_action[hand_name] = np.r_[
                     self.raw_data["hand_data"][hand]["pos"][0], 
-                    T.quat_multiply(
+                    T.quat2euler(T.quat_multiply(
                         self.raw_data["hand_data"][hand]["orn"][0],
                         self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(hand)]]
-                    )
-                )
+                    )),
+                    [0]
+                ]
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
                 joint_angles = np.zeros((5, 3))
@@ -440,6 +445,4 @@ class OVXRSystem(TeleopSystem):
                         v1 /= np.linalg.norm(v1)
                         v2 /= np.linalg.norm(v2)
                         joint_angles[i, j] = np.arccos(v1 @ v2)
-                self.teleop_data.hand_data[hand] = joint_angles
-            else:
-                self.teleop_data.is_valid[hand] = False
+                self.teleop_action.hand_data[hand_name] = joint_angles
