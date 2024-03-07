@@ -38,7 +38,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         programmatic_pos = True
 
     # Import scene and robot (Fetch)
+    scene_cfg = {"type": "Scene"}
+    cfg = dict(scene=scene_cfg)
+    env = og.Environment(configs=cfg)
     scene = Scene()
+    if og.sim.is_playing():
+        og.sim.stop()
     og.sim.import_scene(scene)
 
     # Update the viewer camera's pose so that it points towards the robot
