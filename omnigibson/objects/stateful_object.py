@@ -11,6 +11,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
     get_default_states,
     get_state_name,
+    get_requirements_for_ability,
     get_states_for_ability,
     get_states_by_dependency_order,
     get_texture_change_states,
@@ -201,9 +202,22 @@ class StatefulObject(BaseObject):
 
         # Map the state type (class) to ability name and params
         if gm.ENABLE_OBJECT_STATES:
-            for ability, params in self._abilities.items():
-                for state_type in get_states_for_ability(ability):
-                    states_info[state_type] = {"ability": ability, "params": state_type.postprocess_ability_params(params)}
+            for ability in tuple(self._abilities.keys()):
+                # First, sanity check all ability requirements
+                compatible = True
+                for requirement in get_requirements_for_ability(ability):
+                    compatible, reason = requirement.is_compatible(obj=self)
+                    if not compatible:
+                        # Print out warning and pop ability
+                        log.warning(f"Ability '{ability}' is incompatible with obj {self.name}, "
+                                    f"because requirement {requirement.__name__} was not met. Reason: {reason}")
+                        self._abilities.pop(ability)
+                        break
+                if compatible:
+                    params = self._abilities[ability]
+                    for state_type in get_states_for_ability(ability):
+                        states_info[state_type] = {"ability": ability,
+                                                   "params": state_type.postprocess_ability_params(params)}
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
