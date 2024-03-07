@@ -442,7 +442,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
         # We do this by adding the object to our tracked collision groups
         structure_categories = {"walls", "floors", "ceilings"}
-        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
+        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
             # TODO: Remove structure hotfix once asset collision meshes are fixed!!
             if obj.category in structure_categories:
                 CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
