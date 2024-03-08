@@ -148,7 +148,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="modifier",
         category="dishtowel",
         model="dtfspn",
-        bounding_box=[0.341, 0.466, 0.07],
+        bounding_box=[0.34245, 0.46798, 0.07],
         visual_only=method_type == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
@@ -203,9 +203,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Move object in square around table
     deltas = [
-        [150, np.array([-0.01, 0, 0])],
+        [130, np.array([-0.01, 0, 0])],
         [60, np.array([0, -0.01, 0])],
-        [150, np.array([0.01, 0, 0])],
+        [130, np.array([0.01, 0, 0])],
         [60, np.array([0, 0.01, 0])],
     ]
     for t, delta in deltas:
