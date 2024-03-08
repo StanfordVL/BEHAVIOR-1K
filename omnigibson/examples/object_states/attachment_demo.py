@@ -102,7 +102,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     shelf_baseboard = og.sim.scene.object_registry("name", "shelf_baseboard")
     shelf_baseboard.set_position_orientation([0, -0.979, 0.26], [0, 0, 0, 1])
     shelf_baseboard.keep_still()
-    shelf_baseboard.set_linear_velocity([-0.2, 0, 0])
+    shelf_baseboard.set_linear_velocity(np.array([-0.2, 0, 0]))
 
     input("\n\nShelf parts fall to their correct poses and get automatically attached to the back panel.\n"
           "You can try to drag the shelf to hit the floor to break it apart. Press [ENTER] to continue.\n")
