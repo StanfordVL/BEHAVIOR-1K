@@ -49,7 +49,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"plate{i}",
             category="plate",
             model="iawoof",
-            bounding_box=np.array([0.25, 0.25, 0.05]),
+            bounding_box=np.array([0.20, 0.20, 0.05]),
     ) for i in range(2)]
 
     apple_cfgs = [dict(
