@@ -20,6 +20,7 @@ from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.overlaid import Overlaid
 from omnigibson.object_states.particle_modifier import ParticleRemover, ParticleApplier
 from omnigibson.object_states.particle_source_or_sink import ParticleSource, ParticleSink
+from omnigibson.object_states.particle import ParticleRequirement
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import IsGrasping, ObjectsInFOVOfRobot
 from omnigibson.object_states.saturated import Saturated
