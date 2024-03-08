@@ -6,12 +6,12 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 
 def main():
     # Create the config for generating the environment we want
-    scene_cfg = {"type": "Scene"}#, "scene_model": "Rs_int"}
+    scene_cfg = {"type": "InteractiveIndoorScene", "scene_model": "Rs_int"}
     robot0_cfg = {
         "type": "BehaviorRobot",
         "controller_config": {
-            "gripper_0": {"command_input_limits": "default"},
-            "gripper_1": {"command_input_limits": "default"},
+            "gripper_left": {"command_input_limits": "default"},
+            "gripper_right": {"command_input_limits": "default"},
         }
     }
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
