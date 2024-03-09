@@ -1,5 +1,5 @@
 ---
-icon: octicons/globe-16
+icon: material/earth
 ---
 
 # 🌎 **Environment**
