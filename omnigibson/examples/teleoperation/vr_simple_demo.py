@@ -6,9 +6,9 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 
 def main():
     # Create the config for generating the environment we want
-    scene_cfg = {"type": "InteractiveIndoorScene", "scene_model": "Rs_int"}
+    scene_cfg = {"type": "Scene"} #"InteractiveTraversableScene", "scene_model": "Rs_int"}
     robot0_cfg = {
-        "type": "BehaviorRobot",
+        "type": "Tiago",
         "controller_config": {
             "gripper_left": {"command_input_limits": "default"},
             "gripper_right": {"command_input_limits": "default"},
@@ -20,9 +20,7 @@ def main():
     env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys
-    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="SteamVR", enable_touchpad_movement=True)
-    # We want a lower movement speed for controlling with VR headset
-    vrsys.base_movement_speed = 0.03
+    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="SteamVR", align_anchor_to_robot_base=True)
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
     vrsys.set_initial_transform(pos=[0, 0, 1], orn=[0, 0, 0, 1])

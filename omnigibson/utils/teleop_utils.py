@@ -139,7 +139,7 @@ class OVXRSystem(TeleopSystem):
         super().__init__(teleop_config, robot, show_control_marker)
         # we want to further slow down the movement speed if we are using touchpad movement
         if enable_touchpad_movement:
-            self.movement_speed *= 0.1
+            self.movement_speed *= 0.3
         # get xr core and profile
         self.xr_core = lazy.omni.kit.xr.core.XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")

@@ -76,12 +76,12 @@ def main():
         vrsys.update()
         if DEBUG_MODE:
             # update the 26 markers' position and orientation for each hand
-            if vrsys.teleop_data.is_valid["left"]:
+            if vrsys.teleop_action.is_valid["left"]:
                 for i in range(26):
                     pos = vrsys.raw_data["hand_data"]["left"]["pos"][i]
                     orn = vrsys.raw_data["hand_data"]["left"]["orn"][i]
                     markers[i].set_position_orientation(pos, orn)
-            if vrsys.teleop_data.is_valid["right"]:
+            if vrsys.teleop_action.is_valid["right"]:
                 for i in range(26):
                     pos = vrsys.raw_data["hand_data"]["right"]["pos"][i]
                     orn = vrsys.raw_data["hand_data"]["right"]["orn"][i]
