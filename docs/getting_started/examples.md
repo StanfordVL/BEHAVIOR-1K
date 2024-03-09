@@ -2,7 +2,7 @@
 icon: octicons/package-16
 ---
 
-# 🧱 **Building Blocks**
+# 🧱 **Examples**
 **`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended as a set of building blocks enabling your research. Let's try them out!
 
 ***
@@ -119,7 +119,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with
     * Understanding how to generate a trajectory from a set of waypoints
 
 ```{.python .annotate}
-python -m omnigibson.examples.scenes.scene_selector
+python -m omnigibson.examples.scenes.scene_tour_demo
 ```
 
 This demo lets you choose a scene from the BEHAVIOR dataset. It allows you to move the camera using the keyboard, select waypoints, and then programmatically generates a video trajectory from the selected waypoints
