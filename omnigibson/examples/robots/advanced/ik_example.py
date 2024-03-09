@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         fixed_base=True,
         controller_config={
             "arm_0": {
-                "name": "JointController",
+                "name": "NullJointController",
                 "motor_type": "position",
             }
         }
@@ -78,6 +78,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.step()
     # Make sure none of the joints are moving
     robot.keep_still()
+    # Since this demo aims to showcase how users can directly control the robot with IK, 
+    # we will need to disable the built-in controllers in OmniGibson
+    robot.control_enabled = False
 
     # Create the IK solver -- note that we are controlling both the trunk and the arm since both are part of the
     # controllable kinematic chain for the end-effector!
@@ -96,7 +99,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         joint_pos = ik_solver.solve(
             target_pos=pos,
             target_quat=quat,
+            tolerance_pos=0.002,
+            tolerance_quat=0.01,
+            weight_pos=20.0,
+            weight_quat=0.05,
             max_iterations=max_iter,
+            initial_joint_pos=robot.get_joint_positions()[control_idx],
         )
         if joint_pos is not None:
             og.log.info("Solution found. Setting new arm configuration.")
