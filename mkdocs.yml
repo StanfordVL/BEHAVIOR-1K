@@ -93,6 +93,8 @@ nav:
     - Object: modules/scene.md
     - Environment: modules/environment.md
     - Sensor: modules/sensor.md
+  - Tutorials:
+    - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
 
 extra:
