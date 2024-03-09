@@ -21,9 +21,8 @@ We build upon IsaacSim's `Simulator` interface to construct our `Environment` cl
 
 The above figure describes **`OmniGibson`**'s simulation loop:
 
-1. An externally defined `action` is passed to `Robot` instances in the `Environment`, which is processed by each robot's own set of `Controller`s and converted into low-level joint commands that are then deployed on the robot.
-2. The simulator takes at least one (and potentially multiple) physics steps, updating its internal state.
-3. Sensors on each `Robot` instance grab observations from the updated simulator state, and the loaded `Task` instance also computes its task-relevant observations and updates its internal state.
-4. Observations as well as task-relevant data is returned from the `Environment` instance.
+1. **Action Execution:** An externally defined `action` is passed to `Robot` instances in the `Environment`, which is processed by each robot's own set of `Controller`s and converted into low-level joint commands that are then deployed on the robot.
+2. **Simulation Stepping:** The simulator takes at least one (and potentially multiple) physics steps, updating its internal state.
+3. **Observation Retrieval:** Sensors on each `Robot` instance grab observations from the updated simulator state, and the loaded `Task` instance also computes its task-relevant observations and updates its internal state. The observations as well as task-relevant data is then returned from the `Environment` instance.
 
 Each of the modules in **`OmniGibson`** can be extended by the user, and allow for custom subclass implementations to be used without needing to directly modify **`OmniGibson`** source code. This section provides high-level overviews of each of the modules, as well as general insight into the purpose and intended use-cases of each module.

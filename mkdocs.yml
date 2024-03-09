@@ -90,8 +90,9 @@ nav:
   - Modules:
     - Overview: modules/overview.md
     - Prim: modules/prim.md
+    - Robot: modules/robot.md
     - Object: modules/object.md
-    - Object: modules/scene.md
+    - Scene: modules/scene.md
     - Environment: modules/environment.md
     - Sensor: modules/sensor.md
   - Tutorials:

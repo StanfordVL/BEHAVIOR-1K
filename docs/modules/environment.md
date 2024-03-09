@@ -1,8 +1,8 @@
 ---
-icon: octicons/rocket-16
+icon: octicons/globe-16
 ---
 
-# 🖼️ **Environment**
+# 🌎 **Environment**
 
 The OpenAI Gym Environment serves as a top-level simulation object, offering a suite of common interfaces. These include methods such as `step`, `reset`, `render`, and properties like `observation_space` and `action_space`. The OmniGibson Environment builds upon this foundation by also supporting the loading of scenes, robots, and tasks. Following the OpenAI Gym interface, the OmniGibson environment further provides access to both the action space and observation space of the robots and external sensors.
 
