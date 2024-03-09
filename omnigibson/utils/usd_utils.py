@@ -9,7 +9,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
 
@@ -75,54 +75,6 @@ def get_prim_nested_children(prim):
         prims += get_prim_nested_children(prim=child)
 
     return prims
-
-
-def get_camera_params(viewport):
-    """
-    Get active camera intrinsic and extrinsic parameters.
-
-    Returns:
-        dict: Keyword-mapped values of the active camera's parameters:
-
-            pose (numpy.ndarray): camera position in world coordinates,
-            fov (float): horizontal field of view in radians
-            focal_length (float)
-            horizontal_aperture (float)
-            view_projection_matrix (numpy.ndarray(dtype=float64, shape=(4, 4)))
-            resolution (dict): resolution as a dict with 'width' and 'height'.
-            clipping_range (tuple(float, float)): Near and Far clipping values.
-    """
-    stage = lazy.omni.usd.get_context().get_stage()
-    prim = stage.GetPrimAtPath(viewport.get_active_camera())
-    prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
-    view_params = lazy.omni.syntheticdata.helpers.get_view_params(viewport)
-    fov = 2 * math.atan(view_params["horizontal_aperture"] / (2 * view_params["focal_length"]))
-    view_proj_mat = lazy.omni.syntheticdata.helpers.get_view_proj_mat(view_params)
-
-    return {
-        "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
-        "fov": fov,
-        "focal_length": view_params["focal_length"],
-        "horizontal_aperture": view_params["horizontal_aperture"],
-        "view_projection_matrix": view_proj_mat,
-        "resolution": {"width": view_params["width"], "height": view_params["height"]},
-        "clipping_range": np.array(view_params["clipping_range"]),
-    }
-
-
-def get_semantic_objects_pose():
-    """
-    Get pose of all objects with a semantic label.
-    """
-    stage = lazy.omni.usd.get_context().get_stage()
-    mappings = lazy.omni.syntheticdata.helpers.get_instance_mappings()
-    pose = []
-    for m in mappings:
-        prim_path = m[1]
-        prim = stage.GetPrimAtPath(prim_path)
-        prim_tf = lazy.omni.usd.get_world_transform_matrix(prim)
-        pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
-    return pose
 
 
 def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
@@ -447,154 +399,6 @@ class CollisionAPI:
         cls.ACTIVE_COLLISION_GROUPS = {}
 
 
-class BoundingBoxAPI:
-    """
-    Class containing class methods to facilitate bounding box handling
-    """
-    # Non-flatcache-compatible cache -- this is a direct omni API-based object
-    CACHE_NON_FLATCACHE = None
-
-    # Flatcache-compatible cache -- this is a dictionary mapping prim paths to corresponding AABBs
-    CACHE_FLATCACHE = dict()
-
-    @classmethod
-    def compute_aabb(cls, prim):
-        """
-        Computes the AABB (world-frame oriented) for @prim.
-
-        NOTE: If @prim is an EntityPrim (i.e.: owns multiple links), then the computed bounding box will be
-        the subsequent aggregate over all the links.
-
-        Args:
-            prim (XFormPrim): Prim to calculate AABB for
-
-        Returns:
-            2-tuple:
-                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
-                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
-        """
-        # Use the correct API to calculate AABB based on whether flatcache is enabled or not
-        return cls._compute_flatcache_aabb(prim=prim) if gm.ENABLE_FLATCACHE else \
-            cls._compute_non_flatcache_aabb(prim_path=prim.prim_path)
-
-    @classmethod
-    def _compute_flatcache_aabb(cls, prim):
-        """
-        Computes the AABB (world-frame oriented) for @prim. This an API compatible with flatcache, which manually
-        updates the @prim's transforms on the USD stage before computing its AABB
-
-        Args:
-            prim (XFormPrim): Prim to calculate AABB for
-
-        Returns:
-            2-tuple:
-                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
-                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
-        """
-        # Run imports here to avoid circular imports
-        from omnigibson.prims import EntityPrim, RigidPrim, XFormPrim
-
-        # Simply grab the AABB if it's already been cached
-        if prim in cls.CACHE_FLATCACHE:
-            return cls.CACHE_FLATCACHE[prim]
-
-        # Next, process the AABB depending on the type of prim it is
-        if isinstance(prim, EntityPrim):
-            obj = prim
-        elif isinstance(prim, RigidPrim):
-            # Find the obj owning this link
-            obj = og.sim.scene.object_registry("prim_path", "/".join(prim.prim_path.split("/")[:-1]))
-        elif isinstance(prim, XFormPrim):
-            # See if this XForm belongs to any object
-            obj = og.sim.scene.object_registry("prim_path", "/".join(prim.prim_path.split("/")[:2]), None)
-        else:
-            raise ValueError(f"Inputted prim must be an instance of EntityPrim, RigidPrim, or XFormPrim "
-                             f"in order to calculate AABB!")
-
-        # Update tfs for the object that owns this prim
-        if obj is not None:
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=obj)
-
-        # Compute the AABB and cache it internally
-        val = cls._compute_non_flatcache_aabb(prim_path=prim.prim_path)
-        cls.CACHE_FLATCACHE[prim] = val
-
-        return val
-
-    @classmethod
-    def _compute_non_flatcache_aabb(cls, prim_path):
-        """
-        Computes the AABB (world-frame oriented) for the prim specified at @prim_path using the underlying omniverse
-        API.
-
-        NOTE: This is NOT compatible with flatcache and will result in incorrect values if flatcache is enabled!! See:
-        https://docs.omniverse.nvidia.com/app_code/prod_extensions/ext_physics.html#physx-short-flatcache-also-known-as-fabric-rename-in-next-release
-
-        Args:
-            prim_path (str): Path to the prim to calculate AABB for
-
-        Returns:
-            2-tuple:
-                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
-                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
-        """
-        # Create cache if it doesn't already exist
-        if cls.CACHE_NON_FLATCACHE is None:
-            og.sim.psi.fetch_results()
-            cls.CACHE_NON_FLATCACHE = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
-
-        # Grab aabb
-        aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(bbox_cache=cls.CACHE_NON_FLATCACHE, prim_path=prim_path)
-
-        # Sanity check values
-        if np.any(aabb[3:] < aabb[:3]):
-            raise ValueError(f"Got invalid aabb values for prim: {prim_path}: low={aabb[:3]}, high={aabb[3:]}")
-
-        return aabb[:3], aabb[3:]
-
-    @classmethod
-    def compute_center_extent(cls, prim):
-        """
-        Computes the AABB (world-frame oriented) for @prim, and convert it into the center and extent values
-
-        Args:
-            prim (XFormPrim): Prim to calculate AABB for
-
-        Returns:
-            2-tuple:
-                - 3-array: center position (x,y,z) of world-coordinate frame aligned bounding box
-                - 3-array: end-to-end extent size (x,y,z) of world-coordinate frame aligned bounding box
-        """
-        low, high = cls.compute_aabb(prim=prim)
-
-        return (low + high) / 2.0, high - low
-
-    @classmethod
-    def clear(cls):
-        """
-        Clears the internal state of this BoundingBoxAPI. This should occur at least once per sim step.
-        """
-        cls.CACHE_NON_FLATCACHE = None
-        cls.CACHE_FLATCACHE = dict()
-
-    @classmethod
-    def aabb_contains_point(cls, point, container):
-        """
-        Returns true if the point is contained in the container AABB
-
-        Args:
-            point (tuple): (x,y,z) position in world-coordinates
-            container (tuple):
-                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
-                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
-
-        Returns:
-            bool: True if AABB contains @point, otherwise False
-        """
-        lower, upper = container
-        return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
-
-
 class FlatcacheAPI:
     """
     Monolithic class for leveraging functionality meant to be used EXCLUSIVELY with flatcache.
@@ -697,12 +501,58 @@ class FlatcacheAPI:
         cls.MODIFIED_PRIMS = set()
 
 
+class PoseAPI:
+    """
+    This is a singleton class for getting world poses.
+    Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
+    After that, if we need to access the pose of a prim without stepping physics, 
+    this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
+    """
+    VALID = False
+    
+    @classmethod
+    def invalidate(cls):
+        cls.VALID = False
+        
+    @classmethod
+    def mark_valid(cls):
+        cls.VALID = True
+        
+    @classmethod
+    def _refresh(cls):
+        if og.sim is not None and not cls.VALID:
+            # when flatcache is on
+            if og.sim._physx_fabric_interface:
+                # no time step is taken here
+                og.sim._physx_fabric_interface.update(og.sim.get_physics_dt(), og.sim.current_time)
+            # when flatcache is off
+            else:
+                # no time step is taken here
+                og.sim.psi.fetch_results()
+            cls.mark_valid()
+        
+    @classmethod
+    def get_world_pose(cls, prim_path):
+        cls._refresh()
+        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+    @classmethod
+    def get_world_pose_with_scale(cls, prim_path):
+        """
+        This is used when information about the prim's global scale is needed, 
+        e.g. when converting points in the prim frame to the world frame.
+        """
+        cls._refresh()
+        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
+    PoseAPI.invalidate()
     CollisionAPI.clear()
-    BoundingBoxAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
@@ -757,9 +607,9 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
-def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
+def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
     """
-    Generates trimesh mesh from @mesh_prim
+    Generates trimesh mesh from @mesh_prim if mesh_type is "Mesh"
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
@@ -770,6 +620,8 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
     """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
     face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
     vertices = np.array(mesh_prim.GetAttribute("points").Get())
     face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())
@@ -791,6 +643,63 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
 
     return trimesh.Trimesh(**kwargs)
 
+def mesh_prim_shape_to_trimesh_mesh(mesh_prim):
+    """
+    Generates trimesh mesh from @mesh_prim if mesh_type is "Sphere", "Cube", "Cone" or "Cylinder"
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+
+    Returns:
+        trimesh.Trimesh: Generated trimesh mesh
+    """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    if mesh_type == "Sphere":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        trimesh_mesh = trimesh.creation.icosphere(subdivision=3, radius=radius)
+    elif mesh_type == "Cube":
+        extent = mesh_prim.GetAttribute("size").Get()
+        trimesh_mesh = trimesh.creation.box([extent] * 3)
+    elif mesh_type == "Cone":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
+        trimesh_mesh = trimesh.creation.cone(radius=radius, height=height)
+        # Trimesh cones are centered at the base. We'll move them down by half the height.
+        transform = trimesh.transformations.translation_matrix([0, 0, -height / 2])
+        trimesh_mesh.apply_transform(transform)
+    elif mesh_type == "Cylinder":
+        radius = mesh_prim.GetAttribute("radius").Get()
+        height = mesh_prim.GetAttribute("height").Get()
+        trimesh_mesh = trimesh.creation.cylinder(radius=radius, height=height)
+    else:
+        raise ValueError(f"Expected mesh prim to have type Sphere, Cube, Cone or Cylinder, got {mesh_type}")
+
+    return trimesh_mesh
+
+def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True, world_frame=False):
+    """
+    Generates trimesh mesh from @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+        include_normals (bool): Whether to include the normals in the resulting trimesh or not
+        include_texcoord (bool): Whether to include the corresponding 2D-texture coordinates in the resulting
+            trimesh or not
+        world_frame (bool): Whether to convert the mesh to the world frame or not
+
+    Returns:
+        trimesh.Trimesh: Generated trimesh mesh
+    """
+    mesh_type = mesh_prim.GetTypeName()
+    if mesh_type == "Mesh":
+        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals, include_texcoord)
+    else:
+        trimesh_mesh = mesh_prim_shape_to_trimesh_mesh(mesh_prim)
+
+    if world_frame:
+        trimesh_mesh.apply_transform(PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString))
+
+    return trimesh_mesh
 
 def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
@@ -816,7 +725,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
         np.random.seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
-    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
     n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
     faces_flat = tm.faces.flatten()
     n_vertices = len(faces_flat)
@@ -834,52 +743,34 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     return keypoint_idx, keyface_idx
 
 
-def get_mesh_volume_and_com(mesh_prim):
+def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     """
     Computes the volume and center of mass for @mesh_prim
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
+        world_frame (bool): Whether to return the volume and CoM in the world frame
 
     Returns:
-        Tuple[bool, float, np.array]: Tuple containing the (is_volume, volume, center_of_mass) in the mesh
-            frame of @mesh_prim
+        Tuple[float, np.array]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
-    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
-    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
-    # Default volume and com
-    volume = 0.0
-    com = np.zeros(3)
-    is_volume = True
-    if mesh_type == "Mesh":
-        # We construct a trimesh object from this mesh in order to infer its volume
-        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
-        is_volume = trimesh_mesh.is_volume
-        if is_volume:
-            volume = trimesh_mesh.volume
-            com = trimesh_mesh.center_mass
-        else:
-            # If the mesh is not a volume, we compute its convex hull and use that instead
-            try:
-                trimesh_mesh_convex = trimesh_mesh.convex_hull
-                volume = trimesh_mesh_convex.volume
-                com = trimesh_mesh_convex.center_mass
-            except:
-                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
-                pass
-    elif mesh_type == "Sphere":
-        volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
-    elif mesh_type == "Cube":
-        volume = mesh_prim.GetAttribute("size").Get() ** 3
-    elif mesh_type == "Cone":
-        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
-        com = np.array([0, 0, mesh_prim.GetAttribute("height").Get() / 4])
-    elif mesh_type == "Cylinder":
-        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
-    else:
-        raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
 
-    return is_volume, volume, com
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=world_frame)
+    if trimesh_mesh.is_volume:
+        volume = trimesh_mesh.volume
+        com = trimesh_mesh.center_mass
+    else:
+        # If the mesh is not a volume, we compute its convex hull and use that instead
+        try:
+            trimesh_mesh_convex = trimesh_mesh.convex_hull
+            volume = trimesh_mesh_convex.volume
+            com = trimesh_mesh_convex.center_mass
+        except:
+            # if convex hull computation fails, it usually means the mesh is degenerated: use trivial values.
+            volume = 0.0
+            com = np.zeros(3)
+
+    return volume, com
 
 def check_extent_radius_ratio(mesh_prim):
     """
@@ -893,21 +784,17 @@ def check_extent_radius_ratio(mesh_prim):
     Returns:
         bool: True if the extent radius ratio is within the acceptable range, False otherwise
     """
-
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
-    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
-
+    # Non-mesh prims are always considered to be within the acceptable range
     if mesh_type != "Mesh":
         return True
 
-    is_volume, _, com = get_mesh_volume_and_com(mesh_prim)
-
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
-    if not is_volume:
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=False)
+    if not trimesh_mesh.is_volume:
         trimesh_mesh = trimesh_mesh.convex_hull
 
     max_radius = trimesh_mesh.extents.max() / 2.0
-    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([com]))[1][0]
+    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([trimesh_mesh.center_mass]))[1][0]
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.

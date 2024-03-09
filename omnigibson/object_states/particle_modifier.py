@@ -298,9 +298,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Sanity check scale if requested
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
-            if self.method == ParticleModifyMethod.PROJECTION and self.obj.scale.max() != self.obj.scale.min():
+            if self.method == ParticleModifyMethod.PROJECTION and not np.isclose(self.obj.scale.max(), self.obj.scale.min(), atol=1e-04):
                 raise ValueError(f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "
-                                 f"created with non-uniform scale and sample_with_raycast! Got scale: {self.obj.scale}")
+                                 f"created with non-uniform scale and requires_overlap! Got scale: {self.obj.scale}")
 
         # Initialize internal variables
         self._current_step = 0
@@ -402,7 +402,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Define the function for checking whether points are within the adjacency mesh
             def check_in_adjacency_mesh(particle_positions):
                 # Define the AABB bounds
-                lower, upper = self.link.aabb
+                lower, upper = self.link.visual_aabb
                 # Add the margin
                 lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
                 upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
@@ -413,7 +413,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                aabb = self.link.aabb
+                aabb = self.link.visual_aabb
                 og.sim.psqi.overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
@@ -631,7 +631,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         Returns:
             bool: Whether overlap checks should be executed as a guard condition against modifying particles
         """
-        return True
+        raise NotImplementedError()
 
     @classproperty
     def supported_active_systems(cls):
@@ -1317,7 +1317,7 @@ class ParticleApplier(ParticleModifier):
         """
         # Randomly sample end points from within the object's AABB
         n_samples = self._get_max_particles_limit_per_step(system=system)
-        lower, upper = self.link.aabb
+        lower, upper = self.link.visual_aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         lower_upper = np.concatenate([lower, upper], axis=0)

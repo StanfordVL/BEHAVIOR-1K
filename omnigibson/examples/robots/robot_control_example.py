@@ -75,7 +75,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the config for generating the environment we want
     env_cfg = dict()
     env_cfg["action_frequency"] = 10
-    env_cfg["physics_frequency"] = 60
+    env_cfg["physics_frequency"] = 120
 
     scene_cfg = dict()
     if scene_model == "empty":

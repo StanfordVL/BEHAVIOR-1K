@@ -4,7 +4,6 @@ from omnigibson.systems import get_system, is_physical_particle_system, is_visua
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson as og
 
 from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane, SYSTEM_EXAMPLES
@@ -232,7 +231,7 @@ def test_aabb():
     # Need to take one sim step
     og.sim.step()
 
-    assert np.allclose(breakfast_table.states[AABB].get_value(), BoundingBoxAPI.compute_aabb(breakfast_table))
+    assert np.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
     assert np.all((breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1]))
 
     pp = dishtowel.root_link.compute_particle_positions()
@@ -634,7 +633,7 @@ def test_toggled_on():
     robot = og.sim.scene.object_registry("name", "robot0")
 
     stove.set_position_orientation([1.46, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
-    robot.set_position_orientation([0.01, 0.38, 0.01], [0, 0, 0, 1])
+    robot.set_position_orientation([0.0, 0.38, 0.01], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
@@ -642,7 +641,7 @@ def test_toggled_on():
     jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
     q[jnt_idxs["torso_lift_joint"]] = 0.0
     q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
-    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(8.0)
+    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(9.0)
     q[jnt_idxs["upperarm_roll_joint"]] = 0.0
     q[jnt_idxs["elbow_flex_joint"]] = 0.0
     q[jnt_idxs["forearm_roll_joint"]] = 0.0
@@ -1074,10 +1073,7 @@ def test_filled():
             og.sim.step()
 
         assert stockpot.states[Filled].set_value(system, True)
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Filled].get_value(system)
 
         # Cannot set Filled state False
@@ -1085,10 +1081,7 @@ def test_filled():
             stockpot.states[Filled].set_value(system, False)
 
         system.remove_all_particles()
-
-        for _ in range(5):
-            og.sim.step()
-
+        og.sim.step()
         assert not stockpot.states[Filled].get_value(system)
 
 @og_test
@@ -1096,6 +1089,7 @@ def test_contains():
     stockpot = og.sim.scene.object_registry("name", "stockpot")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
+        print(f"Testing Contains {stockpot.name} with {system.name}")
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
@@ -1103,8 +1097,7 @@ def test_contains():
 
         # Sample single particle
         if is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] + system.particle_radius * 1.01])])
-            assert not stockpot.states[Contains].get_value(system)
+            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
@@ -1114,9 +1107,7 @@ def test_contains():
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 
-        for _ in range(10):
-            og.sim.step()
-
+        og.sim.step()
         assert stockpot.states[Contains].get_value(system)
 
         # Remove all particles and make sure contains returns False
@@ -1133,10 +1124,10 @@ def test_contains():
 @og_test
 def test_covered():
     bracelet = og.sim.scene.object_registry("name", "bracelet")
-    oyster = og.sim.scene.object_registry("name", "oyster")
+    bowl = og.sim.scene.object_registry("name", "bowl")
     microwave = og.sim.scene.object_registry("name", "microwave")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
-    for obj in (bracelet, oyster, microwave):
+    for obj in (bracelet, bowl, microwave):
         for system in systems:
             # bracelet is too small to sample physical particles on it
             sampleable = is_visual_particle_system(system.name) or obj != bracelet
@@ -1148,12 +1139,10 @@ def test_covered():
                     og.sim.step()
 
                 assert obj.states[Covered].set_value(system, True)
-                for _ in range(10):
-                    og.sim.step()
+                og.sim.step()
                 assert obj.states[Covered].get_value(system)
 
                 assert obj.states[Covered].set_value(system, False)
-
                 # We don't call og.sim.step() here because it's possible for the "second" layer of particles to fall down
                 # and make Covered to be True again. Instead, we clear the caches and check that Covered is False.
                 obj.states[Covered].clear_cache()

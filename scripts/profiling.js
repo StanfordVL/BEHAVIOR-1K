@@ -71,10 +71,9 @@ function init() {
 
 	// Render footer
 	document.getElementById('dl-button').onclick = () => {
-		const dataUrl = 'data:,' + JSON.stringify(data, null, 2);
 		const a = document.createElement('a');
-		a.href = dataUrl;
-		a.download = 'OmniGibson_profiling.json';
+		a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: "application/json"}));
+		a.download = 'OmniGibson Profiling.json';
 		a.click();
 	};
 
@@ -91,20 +90,26 @@ function renderGraph(canvasName, fieldName, runNames) {
 	const canvas = document.getElementById(canvasName);
 	const color = ['#178600', '#00add8', '#ffa500', '#ff3838'];
 	const data = {
-		labels: Array.from(filteredData).map(([_name, value]) => (value[0].commit.id.slice(0, 7))),
-		datasets: Array.from(filteredData).map(([name, value], index) => ({
-			label: name,
-			data: value.map(d => d.bench.value),
-			borderColor: color[index],
-			backgroundColor: 'rgba(0, 0, 0, 0.01)'
-		}))
+		labels: Array.from(filteredData.values())[0].map(value => value.commit.id.slice(0, 7)),
+		datasets: Array.from(filteredData).map(([name, value], index) => {
+			return {
+				label: name,
+				data: value.map(d => ({
+					'x': d.commit.id.slice(0, 7),
+					'y': d.bench.value
+				}
+				)),
+				borderColor: color[index],
+				backgroundColor: 'rgba(0, 0, 0, 0.01)'
+			};
+	})
 	};
 	const options = {
 		tooltips: {
 			callbacks: {
 				afterTitle: items => {
-					const {index} = items[0];
-					const data = filteredData.values().next().value[index];
+					const {datasetIndex, index} = items[0];
+					const data = Array.from(filteredData.values())[datasetIndex][index];
 					return '\n' + data.commit.message + '\n\n' + data.commit.timestamp + ' committed by @' + data.commit.committer.username + '\n';
 				},
 				label: item => {
@@ -122,13 +127,12 @@ function renderGraph(canvasName, fieldName, runNames) {
 				}
 			}
 		},
-		onClick: (_mouseEvent, activeElems) => {
-			if (activeElems.length === 0) {
+		onClick: (_mouseEvent) => {
+			const points = myChart.getElementsAtEventForMode(_mouseEvent, 'nearest', { intersect: true }, true);
+			if (points.length === 0) {
 				return;
 			}
-			// XXX: Undocumented. How can we know the index?
-			const index = activeElems[0]._index;
-			const url = filteredData.values().next().value[index].commit.url;
+			const url = Array.from(filteredData.values())[points[0]._datasetIndex][points[0]._index].commit.url;
 			window.open(url, '_blank');
 		},
 		title: {
@@ -142,11 +146,12 @@ function renderGraph(canvasName, fieldName, runNames) {
 		maintainAspectRatio: true
 	};
 
-	new Chart(canvas, {
+	const myChart = new Chart(canvas, {
 		type: 'line',
 		data,
 		options,
 	});
+	return myChart;
 }
 
 

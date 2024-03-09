@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import SemanticClass, PrimType
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
@@ -228,7 +228,7 @@ class MacroParticleSystem(BaseSystem):
         new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
         # Set the scale and make sure the particle is visible
-        new_particle.scale = scale
+        new_particle.scale *= scale
         new_particle.visible = True
 
         # Track this particle as well
@@ -407,6 +407,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 path_from=cls.particle_object.prim_path,
                 path_to=prim_path,
             )
+            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
+            )
         return VisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
@@ -478,6 +484,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
+
         bbox_extents_local = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # If we're using flatcache, we need to update the object's pose on the USD manually
@@ -533,6 +540,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
         avg_scale = np.cbrt(np.product(obj.scale))
+
         bbox_extents_global = scales * cls.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
         if obj.prim_type == PrimType.CLOTH:
@@ -1144,6 +1152,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=prim,
+                semantic_label=cls.name,
+                type_label="class",
+            )
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
@@ -1152,7 +1165,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super().process_particle_object()
 
         # Compute particle radius
-        vertices = np.array(cls.particle_object.get_attribute("points")) * cls.max_scale.reshape(1, 3)
+        vertices = np.array(cls.particle_object.get_attribute("points")) * cls.particle_object.scale * cls.max_scale.reshape(1, 3)
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
     @classmethod

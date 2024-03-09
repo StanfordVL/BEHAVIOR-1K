@@ -37,7 +37,7 @@ class ProfilingEnv(og.Environment):
             og.sim._non_physics_step()
 
             # Grab observations
-            obs = self.get_obs()
+            obs, obs_info = self.get_obs()
 
             # Step the scene graph builder if necessary
             if self._scene_graph_builder is not None:
@@ -50,7 +50,8 @@ class ProfilingEnv(og.Environment):
             if done and self._automatic_reset:
                 # Add lost observation to our information dict, and reset
                 info["last_observation"] = obs
-                obs = self.reset()
+                info["last_observation_info"] = obs_info
+                obs, obs_info = self.reset()
 
             # Increment step
             self._current_step += 1
