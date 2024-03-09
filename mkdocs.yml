@@ -88,6 +88,7 @@ nav:
     - Building Blocks: getting_started/building_blocks.md
     - Slurm: getting_started/slurm.md
   - Modules:
+    - Overview: modules/overview.md
     - Prim: modules/prim.md
     - Object: modules/object.md
     - Object: modules/scene.md
