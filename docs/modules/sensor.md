@@ -73,7 +73,7 @@ info:
 
 Summary of all `vision` modalities:
 
-<details>
+<details open>
     <summary><strong>RGB</strong></summary>
     <p>RGB image of the scene from the camera perspective.</p>
     <p>Size: (height, width, 4), numpy.uint8</p>
@@ -231,4 +231,12 @@ Summary of all `proprioception`:
     <summary><strong>Robot Angular Velocity</strong></summary>
     <p>Robot angular velocity.</p>
     <p>Size: (x_vel, y_vel, z_vel), numpy.float64</p>
+</details>
+
+Summary of `task` observation:
+
+<details>
+    <summary><strong>Low-dim task observation</strong></summary>
+    <p>Task-specific observation, e.g. navigation goal position.</p>
+    <p>Size: # of low-dim observation, numpy.float64</p>
 </details>
