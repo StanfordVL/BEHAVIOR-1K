@@ -71,7 +71,7 @@ info:
 </code></pre>
 </details>
 
-Here's a selection of camera modalities:
+Summary of all vision modalities:
 
 <details>
     <summary><strong>RGB</strong></summary>
@@ -167,4 +167,18 @@ Here's a selection of camera modalities:
         z_max, numpy.float32;<br>
         transform (4x4), numpy.float32;<br>
         occlusion_ratio, numpy.float32</p>
+</details>
+
+Summary of all range modalities:
+
+<details>
+    <summary><strong>2D LiDAR</strong></summary>
+    <p>Distances to surrounding objects by emitting laser beams and detecting the reflected light.</p>
+    <p>Size: (# of horizontal rays, # of vertical rays), numpy.float32</p>
+</details>
+
+<details>
+    <summary><strong>Occupancy Grid</strong></summary>
+    <p>A representation of the environment as a 2D grid where each cell indicates the presence (or absence) of an obstacle.</p>
+    <p>Size: (grid resolution, grid resolution), numpy.float32</p>
 </details>
