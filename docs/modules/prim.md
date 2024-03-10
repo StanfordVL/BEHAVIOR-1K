@@ -1,8 +1,8 @@
 ---
-icon: octicons/rocket-16
+icon: material/cube-outline
 ---
 
-# 🛠️ **Prim**
+# 🧱 **Prim**
 
 A Prim, short for "primitive," is a fundamental building block of a scene, representing an individual object or entity within the scene's hierarchy. It is essentially a container that encapsulates data, attributes, and relationships, allowing it to represent various scene components like models, cameras, lights, or groups of prims. These prims are systematically organized into a hierarchical framework, creating a scene graph that depicts the relationships and transformations between objects.
 

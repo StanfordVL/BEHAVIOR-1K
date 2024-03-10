@@ -1,8 +1,8 @@
 ---
-icon: material/food-apple-outline
+icon: material/robot-outline
 ---
 
-# 🍎 **Object**
+# 🤖 **Object**
 
 Objects, such as furnitures, are essential to building manipulation environments. We designed the MujocoObject interfaces to standardize and simplify the procedure for importing 3D models into the scene or procedurally generate new objects. MuJoCo defines models via the MJCF XML format. These MJCF files can either be stored as XML files on disk and loaded into simulator, or be created on-the-fly by code prior to simulation. 
 

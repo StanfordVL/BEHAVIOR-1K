@@ -1,5 +1,5 @@
 ---
-icon: octicons/rocket-16
+icon: material/camera-outline
 ---
 
 # 📷 **Sensor**

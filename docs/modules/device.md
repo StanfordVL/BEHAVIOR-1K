@@ -1,5 +1,5 @@
 ---
-icon: octicons/rocket-16
+icon: material/controller-classic-outline
 ---
 
 # 🕹️ **Device**
