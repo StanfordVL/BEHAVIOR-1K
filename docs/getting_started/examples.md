@@ -168,7 +168,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and loads
     --8<-- "src/examples/objects/load_object_selector.py"
     ```
 
-### ** Object Visualizer Demo**
+### **Object Visualizer Demo**
 !!! abstract "This demo is useful for..."
 
     * Viewing objects' textures as rendered in **`OmniGibson`**
