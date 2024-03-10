@@ -71,7 +71,7 @@ info:
 </code></pre>
 </details>
 
-Summary of all vision modalities:
+Summary of all `vision` modalities:
 
 <details>
     <summary><strong>RGB</strong></summary>
@@ -169,7 +169,7 @@ Summary of all vision modalities:
         occlusion_ratio, numpy.float32</p>
 </details>
 
-Summary of all range modalities:
+Summary of all `range` modalities:
 
 <details>
     <summary><strong>2D LiDAR</strong></summary>
@@ -181,4 +181,54 @@ Summary of all range modalities:
     <summary><strong>Occupancy Grid</strong></summary>
     <p>A representation of the environment as a 2D grid where each cell indicates the presence (or absence) of an obstacle.</p>
     <p>Size: (grid resolution, grid resolution), numpy.float32</p>
+</details>
+
+Summary of all `proprioception`:
+
+<details>
+    <summary><strong>Joint Positions</strong></summary>
+    <p>Joint positions.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Joint Velocities</strong></summary>
+    <p>Joint velocities.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Joint Efforts</strong></summary>
+    <p>Torque measured at each joint.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Position</strong></summary>
+    <p>Robot position in the world frame.</p>
+    <p>Size: (x, y, z), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Orientation</strong></summary>
+    <p>Robot global euler orientation.</p>
+    <p>Size: (roll, pitch, yaw), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot 2D Orientation</strong></summary>
+    <p>Robot orientation on the XY plane of the world frame.</p>
+    <p>Size: angle, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Linear Velocity</strong></summary>
+    <p>Robot linear velocity.</p>
+    <p>Size: (x_vel, y_vel, z_vel), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Angular Velocity</strong></summary>
+    <p>Robot angular velocity.</p>
+    <p>Size: (x_vel, y_vel, z_vel), numpy.float64</p>
 </details>
