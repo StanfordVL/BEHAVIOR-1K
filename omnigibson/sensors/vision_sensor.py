@@ -99,7 +99,7 @@ class VisionSensor(BaseSensor):
     INSTANCE_REMAPPER = Remapper()
     INSTANCE_ID_REMAPPER = Remapper()
     INSTANCE_REGISTRY = {0: "background", 1: "unlabelled"}
-    INSTANCE_ID_REGISTRY = {0: "background", 1: "unlabelled"}
+    INSTANCE_ID_REGISTRY = {0: "background"}
 
     def __init__(
         self,
@@ -322,8 +322,9 @@ class VisionSensor(BaseSensor):
             np.ndarray: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
         """
-        # instance segmentation ID for some reason doesn't include the background and unlabelled classes
-        id_to_labels.update({"0": "BACKGROUND", "1": "UNLABELLED"})
+        if id:
+            # instance segmentation ID for some reason doesn't include the background class
+            id_to_labels.update({"0": "BACKGROUND"})
 
         # Preprocess id_to_labels and update instance registry
         replicator_mapping = {}
@@ -344,10 +345,13 @@ class VisionSensor(BaseSensor):
                     # Remap instance segmentation labels to object name
                     if not id:
                         # value is the prim path of the object
-                        obj = og.sim.scene.object_registry("prim_path", value)
-                        # Remap instance segmentation labels from prim path to object name
-                        assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
-                        value = obj.name
+                        if value == "/World/groundPlane":
+                            value = "groundPlane"
+                        else:
+                            obj = og.sim.scene.object_registry("prim_path", value)
+                            # Remap instance segmentation labels from prim path to object name
+                            assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
+                            value = obj.name
 
                     # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
                     else:
@@ -672,7 +676,7 @@ class VisionSensor(BaseSensor):
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None
         cls.INSTANCE_REGISTRY = {0: "background", 1: "unlabelled"}
-        cls.INSTANCE_ID_REGISTRY = {0: "background", 1: "unlabelled"}
+        cls.INSTANCE_ID_REGISTRY = {0: "background"}
 
     @classproperty
     def all_modalities(cls):
