@@ -1,5 +1,4 @@
 import colorsys
-import random
 
 import numpy as np
 from PIL import Image
@@ -42,7 +41,7 @@ class RandomScale:
             PIL.Image: Rescaled image.
         """
 
-        size = random.randint(self.minsize, self.maxsize)
+        size = np.random.randint(self.minsize, self.maxsize)
 
         if isinstance(size, int):
             w, h = img.size

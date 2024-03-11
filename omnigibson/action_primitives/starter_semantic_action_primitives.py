@@ -8,7 +8,6 @@ runnable examples.
 from functools import cached_property
 import inspect
 import logging
-import random
 from aenum import IntEnum, auto
 from math import ceil
 import cv2
@@ -647,7 +646,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Allow grasping from suboptimal extents if we've tried enough times.
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pose, object_direction = random.choice(grasp_poses)
+        grasp_pose, object_direction = np.random.choice(grasp_poses)
 
         # Prepare data for the approach later.
         approach_pos = grasp_pose[0] + object_direction * m.GRASP_APPROACH_DISTANCE

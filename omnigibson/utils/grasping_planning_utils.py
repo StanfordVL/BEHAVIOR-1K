@@ -1,5 +1,4 @@
 import numpy as np
-import random
 from scipy.spatial.transform import Rotation as R, Slerp
 from math import ceil
 from omnigibson.macros import create_module_macros
@@ -60,8 +59,8 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     )
 
     # Pick an axis and a direction.
-    approach_axis = random.choice([0, 1, 2])
-    approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
+    approach_axis = np.random.choice([0, 1, 2])
+    approach_direction = np.random.choice([-1, 1]) if approach_axis != 2 else 1
     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * np.eye(3)[approach_axis]
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - np.abs(constant_dimension_in_base_frame)
     random_dimensions_in_base_frame = np.random.uniform([-1, -1, 0], [1, 1, 1]) # note that we don't allow going below center
@@ -118,7 +117,7 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
         raise ValueError("Cannot open/close object without relevant joints.")
 
     # Make sure what we got is an appropriately open/close joint.
-    random.shuffle(relevant_joints)
+    np.random.shuffle(relevant_joints)
     selected_joint = None
     for joint in relevant_joints:
         current_position = joint.get_state()[0][0]

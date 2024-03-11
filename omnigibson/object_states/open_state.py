@@ -1,4 +1,4 @@
-import random
+import numpy as np
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
@@ -216,7 +216,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         sides = [1, -1] if both_sides else [1]
 
         for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
-            side = random.choice(sides)
+            side = np.random.choice(sides)
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
