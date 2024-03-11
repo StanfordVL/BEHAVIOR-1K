@@ -27,7 +27,7 @@ m = create_module_macros(module_path=__file__)
 
 # Subsample cloth particle points to boost performance
 m.N_CLOTH_KEYPOINTS = 1000
-m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
+m.KEYPOINT_COVERAGE_THRESHOLD = 0.75
 m.N_CLOTH_KEYFACES = 500
 
 
@@ -111,7 +111,7 @@ class ClothPrim(GeomPrim):
                 max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
                 max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
             true_vol = np.product(true_aabb[1] - true_aabb[0])
-            if overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
+            if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
                 success = True
                 break
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
@@ -130,6 +130,18 @@ class ClothPrim(GeomPrim):
 
         # Store the default position of the points in the local frame
         self._default_positions = np.array(self.get_attribute(attr="points"))
+
+    @property
+    def visual_aabb(self):
+        return self.aabb
+
+    @property
+    def visual_aabb_extent(self):
+        return self.aabb_extent
+
+    @property
+    def visual_aabb_center(self):
+        return self.aabb_center
 
     @classproperty
     def cloth_system(cls):

@@ -3,6 +3,7 @@ import os
 import numpy as np
 
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 
 import omnigibson as og
 from omnigibson.macros import gm

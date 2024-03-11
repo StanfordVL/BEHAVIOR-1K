@@ -231,17 +231,21 @@ class DatasetObject(USDObject):
         for material in self.materials:
             material.shader_update_asset_paths_with_root_path(root_path)
 
-        # Assign realistic density and mass based on average object category spec
+        # Assign realistic density and mass based on average object category spec, or fall back to a default value
         if self.avg_obj_dims is not None and self.avg_obj_dims["density"] is not None:
-            if self._prim_type == PrimType.RIGID:
-                for link in self._links.values():
-                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                    if link.has_collision_meshes:
-                        link.mass = 0.0
-                        link.density = self.avg_obj_dims["density"]
+            density = self.avg_obj_dims["density"]
+        else:
+            density = 1000.0
 
-            elif self._prim_type == PrimType.CLOTH:
-                self.root_link.mass = self.avg_obj_dims["density"] * self.root_link.volume
+        if self._prim_type == PrimType.RIGID:
+            for link in self._links.values():
+                # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                if link.has_collision_meshes:
+                    link.mass = 0.0
+                    link.density = density
+
+        elif self._prim_type == PrimType.CLOTH:
+            self.root_link.mass = density * self.root_link.volume
 
     def _update_texture_change(self, object_state):
         """

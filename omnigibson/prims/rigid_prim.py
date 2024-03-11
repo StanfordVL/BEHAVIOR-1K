@@ -465,16 +465,15 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        raw_usd_mass = self._rigid_prim_view.get_masses()[0]
-        # We first check if the raw usd mass is specified, since mass overrides density
-        # If it's specified, we infer density based on that value divided by volume
-        # Otherwise, we try to directly grab the raw usd density value, and if that value
-        # does not exist, we return 1000 since that is the canonical density assigned by omniverse
-        if raw_usd_mass != 0:
-            density = raw_usd_mass / self.volume
+        mass = self._rigid_prim_view.get_masses()[0]
+        # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
+        # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
+        # we return 1000 since that is the canonical density assigned by omniverse
+        if mass != 0.0:
+            density = mass / self.volume
         else:
             density = self._rigid_prim_view.get_densities()[0]
-            if density == 0:
+            if density == 0.0:
                 density = 1000.0
 
         return density
