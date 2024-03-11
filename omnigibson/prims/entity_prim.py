@@ -21,7 +21,7 @@ from omnigibson.macros import gm, create_module_macros
 m = create_module_macros(module_path=__file__)
 
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
-m.DEFAULT_SLEEP_THRESHOLD = 0.005
+m.DEFAULT_SLEEP_THRESHOLD = 0.001
 
 
 class EntityPrim(XFormPrim):
@@ -1427,6 +1427,7 @@ class EntityPrim(XFormPrim):
         link.visible = False
         # Set a very small mass
         link.mass = 1e-6
+        link.density = 0.0
 
         self._links[link_name] = link
 
