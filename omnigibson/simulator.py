@@ -1067,9 +1067,8 @@ def launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
-            # Clear all transition rules if being used
-            if gm.ENABLE_TRANSITION_RULES:
-                TransitionRuleAPI.clear()
+            # Clear all transition rules
+            TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_pu()
