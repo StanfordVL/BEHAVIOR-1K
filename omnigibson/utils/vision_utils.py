@@ -108,6 +108,10 @@ def segmentation_to_rgb(seg_im, N, colors=None):
         return (use_colors[seg_im]).astype(np.float)
 
 class Remapper:
+    """
+    Remaps values in an image from old_mapping to new_mapping using an efficient key_array.
+    See more details in the remap method.
+    """
     def __init__(self):
         self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
         self.known_ids = set()
