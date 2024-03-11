@@ -29,7 +29,7 @@ m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color
 m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
 
 # Physics settings for objects -- see https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/docs/RigidBodyDynamics.html?highlight=velocity%20iteration#solver-iterations
-m.DEFAULT_SOLVER_POSITION_ITERATIONS = 16
+m.DEFAULT_SOLVER_POSITION_ITERATIONS = 32
 m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = 1
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
