@@ -408,14 +408,6 @@ class DatasetObject(USDObject):
         return -self.scale * self.base_link_offset
 
     @property
-    def native_link_bboxes(self):
-        """
-        Returns:
-             dict: Keyword-mapped native bounding boxes for each link of this object
-        """
-        return None if self.metadata is None else self.metadata.get("link_bounding_boxes", None)
-
-    @property
     def scales_in_link_frame(self):
         """
         Returns:
@@ -445,7 +437,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
@@ -454,10 +446,6 @@ class DatasetObject(USDObject):
             visual (bool): Whether to aggregate the bounding boxes from the visual meshes. Otherwise, will use
                 collision meshes
             xy_aligned (bool): Whether to align the bounding box to the global XY-plane
-            fallback_to_aabb (bool): If set and a link's info is not found, the (global-frame) AABB will be
-                dynamically computed directly from omniverse
-            link_bbox_type (str): Which type of link bbox to use, "axis_aligned" means the bounding box is axis-aligned
-                to the link frame, "oriented" means the bounding box has the minimum volume
 
         Returns:
             4-tuple:
@@ -466,8 +454,6 @@ class DatasetObject(USDObject):
                 - 3-array: (x,y,z) bbox extent in desired frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
-        bbox_type = "visual" if visual else "collision"
-
         # Get the base position transform.
         pos, orn = self.get_position_orientation()
         base_frame_to_world = T.pose2mat((pos, orn))
@@ -490,57 +476,13 @@ class DatasetObject(USDObject):
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
             for link_name, link in links.items():
-                # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
-                meshes = link.visual_meshes if visual else link.collision_meshes
-                if len(meshes) == 0:
-                    continue
-
-                # If the link has a bounding box annotation.
-                if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
-                    # Check if the annotation is still missing.
-                    if bbox_type not in self.native_link_bboxes[link_name]:
-                        raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
-
-                    # Get the extent and transform.
-                    bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
-                    extent_in_bbox_frame = np.array(bb_data["extent"])
-                    bbox_to_link_origin = np.array(bb_data["transform"])
-
-                    # # Get the link's pose in the base frame.
-                    link_frame_to_world = T.pose2mat(link.get_position_orientation())
-                    link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
-
-                    # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
-                    # box's vertices into the link frame, and then scales them to match the scale applied to this object.
-                    # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
-                    # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
-                    # this time in the object's base link frame.
-                    scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
-                    bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
-
-                    # Compute the bounding box vertices in the base frame.
-                    # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                    bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                    vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
-
-                    # Add the points to our collection of points.
-                    points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-                elif fallback_to_aabb:  # always default to AABB for cloth
-                    # If we're visual and the mesh is not visible, there is no fallback so continue
-                    if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
-                        continue
-                    aabb_vertices_in_world = link.aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                            link.aabb_extent / 2
-                    )
-                    aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
-                        aabb_vertices_in_world, world_to_base_frame
-                    )
-                    points.extend(aabb_vertices_in_base_frame)
+                if visual:
+                    hull_points = link.visual_boundary_points_world
                 else:
-                    raise ValueError(
-                        "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
-                        "AABB as fallback." % link_name
-                    )
+                    hull_points = link.collision_boundary_points_world
+
+                if hull_points is not None:
+                    points.extend(hull_points)
 
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
