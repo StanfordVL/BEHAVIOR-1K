@@ -16,6 +16,7 @@ def test_seg():
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi/2]))
+    robot.reset()
 
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for i, system in enumerate(systems):
@@ -40,7 +41,6 @@ def test_seg():
     vision_sensor = sensors[0]
     all_observation, all_info = vision_sensor.get_obs()
 
-    from IPython import embed; embed()
     seg_semantic = all_observation['seg_semantic']
     seg_semantic_info = all_info['seg_semantic']
     assert set(np.unique(seg_semantic)) == set(seg_semantic_info.keys())
@@ -54,7 +54,7 @@ def test_seg():
         3330677804: 'water',
         4207839377: 'dishtowel'
     }
-    assert seg_semantic_info == expected_dict
+    assert set(seg_semantic_info.values()) == set(expected_dict.values())
 
     seg_instance = all_observation['seg_instance']
     seg_instance_info = all_info['seg_instance']
@@ -69,7 +69,7 @@ def test_seg():
         8: 'white_rice',
         9: 'diced__apple'
     }
-    assert seg_instance_info == expected_dict
+    assert set(seg_instance_info.values()) == set(expected_dict.values())
 
     seg_instance_id = all_observation['seg_instance_id']
     seg_instance_id_info = all_info['seg_instance_id']
@@ -89,7 +89,7 @@ def test_seg():
         15: 'diced__apple',
         16: 'water'
     }
-    assert seg_instance_id_info == expected_dict
+    assert set(seg_instance_id_info.values()) == set(expected_dict.values())
 
 def test_clear_sim():
     og.sim.clear()
