@@ -357,6 +357,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     _SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
     _SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
     _SAMPLING_MAX_ATTEMPTS = 20
+    _SAMPLING_HIT_PROPORTION = 0.4
 
     @classmethod
     def initialize(cls):
@@ -573,6 +574,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 aabb_offset=cls._SAMPLING_AABB_OFFSET,
                 max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
                 refuse_downwards=True,
+                hit_proportion=cls._SAMPLING_HIT_PROPORTION,
             )
 
             # Use sampled points
