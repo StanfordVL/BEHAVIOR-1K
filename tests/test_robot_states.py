@@ -134,7 +134,7 @@ def test_camera_semantic_segmentation():
     agent_label = semantic_class_name_to_id()['agent']
     background_label = semantic_class_name_to_id()['background']
     assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
-    assert set(seg_semantic_info.keys()) == {str(agent_label), str(background_label)}
+    assert set(seg_semantic_info.keys()) == {agent_label, background_label}
     og.sim.clear()
 
 def test_object_in_FOV_of_robot():

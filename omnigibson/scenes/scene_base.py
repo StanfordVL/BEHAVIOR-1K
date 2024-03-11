@@ -619,6 +619,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             name=plane.name,
         )
 
+        # Assign floors category to the floor plane
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=self._floor_plane.prim,
+            semantic_label="floors",
+            type_label="class",
+        )
+
     def update_initial_state(self, state=None):
         """
         Updates the initial state for this scene (which the scene will get reset to upon calling reset())

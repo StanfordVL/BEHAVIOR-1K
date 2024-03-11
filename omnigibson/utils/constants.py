@@ -185,7 +185,7 @@ def semantic_class_name_to_id():
     categories = get_all_object_categories()
     from omnigibson.systems.system_base import REGISTERED_SYSTEMS
     systems = sorted(REGISTERED_SYSTEMS)
-    all_semantics = sorted(set(categories + systems + ['agent', 'background', 'object', 'light']))
+    all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
     
     # Assign a unique class id to each class name with hashing
     class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32) for s in all_semantics}
