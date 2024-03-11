@@ -13,10 +13,10 @@ from omnigibson.simulator import launch_simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
 
 # Launch the simulator
-launch_simulator()
+launch_simulator(physics_dt=1/60., rendering_dt=1/60.)
 
 # Params to be set as needed.
-SCENES = ["restaurant_hotel"]
+SCENES = ["Rs_int"]
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 NUM_STEPS = 2000
 gm.RENDER_VIEWER_CAMERA = False
@@ -34,7 +34,7 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
     print(time.time() - start)
 
     if import_robot:
-        turtlebot = Turtlebot(prim_path="/World/robot", name="agent")
+        turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=['rgb'])
         og.sim.import_object(turtlebot)
         og.sim.step()
         if scene_name == "restaurant_hotel":
