@@ -21,7 +21,6 @@ class USDObject(StatefulObject):
         encrypted=False,
         prim_path=None,
         category="object",
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -43,8 +42,6 @@ class USDObject(StatefulObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -75,7 +72,6 @@ class USDObject(StatefulObject):
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -118,7 +114,6 @@ class USDObject(StatefulObject):
             usd_path=self._usd_path,
             name=name,
             category=self.category,
-            class_id=self.class_id,
             scale=self.scale,
             visible=self.visible,
             fixed_base=self.fixed_base,

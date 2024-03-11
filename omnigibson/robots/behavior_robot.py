@@ -58,7 +58,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Shared kwargs in hierarchy
             name,
             prim_path=None,
-            class_id=None,
             uuid=None,
             scale=None,
             visible=True,
@@ -97,7 +96,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super(BehaviorRobot, self).__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,

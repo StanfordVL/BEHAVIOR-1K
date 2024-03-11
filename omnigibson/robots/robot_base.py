@@ -38,7 +38,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Shared kwargs in hierarchy
         name,
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -69,8 +68,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -135,7 +132,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             usd_path=self.usd_path,
             name=name,
             category=m.ROBOT_CATEGORY,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
