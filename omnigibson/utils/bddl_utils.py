@@ -948,7 +948,7 @@ class BDDLSampler:
                         return f"Missing valid object models for all categories: {categories}"
 
                     # Randomly select an object model
-                    model = np.random.choice(model_choices)
+                    model = np.random.choice(list(model_choices))
 
                     # create the object
                     simulator_obj = DatasetObject(
