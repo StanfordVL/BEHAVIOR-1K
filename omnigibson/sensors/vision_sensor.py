@@ -322,9 +322,10 @@ class VisionSensor(BaseSensor):
             np.ndarray: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
         """
-        if id:
-            # instance segmentation ID for some reason doesn't include the background class
-            id_to_labels.update({"0": "BACKGROUND"})
+        # Sometimes 0 and 1 show up in the image, but they are not in the id_to_labels mapping
+        id_to_labels.update({"0": "BACKGROUND"})
+        if not id:
+            id_to_labels.update({"1": "UNLABELLED"})
 
         # Preprocess id_to_labels and update instance registry
         replicator_mapping = {}
