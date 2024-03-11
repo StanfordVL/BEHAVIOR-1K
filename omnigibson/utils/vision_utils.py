@@ -41,7 +41,7 @@ class RandomScale:
             PIL.Image: Rescaled image.
         """
 
-        size = np.random.randint(self.minsize, self.maxsize)
+        size = np.random.randint(self.minsize, self.maxsize + 1)
 
         if isinstance(size, int):
             w, h = img.size
