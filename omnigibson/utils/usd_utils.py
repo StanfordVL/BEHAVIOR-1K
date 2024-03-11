@@ -638,9 +638,10 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     if include_normals:
         kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
 
-    raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
-    if raw_texture is not None:
-        kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(raw_texture))
+    if include_texcoord:
+        raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
+        if raw_texture is not None:
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 
