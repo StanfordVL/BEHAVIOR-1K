@@ -2,7 +2,6 @@
 
 import os
 import time
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -10,31 +9,20 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.simulator import launch_simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
 
+# Launch the simulator
+launch_simulator()
 
 # Params to be set as needed.
 SCENES = ["restaurant_hotel"]
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 NUM_STEPS = 2000
-gm.DEFAULT_VIEWER_WIDTH = 128
-gm.DEFAULT_VIEWER_HEIGHT = 128
-
-# scenes = ["Beechwood_0_int",
-#           "Beechwood_1_int",
-#           "Benevolence_0_int",
-#           "Benevolence_1_int",
-#           "Benevolence_2_int",
-#           "Ihlen_0_int",
-#           "Ihlen_1_int",
-#           "Merom_0_int",
-#           "Merom_1_int",
-#           "Pomaria_0_int",
-#           "Pomaria_1_int",
-#           "Pomaria_2_int",
-#           "Rs_int",
-#           "Wainscott_0_int",
-#           "Wainscott_1_int"]
+gm.RENDER_VIEWER_CAMERA = False
+gm.ENABLE_FLATCACHE = True
+gm.ENABLE_OBJECT_STATES = False
+gm.ENABLE_TRANSITION_RULES = False
 
 
 def benchmark_scene(scene_name, optimized=False, import_robot=True):
@@ -44,14 +32,6 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
     start = time.time()
     og.sim.import_scene(scene)
     print(time.time() - start)
-
-    og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-13.27634359, -12.70026879,  -2.68970369]),
-        orientation=np.array([0.70597155, 0.10758371, 0.10545935, 0.69203196]),
-    )
-
-    # Hide main viewport
-    og.sim.viewer_visibility = False
 
     if import_robot:
         turtlebot = Turtlebot(prim_path="/World/robot", name="agent")
@@ -74,7 +54,7 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
         og.sim.step(render=False)
         physics_end = time.time()
 
-        # og.sim.render()
+        og.sim.render()
         end = time.time()
 
         if i % 100 == 0:
@@ -123,14 +103,10 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
         OUTPUT_DIR,
         "scene_benchmark_{}_o_{}_r_{}.pdf".format(scene_name, optimized, import_robot)))
 
-    from IPython import embed; embed()
-
 
 def main():
     for scene in SCENES:
         benchmark_scene(scene, optimized=True, import_robot=True)
-        # og.sim.stop()
-        # benchmark_scene(scene, optimized=True, import_robot=False)
 
     og.shutdown()
 
