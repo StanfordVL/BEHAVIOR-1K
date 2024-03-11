@@ -3,6 +3,7 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
