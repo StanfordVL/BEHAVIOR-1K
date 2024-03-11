@@ -239,6 +239,7 @@ class EntityPrim(XFormPrim):
             link_load_config = {
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
+                "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),

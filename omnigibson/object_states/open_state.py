@@ -1,4 +1,4 @@
-import random
+import numpy as np
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
@@ -216,12 +216,14 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         sides = [1, -1] if both_sides else [1]
 
         for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
-            side = random.choice(sides)
+            side = np.random.choice(sides)
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
-                num_to_open = random.randint(1, len(relevant_joints))
-                relevant_joints = random.sample(relevant_joints, num_to_open)
+                num_to_open = np.random.randint(1, len(relevant_joints) + 1)
+                random_indices = np.random.choice(range(len(relevant_joints)), size=num_to_open, replace=False)
+                relevant_joints = [relevant_joints[i] for i in random_indices]
+                joint_directions = [joint_directions[i] for i in random_indices]
 
             # Go through the relevant joints & set random positions.
             for joint, joint_direction in zip(relevant_joints, joint_directions):
@@ -241,7 +243,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
                     high = max(joint_range)
 
                     # Sample a position.
-                    joint_pos = random.uniform(low, high)
+                    joint_pos = np.random.uniform(low, high)
 
                 # Save sampled position.
                 joint.set_pos(joint_pos)

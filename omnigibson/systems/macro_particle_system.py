@@ -202,11 +202,12 @@ class MacroParticleSystem(BaseSystem):
         """
         # Update color if the particle object has any material
         color = np.ones(3)
-        if cls.particle_object.material.is_glass:
-            color = cls.particle_object.material.glass_color
-        else:
-            diffuse_texture = cls.particle_object.material.diffuse_texture
-            color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else cls.particle_object.material.diffuse_color_constant
+        if cls.particle_object.has_material():
+            if cls.particle_object.material.is_glass:
+                color = cls.particle_object.material.glass_color
+            else:
+                diffuse_texture = cls.particle_object.material.diffuse_texture
+                color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else cls.particle_object.material.diffuse_color_constant
         cls._color = color
 
     @classmethod

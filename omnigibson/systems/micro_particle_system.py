@@ -1567,8 +1567,13 @@ class Cloth(MicroParticleSystem):
                 cloth particles are roughly touching each other, given cls.particle_contact_offset and
                 @mesh_prim's scale
         """
-        # Possibly remesh if requested
-        if remesh:
+        has_uv_mapping = mesh_prim.GetAttribute("primvars:st").Get() is not None
+        if not remesh:
+            # We always load into trimesh to remove redundant particles (since natively omni redundantly represents
+            # the number of vertices as 6x the total unique number of vertices)
+            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False)
+            texcoord = np.array(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
+        else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
             scaled_world_transform = PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString)
@@ -1619,27 +1624,25 @@ class Cloth(MicroParticleSystem):
 
             # Re-write data to @mesh_prim
             new_faces = cm.face_matrix()
-            new_face_vertex_ids = new_faces.flatten()
-            new_texcoord = cm.wedge_tex_coord_matrix()
             new_vertices = cm.vertex_matrix()
             new_normals = cm.vertex_normal_matrix()
-            n_faces = len(cm.face_matrix())
-            new_face_vertex_counts = np.ones(n_faces, dtype=int) * 3
-
-            tm_new = trimesh.Trimesh(
+            texcoord = np.array(cm.wedge_tex_coord_matrix()) if has_uv_mapping else None
+            tm = trimesh.Trimesh(
                 vertices=new_vertices,
                 faces=new_faces,
                 vertex_normals=new_normals,
             )
             # Apply the inverse of the world transform to get the mesh back into its local frame
-            tm_new.apply_transform(np.linalg.inv(scaled_world_transform))
+            tm.apply_transform(np.linalg.inv(scaled_world_transform))
 
-            # Update the mesh prim
-            mesh_prim.GetAttribute("faceVertexCounts").Set(new_face_vertex_counts)
-            mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertices))
-            mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
-            mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertex_normals))
-            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
+        # Update the mesh prim
+        face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+        mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+        mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
+        mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
+        mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
+        if has_uv_mapping:
+            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
 
         # Convert into particle cloth
         lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(

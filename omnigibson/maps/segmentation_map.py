@@ -3,6 +3,7 @@ import os
 import numpy as np
 
 from PIL import Image
+# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
 Image.MAX_IMAGE_PIXELS = None
 
 import omnigibson as og

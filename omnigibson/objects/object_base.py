@@ -28,6 +28,9 @@ m = create_module_macros(module_path=__file__)
 m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color when highlighting objects
 m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
 
+# Physics settings for objects -- see https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/docs/RigidBodyDynamics.html?highlight=velocity%20iteration#solver-iterations
+m.DEFAULT_SOLVER_POSITION_ITERATIONS = 32
+m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = 1
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     """This is the interface that all OmniGibson objects must implement."""
@@ -185,6 +188,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
+        # Set position / velocity solver iterations if we're not cloth
+        if self._prim_type != PrimType.CLOTH:
+            self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
+            self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
+
+        # Add semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
