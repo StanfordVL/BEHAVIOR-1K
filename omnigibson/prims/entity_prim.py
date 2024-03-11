@@ -1245,20 +1245,8 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
                                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
-            points_world = []
-            for link in self._links.values():
-                hull_points = link.collision_boundary_points
-                if hull_points is None:
-                    continue
-                
-                position, orientation = link.get_position_orientation()
-                scale = link.scale
-                points_scaled = hull_points * scale
-                points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-                points_transformed = points_rotated + position
-                points_world.append(points_transformed)
-
-            all_points = np.concatenate(points_world, axis=0)
+            points_world = [link.collision_boundary_points_world for link in self._links.values()]
+            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
             aabb_lo = np.min(all_points, axis=0)
             aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
