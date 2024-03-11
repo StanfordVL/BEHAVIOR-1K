@@ -37,7 +37,6 @@ class DatasetObject(USDObject):
         prim_path=None,
         category="object",
         model=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -65,9 +64,6 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -123,7 +119,6 @@ class DatasetObject(USDObject):
             encrypted=True,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -447,7 +442,6 @@ class DatasetObject(USDObject):
             prim_path=prim_path,
             name=name,
             category=self.category,
-            class_id=self.class_id,
             scale=self.scale,
             visible=self.visible,
             fixed_base=self.fixed_base,
