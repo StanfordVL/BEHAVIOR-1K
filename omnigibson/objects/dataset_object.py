@@ -1,12 +1,6 @@
-import itertools
 import math
 import os
-import stat
-import cv2
 import numpy as np
-
-import trimesh
-from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -408,14 +402,6 @@ class DatasetObject(USDObject):
         return -self.scale * self.base_link_offset
 
     @property
-    def native_link_bboxes(self):
-        """
-        Returns:
-             dict: Keyword-mapped native bounding boxes for each link of this object
-        """
-        return None if self.metadata is None else self.metadata.get("link_bounding_boxes", None)
-
-    @property
     def scales_in_link_frame(self):
         """
         Returns:
@@ -444,143 +430,6 @@ class DatasetObject(USDObject):
                         scales[child_name] = scale_in_child_lf
 
         return scales
-
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
-        """
-        Get a bounding box for this object that's axis-aligned in the object's base frame.
-
-        Args:
-            link_name (None or str): If specified, only get the bbox for the given link
-            visual (bool): Whether to aggregate the bounding boxes from the visual meshes. Otherwise, will use
-                collision meshes
-            xy_aligned (bool): Whether to align the bounding box to the global XY-plane
-            fallback_to_aabb (bool): If set and a link's info is not found, the (global-frame) AABB will be
-                dynamically computed directly from omniverse
-            link_bbox_type (str): Which type of link bbox to use, "axis_aligned" means the bounding box is axis-aligned
-                to the link frame, "oriented" means the bounding box has the minimum volume
-
-        Returns:
-            4-tuple:
-                - 3-array: (x,y,z) bbox center position in world frame
-                - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
-                - 3-array: (x,y,z) bbox extent in desired frame
-                - 3-array: (x,y,z) bbox center in desired frame
-        """
-        bbox_type = "visual" if visual else "collision"
-
-        # Get the base position transform.
-        pos, orn = self.get_position_orientation()
-        base_frame_to_world = T.pose2mat((pos, orn))
-
-        # Compute the world-to-base frame transform.
-        world_to_base_frame = trimesh.transformations.inverse_matrix(base_frame_to_world)
-
-        # Grab the corners of all the different links' bounding boxes. We will later fit a bounding box to
-        # this set of points to get our final, base-frame bounding box.
-        points = []
-
-        if self.prim_type == PrimType.CLOTH:
-            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
-            particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate([
-                particle_positions - particle_contact_offset,
-                particle_positions + particle_contact_offset
-            ], axis=0)
-            points.extend(trimesh.transformations.transform_points(particles_in_world_frame, world_to_base_frame))
-        else:
-            links = {link_name: self._links[link_name]} if link_name is not None else self._links
-            for link_name, link in links.items():
-                # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
-                meshes = link.visual_meshes if visual else link.collision_meshes
-                if len(meshes) == 0:
-                    continue
-
-                # If the link has a bounding box annotation.
-                if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
-                    # Check if the annotation is still missing.
-                    if bbox_type not in self.native_link_bboxes[link_name]:
-                        raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
-
-                    # Get the extent and transform.
-                    bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
-                    extent_in_bbox_frame = np.array(bb_data["extent"])
-                    bbox_to_link_origin = np.array(bb_data["transform"])
-
-                    # # Get the link's pose in the base frame.
-                    link_frame_to_world = T.pose2mat(link.get_position_orientation())
-                    link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
-
-                    # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
-                    # box's vertices into the link frame, and then scales them to match the scale applied to this object.
-                    # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
-                    # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
-                    # this time in the object's base link frame.
-                    scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
-                    bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
-
-                    # Compute the bounding box vertices in the base frame.
-                    # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                    bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                    vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
-
-                    # Add the points to our collection of points.
-                    points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-                elif fallback_to_aabb:  # always default to AABB for cloth
-                    # If we're visual and the mesh is not visible, there is no fallback so continue
-                    if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
-                        continue
-                    aabb_vertices_in_world = link.aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                            link.aabb_extent / 2
-                    )
-                    aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
-                        aabb_vertices_in_world, world_to_base_frame
-                    )
-                    points.extend(aabb_vertices_in_base_frame)
-                else:
-                    raise ValueError(
-                        "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
-                        "AABB as fallback." % link_name
-                    )
-
-        if xy_aligned:
-            # If the user requested an XY-plane aligned bbox, convert everything to that frame.
-            # The desired frame is same as the base_com frame with its X/Y rotations removed.
-            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
-
-            # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
-            # and then take the arctangent of its projection onto the XY plane.
-            rotated_X_axis = base_frame_to_world[:3, 0]
-            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
-                translate=translate, angles=[0, 0, rotation_around_Z_axis]
-            )
-
-            # We want to move our points to this frame as well.
-            world_to_xy_aligned_base_com = trimesh.transformations.inverse_matrix(xy_aligned_base_com_to_world)
-            base_com_to_xy_aligned_base_com = np.dot(world_to_xy_aligned_base_com, base_frame_to_world)
-            points = trimesh.transformations.transform_points(points, base_com_to_xy_aligned_base_com)
-
-            # Finally update our desired frame.
-            desired_frame_to_world = xy_aligned_base_com_to_world
-        else:
-            # Default desired frame is base CoM frame.
-            desired_frame_to_world = base_frame_to_world
-
-        # TODO: Implement logic to allow tight bounding boxes that don't necessarily have to match the base frame.
-        # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
-        # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, axis=0)
-        aabb_max_in_desired_frame = np.amax(points, axis=0)
-        bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
-        bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
-
-        # Transform the center to the world frame.
-        bbox_center_in_world = trimesh.transformations.transform_points(
-            [bbox_center_in_desired_frame], desired_frame_to_world
-        )[0]
-        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
-
-        return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
     @property
     def avg_obj_dims(self):

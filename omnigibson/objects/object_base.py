@@ -1,6 +1,8 @@
 from abc import ABCMeta
 import numpy as np
 from collections.abc import Iterable
+import trimesh
+from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,6 +12,7 @@ from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+import omnigibson.utils.transform_utils as T
 
 
 # Global dicts that will contain mappings
@@ -311,6 +314,89 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Update internal value
         self._highlighted = enabled
+
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False):
+        """
+        Get a bounding box for this object that's axis-aligned in the object's base frame.
+
+        Args:
+            link_name (None or str): If specified, only get the bbox for the given link
+            visual (bool): Whether to aggregate the bounding boxes from the visual meshes. Otherwise, will use
+                collision meshes
+            xy_aligned (bool): Whether to align the bounding box to the global XY-plane
+
+        Returns:
+            4-tuple:
+                - 3-array: (x,y,z) bbox center position in world frame
+                - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
+                - 3-array: (x,y,z) bbox extent in desired frame
+                - 3-array: (x,y,z) bbox center in desired frame
+        """
+        # Get the base position transform.
+        pos, orn = self.get_position_orientation()
+        base_frame_to_world = T.pose2mat((pos, orn))
+
+        # Prepare the desired frame.
+        if xy_aligned:
+            # If the user requested an XY-plane aligned bbox, convert everything to that frame.
+            # The desired frame is same as the base_com frame with its X/Y rotations removed.
+            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
+
+            # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
+            # and then take the arctangent of its projection onto the XY plane.
+            rotated_X_axis = base_frame_to_world[:3, 0]
+            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
+                translate=translate, angles=[0, 0, rotation_around_Z_axis]
+            )
+
+            # Finally update our desired frame.
+            desired_frame_to_world = xy_aligned_base_com_to_world
+        else:
+            # Default desired frame is base CoM frame.
+            desired_frame_to_world = base_frame_to_world
+
+        # Compute the world-to-base frame transform.
+        world_to_desired_frame = np.linalg.inv(desired_frame_to_world)
+
+        # Grab all the world-frame points corresponding to the object's visual or collision hulls.
+        points_in_world = []
+        if self.prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            particles_in_world_frame = np.concatenate([
+                particle_positions - particle_contact_offset,
+                particle_positions + particle_contact_offset
+            ], axis=0)
+            points_in_world.extend(particles_in_world_frame)
+        else:
+            links = {link_name: self._links[link_name]} if link_name is not None else self._links
+            for link_name, link in links.items():
+                if visual:
+                    hull_points = link.visual_boundary_points_world
+                else:
+                    hull_points = link.collision_boundary_points_world
+
+                if hull_points is not None:
+                    points_in_world.extend(hull_points)
+
+        # Move the points to the desired frame
+        points = trimesh.transformations.transform_points(points_in_world, world_to_desired_frame)
+
+        # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
+        # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
+        aabb_min_in_desired_frame = np.amin(points, axis=0)
+        aabb_max_in_desired_frame = np.amax(points, axis=0)
+        bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
+        bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
+
+        # Transform the center to the world frame.
+        bbox_center_in_world = trimesh.transformations.transform_points(
+            [bbox_center_in_desired_frame], desired_frame_to_world
+        )[0]
+        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
+
+        return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
     @classproperty
     def _do_not_register_classes(cls):
