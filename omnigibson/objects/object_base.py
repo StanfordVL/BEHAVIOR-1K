@@ -357,7 +357,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             desired_frame_to_world = base_frame_to_world
 
         # Compute the world-to-base frame transform.
-        world_to_desired_frame = trimesh.transformations.inverse_matrix(desired_frame_to_world)
+        world_to_desired_frame = np.linalg.inv(desired_frame_to_world)
 
         # Grab all the world-frame points corresponding to the object's visual or collision hulls.
         points_in_world = []
