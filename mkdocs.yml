@@ -94,9 +94,9 @@ nav:
     - Object States: modules/object_states.md
     - Robots: modules/robots.md
     - Controllers: modules/controllers.md
+    - Sensor: modules/sensor.md
     - Scene: modules/scene.md
     - Environment: modules/environment.md
-    - Sensor: modules/sensor.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
