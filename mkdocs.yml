@@ -57,7 +57,7 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite
   - pymdownx.snippets:
-      base_path: docs
+      base_path: omnigibson
   - pymdownx.tasklist:
       custom_checkbox: true
   - attr_list
@@ -91,6 +91,7 @@ nav:
     - Overview: modules/overview.md
     - Prim: modules/prim.md
     - Object: modules/object.md
+    - Object States: modules/object_states.md
     - Robots: modules/robots.md
     - Controllers: modules/controllers.md
     - Scene: modules/scene.md
