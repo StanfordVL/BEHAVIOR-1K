@@ -470,6 +470,9 @@ class VisionSensor(BaseSensor):
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
+            # Requires 3 render updates for camera params annotator to decome active
+            for _ in range(3):
+                render()
 
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
