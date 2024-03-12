@@ -4,10 +4,14 @@ icon: material/camera-outline
 
 # 📷 **Sensor**
 
+## Description
+
 Sensors play a crucial role in OmniGibson, as they facilitate the robots' observation of their environment. We offer two main classes of sensors:
 
  - `ScanSensor`: This includes a 2D LiDAR range sensor and an occupancy grid sensor.
  - `VisionSensor`: This sensor type features a camera equipped with various modalities, including RGB, depth, normals, three types of segmentation, optical flow, 2D and 3D bounding boxes.
+
+## Usage
 
 To obtain sensor readings, the `get_obs()` function can be invoked at multiple levels within our hierarchy:
 
@@ -71,6 +75,10 @@ info:
 </code></pre>
 </details>
 
+## Observations
+
+### Vision Sensor
+
 <table>
     <tr>
         <td valign="top" width="60%">
@@ -79,7 +87,7 @@ info:
             Size: (height, width, 4), numpy.uint8<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/rgb.png" alt="rgb">
+            <img src="../assets/sensor_asset/rgb.png" alt="rgb">
         </td>
     </tr>
     <tr>
@@ -89,7 +97,7 @@ info:
             Size: (height, width), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/depth.png" alt="Depth Map">
+            <img src="../assets/sensor_asset/depth.png" alt="Depth Map">
         </td>
     </tr>
     <tr>
@@ -99,7 +107,7 @@ info:
             Size: (height, width), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/depth_linear.png" alt="Depth Map Linear">
+            <img src="../assets/sensor_asset/depth_linear.png" alt="Depth Map Linear">
         </td>
     </tr>
     <tr>
@@ -109,7 +117,7 @@ info:
             Size: (height, width, 4), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/normal.png" alt="Normal">
+            <img src="../assets/sensor_asset/normal.png" alt="Normal">
         </td>
     </tr>
     <tr>
@@ -119,7 +127,7 @@ info:
             Size: (height, width), numpy.uint32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/seg_semantic.png" alt="Semantic Segmentation">
+            <img src="../assets/sensor_asset/seg_semantic.png" alt="Semantic Segmentation">
         </td>
     </tr>
     <tr>
@@ -129,7 +137,7 @@ info:
             Size: (height, width), numpy.uint32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/seg_instance.png" alt="Instance Segmentation">
+            <img src="../assets/sensor_asset/seg_instance.png" alt="Instance Segmentation">
         </td>
     </tr>
     <tr>
@@ -139,7 +147,7 @@ info:
             Size: (height, width), numpy.uint32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/seg_instance_id.png" alt="Instance Segmentation ID">
+            <img src="../assets/sensor_asset/seg_instance_id.png" alt="Instance Segmentation ID">
         </td>
     </tr>
     <tr>
@@ -149,7 +157,7 @@ info:
             Size: (height, width, 4), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/optical_flow.png" alt="Optical Flow">
+            <img src="../assets/sensor_asset/optical_flow.png" alt="Optical Flow">
         </td>
     </tr>
     <tr>
@@ -165,7 +173,7 @@ info:
             occlusion_ratio, numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/bbox_2d_tight.png" alt="2D Bounding Box Tight">
+            <img src="../assets/sensor_asset/bbox_2d_tight.png" alt="2D Bounding Box Tight">
         </td>
     </tr>
     <tr>
@@ -181,7 +189,7 @@ info:
             occlusion_ratio, numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/bbox_2d_loose.png" alt="2D Bounding Box Loose">
+            <img src="../assets/sensor_asset/bbox_2d_loose.png" alt="2D Bounding Box Loose">
         </td>
     </tr>
     <tr>
@@ -200,9 +208,14 @@ info:
             occlusion_ratio, numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/bbox_3d.png" alt="3D Bounding Box">
+            <img src="../assets/sensor_asset/bbox_3d.png" alt="3D Bounding Box">
         </td>
     </tr>
+</table>
+
+### Range Sensor
+
+<table>
     <tr>
         <td valign="top" width="60%">
             <strong>2D LiDAR</strong><br><br>  
@@ -210,7 +223,7 @@ info:
             Size: (# of horizontal rays, # of vertical rays), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/lidar.png" alt="2D LiDAR">
+            <img src="../assets/sensor_asset/lidar.png" alt="2D LiDAR">
         </td>
     </tr>
     <tr>
@@ -220,67 +233,77 @@ info:
             Size: (grid resolution, grid resolution), numpy.float32<br><br>
         </td>
         <td>
-            <img src="../assets/camera_asset/occupancy_grid.png" alt="Occupancy Grid">
+            <img src="../assets/sensor_asset/occupancy_grid.png" alt="Occupancy Grid">
         </td>
     </tr>
+</table>
+
+### Proprioception
+
+<table>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Joint Positions</strong><br><br>  
             Joint positions.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Joint Velocities</strong><br><br>  
             Joint velocities.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Joint Efforts</strong><br><br>  
             Torque measured at each joint.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Robot Position</strong><br><br>  
             Robot position in the world frame.<br><br>
             Size: (x, y, z), numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Robot Orientation</strong><br><br>  
             Robot global euler orientation.<br><br>
             Size: (roll, pitch, yaw), numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Robot 2D Orientation</strong><br><br>  
             Robot orientation on the XY plane of the world frame.<br><br>
             Size: angle, numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Robot Linear Velocity</strong><br><br>  
             Robot linear velocity.<br><br>
             Size: (x_vel, y_vel, z_vel), numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Robot Angular Velocity</strong><br><br>  
             Robot angular velocity.<br><br>
             Size: (x_vel, y_vel, z_vel), numpy.float64<br><br>
         </td>
     </tr>
+</table>
+
+### Task Observation
+
+<table>
     <tr>
-        <td valign="top" width="60%">
+        <td>
             <strong>Low-dim task observation</strong><br><br>  
             Task-specific observation, e.g. navigation goal position.<br><br>
             Size: # of low-dim observation, numpy.float64<br><br>
