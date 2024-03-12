@@ -973,7 +973,7 @@ class PhysicalParticleSystem(BaseSystem):
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
             particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)]
 
         return cls.generate_particles(
             positions=particle_positions,

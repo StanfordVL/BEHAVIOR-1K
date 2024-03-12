@@ -931,18 +931,24 @@ class BDDLSampler:
                     if obj_inst in self._inroom_object_instances:
                         continue
 
-                    category = np.random.choice(categories)
+                    # Shuffle categories and sample to find a valid model
+                    np.random.shuffle(categories)
+                    model_choices, category = set(), None
+                    for category in categories:
+                        # Get all available models that support all of its synset abilities
+                        model_choices = set(get_all_object_category_models_with_abilities(
+                            category=category,
+                            abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
+                        ))
+                        if len(model_choices) > 0:
+                            break
 
-                    # Get all available models that support all of its synset abilities
-                    model_choices = get_all_object_category_models_with_abilities(
-                        category=category,
-                        abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
-                    )
                     if len(model_choices) == 0:
-                        return f"Missing valid object models for category: {category}"
+                        # We failed to find ANY valid model across ALL valid categories
+                        return f"Missing valid object models for all categories: {categories}"
 
                     # Randomly select an object model
-                    model = np.random.choice(model_choices)
+                    model = np.random.choice(list(model_choices))
 
                     # create the object
                     simulator_obj = DatasetObject(
@@ -1050,6 +1056,11 @@ class BDDLSampler:
                                     state = og.sim.dump_state(serialized=False)
                                     break
                             if success:
+                                # After the final round of kinematic sampling, we assign in_rooms to newly imported objects
+                                if group == "kinematic":
+                                    parent = self._object_scope[condition.body[1]]
+                                    entity.in_rooms = parent.in_rooms.copy()
+
                                 # Can terminate immediately
                                 break
 
@@ -1072,7 +1083,12 @@ class BDDLSampler:
                             og.sim.load_state(state, serialized=False)
                             og.sim.step_physics()
                         if not success:
+                            # Update object registry because we just assigned in_rooms to newly imported objects
+                            og.sim.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
+
+        # Update object registry because we just assigned in_rooms to newly imported objects
+        og.sim.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step

@@ -29,7 +29,7 @@ m.DEFAULT_MAX_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_CUBOID_BOTTOM_PADDING = 0.005
 # We will cast an additional parallel ray for each additional this much distance.
 m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE = 0.1
-m.DEFAULT_HIT_PROPORTION = 0.6
+m.DEFAULT_HIT_PROPORTION = 0.8
 
 
 def fit_plane(points, refusal_log):

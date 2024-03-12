@@ -10,6 +10,7 @@ from omnigibson.utils.usd_utils import PoseAPI
 import omnigibson.utils.transform_utils as T
 from scipy.spatial.transform import Rotation as R
 from omnigibson.macros import gm
+import trimesh.transformations
 
 class XFormPrim(BasePrim):
     """
@@ -317,6 +318,9 @@ class XFormPrim(BasePrim):
         Returns the scaled transform of this prim.
         """
         return PoseAPI.get_world_pose_with_scale(self._prim_path)
+
+    def transform_local_points_to_world(self, points):
+        return trimesh.transformations.transform_points(points, self.scaled_transform)
 
     @property
     def scale(self):

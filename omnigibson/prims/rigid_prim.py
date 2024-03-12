@@ -465,16 +465,15 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        raw_usd_mass = self._rigid_prim_view.get_masses()[0]
-        # We first check if the raw usd mass is specified, since mass overrides density
-        # If it's specified, we infer density based on that value divided by volume
-        # Otherwise, we try to directly grab the raw usd density value, and if that value
-        # does not exist, we return 1000 since that is the canonical density assigned by omniverse
-        if raw_usd_mass != 0:
-            density = raw_usd_mass / self.volume
+        mass = self._rigid_prim_view.get_masses()[0]
+        # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
+        # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
+        # we return 1000 since that is the canonical density assigned by omniverse
+        if mass != 0.0:
+            density = mass / self.volume
         else:
             density = self._rigid_prim_view.get_densities()[0]
-            if density == 0:
+            if density == 0.0:
                 density = 1000.0
 
         return density
@@ -631,34 +630,54 @@ class RigidPrim(XFormPrim):
             return points
         
     @cached_property
-    def visual_boundary_points(self):
+    def visual_boundary_points_local(self):
         """
         Returns:
-            np.ndarray: points on the convex hull of all points from child geom prims
+            np.ndarray: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=True)
     
-    @cached_property
-    def collision_boundary_points(self):
+    @property
+    def visual_boundary_points_world(self):
         """
         Returns:
-            np.ndarray: points on the convex hull of all points from child geom prims
+            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+        """
+        local_points = self.visual_boundary_points_local
+        if local_points is None:
+            return None
+        return self.transform_local_points_to_world(local_points)
+    
+    @cached_property
+    def collision_boundary_points_local(self):
+        """
+        Returns:
+            np.ndarray: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=False)
+    
+    @property
+    def collision_boundary_points_world(self):
+        """
+        Returns:
+            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+        """
+        local_points = self.collision_boundary_points_local
+        if local_points is None:
+            return None
+        return self.transform_local_points_to_world(local_points)
         
     @property
     def aabb(self):
         position, _ = self.get_position_orientation()
-        hull_points = self.collision_boundary_points
+        hull_points = self.collision_boundary_points_world
         
         if hull_points is None:
             # When there's no points on the collision meshes
             return position, position
         
-        points_transformed = self._transform_points_to_world(hull_points)
-
-        aabb_lo = np.min(points_transformed, axis=0)
-        aabb_hi = np.max(points_transformed, axis=0)
+        aabb_lo = np.min(hull_points, axis=0)
+        aabb_hi = np.max(hull_points, axis=0)
         return aabb_lo, aabb_hi
 
     @property
@@ -685,12 +704,12 @@ class RigidPrim(XFormPrim):
     
     @property
     def visual_aabb(self):
-        assert self.visual_boundary_points is not None, "No visual boundary points found for this rigid prim"
-        points_transformed = self._transform_points_to_world(np.array(self.visual_boundary_points))
+        hull_points = self.visual_boundary_points_world
+        assert hull_points is not None, "No visual boundary points found for this rigid prim"
 
         # Calculate and return the AABB
-        aabb_lo = np.min(points_transformed, axis=0)
-        aabb_hi = np.max(points_transformed, axis=0)
+        aabb_lo = np.min(hull_points, axis=0)
+        aabb_hi = np.max(hull_points, axis=0)
 
         return aabb_lo, aabb_hi
 
@@ -785,11 +804,3 @@ class RigidPrim(XFormPrim):
         state_dic["ang_vel"] = state[idx + 3: idx + 6]
 
         return state_dic, idx + 6
-
-    def _transform_points_to_world(self, points):
-        scale = self.scale
-        points_scaled = points * scale
-        position, orientation = self.get_position_orientation()
-        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-        points_transformed = points_rotated + position
-        return points_transformed

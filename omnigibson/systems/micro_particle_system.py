@@ -87,9 +87,6 @@ class PhysxParticleInstancer(BasePrim):
         # Store inputs
         self._idn = idn
 
-        # Values loaded at runtime
-        self._n_particles = None
-
         # Run super method directly
         super().__init__(prim_path=prim_path, name=name)
 
@@ -98,13 +95,6 @@ class PhysxParticleInstancer(BasePrim):
     def _load(self):
         # We raise an error, this should NOT be created from scratch
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
-
-    def _post_load(self):
-        # Run super
-        super()._post_load()
-
-        # Store how many particles we have
-        self._n_particles = len(self.particle_positions)
 
     def remove(self):
         super().remove()
@@ -140,8 +130,6 @@ class PhysxParticleInstancer(BasePrim):
         scales = np.ones((n_new_particles, 3)) * np.ones((1, 3)) if scales is None else scales
         prototype_indices = np.zeros(n_new_particles, dtype=int) if prototype_indices is None else prototype_indices
 
-        # Update the number of particles and update the values
-        self._n_particles += n_new_particles
         self.particle_positions = np.vstack([self.particle_positions, positions])
         self.particle_velocities = np.vstack([self.particle_velocities, velocities])
         self.particle_orientations = np.vstack([self.particle_orientations, orientations])
@@ -157,8 +145,6 @@ class PhysxParticleInstancer(BasePrim):
                 instancer
         """
         if len(idxs) > 0:
-            # Update the number of particles
-            self._n_particles -= len(idxs)
             # Remove all requested indices and write to all the internal data arrays
             self.particle_positions = np.delete(self.particle_positions, idxs, axis=0)
             self.particle_velocities = np.delete(self.particle_velocities, idxs, axis=0)
@@ -167,7 +153,7 @@ class PhysxParticleInstancer(BasePrim):
             self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, axis=0)
 
     def remove_all_particles(self):
-        self.remove_particles(idxs=np.arange(self._n_particles))
+        self.remove_particles(idxs=np.arange(self.n_particles))
 
     @property
     def n_particles(self):
@@ -175,7 +161,7 @@ class PhysxParticleInstancer(BasePrim):
         Returns:
             int: Number of particles owned by this instancer
         """
-        return self._n_particles
+        return len(self.particle_positions)
 
     @property
     def idn(self):
@@ -219,8 +205,6 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert pos.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
         self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.astype(float)))
 
     @property
@@ -230,9 +214,7 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        oris = self.get_attribute(attr="orientations")
-        assert oris is not None, f"Orientations should be set for particle instancer {self.name}!"
-        return np.array(oris)
+        return np.array(self.get_attribute(attr="orientations"))
 
     @particle_orientations.setter
     def particle_orientations(self, quat):
@@ -243,11 +225,11 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        assert quat.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self._n_particles}!"
+        assert quat.shape[0] == self.n_particles, \
+            f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
         # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
         quat = quat.astype(float)
-        if self._n_particles > 0:
+        if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat))
 
@@ -269,10 +251,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert vel.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
-        vel = vel.astype(float)
-        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel))
+        assert vel.shape[0] == self.n_particles, \
+            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel.astype(float)))
 
     @property
     def particle_scales(self):
@@ -281,8 +262,7 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        scales = self.get_attribute(attr="scales")
-        return np.ones((self._n_particles, 3)) if scales is None else np.array(scales)
+        return np.array(self.get_attribute(attr="scales"))
 
     @particle_scales.setter
     def particle_scales(self, scales):
@@ -293,10 +273,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert scales.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self._n_particles}!"
-        scales = scales.astype(float)
-        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales))
+        assert scales.shape[0] == self.n_particles, \
+            f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
+        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales.astype(float)))
 
     @property
     def particle_prototype_ids(self):
@@ -305,8 +284,7 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N,) numpy array, where each of the N particles' prototype_id (i.e.: which prototype is being used
                 for that particle)
         """
-        ids = self.get_attribute(attr="protoIndices")
-        return np.zeros(self.n_particles) if ids is None else np.array(ids)
+        return np.array(self.get_attribute(attr="protoIndices"))
 
     @particle_prototype_ids.setter
     def particle_prototype_ids(self, prototype_ids):
@@ -317,21 +295,21 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N,) numpy array, where each of the N particles' desired prototype_id
                 (i.e.: which prototype is being used for that particle)
         """
-        assert prototype_ids.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self._n_particles}!"
-        self.set_attribute(attr="protoIndices", val=prototype_ids)
+        assert prototype_ids.shape[0] == self.n_particles, \
+            f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
+        self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
     @property
     def state_size(self):
         # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
         # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
-        return 3 + self._n_particles * 14
+        return 3 + self.n_particles * 14
 
     def _dump_state(self):
         return dict(
             idn=self._idn,
             particle_group=self.particle_group,
-            n_particles=self._n_particles,
+            n_particles=self.n_particles,
             particle_positions=self.particle_positions,
             particle_velocities=self.particle_velocities,
             particle_orientations=self.particle_orientations,
@@ -347,7 +325,6 @@ class PhysxParticleInstancer(BasePrim):
             f"instancer when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
 
         # Set values appropriately
-        self._n_particles = state["n_particles"]
         keys = ("particle_positions", "particle_velocities", "particle_orientations", "particle_scales", "particle_prototype_ids")
         for key in keys:
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
@@ -638,6 +615,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return True
 
     @classmethod
+    def _sync_particle_prototype_ids(cls):
+        """
+        Synchronizes the particle prototype IDs across all particle instancers when sim is stopped.
+        Omniverse has a bug where all particle positions, orientations, velocities, and scales are correctly reset
+        when sim is stopped, but not the prototype IDs. This function is a workaround for that.
+        """
+        if cls.initialized:
+            for instancer in cls.particle_instancers.values():
+                instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=np.int32)
+
+    @classmethod
     def initialize(cls):
         # Create prototype before running super!
         cls.particle_prototypes = cls._create_particle_prototypes()
@@ -647,6 +635,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = dict()
+
+        # TODO: remove this hack once omniverse fixes the issue (now we assume prototype IDs are all 0 always)
+        og.sim.add_callback_on_stop(name=f"{cls.name}_sync_particle_prototype_ids", callback=cls._sync_particle_prototype_ids)
 
     @classmethod
     def _clear(cls):
@@ -868,10 +859,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)
-
-        # /World/water
-        # /World/water/system
-        # /World/water/instancer_0
         
         # Create the instancer
         instance = create_physx_particleset_pointinstancer(
@@ -1580,8 +1567,13 @@ class Cloth(MicroParticleSystem):
                 cloth particles are roughly touching each other, given cls.particle_contact_offset and
                 @mesh_prim's scale
         """
-        # Possibly remesh if requested
-        if remesh:
+        has_uv_mapping = mesh_prim.GetAttribute("primvars:st").Get() is not None
+        if not remesh:
+            # We always load into trimesh to remove redundant particles (since natively omni redundantly represents
+            # the number of vertices as 6x the total unique number of vertices)
+            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False)
+            texcoord = np.array(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
+        else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
             scaled_world_transform = PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString)
@@ -1598,7 +1590,7 @@ class Cloth(MicroParticleSystem):
             particle_distance = cls.particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
-            for _ in range(3):
+            for _ in range(10):
                 ms = pymeshlab.MeshSet()
                 ms.load_new_mesh(tmp_fpath)
 
@@ -1632,27 +1624,25 @@ class Cloth(MicroParticleSystem):
 
             # Re-write data to @mesh_prim
             new_faces = cm.face_matrix()
-            new_face_vertex_ids = new_faces.flatten()
-            new_texcoord = cm.wedge_tex_coord_matrix()
             new_vertices = cm.vertex_matrix()
             new_normals = cm.vertex_normal_matrix()
-            n_faces = len(cm.face_matrix())
-            new_face_vertex_counts = np.ones(n_faces, dtype=int) * 3
-
-            tm_new = trimesh.Trimesh(
+            texcoord = np.array(cm.wedge_tex_coord_matrix()) if has_uv_mapping else None
+            tm = trimesh.Trimesh(
                 vertices=new_vertices,
                 faces=new_faces,
                 vertex_normals=new_normals,
             )
             # Apply the inverse of the world transform to get the mesh back into its local frame
-            tm_new.apply_transform(np.linalg.inv(scaled_world_transform))
+            tm.apply_transform(np.linalg.inv(scaled_world_transform))
 
-            # Update the mesh prim
-            mesh_prim.GetAttribute("faceVertexCounts").Set(new_face_vertex_counts)
-            mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertices))
-            mesh_prim.GetAttribute("faceVertexIndices").Set(new_face_vertex_ids)
-            mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm_new.vertex_normals))
-            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(new_texcoord))
+        # Update the mesh prim
+        face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+        mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+        mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
+        mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
+        mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
+        if has_uv_mapping:
+            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
 
         # Convert into particle cloth
         lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(

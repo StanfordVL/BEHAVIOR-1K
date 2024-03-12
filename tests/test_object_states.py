@@ -632,8 +632,8 @@ def test_toggled_on():
     stove = og.sim.scene.object_registry("name", "stove")
     robot = og.sim.scene.object_registry("name", "robot0")
 
-    stove.set_position_orientation([1.46, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
-    robot.set_position_orientation([0.0, 0.38, 0.01], [0, 0, 0, 1])
+    stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -np.pi / 2.0]))
+    robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
