@@ -187,7 +187,7 @@ class SceneGraphBuilder(object):
 
             # Get the bounding box.
             if hasattr(obj, "get_base_aligned_bbox"):
-                bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bbox(visual=True, fallback_to_aabb=True)
+                bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bbox(visual=True)
                 bbox_pose = T.pose2mat((bbox_center, bbox_orn))
             else:
                 bbox_pose, bbox_extent = _formatted_aabb(obj)

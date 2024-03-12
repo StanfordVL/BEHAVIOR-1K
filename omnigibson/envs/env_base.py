@@ -234,11 +234,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 og.sim.import_object(robot)
                 robot.set_position_orientation(position=position, orientation=orientation)
 
-            # Auto-initialize all robots
-            og.sim.play()
-            self.scene.reset()
-            self.scene.update_initial_state()
-            og.sim.stop()
+            if len(self.robots_config) > 0:
+                # Auto-initialize all robots
+                og.sim.play()
+                self.scene.reset()
+                self.scene.update_initial_state()
+                og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -264,11 +265,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
             og.sim.import_object(obj)
             obj.set_position_orientation(position=position, orientation=orientation)
 
-        # Auto-initialize all objects
-        og.sim.play()
-        self.scene.reset()
-        self.scene.update_initial_state()
-        og.sim.stop()
+        if len(self.objects_config) > 0:
+            # Auto-initialize all objects
+            og.sim.play()
+            self.scene.reset()
+            self.scene.update_initial_state()
+            og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
