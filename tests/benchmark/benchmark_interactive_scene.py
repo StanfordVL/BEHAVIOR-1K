@@ -12,17 +12,22 @@ from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversab
 from omnigibson.simulator import launch_simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
 
-# Launch the simulator
-launch_simulator(physics_dt=1/60., rendering_dt=1/60.)
 
 # Params to be set as needed.
 SCENES = ["Rs_int"]
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 NUM_STEPS = 2000
+
+gm.HEADLESS = False
+gm.GUI_VIEWPORT_ONLY = True
 gm.RENDER_VIEWER_CAMERA = False
 gm.ENABLE_FLATCACHE = True
+gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
+
+# Launch the simulator
+launch_simulator(physics_dt=1/60., rendering_dt=1/60.)
 
 
 def benchmark_scene(scene_name, optimized=False, import_robot=True):
