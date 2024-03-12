@@ -335,12 +335,18 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
         def _set_renderer_settings(self):
-            # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   # Can be True with a fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)               # Can be True with a fps penalty
-            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)                         # "Performance", can be others with a fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)              # Can be True with a fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) # Can be False with a fps penalty
+            if gm.ENABLE_HQ_RENDERING:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)                    
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)                 
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)   # "Auto"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)                
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
+            else:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)              
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)   # "Performance"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)             
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) 
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
 
@@ -413,6 +419,7 @@ def launch_simulator(*args, **kwargs):
             """
             Enables keyboard control of the active viewer camera for this simulation
             """
+            assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
             self._camera_mover = CameraMover(cam=self._viewer_camera)
             self._camera_mover.print_info()
             return self._camera_mover
