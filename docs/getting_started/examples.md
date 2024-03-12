@@ -51,7 +51,7 @@ This demo instantiates one of our BEHAVIOR tasks (and optionally sampling object
 ??? code "behavior_env_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/environments/behavior_env_demo.py"
+    --8<-- "examples/environments/behavior_env_demo.py"
     ```
 
 ### **Navigation Task Demo**
@@ -69,7 +69,7 @@ This demo instantiates one of our navigation tasks in a fully-populated scene an
 ??? code "navigation_env_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/environments/navigation_env_demo.py"
+    --8<-- "examples/environments/navigation_env_demo.py"
     ```
 
 ## 🧑‍🏫 **Learning**
@@ -90,7 +90,7 @@ This demo loads a BEHAVIOR task with a `Fetch` robot, and trains / evaluates the
 ??? code "navigation_policy_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/learning/navigation_policy_demo.py"
+    --8<-- "examples/learning/navigation_policy_demo.py"
     ```
 
 ## 🏔️ **Scenes**
@@ -111,7 +111,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with
 ??? code "scene_selector.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/scenes/scene_selector.py"
+    --8<-- "examples/scenes/scene_selector.py"
     ```
 
 ### **Scene Tour Demo**
@@ -129,7 +129,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset. It allows you to mo
 ??? code "scene_tour_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/scenes/scene_tour_demo.py"
+    --8<-- "examples/scenes/scene_tour_demo.py"
     ```
 
 ### **Traversability Map Demo**
@@ -146,7 +146,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, and generates its c
 ??? code "traversability_map_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/scenes/traversability_map_example.py"
+    --8<-- "examples/scenes/traversability_map_example.py"
     ```
 
 ## 🍎 **Objects**
@@ -167,7 +167,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and loads
 ??? code "load_object_selector.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/objects/load_object_selector.py"
+    --8<-- "examples/objects/load_object_selector.py"
     ```
 
 ### **Object Visualizer Demo**
@@ -187,7 +187,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and rotat
 ??? code "visualize_object.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/objects/visualize_object.py"
+    --8<-- "examples/objects/visualize_object.py"
     ```
 
 ### **Highlight Object**
@@ -205,7 +205,7 @@ This demo loads the Rs_int scene and highlights windows on/off repeatedly.
 ??? code "highlight_objects.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/objects/highlight_objects.py"
+    --8<-- "examples/objects/highlight_objects.py"
     ```
 
 ### **Draw Object Bounding Box Demo**
@@ -226,7 +226,7 @@ This demo loads a door object and banana object, and partially obscures the bana
 ??? code "draw_bounding_box.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/objects/draw_bounding_box.py"
+    --8<-- "examples/objects/draw_bounding_box.py"
     ```
 
 ## 🌡️ **Object States**
@@ -247,7 +247,7 @@ This demo spawns an apple on a table with a knife above it, and lets the knife f
 ??? code "slicing_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/slicing_demo.py"
+    --8<-- "examples/object_states/slicing_demo.py"
     ```
 
 ### **Dicing Demo**
@@ -265,7 +265,7 @@ This demo loads an apple and a knife, and showcases how apple can be diced into 
 ??? code "dicing_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/dicing_demo.py"
+    --8<-- "examples/object_states/dicing_demo.py"
     ```
 
 ### **Folded and Unfolded Demo**
@@ -284,7 +284,7 @@ This demo loads in three different cloth objects, and allows you to manipulate t
 ??? code "folded_unfolded_state_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/folded_unfolded_state_demo.py"
+    --8<-- "examples/object_states/folded_unfolded_state_demo.py"
     ```
 
 ### **Overlaid Demo**
@@ -302,7 +302,7 @@ This demo loads in a carpet on top of a table. The demo allows you to manipulate
 ??? code "overlaid_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/overlaid_demo.py"
+    --8<-- "examples/object_states/overlaid_demo.py"
     ```
 
 ### **Heat Source or Sink Demo**
@@ -320,7 +320,7 @@ This demo loads in a stove and toggles its `HeatSource` on and off, showcasing t
 ??? code "heat_source_or_sink_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/heat_source_or_sink_demo.py"
+    --8<-- "examples/object_states/heat_source_or_sink_demo.py"
     ```
 
 ### **Temperature Demo**
@@ -338,7 +338,7 @@ This demo loads in various heat sources and sinks, and places an apple within cl
 ??? code "temperature_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/temperature_demo.py"
+    --8<-- "examples/object_states/temperature_demo.py"
     ```
 
 ### **Heated Demo**
@@ -356,7 +356,7 @@ This demo loads in three bowls, and immediately sets their temperatures past the
 ??? code "heated_state_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/heated_state_demo.py"
+    --8<-- "examples/object_states/heated_state_demo.py"
     ```
 
 ### **Onfire Demo**
@@ -374,7 +374,7 @@ This demo loads in a stove (toggled on) and two apples. The first apple will be 
 ??? code "onfire_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/onfire_demo.py"
+    --8<-- "examples/object_states/onfire_demo.py"
     ```
 
 ### **Particle Applier and Remover Demo**
@@ -393,7 +393,7 @@ This demo loads in a washtowel and table and lets you choose the ability configu
 ??? code "particle_applier_remover_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/particle_applier_remover_demo.py"
+    --8<-- "examples/object_states/particle_applier_remover_demo.py"
     ```
 
 ### **Particle Source and Sink Demo**
@@ -419,7 +419,7 @@ This demo loads in a sink, which is enabled with both the ParticleSource and Par
 ??? code "particle_source_sink_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/particle_source_sink_demo.py"
+    --8<-- "examples/object_states/particle_source_sink_demo.py"
     ```
 
 ### **Kinematics Demo**
@@ -437,7 +437,7 @@ This demo procedurally generates a mini populated scene, spawning in a cabinet a
 ??? code "sample_kinematics_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/sample_kinematics_demo.py"
+    --8<-- "examples/object_states/sample_kinematics_demo.py"
     ```
 
 ### **Attachment Demo**
@@ -454,7 +454,7 @@ This demo loads an assembled shelf, and showcases how it can be manipulated to a
 ??? code "attachment_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/attachment_demo.py"
+    --8<-- "examples/object_states/attachment_demo.py"
     ```
 
 ### **Object Texture Demo**
@@ -473,7 +473,7 @@ This demo loads in a single object, and then dynamically modifies its state so t
 ??? code "object_state_texture_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/object_state_texture_demo.py"
+    --8<-- "examples/object_states/object_state_texture_demo.py"
     ```
 
 ## 🤖 **Robots**
@@ -495,7 +495,7 @@ This demo iterates over all robots in **`OmniGibson`**, loading each one into an
 ??? code "all_robots_visualizer.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/robots/all_robots_visualizer.py"
+    --8<-- "examples/robots/all_robots_visualizer.py"
     ```
 
 ### **Robot Control Demo**
@@ -513,7 +513,7 @@ This demo lets you choose a robot and the set of controllers to control the robo
 ??? code "robot_control_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/robots/robot_control_example.py"
+    --8<-- "examples/robots/robot_control_example.py"
     ```
 
 ### **Robot Grasping Demo**
@@ -531,7 +531,7 @@ This demo lets you choose a grasping mode and then loads a `Fetch` robot and a c
 ??? code "grasping_mode_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/robots/grasping_mode_example.py"
+    --8<-- "examples/robots/grasping_mode_example.py"
     ```
 
 ### **Advanced: IK Demo**
@@ -549,7 +549,7 @@ This demo loads in `Fetch` robot and a IK solver to control the robot, and then 
 ??? code "ik_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/robots/advanced/ik_example.py"
+    --8<-- "examples/robots/advanced/ik_example.py"
     ```
 
 ## 🧰 **Simulator**
@@ -585,7 +585,7 @@ This demo loads a stripped-down scene with the `Turtlebot` robot, and lets you i
 ??? code "sim_save_load_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/simulator/sim_save_load_example.py"
+    --8<-- "examples/simulator/sim_save_load_example.py"
     ```
 
 ## 🖼️ **Rendering**
@@ -605,5 +605,5 @@ This demo iterates over different renderer settings of and shows how they can be
 ??? code "renderer_settings_example.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/renderer_settings/renderer_settings_example.py"
+    --8<-- "examples/renderer_settings/renderer_settings_example.py"
     ```
