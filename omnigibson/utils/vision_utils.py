@@ -192,6 +192,7 @@ def segmentation_to_rgb(seg_im, N, colors=None):
 def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     """
     Project 3D bounding box data onto 2D and colorize the bounding boxes for visualization.
+    Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
     
     Args:
         bbox_3d_data (np.ndarray): 3D bounding box data
