@@ -232,22 +232,22 @@ This demo loads a door object and banana object, and partially obscures the bana
 ## 🌡️ **Object States**
 These examples showcase **`OmniGibson`**'s powerful object states functionality, which captures both individual and relational kinematic and non-kinematic states.
 
-### **Attachment Demo**
+### **Slicing Demo**
 !!! abstract "This demo is useful for..."
 
-    * Understanding how to leverage the `Attached` state
-    * Understanding how to enable objects to be `attachable`
+    * Understanding how slicing works in **`OmniGibson`**
+    * Understanding how to access individual objects once the environment is created
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.attachment_demo
+python -m omnigibson.examples.object_states.slicing_demo
 ```
 
-This demo loads an apple and a fridge, and showcases how they may or may not be attached upon contact based on their assigned attachment types.
+This demo spawns an apple on a table with a knife above it, and lets the knife fall to "cut" the apple in half.
 
-??? code "attachment_demo.py"
+??? code "slicing_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/attachment_demo.py"
+    --8<-- "src/examples/object_states/slicing_demo.py"
     ```
 
 ### **Dicing Demo**
@@ -287,6 +287,24 @@ This demo loads in three different cloth objects, and allows you to manipulate t
     --8<-- "src/examples/object_states/folded_unfolded_state_demo.py"
     ```
 
+### **Overlaid Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how cloth objects can be overlaid on rigid objects
+    * Understanding current heuristics used for gauging a cloth's "overlaid" status
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.overlaid_demo
+```
+
+This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet while printing out their `Overlaid` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+
+??? code "overlaid_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/overlaid_demo.py"
+    ```
+
 ### **Heat Source or Sink Demo**
 !!! abstract "This demo is useful for..."
 
@@ -303,6 +321,24 @@ This demo loads in a stove and toggles its `HeatSource` on and off, showcasing t
 
     ``` py linenums="1"
     --8<-- "src/examples/object_states/heat_source_or_sink_demo.py"
+    ```
+
+### **Temperature Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to dynamically sample kinematic states for BEHAVIOR dataset objects
+    * Understanding how temperature changes are propagated to individual objects from individual heat sources or sinks
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.temperature_demo
+```
+
+This demo loads in various heat sources and sinks, and places an apple within close proximity to each of them. As the environment steps, each apple's temperature is printed in real-time, showcasing **`OmniGibson`**'s rudimentary temperature dynamics.
+
+??? code "temperature_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/temperature_demo.py"
     ```
 
 ### **Heated Demo**
@@ -323,25 +359,6 @@ This demo loads in three bowls, and immediately sets their temperatures past the
     --8<-- "src/examples/object_states/heated_state_demo.py"
     ```
 
-### **Object Texture Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how different object states can result in texture changes
-    * Understanding how to enable objects with texture-changing states
-    * Understanding how to dynamically modify object states
-
-```{.python .annotate}
-python -m omnigibson.examples.object_states.object_state_texture_demo
-```
-
-This demo loads in a single object, and then dynamically modifies its state so that its texture changes with each modification.
-
-??? code "object_state_texture_demo.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/object_states/object_state_texture_demo.py"
-    ```
-
 ### **Onfire Demo**
 !!! abstract "This demo is useful for..."
 
@@ -358,24 +375,6 @@ This demo loads in a stove (toggled on) and two apples. The first apple will be 
 
     ``` py linenums="1"
     --8<-- "src/examples/object_states/onfire_demo.py"
-    ```
-
-### **Overlaid Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how cloth objects can be overlaid on rigid objects
-    * Understanding current heuristics used for gauging a cloth's "overlaid" status
-
-```{.python .annotate}
-python -m omnigibson.examples.object_states.overlaid_demo
-```
-
-This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet while printing out their `Overlaid` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
-
-??? code "overlaid_demo.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/object_states/overlaid_demo.py"
     ```
 
 ### **Particle Applier and Remover Demo**
@@ -441,60 +440,40 @@ This demo procedurally generates a mini populated scene, spawning in a cabinet a
     --8<-- "src/examples/object_states/sample_kinematics_demo.py"
     ```
 
-### **Slicing Demo**
+### **Attachment Demo**
 !!! abstract "This demo is useful for..."
 
-    * Understanding how slicing works in **`OmniGibson`**
-    * Understanding how to access individual objects once the environment is created
+    * Understanding how to leverage the `Attached` state
+    * Understanding how to enable objects to be `attachable`
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.slicing_demo
+python -m omnigibson.examples.object_states.attachment_demo
 ```
+This demo loads an assembled shelf, and showcases how it can be manipulated to attach and detach parts. 
 
-This demo spawns an apple on a table with a knife above it, and lets the knife fall to "cut" the apple in half.
-
-??? code "slicing_demo.py"
+??? code "attachment_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/slicing_demo.py"
+    --8<-- "src/examples/object_states/attachment_demo.py"
     ```
 
-### **Temperature Demo**
+### **Object Texture Demo**
 !!! abstract "This demo is useful for..."
 
-    * Understanding how to dynamically sample kinematic states for BEHAVIOR dataset objects
-    * Understanding how temperature changes are propagated to individual objects from individual heat sources or sinks
+    * Understanding how different object states can result in texture changes
+    * Understanding how to enable objects with texture-changing states
+    * Understanding how to dynamically modify object states
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.temperature_demo
+python -m omnigibson.examples.object_states.object_state_texture_demo
 ```
 
-This demo loads in various heat sources and sinks, and places an apple within close proximity to each of them. As the environment steps, each apple's temperature is printed in real-time, showcasing **`OmniGibson`**'s rudimentary temperature dynamics.
+This demo loads in a single object, and then dynamically modifies its state so that its texture changes with each modification.
 
-??? code "temperature_demo.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/object_states/temperature_demo.py"
-    ```
-
-## 🖼️ **Rendering**
-These examples showcase how to change renderer settings in **`OmniGibson`**.
-
-### **Renderer Settings Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how to use RendererSettings class
-
-```{.python .annotate}
-python -m omnigibson.examples.renderer_settings.renderer_settings_example
-```
-
-This demo iterates over different renderer settings of and shows how they can be programmatically set with **`OmniGibson`** interface.
-
-??? code "renderer_settings_example.py"
+??? code "object_state_texture_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/renderer_settings/renderer_settings_example.py"
+    --8<-- "src/examples/object_states/object_state_texture_demo.py"
     ```
 
 ## 🤖 **Robots**
@@ -607,4 +586,24 @@ This demo loads a stripped-down scene with the `Turtlebot` robot, and lets you i
 
     ``` py linenums="1"
     --8<-- "src/examples/simulator/sim_save_load_example.py"
+    ```
+
+## 🖼️ **Rendering**
+These examples showcase how to change renderer settings in **`OmniGibson`**.
+
+### **Renderer Settings Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to use RendererSettings class
+
+```{.python .annotate}
+python -m omnigibson.examples.renderer_settings.renderer_settings_example
+```
+
+This demo iterates over different renderer settings of and shows how they can be programmatically set with **`OmniGibson`** interface.
+
+??? code "renderer_settings_example.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/renderer_settings/renderer_settings_example.py"
     ```
