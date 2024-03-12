@@ -16,7 +16,7 @@ We build upon IsaacSim's `Simulator` interface to construct our `Environment` cl
 
 - A [`Scene`](./scene.md) instance, which by default is a "dummy" (empty) or a full-populated (`InteractiveTraversableScene`) instance,
 - A [`BaseTask`](./task.md) instance, which can range from a complex `BehaviorTask`, navigation `PointNavigationTask`, or no-op `DummyTask`,
-- Optionally, one or more [`BaseRobot`](./robot.md)s, which define the action space for the given environment instance,
+- Optionally, one or more [`BaseRobot`](./robots.md)s, which define the action space for the given environment instance,
 - Optionally, one or more additional [`BaseObject`](./object.md)s, which are additional object models not explicitly defined in the environment's scene
 
 The above figure describes **`OmniGibson`**'s simulation loop:

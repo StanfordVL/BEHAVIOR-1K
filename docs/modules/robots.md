@@ -2,12 +2,12 @@
 icon: material/robot-outline
 ---
 
-# 🤖 **Robot**
+# 🤖 **Robots**
 
 ## Description
 
 In **`OmniGibson`**, `Robot`s define agents that can interact with other objects in a given environment. Each robot can _interact_ by deploying joint
-commands via its set of [`Controller`](./controller.md)s, and can _perceive_ its surroundings via its set of [`Sensor`](./sensor.md)s. 
+commands via its set of [`Controller`](./controllers.md)s, and can _perceive_ its surroundings via its set of [`Sensor`](./sensor.md)s. 
 
 **`OmniGibson`** supports both navigation and manipulation robots, and allows for modular specification of individual controllers for controlling the different components of a given robot. For example, the `Fetch` robot is a mobile manipulator composed of a mobile (two-wheeled) base, two head joints, a trunk, seven arm joints, and two gripper finger joints. `Fetch` owns 4 controllers, one for controlling the base, the head, the trunk + arm, and the gripper. There are multiple options for each controller depending on the desired action space. For more information, check out our [robot examples](../getting_started/examples.md#robots).
 
@@ -70,7 +70,7 @@ Usually, actions are passed to robots and observations retrieved via the `obs, i
 - **Retrieving observations**: `obs, info = robot.get_obs()` (2)
 </div>
 
-1. `action` is a 1D-numpy array. For more information, please see the [Controller](./controller.md) section!
+1. `action` is a 1D-numpy array. For more information, please see the [Controller](./controllers.md) section!
 2. `obs` is a dict mapping observation name to observation data, and `info` is a dict of relevant metadata about the observations. For more information, please see the [Sensor](./sensor.md) section!
 
 
@@ -83,13 +83,15 @@ Controllers and sensors can be accessed directly via the `controllers` and `sens
 ### Mobile Robots
 These are navigation-only robots that solely consist of a base that can move.
 
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            <strong>Turtlebot</strong><br><br>  
+            **Turtlebot**<br><br>  
             The two-wheeled <a href="https://www.turtlebot.com/turtlebot2/">Turtlebot 2</a> model with the Kobuki base.<br><br> 
-            Controllers: Base<br>
-            Sensors: Camera, LIDAR
+            <ul>
+                <li>_Controllers_: Base</li>
+                <li>_Sensors_: Camera, LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Turtlebot.png" alt="rgb">
@@ -97,10 +99,12 @@ These are navigation-only robots that solely consist of a base that can move.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            <strong>Locobot</strong><br><br>  
+            **Locobot**<br><br>  
             The two-wheeled, open-source <a href="http://www.locobot.org/">LoCoBot</a> model.<br><br> Note that in our model the arm is disabled and is fixed to the base.<br><br>
-            Controllers: Base<br>
-            Sensors: Camera, LIDAR
+            <ul>
+                <li>_Controllers_: Base</li>
+                <li>_Sensors_: Camera, LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Locobot.png" alt="rgb">
@@ -108,10 +112,12 @@ These are navigation-only robots that solely consist of a base that can move.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            <strong>Husky</strong><br><br>  
+            **Husky**<br><br>  
             The four-wheeled <a href="https://clearpathrobotics.com/husky-unmanned-ground-vehicle-robot/">Husky UAV</a> model from Clearpath Robotics.<br><br> 
-            Controllers: Base<br>
-            Sensors: Camera, LIDAR
+            <ul>
+                <li>_Controllers_: Base</li>
+                <li>_Sensors_: Camera, LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Husky.png" alt="rgb">
@@ -119,10 +125,12 @@ These are navigation-only robots that solely consist of a base that can move.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            <strong>Freight</strong><br><br>  
+            **Freight**<br><br>  
             The two-wheeled <a href="https://docs.fetchrobotics.com/">Freight</a> model which serves as the base for the Fetch robot.<br><br> 
-            Controllers: Base<br>
-            Sensors: Camera, LIDAR
+            <ul>
+                <li>_Controllers_: Base</li>
+                <li>_Sensors_: Camera, LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Freight.png" alt="rgb">
@@ -133,13 +141,15 @@ These are navigation-only robots that solely consist of a base that can move.
 ### Manipulation Robots
 These are manipulation-only robots that cannot move and solely consist of an actuated arm with a gripper attached to its end effector.
 
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            <strong>Franka</strong><br><br>  
-            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes two alternative versions of Franka: FrankaAllegro (equipped with an Allegro hand) and FrankaLeap (equipped with a Leap hand).<br><br> 
-            Controllers: Arm, Gripper<br>
-            Sensors: Wrist Camera
+            **Franka**<br><br>  
+            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes two alternative versions of Franka: FrankaAllegro (equipped with an Allegro hand) and FrankaLeap (equipped with a Leap hand).<br><br>
+            <ul>
+                <li>_Controllers_: Arm, Gripper</li>
+                <li>_Sensors_: Wrist Camera</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/FrankaPanda.png" alt="rgb">
@@ -147,10 +157,12 @@ These are manipulation-only robots that cannot move and solely consist of an act
     </tr>
     <tr>
         <td valign="top" width="60%">
-            <strong>ViperX-300S</strong><br><br>  
+            **ViperX-300S**<br><br>  
             The 6-DOF <a href="https://www.trossenrobotics.com/viperx-300-robot-arm-6dof.aspx">ViperX 300 6DOF</a> model from Trossen Robotics equipped with a parallel jaw gripper.<br><br> 
-            Controllers: Arm, Gripper<br>
-            Sensors: Wrist Camera
+            <ul>
+                <li>_Controllers_: Arm, Gripper</li>
+                <li>_Sensors_: Wrist Camera</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/VX300S.png" alt="rgb">
@@ -162,13 +174,15 @@ These are manipulation-only robots that cannot move and solely consist of an act
 ### Mobile Manipulation Robots
 These are robots that can both navigate and manipulate, and are equipped with both a base that can move as well as one or more gripper-equipped arms that can actuate.
 
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            <strong>Fetch</strong><br><br>  
+            **Fetch**<br><br>  
             The <a href="https://docs.fetchrobotics.com/">Fetch</a> model, composed of a two-wheeled base, linear trunk, 2-DOF head, 7-DOF arm, and 2-DOF parallel jaw gripper.<br><br> 
-            Controllers: Base, Head, Arm, Gripper<br>
-            Sensors: Head Camera, LIDAR
+            <ul>
+                <li>_Controllers_: Base, Head, Arm, Gripper</li>
+                <li>_Sensors_: Head Camera, LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Fetch.png" alt="rgb">
@@ -176,10 +190,12 @@ These are robots that can both navigate and manipulate, and are equipped with bo
     </tr>
     <tr>
         <td valign="top" width="60%">
-            <strong>Tiago</strong><br><br>  
+            **Tiago**<br><br>  
             The bimanual <a href="https://pal-robotics.com/robots/tiago/">Tiago</a> model from PAL robotics, composed of a holonomic base (which we model as a 3-DOF (x,y,rz) set of joints), linear trunk, 2-DOF head, x2 7-DOF arm, and x2 2-DOF parallel jaw grippers.<br><br> 
-            Controllers: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper<br>
-            Sensors: Head Camera, Rear LIDAR, Front LIDAR
+            <ul>
+                <li>_Controllers_: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper</li>
+                <li>_Sensors_: Head Camera, Rear LIDAR, Front LIDAR</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/Tiago.png" alt="rgb">
@@ -188,13 +204,15 @@ These are robots that can both navigate and manipulate, and are equipped with bo
 </table>
 
 ### Additional Robots
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            <strong>BehaviorRobot</strong><br><br>  
+            **BehaviorRobot**<br><br>  
             A hand-designed model intended to be used exclusively for VR teleoperation.<br><br> 
-            Controllers: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper<br>
-            Sensors: Head Camera
+            <ul>
+                <li>_Controllers_: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper</li>
+                <li>_Sensors_: Head Camera</li>
+            </ul>
         </td>
         <td>
             <img src="../assets/robots/BehaviorRobot.png" alt="rgb">
