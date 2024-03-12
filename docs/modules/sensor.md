@@ -1,5 +1,5 @@
 ---
-icon: octicons/rocket-16
+icon: material/camera-outline
 ---
 
 # 📷 **Sensor**
@@ -71,64 +71,172 @@ info:
 </code></pre>
 </details>
 
-Here's a selection of camera modalities:
+Summary of all `vision` modalities:
 
-<table>
-    <tr>
-        <td valign="top">
-            <strong>RGB</strong><br>  
-            RGB image of the scene from the camera perspective.<br>
-            Size: (height, width, 4), numpy.uint8
-        </td>
-        <td>
-            <img src="../assets/camera_asset/rgb.png" alt="rgb">
-        </td>
-    </tr>
-    <tr>
-        <td valign="top">
-            <strong>Depth Map</strong><br>  
-            Distance between the camera and everything else in the scene.<br>
-            Size: (height, width), numpy.float32
-        </td>
-        <td>
-            <img src="../assets/camera_asset/depth.png" alt="depth">
-        </td>
-    </tr>
-    <tr>
-        <td valign="top">
-            <strong>Semantic Segmentation</strong><br>  
-            Each pixel is assigned a label, indicating the object category it belongs to (e.g. table, chair).<br> 
-            Size: (height, width), numpy.uint32
-        </td>
-        <td>
-            <img src="../assets/camera_asset/seg_semantic.png" alt="seg_semantic">
-        </td>
-    </tr>
-    <tr>
-        <td valign="top">
-            <strong>Instance Segmentation</strong><br> 
-            Each pixel is assigned a label, indicating the specific object instance this pixel belongs to (e.g. table1, chair2).<br> 
-            Size: (height, width), numpy.uint32
-        </td>
-        <td>
-            <img src="../assets/camera_asset/seg_instance.png" alt="seg_instance">
-        </td>
-    </tr>
-    <tr>
-        <td valign="top">
-            <strong>2D Bounding Box</strong><br>
-            Bounding boxes wrapping individual objects.<br>
-            Size: a list of(<br>
-            - semanticID, numpy.uint32<br>
-            - x_min, numpy.int32<br>
-            - y_min, numpy.int32<br>
-            - x_max, numpy.int32<br>
-            - y_max, numpy.int32<br>
-            - occlusion_ratio, numpy.float32)
-        </td>
-        <td>
-            <img src="../assets/camera_asset/bbox_2d_tight.png" alt="bbox_2d">
-        </td>
-    </tr>
-</table>
+<details open>
+    <summary><strong>RGB</strong></summary>
+    <p>RGB image of the scene from the camera perspective.</p>
+    <p>Size: (height, width, 4), numpy.uint8</p>
+    <img src="../assets/camera_asset/rgb.png" alt="rgb">
+</details>
 
+<details>
+    <summary><strong>Depth</strong></summary>
+    <p>Distance between the camera and everything else in the scene.</p>
+    <p>Size: (height, width), numpy.float32</p>
+    <img src="../assets/camera_asset/depth.png" alt="Depth Map">
+</details>
+
+<details>
+    <summary><strong>Depth Linear</strong></summary>
+    <p>Distance between the camera and everything else in the scene, where distance measurement is linearly proportional to the actual distance.</p>
+    <p>Size: (height, width), numpy.float32</p>
+    <img src="../assets/camera_asset/depth_linear.png" alt="Depth Map Linear">
+</details>
+
+<details>
+    <summary><strong>Normal</strong></summary>
+    <p>Surface normals - vectors perpendicular to the surface of objects in the scene.</p>
+    <p>Size: (height, width, 4), numpy.float32</p>
+    <img src="../assets/camera_asset/normal.png" alt="Normal">
+</details>
+
+<details>
+    <summary><strong>Semantic Segmentation</strong></summary>
+    <p>Each pixel is assigned a label, indicating the object category it belongs to (e.g., table, chair).</p>
+    <p>Size: (height, width), numpy.uint32</p>
+    <img src="../assets/camera_asset/seg_semantic.png" alt="Semantic Segmentation">
+</details>
+
+<details>
+    <summary><strong>Instance Segmentation</strong></summary>
+    <p>Each pixel is assigned a label, indicating the specific object instance it belongs to (e.g., table1, chair2).</p>
+    <p>Size: (height, width), numpy.uint32</p>
+    <img src="../assets/camera_asset/seg_instance.png" alt="Instance Segmentation">
+</details>
+
+<details>
+    <summary><strong>Instance Segmentation ID</strong></summary>
+    <p>Each pixel is assigned a label, indicating the specific object instance it belongs to (e.g., /World/table1/visuals, /World/chair2/visuals).</p>
+    <p>Size: (height, width), numpy.uint32</p>
+    <img src="../assets/camera_asset/seg_instance_id.png" alt="Instance Segmentation ID">
+</details>
+
+<details>
+    <summary><strong>Optical Flow</strong></summary>
+    <p>Optical flow - motion of pixels belonging to objects caused by the relative motion between the camera and the scene.</p>
+    <p>Size: (height, width, 4), numpy.float32</p>
+</details>
+
+<details>
+    <summary><strong>2D Bounding Box Tight</strong></summary>
+    <p>2D bounding boxes wrapping individual objects, excluding any parts that are occluded.</p>
+    <p>Size: a list of <br>
+        semanticID, numpy.uint32;<br> 
+        x_min, numpy.int32;<br> 
+        y_min, numpy.int32;<br>  
+        x_max, numpy.int32;<br> 
+        y_max, numpy.int32;<br> 
+        occlusion_ratio, numpy.float32</p>
+    <img src="../assets/camera_asset/bbox_2d_tight.png" alt="2D Bounding Box Tight">
+</details>
+
+<details>
+    <summary><strong>2D Bounding Box Loose</strong></summary>
+    <p>2D bounding boxes wrapping individual objects, including occluded parts.</p>
+    <p>Size: a list of <br>
+        semanticID, numpy.uint32;<br> 
+        x_min, numpy.int32;<br> 
+        y_min, numpy.int32;<br>  
+        x_max, numpy.int32;<br> 
+        y_max, numpy.int32;<br> 
+        occlusion_ratio, numpy.float32</p>
+    <img src="../assets/camera_asset/bbox_2d_loose.png" alt="2D Bounding Box Loose">
+</details>
+
+<details>
+    <summary><strong>3D Bounding Box</strong></summary>
+    <p>3D bounding boxes wrapping individual objects.</p>
+    <p>Size: a list of <br>
+        semanticID, numpy.uint32;<br> 
+        x_min, numpy.float32;<br>
+        y_min, numpy.float32;<br>
+        z_min, numpy.float32;<br>
+        x_max, numpy.float32;<br>
+        y_max, numpy.float32;<br>
+        z_max, numpy.float32;<br>
+        transform (4x4), numpy.float32;<br>
+        occlusion_ratio, numpy.float32</p>
+</details>
+
+Summary of all `range` modalities:
+
+<details>
+    <summary><strong>2D LiDAR</strong></summary>
+    <p>Distances to surrounding objects by emitting laser beams and detecting the reflected light.</p>
+    <p>Size: (# of horizontal rays, # of vertical rays), numpy.float32</p>
+</details>
+
+<details>
+    <summary><strong>Occupancy Grid</strong></summary>
+    <p>A representation of the environment as a 2D grid where each cell indicates the presence (or absence) of an obstacle.</p>
+    <p>Size: (grid resolution, grid resolution), numpy.float32</p>
+</details>
+
+Summary of all `proprioception`:
+
+<details>
+    <summary><strong>Joint Positions</strong></summary>
+    <p>Joint positions.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Joint Velocities</strong></summary>
+    <p>Joint velocities.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Joint Efforts</strong></summary>
+    <p>Torque measured at each joint.</p>
+    <p>Size: # of joints, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Position</strong></summary>
+    <p>Robot position in the world frame.</p>
+    <p>Size: (x, y, z), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Orientation</strong></summary>
+    <p>Robot global euler orientation.</p>
+    <p>Size: (roll, pitch, yaw), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot 2D Orientation</strong></summary>
+    <p>Robot orientation on the XY plane of the world frame.</p>
+    <p>Size: angle, numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Linear Velocity</strong></summary>
+    <p>Robot linear velocity.</p>
+    <p>Size: (x_vel, y_vel, z_vel), numpy.float64</p>
+</details>
+
+<details>
+    <summary><strong>Robot Angular Velocity</strong></summary>
+    <p>Robot angular velocity.</p>
+    <p>Size: (x_vel, y_vel, z_vel), numpy.float64</p>
+</details>
+
+Summary of `task` observation:
+
+<details>
+    <summary><strong>Low-dim task observation</strong></summary>
+    <p>Task-specific observation, e.g. navigation goal position.</p>
+    <p>Size: # of low-dim observation, numpy.float64</p>
+</details>

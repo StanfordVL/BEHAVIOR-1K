@@ -85,11 +85,18 @@ nav:
   - Getting Started:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
-    - Building Blocks: getting_started/building_blocks.md
+    - Examples: getting_started/examples.md
+    - Slurm: getting_started/slurm.md
   - Modules:
+    - Overview: modules/overview.md
     - Prim: modules/prim.md
-    - Sensor: modules/sensor.md
+    - Robot: modules/robot.md
+    - Object: modules/object.md
+    - Scene: modules/scene.md
     - Environment: modules/environment.md
+    - Sensor: modules/sensor.md
+  - Tutorials:
+    - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
 
 extra:

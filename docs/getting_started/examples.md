@@ -1,8 +1,10 @@
 ---
-icon: octicons/package-16
+icon: material/laptop
 ---
 
-# 🧱 **Examples**
+
+# 💻 **Examples**
+
 **`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended as a set of building blocks enabling your research. Let's try them out!
 
 ***
@@ -147,7 +149,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, and generates its c
     --8<-- "src/examples/scenes/traversability_map_example.py"
     ```
 
-## 🎾 **Objects**
+## 🍎 **Objects**
 These examples showcase how to leverage objects in **`OmniGibson`**.
 
 ### **Load Object Demo**
@@ -168,7 +170,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and loads
     --8<-- "src/examples/objects/load_object_selector.py"
     ```
 
-### ** Object Visualizer Demo**
+### **Object Visualizer Demo**
 !!! abstract "This demo is useful for..."
 
     * Viewing objects' textures as rendered in **`OmniGibson`**
