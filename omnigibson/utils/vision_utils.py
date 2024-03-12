@@ -176,3 +176,14 @@ class Remapper:
             remapped_labels[key] = new_mapping[key]
 
         return remapped_img, remapped_labels
+
+    def remap_bbox(self, semantic_id):
+        """
+        Remaps a semantic id to a new id using the key_array.
+        Args:
+            semantic_id (int): The semantic id to remap.
+        Returns:
+            int: The remapped id.
+        """
+        assert semantic_id < len(self.key_array), f"Semantic id {semantic_id} is out of range!"
+        return self.key_array[semantic_id]
