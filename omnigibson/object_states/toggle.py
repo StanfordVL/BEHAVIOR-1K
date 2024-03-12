@@ -115,9 +115,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker.initialize()
         self.visual_marker.visible = True
 
-        # Make sure the marker isn't translated at all
-        self.visual_marker.set_local_pose(position=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
-
         # Store the projection mesh's IDs
         projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
 

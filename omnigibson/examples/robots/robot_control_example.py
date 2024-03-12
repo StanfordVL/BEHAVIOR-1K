@@ -72,11 +72,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
     )
 
-    # Create the config for generating the environment we want
-    env_cfg = dict()
-    env_cfg["action_frequency"] = 10
-    env_cfg["physics_frequency"] = 120
-
     scene_cfg = dict()
     if scene_model == "empty":
         scene_cfg["type"] = "Scene"
@@ -92,7 +87,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot0_cfg["action_normalize"] = True
 
     # Compile config
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)

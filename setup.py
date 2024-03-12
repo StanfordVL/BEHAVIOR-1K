@@ -23,6 +23,7 @@ setup(
     install_requires=[
         "gym~=0.26.2",
         "numpy~=1.23.5",
+        "scipy~=1.10.1",
         "GitPython~=3.1.40",
         "transforms3d~=0.4.1",
         "networkx~=3.2.1",
@@ -41,7 +42,7 @@ setup(
         "termcolor~=2.4.0",
         "progressbar~=2.5",
         "pymeshlab~=2022.2",
-        "click~=8.1.7",
+        "click~=8.1.3",
         "aenum~=3.1.15",
         "rtree~=1.2.0"
     ],
