@@ -22,7 +22,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Iterate over all robots and demo their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
-        if robot_name != "Tiago": continue
         # Create and import robot
         robot = robot_cls(
             prim_path=f"/World/{robot_name}",
