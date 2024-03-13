@@ -125,15 +125,8 @@ info:
             <strong>Semantic Segmentation</strong><br><br>  
             Each pixel is assigned a label, indicating the object category it belongs to (e.g., table, chair).<br><br>
             Size: (height, width), numpy.uint32<br><br>
-            We also provide a dictionary containing the mapping of semantic IDs to object categories. You can get this with:
-            <pre style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; border: 1px solid #ccc; overflow-x: auto;">
-from omnigibson.utils.constants import semantic_class_id_to_name
-
-# Example to access the dictionary
-semantic_dict = semantic_class_id_to_name()
-all_ids = semantic_dict.keys()
-all_obj_categories = semantic_dict.values()
-            </pre>
+            We also provide a dictionary containing the mapping of semantic IDs to object categories. You can get this here: <br><br>
+                from omnigibson.utils.constants import semantic_class_id_to_name
         </td>
         <td>
             <img src="../assets/sensor_asset/seg_semantic.png" alt="Semantic Segmentation">
@@ -229,7 +222,7 @@ all_obj_categories = semantic_dict.values()
         <td valign="top" width="60%">
             <strong>2D LiDAR</strong><br><br>  
             Distances to surrounding objects by emitting laser beams and detecting the reflected light.<br><br>
-            Size: (# of horizontal rays, # of vertical rays), numpy.float32<br><br>
+            Size: # of rays, numpy.float32<br><br>
         </td>
         <td>
             <img src="../assets/sensor_asset/lidar.png" alt="2D LiDAR">
