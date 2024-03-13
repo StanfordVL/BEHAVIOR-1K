@@ -235,6 +235,8 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
+        for _ in range(3):
+            render()
 
     def initialize_sensors(self, names):
         """Initializes a raw sensor in the simulation.
@@ -339,9 +341,9 @@ class VisionSensor(BaseSensor):
                 # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
                 # Remap instance segmentation and instance segmentation ID labels to system name
                 if "Particle" in prim_name:
-                    system_name = prim_name.split("Particle")[0]
-                    assert system_name in REGISTERED_SYSTEMS, f"System name {system_name} is not in the registered systems!"
-                    value = system_name
+                    category_name = prim_name.split("Particle")[0]
+                    assert category_name in REGISTERED_SYSTEMS, f"System name {category_name} is not in the registered systems!"
+                    value = category_name
                 else:
                     # Remap instance segmentation labels to object name
                     if not id:
@@ -368,10 +370,15 @@ class VisionSensor(BaseSensor):
             if str(key) not in id_to_labels:
                 semantic_label = semantic_img.flatten()[img_idx]
                 assert semantic_label in semantic_labels, f"Semantic map value {semantic_label} is not in the semantic labels!"
-                system_name = semantic_labels[semantic_label]
-                assert system_name in REGISTERED_SYSTEMS, f"System name {system_name} is not in the registered systems!"
-                value = system_name
-                self._register_instance(value, id=id)
+                category_name = semantic_labels[semantic_label]
+                if category_name in REGISTERED_SYSTEMS:
+                    value = category_name
+                    self._register_instance(value, id=id)
+                # If the category name is not in the registered systems, 
+                # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
+                # we will label this as "unlabelled" for now
+                else:
+                    value = "unlabelled"
                 replicator_mapping[key] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
