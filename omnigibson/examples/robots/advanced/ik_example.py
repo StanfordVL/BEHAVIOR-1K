@@ -198,7 +198,7 @@ def print_message():
     print("Move the marker to a desired position to query IK and press ENTER")
     print("W/S: move marker further away or closer to the robot")
     print("A/D: move marker to the left or the right of the robot")
-    print("T/G: move marker up and down")
+    print("UP/DOWN: move marker up and down")
     print("ESC: quit")
 
 
