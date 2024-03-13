@@ -12,19 +12,6 @@ def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
 
-# def set_start_pose(robot):
-#     reset_pose_tiago = np.array([
-#         -1.78029833e-04,  3.20231302e-05, -1.85759447e-07, -1.16488536e-07,
-#         4.55182843e-08,  2.36128806e-04,  1.50000000e-01,  9.40000000e-01,
-#         -1.10000000e+00,  0.00000000e+00, -0.90000000e+00,  1.47000000e+00,
-#         0.00000000e+00,  2.10000000e+00,  2.71000000e+00,  1.50000000e+00,
-#         1.71000000e+00,  1.30000000e+00, -1.57000000e+00, -1.40000000e+00,
-#         1.39000000e+00,  0.00000000e+00,  0.00000000e+00,  4.50000000e-02,
-#         4.50000000e-02,  4.50000000e-02,  4.50000000e-02,
-#     ])
-#     robot.set_joint_positions(reset_pose_tiago)
-#     og.sim.step()
-
 def primitive_tester(load_object_categories, objects, primitives, primitives_args):
     cfg = {
         "scene": {
