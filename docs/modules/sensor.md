@@ -125,6 +125,15 @@ info:
             <strong>Semantic Segmentation</strong><br><br>  
             Each pixel is assigned a label, indicating the object category it belongs to (e.g., table, chair).<br><br>
             Size: (height, width), numpy.uint32<br><br>
+            We also provide a dictionary containing the mapping of semantic IDs to object categories. You can get this with:
+            <pre style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; border: 1px solid #ccc; overflow-x: auto;">
+from omnigibson.utils.constants import semantic_class_id_to_name
+
+# Example to access the dictionary
+semantic_dict = semantic_class_id_to_name()
+all_ids = semantic_dict.keys()
+all_obj_categories = semantic_dict.values()
+            </pre>
         </td>
         <td>
             <img src="../assets/sensor_asset/seg_semantic.png" alt="Semantic Segmentation">
