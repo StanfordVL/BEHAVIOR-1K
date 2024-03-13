@@ -100,16 +100,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    # Define objects to load: a light, table, and cloth
-    light_cfg = dict(
-        type="LightObject",
-        name="light",
-        light_type="Sphere",
-        radius=0.01,
-        intensity=1e8,
-        position=[-2.0, -2.0, 2.0],
-    )
-
     table_cfg = dict(
         type="DatasetObject",
         name="table",
@@ -124,7 +114,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         "scene": {
             "type": "Scene",
         },
-        "objects": [light_cfg, table_cfg],
+        "objects": [table_cfg],
     }
 
     # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
