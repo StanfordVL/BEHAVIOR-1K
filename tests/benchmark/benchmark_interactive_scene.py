@@ -30,6 +30,7 @@ gm.ENABLE_TRANSITION_RULES = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
+
 # Launch the simulator
 launch_simulator(physics_dt=1/60., rendering_dt=1/60.)
 
