@@ -105,6 +105,9 @@ def plan_base_motion(
             return np.arctan2(segment[1], segment[0])
     
     def create_state(space, x, y, yaw):
+        x = float(x)
+        y = float(y)
+        yaw = float(yaw)
         state = ob.State(space)
         state().setX(x)
         state().setY(y)
@@ -260,12 +263,8 @@ def plan_arm_motion(
             end_conf[i] = joint.upper_limit
         if end_conf[i] < joint.lower_limit:
             end_conf[i] = joint.lower_limit
-        if joint.upper_limit - joint.lower_limit > 2 * np.pi:
-            bounds.setLow(i, 0.0)
-            bounds.setHigh(i, 2 * np.pi)
-        else:
-            bounds.setLow(i, float(joint.lower_limit))
-            bounds.setHigh(i, float(joint.upper_limit))
+        bounds.setLow(i, float(joint.lower_limit))
+        bounds.setHigh(i, float(joint.upper_limit))
     space.setBounds(bounds)
 
     # create a simple setup object
