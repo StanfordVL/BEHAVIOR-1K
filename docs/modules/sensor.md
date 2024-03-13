@@ -229,7 +229,7 @@ all_obj_categories = semantic_dict.values()
         <td valign="top" width="60%">
             <strong>2D LiDAR</strong><br><br>  
             Distances to surrounding objects by emitting laser beams and detecting the reflected light.<br><br>
-            Size: (# of horizontal rays, # of vertical rays), numpy.float32<br><br>
+            Size: # of rays, numpy.float32<br><br>
         </td>
         <td>
             <img src="../assets/sensor_asset/lidar.png" alt="2D LiDAR">
