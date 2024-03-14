@@ -104,7 +104,7 @@ nav:
     - FAQ: miscellaneous/faq.md
     - Known Issues & Troubleshooting: miscellaneous/known_issues.md
     - Contributing: miscellaneous/contributing.md
-    - Changelog: miscellaneous/changelog.md
+    - Changelog: https://github.com/StanfordVL/OmniGibson/releases
     - Contact Us: miscellaneous/contact.md
 
 extra:
