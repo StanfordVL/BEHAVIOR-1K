@@ -42,6 +42,7 @@ class XFormPrim(BasePrim):
         self._material = None
         self._collision_filter_api = None
         self.original_scale = None
+        self.scene = None
 
         # Run super method
         super().__init__(
@@ -50,7 +51,8 @@ class XFormPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self):
+    def _load(self, scene):
+        self.scene = scene
         return og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
     def _post_load(self):

@@ -438,7 +438,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
-        prim = obj.load()
+        prim = obj.load(self)
 
         # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
         # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints

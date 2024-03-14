@@ -192,7 +192,7 @@ class PlanningContext(object):
         # Disable original robot colliders so copy can't collide with it
         disabled_colliders += [link.prim_path for link in self.robot.links.values()]
         filter_categories = ["floors"]
-        for obj in og.sim.scene.objects:
+        for obj in og.sim.scenes[0].objects:
             if obj.category in filter_categories:
                 disabled_colliders += [link.prim_path for link in obj.links.values()]
 

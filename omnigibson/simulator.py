@@ -226,6 +226,8 @@ def launch_simulator(*args, **kwargs):
             # Mapping from link IDs assigned from omni to the object that they reference
             self._link_id_to_objects = dict()
 
+            self.scenes = [self._scene]
+
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = \
