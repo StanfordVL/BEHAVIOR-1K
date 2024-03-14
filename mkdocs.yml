@@ -100,6 +100,12 @@ nav:
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
+  - Miscellaneous:
+    - FAQ: miscellaneous/faq.md
+    - Known Issues & Troubleshooting: miscellaneous/known_issues.md
+    - Contributing: miscellaneous/contributing.md
+    - Changelog: https://github.com/StanfordVL/OmniGibson/releases
+    - Contact Us: miscellaneous/contact.md
 
 extra:
   analytics:
