@@ -61,46 +61,6 @@ It is important to note that object states are usually queried / computed _on de
 ### `AbsoluteObjectState`
 These are object states that are agnostic to other objects in a given scene.
 
-AbsoluteObjectState
-- AABB
-- Vertical / Horizontal Adjacency
-- Burnt
-- ContactBodies
-- Cooked
-- Folded
-- Frozen
-- HeatSourceOrSink
-- Heated
-- MaxTemperature
-- OnFire
-- Open
-- Pose
-- IsGrasping
-- ObjectsInFOVOfRobot
-- Temperature
-- ToggledOn
-
-RelativeObjectState
-- Contains
-- Covered
-- Draped
-- Filled
-- Inside
-- NextTo
-- OnTop
-- Overlaid
-- Saturated
-- Touching
-- Under
-
-
-IntrinsicObjectState
-- ParticleApplier
-- ParticleRemover
-- ParticleSource
-- ParticleSink
-
-
 <table markdown="span">
     <tr>
         <td valign="top" width="60%">
@@ -112,6 +72,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/AABB.png" alt="AABB">
         </td>
     </tr>
     <tr>
@@ -124,6 +85,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/Adjacency.png" alt="Adjacency">
         </td>
     </tr>
     <tr>
@@ -136,6 +98,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/Burnt.png" alt="burnt">
         </td>
     </tr>
     <tr>
@@ -148,6 +111,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/ContactBodies.png" alt="contact_bodies">
         </td>
     </tr>
     <tr>
@@ -160,6 +124,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/Cooked.png" alt="cooked">
         </td>
     </tr>
     <tr>
@@ -172,6 +137,7 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/Folded.png" alt="folded">
         </td>
     </tr>
     <tr>
@@ -184,121 +150,360 @@ IntrinsicObjectState
             </ul>
         </td>
         <td>
+            <img src="../assets/object_states/Frozen.png" alt="frozen">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`HeatSourceOrSink`**](../reference/object_states/heat_source_or_sink.html)<br><br>  
+            Whether the object is considered a heat source or sink. This is a boolean state that is set to `True` if the object is a heat source or sink, and `False` otherwise.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/HeatSourceOrSink.png" alt="heat_source_or_sink">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Heated`**](../reference/object_states/heated.html)<br><br>  
+            Whether the object is considered heated or not. Note that if `True`, this object's visual appearance will also change accordingly. This corresponds to an object hitting some `MaxTemperature` threshold over the course of its lifetime.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Heated.png" alt="heated">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`MaxTemperature`**](../reference/object_states/max_temperature.html)<br><br>  
+            The maximum temperature that the object can reach. This is a scalar value that is set to the maximum temperature that the object can reach.<br><br>
+            <ul>
+                <li>`get_value()`: returns `max_temperature`</li>
+                <li>`set_value(new_value)`: expects a scalar `max_temperature`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/MaxTemperature.png" alt="max_temperature">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`OnFire`**](../reference/object_states/on_fire.html)<br><br>  
+            Whether the object is considered on fire or not.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/OnFire.png" alt="on_fire">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Open`**](../reference/object_states/open.html)<br><br>  
+            Whether the object is considered open or not.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Open.png" alt="open">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Pose`**](../reference/object_states/pose.html)<br><br>  
+            The pose of the object in the world frame.<br><br>
+            <ul>
+                <li>`get_value()`: returns `pose`</li>
+                <li>`set_value(new_value)`: expects a `pose`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Pose.png" alt="pose">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`IsGrasping`**](../reference/object_states/is_grasping.html)<br><br>  
+            Whether the object is currently being grasped by a robot.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/IsGrasping.png" alt="is_grasping">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`ObjectsInFOVOfRobot`**](../reference/object_states/objects_in_fov_of_robot.html)<br><br>  
+            The objects that are currently in the field of view of a robot.<br><br>
+            <ul>
+                <li>`get_value()`: returns `objects_in_fov`</li>
+                <li>`set_value(new_value)`: Not supported</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/ObjectsInFOVOfRobot.png" alt="objects_in_fov_of_robot">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Temperature`**](../reference/object_states/temperature.html)<br><br>  
+            The temperature of the object.<br><br>
+            <ul>
+                <li>`get_value()`: returns `temperature`</li>
+                <li>`set_value(new_value)`: expects a scalar `temperature`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Temperature.png" alt="temperature">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`ToggledOn`**](../reference/object_states/toggled_on.html)<br><br>  
+            Whether the object is considered toggled on or off. This is a boolean state that is set to `True` if the object is toggled on, and `False` otherwise.<br><br>
+            <ul>
+                <li>`get_value()`: returns `True / False`</li>
+                <li>`set_value(new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/ToggledOn.png" alt="toggled_on">
         </td>
     </tr>
 </table>
 
-- HeatSourceOrSink
-- Heated
-- MaxTemperature
-- OnFire
-- Open
-- Pose
-- IsGrasping
-- ObjectsInFOVOfRobot
-- Temperature
-- ToggledOn
 
+### `RelativeObjectState`
+These are object states that are computed with respect to another object in a given scene.
 
-RelativeObjectState
-- AttachedTo
-- Contains
-- Covered
-- Draped
-- Filled
-- Inside
-- NextTo
-- OnTop
-- Overlaid
-- Saturated
-- Touching
-- Under
-
-
-IntrinsicObjectState
-- ParticleApplier
-- ParticleRemover
-- ParticleSource
-- ParticleSink
-
-### Manipulation Robots
-These are manipulation-only robots that cannot move and solely consist of an actuated arm with a gripper attached to its end effector.
-
-<table markdown="span">
+<table markdown=span>
     <tr>
         <td valign="top" width="60%">
-            **Franka**<br><br>  
-            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes two alternative versions of Franka: FrankaAllegro (equipped with an Allegro hand) and FrankaLeap (equipped with a Leap hand).<br><br>
+            [**`AttachedTo`**](../reference/object_states/attached_to.html)<br><br>  
+            Whether the object is considered attached to another object or not.<br><br>
             <ul>
-                <li>_Controllers_: Arm, Gripper</li>
-                <li>_Sensors_: Wrist Camera</li>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/FrankaPanda.png" alt="rgb">
+            <img src="../assets/object_states/AttachedTo.png" alt="attached_to">
         </td>
     </tr>
     <tr>
         <td valign="top" width="60%">
-            **ViperX-300S**<br><br>  
-            The 6-DOF <a href="https://www.trossenrobotics.com/viperx-300-robot-arm-6dof.aspx">ViperX 300 6DOF</a> model from Trossen Robotics equipped with a parallel jaw gripper.<br><br> 
+            [**`Contains`**](../reference/object_states/contains.html)<br><br>  
+            Whether the object contains another object or not.<br><br>
             <ul>
-                <li>_Controllers_: Arm, Gripper</li>
-                <li>_Sensors_: Wrist Camera</li>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/VX300S.png" alt="rgb">
+            <img src="../assets/object_states/Contains.png" alt="contains">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Covered`**](../reference/object_states/covered.html)<br><br>  
+            Whether the object is considered covered by another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Covered.png" alt="covered">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Draped`**](../reference/object_states/draped.html)<br><br>  
+            Whether the object is considered draped over another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Draped.png" alt="draped">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Filled`**](../reference/object_states/filled.html)<br><br>  
+            Whether the object is considered filled with another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Filled.png" alt="filled">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Inside`**](../reference/object_states/inside.html)<br><br>  
+            Whether the object is considered inside another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Inside.png" alt="inside">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`NextTo`**](../reference/object_states/next_to.html)<br><br>  
+            Whether the object is considered next to another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/NextTo.png" alt="next_to">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`OnTop`**](../reference/object_states/on_top.html)<br><br>  
+            Whether the object is considered on top of another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/OnTop.png" alt="on_top">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Overlaid`**](../reference/object_states/overlaid.html)<br><br>  
+            Whether the object is considered overlaid on another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Overlaid.png" alt="overlaid">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Saturated`**](../reference/object_states/saturated.html)<br><br>  
+            Whether the object is considered saturated with another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Saturated.png" alt="saturated">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Touching`**](../reference/object_states/touching.html)<br><br>  
+            Whether the object is considered touching another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Touching.png" alt="touching">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`Under`**](../reference/object_states/under.html)<br><br>  
+            Whether the object is considered under another object or not.<br><br>
+            <ul>
+                <li>`get_value(other_obj)`: returns `True / False`</li>
+                <li>`set_value(other_obj, new_value)`: expects `True / False`</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/Under.png" alt="under">
         </td>
     </tr>
 </table>
 
 
-### Mobile Manipulation Robots
-These are robots that can both navigate and manipulate, and are equipped with both a base that can move as well as one or more gripper-equipped arms that can actuate.
 
-<table markdown="span">
+### `IntrinsicObjectState`
+These are object states that describe an intrinsic semantic property of the object.
+
+<table markdown=span>
     <tr>
         <td valign="top" width="60%">
-            **Fetch**<br><br>  
-            The <a href="https://docs.fetchrobotics.com/">Fetch</a> model, composed of a two-wheeled base, linear trunk, 2-DOF head, 7-DOF arm, and 2-DOF parallel jaw gripper.<br><br> 
+            [**`ParticleApplier`**](../reference/object_states/particle_applier.html)<br><br>  
+            Whether the object is considered a particle applier or not. This is a boolean state that is set to `True` if the object is a particle applier, and `False` otherwise.<br><br>
             <ul>
-                <li>_Controllers_: Base, Head, Arm, Gripper</li>
-                <li>_Sensors_: Head Camera, LIDAR</li>
+                <li>`get_value()`: Not supported</li>
+                <li>`set_value(new_value)`: Not supported</li>
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Fetch.png" alt="rgb">
+            <img src="../assets/object_states/ParticleApplier.png" alt="particle_applier">
         </td>
     </tr>
     <tr>
         <td valign="top" width="60%">
-            **Tiago**<br><br>  
-            The bimanual <a href="https://pal-robotics.com/robots/tiago/">Tiago</a> model from PAL robotics, composed of a holonomic base (which we model as a 3-DOF (x,y,rz) set of joints), linear trunk, 2-DOF head, x2 7-DOF arm, and x2 2-DOF parallel jaw grippers.<br><br> 
+            [**`ParticleRemover`**](../reference/object_states/particle_remover.html)<br><br>  
+            Whether the object is considered a particle remover or not. This is a boolean state that is set to `True` if the object is a particle remover, and `False` otherwise.<br><br>
             <ul>
-                <li>_Controllers_: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper</li>
-                <li>_Sensors_: Head Camera, Rear LIDAR, Front LIDAR</li>
+                <li>`get_value()`: Not supported</li>
+                <li>`set_value(new_value)`: Not supported</li>
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Tiago.png" alt="rgb">
+            <img src="../assets/object_states/ParticleRemover.png" alt="particle_remover">
         </td>
     </tr>
-</table>
-
-### Additional Robots
-<table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            **BehaviorRobot**<br><br>  
-            A hand-designed model intended to be used exclusively for VR teleoperation.<br><br> 
+            [**`ParticleSource`**](../reference/object_states/particle_source.html)<br><br>  
+            Whether the object is considered a particle source or not. This is a boolean state that is set to `True` if the object is a particle source, and `False` otherwise.<br><br>
             <ul>
-                <li>_Controllers_: Base, Head, Left Arm, Right Arm, Left Gripper, Right Gripper</li>
-                <li>_Sensors_: Head Camera</li>
+                <li>`get_value()`: Not supported</li>
+                <li>`set_value(new_value)`: Not supported</li>
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/BehaviorRobot.png" alt="rgb">
+            <img src="../assets/object_states/ParticleSource.png" alt="particle_source">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            [**`ParticleSink`**](../reference/object_states/particle_sink.html)<br><br>
+            Whether the object is considered a particle sink or not. This is a boolean state that is set to `True` if the object is a particle sink, and `False` otherwise.<br><br>
+            <ul>
+                <li>`get_value()`: Not supported</li>
+                <li>`set_value(new_value)`: Not supported</li>
+            </ul>
+        </td>
+        <td>
+            <img src="../assets/object_states/ParticleSink.png" alt="particle_sink">
         </td>
     </tr>
 </table>
