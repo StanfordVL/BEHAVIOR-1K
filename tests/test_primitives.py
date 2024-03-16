@@ -5,8 +5,6 @@ from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.simulator import launch_simulator as launch
-launch()
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
@@ -59,34 +57,36 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     }
 
     # Make sure sim is stopped
-    og.sim.stop()
+    if og.sim is not None:
+        og.sim.stop()
 
     # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
     gm.ENABLE_OBJECT_STATES = True
     gm.USE_GPU_DYNAMICS = False
     gm.ENABLE_FLATCACHE = False
-    # breakpoint()
+
     # Create the environment
     env = og.Environment(configs=cfg)
     robot = env.robots[0]
     env.reset()
-    # breakpoint()
+
     for obj in objects:
         og.sim.import_object(obj['object'])
         obj['object'].set_position_orientation(obj['position'], obj['orientation'])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
-    # set_start_pose(robot)
-    for primitive, args in zip(primitives, primitives_args):
-        try:
-            execute_controller(controller.apply_ref(primitive, *args), env)
-        except Exception as e:
-            og.sim.clear()
-            return False
+    try:
 
-    # Clear the sim
-    og.sim.clear()
+        for primitive, args in zip(primitives, primitives_args):
+            try:
+                execute_controller(controller.apply_ref(primitive, *args), env)
+            except Exception as e:
+                return False
+    finally:
+        # Clear the sim
+        og.sim.clear()
+    
     return True
 
 def test_navigate():
