@@ -8,6 +8,7 @@ runnable examples.
 from functools import cached_property
 import inspect
 import logging
+import random
 from aenum import IntEnum, auto
 from math import ceil
 import cv2
@@ -647,7 +648,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Allow grasping from suboptimal extents if we've tried enough times.
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pose, object_direction = grasp_poses[np.random.choice(len(grasp_poses))]
+        grasp_pose, object_direction = random.choice(grasp_poses)
 
         # Prepare data for the approach later.
         approach_pos = grasp_pose[0] + object_direction * m.GRASP_APPROACH_DISTANCE
@@ -919,7 +920,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 "There is no accessible path from where you are to the desired joint position. Try again"
             )
-
+        
         # Follow the plan to navigate.
         indented_print("Plan has %d steps", len(plan))
         for i, joint_pos in enumerate(plan):
@@ -1440,7 +1441,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 "Could not make a navigation plan to get to the target position"
             )
-        
+
         # self._draw_plan(plan)
         # Follow the plan to navigate.
         indented_print("Plan has %d steps", len(plan))
