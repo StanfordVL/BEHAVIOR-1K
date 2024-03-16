@@ -8,6 +8,7 @@ runnable examples.
 from functools import cached_property
 import inspect
 import logging
+import random
 from aenum import IntEnum, auto
 from math import ceil
 import cv2
@@ -60,7 +61,7 @@ m.MAX_STEPS_FOR_SETTLING = 500
 m.MAX_CARTESIAN_HAND_STEP = 0.002
 m.MAX_STEPS_FOR_HAND_MOVE_JOINT = 500
 m.MAX_STEPS_FOR_HAND_MOVE_IK = 1000
-m.MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
+m.MAX_STEPS_FOR_GRASP_OR_RELEASE = 250
 m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 500
 m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 
@@ -274,7 +275,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking and adding context if necessary."""
-        action = self._overwrite_head_action(action)
+        if self._enable_head_tracking:
+            action = self._overwrite_head_action(action)
 
         if not self.add_context:
             return action
@@ -646,7 +648,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Allow grasping from suboptimal extents if we've tried enough times.
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pose, object_direction = np.random.choice(grasp_poses)
+        grasp_pose, object_direction = random.choice(grasp_poses)
 
         # Prepare data for the approach later.
         approach_pos = grasp_pose[0] + object_direction * m.GRASP_APPROACH_DISTANCE
@@ -836,7 +838,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
             
         # Otherwise just return the default arm control idx
-        return self.robot.arm_control_idx[self.arm]
+        return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
     
     @cached_property
     def _manipulation_descriptor_path(self):
@@ -1051,7 +1053,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
-        assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
+        assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_absolute_ori mode"
         if in_world_frame:
             target_pose = self._get_pose_in_robot_frame(target_pose)
         target_pos = target_pose[0]
@@ -1325,7 +1327,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action[action_idx] = self.robot.get_joint_positions()[joint_idx]
             elif self.robot._controller_config[name]["name"] == "InverseKinematicsController":
                 # overwrite the goal orientation, since it is in absolute frame.
-                assert self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
+                assert self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori", "Controller must be in pose_absolute_ori mode"
                 current_quat = self.robot.get_relative_eef_orientation()
                 current_ori = T.quat2axisangle(current_quat)
                 control_idx = self.robot.controller_action_idx["arm_" + self.arm]
@@ -1363,7 +1365,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if self.robot_model == "Tiago":
             return np.array([0.28493954, 0.37450749, 1.1512334]), np.array([-0.21533823,  0.05361032, -0.08631776,  0.97123871])
         else:
-            raise NotImplementedError
+            return np.array([ 0.48688125, -0.12507881,  0.97888719]), np.array([ 0.61324748,  0.61305553, -0.35266518,  0.35173529])
 
     def _get_reset_joint_pos(self):
         reset_pose_fetch = np.array(

@@ -10,19 +10,6 @@ def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
 
-def set_start_pose(robot):
-    reset_pose_tiago = np.array([
-        -1.78029833e-04,  3.20231302e-05, -1.85759447e-07, -1.16488536e-07,
-        4.55182843e-08,  2.36128806e-04,  1.50000000e-01,  9.40000000e-01,
-        -1.10000000e+00,  0.00000000e+00, -0.90000000e+00,  1.47000000e+00,
-        0.00000000e+00,  2.10000000e+00,  2.71000000e+00,  1.50000000e+00,
-        1.71000000e+00,  1.30000000e+00, -1.57000000e+00, -1.40000000e+00,
-        1.39000000e+00,  0.00000000e+00,  0.00000000e+00,  4.50000000e-02,
-        4.50000000e-02,  4.50000000e-02,  4.50000000e-02,
-    ])
-    robot.set_joint_positions(reset_pose_tiago)
-    og.sim.step()
-
 def primitive_tester(load_object_categories, objects, primitives, primitives_args):
     cfg = {
         "scene": {
@@ -32,7 +19,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
         },
         "robots": [
             {
-                "type": "Tiago",
+                "type": "Fetch",
                 "obs_modalities": ["scan", "rgb", "depth"],
                 "scale": 1.0,
                 "self_collisions": True,
@@ -44,31 +31,16 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                 "default_trunk_offset": 0.365,
                 "controller_config": {
                     "base": {
-                        "name": "JointController",
-                        "motor_type": "velocity"
+                        "name": "DifferentialDriveController",
                     },
-                    "arm_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
+                    "arm_0": {
+                        "name": "InverseKinematicsController",
+                        "command_input_limits": "default",
+                        "command_output_limits": [[-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]], 
+                        "mode": "pose_absolute_ori",
+                        "kp": 300.0
                     },
-                    "arm_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
-                    },
-                    "gripper_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                        "use_delta_commands": True
-                    },
-                    "gripper_right": {
+                    "gripper_0": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
@@ -77,9 +49,6 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                     },
                     "camera": {
                         "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None,
                         "use_delta_commands": False
                     }
                 }
@@ -88,7 +57,8 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     }
 
     # Make sure sim is stopped
-    og.sim.stop()
+    if og.sim is not None:
+        og.sim.stop()
 
     # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
     gm.ENABLE_OBJECT_STATES = True
@@ -105,20 +75,20 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
         obj['object'].set_position_orientation(obj['position'], obj['orientation'])
         og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(env)
-    set_start_pose(robot)
-    for primitive, args in zip(primitives, primitives_args):
-        try:
-            execute_controller(controller.apply_ref(primitive, *args), env)
-        except:
-            og.sim.clear()
-            return False
+    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    try:
 
-    # Clear the sim
-    og.sim.clear()
+        for primitive, args in zip(primitives, primitives_args):
+            try:
+                execute_controller(controller.apply_ref(primitive, *args), env)
+            except Exception as e:
+                return False
+    finally:
+        # Clear the sim
+        og.sim.clear()
+    
     return True
 
-@pytest.mark.skip(reason="primitives are broken")
 def test_navigate():
     categories = ["floors", "ceilings", "walls"]
 
@@ -139,7 +109,6 @@ def test_navigate():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
-@pytest.mark.skip(reason="primitives are broken")
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
@@ -160,7 +129,6 @@ def test_grasp():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
-@pytest.mark.skip(reason="primitives are broken")
 def test_place():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
