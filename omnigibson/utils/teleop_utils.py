@@ -9,10 +9,13 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
-from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
-from telemoma.human_interface.teleop_policy import TeleopPolicy
-from telemoma.utils.general_utils import AttrDict
-from telemoma.configs.base_config import teleop_config
+try:
+    from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
+    from telemoma.human_interface.teleop_policy import TeleopPolicy
+    from telemoma.utils.general_utils import AttrDict
+    from telemoma.configs.base_config import teleop_config
+except ImportError as e:
+    raise e from ValueError("For teleoperation, install telemoma by running 'pip install telemoma'")
 
 m = create_module_macros(module_path=__file__)
 m.movement_speed = 0.2  # the speed of the robot base movement
@@ -23,7 +26,7 @@ class TeleopSystem(TeleopPolicy):
     """
     def __init__(self, config: AttrDict, robot: BaseRobot, show_control_marker: bool = False) -> None:
         """
-        Initializes the Teleoperatin System
+        Initializes the Teleoperation System
         Args:
             config (AttrDict): configuration dictionary
             robot (BaseRobot): the robot that will be controlled.
@@ -262,14 +265,14 @@ class OVXRSystem(TeleopSystem):
             # update right hand related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
-                    self.teleop_action[arm_name] = np.r_[
+                    self.teleop_action[arm_name] = np.concatenate((
                         self.raw_data["transforms"]["controllers"][arm][0],
                         T.quat2euler(T.quat_multiply(
                             self.raw_data["transforms"]["controllers"][arm][1],
                             self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(arm)]]
                         )),
                         [self.raw_data["button_data"][arm]["axis"]["trigger"]]
-                    ]
+                    ))
                     self.teleop_action.is_valid[arm_name] = self._is_valid_transform(self.raw_data["transforms"]["controllers"][arm])
                 else:
                     self.teleop_action.is_valid[arm_name] = False

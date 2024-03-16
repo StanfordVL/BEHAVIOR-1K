@@ -2,7 +2,6 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 import networkx as nx
-from telemoma.human_interface.teleop_core import TeleopAction
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1474,7 +1473,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action: TeleopAction) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 

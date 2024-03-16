@@ -1,17 +1,8 @@
 """
 Example script for using external devices to teleoperate a robot.
 """
-try:
-    from mediapipe import solutions
-except ModuleNotFoundError:
-    pass
-
 import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
-from omnigibson.utils.teleop_utils import TeleopSystem
-
-from telemoma.utils.camera_utils import RealSenseCamera
-from telemoma.configs.base_config import teleop_config
 
 ROBOTS = {
     "FrankaPanda": "Franka Emika Panda (default)",
@@ -26,6 +17,10 @@ TELEOP_METHOD = {
 }
 
 def main():
+    from omnigibson.utils.teleop_utils import TeleopSystem
+    from telemoma.utils.camera_utils import RealSenseCamera
+    from telemoma.configs.base_config import teleop_config
+
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     arm_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot arm teleop method")
     if robot_name != "FrankaPanda":

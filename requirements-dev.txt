@@ -9,3 +9,4 @@ mkdocstrings[python]
 mkdocs-section-index
 mkdocs-literate-nav
 pynvml
+telemoma~=0.1.2
