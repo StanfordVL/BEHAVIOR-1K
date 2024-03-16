@@ -5,7 +5,6 @@ import omnigibson.lazy as lazy
 import numpy as np
 from numba import jit
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 
 class FKSolver:
     """
@@ -116,14 +115,9 @@ class IKSolver:
         self.config.position_tolerance = tolerance_pos
         self.config.orientation_tolerance = 100.0 if target_quat is None else tolerance_quat
 
-        if meets_minimum_isaac_version("2023.0.0"):
-            self.config.ccd_position_weight = weight_pos
-            self.config.ccd_orientation_weight = 0.0 if target_quat is None else weight_quat
-            self.config.max_num_descents = max_iterations
-        else:
-            self.config.position_weight = weight_pos
-            self.config.orientation_weight = 0.0 if target_quat is None else weight_quat
-            self.config.max_iterations_per_descent = max_iterations
+        self.config.ccd_position_weight = weight_pos
+        self.config.ccd_orientation_weight = 0.0 if target_quat is None else weight_quat
+        self.config.max_num_descents = max_iterations
 
         # Compute target joint positions
         ik_results = lazy.lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
