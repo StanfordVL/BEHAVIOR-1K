@@ -1,7 +1,7 @@
 import colorsys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 try:
     import accimage
@@ -57,54 +57,6 @@ class RandomScale:
                 return img.resize((ow, oh), self.interpolation)
         else:
             raise NotImplementedError()
-
-
-def randomize_colors(N, bright=True):
-    """
-    Modified from https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py#L59
-    Generate random colors.
-    To get visually distinct colors, generate them in HSV space then
-    convert to RGB.
-
-    Args:
-        N (int): Number of colors to generate
-
-    Returns:
-        bright (bool): whether to increase the brightness of the colors or not
-    """
-    brightness = 1.0 if bright else 0.5
-    hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
-    colors = np.array(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
-    rstate = np.random.RandomState(seed=20)
-    np.random.shuffle(colors)
-    colors[0] = [0, 0, 0]  # First color is black
-    return colors
-
-
-def segmentation_to_rgb(seg_im, N, colors=None):
-    """
-    Helper function to visualize segmentations as RGB frames.
-    NOTE: assumes that geom IDs go up to N at most - if not,
-    multiple geoms might be assigned to the same color.
-
-    Args:
-        seg_im ((W, H)-array): Segmentation image
-        N (int): Maximum segmentation ID from @seg_im
-        colors (None or list of 3-array): If specified, colors to apply
-            to different segmentation IDs. Otherwise, will be generated randomly
-    """
-    # ensure all values lie within [0, N]
-    seg_im = np.mod(seg_im, N)
-
-    if colors is None:
-        use_colors = randomize_colors(N=N, bright=True)
-    else:
-        use_colors = colors
-
-    if N <= 256:
-        return (255.0 * use_colors[seg_im]).astype(np.uint8)
-    else:
-        return (use_colors[seg_im]).astype(np.float)
 
 class Remapper:
     """
@@ -176,3 +128,139 @@ class Remapper:
             remapped_labels[key] = new_mapping[key]
 
         return remapped_img, remapped_labels
+
+    def remap_bbox(self, semantic_id):
+        """
+        Remaps a semantic id to a new id using the key_array.
+        Args:
+            semantic_id (int): The semantic id to remap.
+        Returns:
+            int: The remapped id.
+        """
+        assert semantic_id < len(self.key_array), f"Semantic id {semantic_id} is out of range!"
+        return self.key_array[semantic_id]
+
+
+def randomize_colors(N, bright=True):
+    """
+    Modified from https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/visualize.py#L59
+    Generate random colors.
+    To get visually distinct colors, generate them in HSV space then
+    convert to RGB.
+
+    Args:
+        N (int): Number of colors to generate
+
+    Returns:
+        bright (bool): whether to increase the brightness of the colors or not
+    """
+    brightness = 1.0 if bright else 0.5
+    hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
+    colors = np.array(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
+    rstate = np.random.RandomState(seed=20)
+    np.random.shuffle(colors)
+    colors[0] = [0, 0, 0]  # First color is black
+    return colors
+
+
+def segmentation_to_rgb(seg_im, N, colors=None):
+    """
+    Helper function to visualize segmentations as RGB frames.
+    NOTE: assumes that geom IDs go up to N at most - if not,
+    multiple geoms might be assigned to the same color.
+
+    Args:
+        seg_im ((W, H)-array): Segmentation image
+        N (int): Maximum segmentation ID from @seg_im
+        colors (None or list of 3-array): If specified, colors to apply
+            to different segmentation IDs. Otherwise, will be generated randomly
+    """
+    # ensure all values lie within [0, N]
+    seg_im = np.mod(seg_im, N)
+
+    if colors is None:
+        use_colors = randomize_colors(N=N, bright=True)
+    else:
+        use_colors = colors
+
+    if N <= 256:
+        return (255.0 * use_colors[seg_im]).astype(np.uint8)
+    else:
+        return (use_colors[seg_im]).astype(np.float)
+
+
+def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
+    """
+    Project 3D bounding box data onto 2D and colorize the bounding boxes for visualization.
+    Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
+    
+    Args:
+        bbox_3d_data (np.ndarray): 3D bounding box data
+        rgb_image (np.ndarray): RGB image
+        camera_params (dict): Camera parameters
+    
+    Returns:
+        np.ndarray: RGB image with 3D bounding boxes drawn
+    """
+    
+    def world_to_image_pinhole(world_points, camera_params):
+        # Project corners to image space (assumes pinhole camera model)
+        proj_mat = camera_params["cameraProjection"].reshape(4, 4)
+        view_mat = camera_params["cameraViewTransform"].reshape(4, 4)
+        view_proj_mat = np.dot(view_mat, proj_mat)
+        world_points_homo = np.pad(world_points, ((0, 0), (0, 1)), constant_values=1.0)
+        tf_points = np.dot(world_points_homo, view_proj_mat)
+        tf_points = tf_points / (tf_points[..., -1:])
+        return 0.5 * (tf_points[..., :2] + 1)
+
+    def draw_lines_and_points_for_boxes(img, all_image_points):
+        width, height = img.size
+        draw = ImageDraw.Draw(img)
+
+        # Define connections between the corners of the bounding box
+        connections = [
+            (0, 1), (1, 3), (3, 2), (2, 0),  # Front face
+            (4, 5), (5, 7), (7, 6), (6, 4),  # Back face
+            (0, 4), (1, 5), (2, 6), (3, 7)   # Side edges connecting front and back faces
+        ]
+        
+        # Calculate the number of bounding boxes
+        num_boxes = len(all_image_points) // 8
+        
+        # Generate random colors for each bounding box
+        from omni.replicator.core import random_colours
+        box_colors = random_colours(num_boxes, enable_random=True, num_channels=3)
+        
+        # Ensure colors are in the correct format for drawing (255 scale)
+        box_colors = [(int(r), int(g), int(b)) for r, g, b in box_colors]
+
+        # Iterate over each set of 8 points (each bounding box)
+        for i in range(0, len(all_image_points), 8):
+            image_points = all_image_points[i:i+8]
+            image_points[:, 1] = height - image_points[:, 1]  # Flip Y-axis to match image coordinates
+            
+            # Use a distinct color for each bounding box
+            line_color = box_colors[i // 8]
+
+            # Draw lines for each connection
+            for start, end in connections:
+                draw.line((image_points[start][0], image_points[start][1],
+                        image_points[end][0], image_points[end][1]),
+                        fill=line_color, width=2)
+
+    rgb = Image.fromarray(rgb_image)
+    
+    # Get 3D corners
+    from omni.syntheticdata.scripts.helpers import get_bbox_3d_corners
+    corners_3d = get_bbox_3d_corners(bbox_3d_data)
+    corners_3d = corners_3d.reshape(-1, 3)
+
+    # Project to image space
+    corners_2d = world_to_image_pinhole(corners_3d, camera_params)
+    width, height = rgb.size
+    corners_2d *= np.array([[width, height]])
+
+    # Now, draw all bounding boxes
+    draw_lines_and_points_for_boxes(rgb, corners_2d)
+
+    return np.array(rgb)
