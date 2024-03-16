@@ -39,36 +39,31 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Import scene and robot (Fetch)
     scene_cfg = {"type": "Scene"}
-    cfg = dict(scene=scene_cfg)
+    # Create Fetch robot
+    # Note that since we only care about IK functionality, we fix the base (this also makes the robot more stable)
+    # (any object can also have its fixed_base attribute set to True!)
+    # Note that since we're going to be setting joint position targets, we also need to make sure the robot's arm joints
+    # (which includes the trunk) are being controlled using joint positions
+    robot_cfg = {
+        "type": "Fetch",
+        "fixed_base": True,
+        "controller_config": {
+            "arm_0": {
+                "name": "NullJointController",
+                "motor_type": "position",
+            }
+        }
+    }
+    cfg = dict(scene=scene_cfg, robots=[robot_cfg])
     env = og.Environment(configs=cfg)
-    scene = Scene()
-    if og.sim.is_playing():
-        og.sim.stop()
-    og.sim.import_scene(scene)
 
     # Update the viewer camera's pose so that it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
         position=np.array([4.32248, -5.74338, 6.85436]),
         orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
     )
-
-    # Create Fetch robot
-    # Note that since we only care about IK functionality, we fix the base (this also makes the robot more stable)
-    # (any object can also have its fixed_base attribute set to True!)
-    # Note that since we're going to be setting joint position targets, we also need to make sure the robot's arm joints
-    # (which includes the trunk) are being controlled using joint positions
-    robot = Fetch(
-        prim_path="/World/robot",
-        name="robot",
-        fixed_base=True,
-        controller_config={
-            "arm_0": {
-                "name": "NullJointController",
-                "motor_type": "position",
-            }
-        }
-    )
-    og.sim.import_object(robot)
+    
+    robot = env.robots[0]
 
     # Set robot base at the origin
     robot.set_position_orientation(np.array([0, 0, 0]), np.array([0, 0, 0, 1]))
