@@ -151,8 +151,11 @@ class VisionSensor(BaseSensor):
 
         modalities = set([modalities]) if isinstance(modalities, str) else modalities
 
-        # seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
-        if ("seg_instance" in modalities or "seg_instance_id" in modalities) and "seg_semantic" not in modalities:
+        # 1) seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
+        # 2) bounding box observations require seg_semantic to be enabled (for remapping bounding box semantic IDs)
+        semantic_dependent_modalities = {"seg_instance", "seg_instance_id", "bbox_2d_loose", "bbox_2d_tight", "bbox_3d"}
+        # if any of the semantic dependent modalities are enabled, then seg_semantic must be enabled
+        if semantic_dependent_modalities.intersection(modalities) and "seg_semantic" not in modalities:
             modalities.add("seg_semantic")
 
         # Run super method
@@ -277,6 +280,8 @@ class VisionSensor(BaseSensor):
                 id_to_labels = raw_obs["info"]["idToLabels"]
                 obs[modality], info[modality] = self._remap_instance_segmentation(
                     obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=True)
+            elif "bbox" in modality:
+                obs[modality] = self._remap_bounding_box_semantic_ids(obs[modality])
         return obs, info
     
     def _remap_semantic_segmentation(self, img, id_to_labels):
@@ -392,6 +397,19 @@ class VisionSensor(BaseSensor):
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         if instance_name not in registry.values():
             registry[len(registry)] = instance_name
+    
+    def _remap_bounding_box_semantic_ids(self, bboxes):
+        """
+        Remap the semantic IDs of the bounding boxes to our own semantic IDs.
+        
+        Args:
+            bboxes (list of dict): List of bounding boxes to remap
+        Returns:
+            list of dict: Remapped list of bounding boxes
+        """
+        for bbox in bboxes:
+            bbox["semanticId"] = VisionSensor.SEMANTIC_REMAPPER.remap_bbox(bbox["semanticId"])
+        return bboxes
     
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
