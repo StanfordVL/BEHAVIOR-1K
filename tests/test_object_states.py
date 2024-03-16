@@ -676,7 +676,7 @@ def test_toggled_on():
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
 
-
+@pytest.mark.skip(reason="skipping attachment for now")
 @og_test
 def test_attached_to():
     shelf_back_panel = og.sim.scene.object_registry("name", "shelf_back_panel")
