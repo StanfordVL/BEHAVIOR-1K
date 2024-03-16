@@ -1,6 +1,3 @@
-"""
-Example script demo'ing robot primitive to solve a task
-"""
 import os
 import yaml
 import numpy as np
