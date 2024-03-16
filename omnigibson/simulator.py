@@ -76,6 +76,8 @@ def _launch_app():
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
 
+    assert meets_minimum_isaac_version("2023.1.1"), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
@@ -314,11 +316,7 @@ def launch_simulator(*args, **kwargs):
             # default collide with each other, and modify settings for speed optimization
             self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
-            else:
-                self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -1219,8 +1217,7 @@ def launch_simulator(*args, **kwargs):
 
             # Clear physics context
             self._physics_context = None
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physx_fabric_interface = None
+            self._physx_fabric_interface = None
 
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
