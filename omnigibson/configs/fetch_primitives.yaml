@@ -1,6 +1,6 @@
 env:
-  action_frequency: 60                  # (int): environment executes action at the action_frequency rate
-  physics_frequency: 60                 # (int): physics frequency (1 / physics_timestep for physx)
+  action_frequency: 30                  # (int): environment executes action at the action_frequency rate
+  physics_frequency: 120                # (int): physics frequency (1 / physics_timestep for physx)
   device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
   automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
@@ -31,8 +31,7 @@ scene:
   include_robots: false
 
 robots:
-  - name: tiago
-    type: Tiago
+  - type: Fetch
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
@@ -44,29 +43,16 @@ robots:
     default_arm_pose: diagonal30
     controller_config:
       base:
-        name: JointController
-        motor_type: velocity
-      arm_left:
+        name: DifferentialDriveController
+      arm_0:
         name: InverseKinematicsController
-        motor_type: velocity
-        command_input_limits: null
-        command_output_limits: null
-        mode : pose_absolute_ori
-        kv: 3.0
-      arm_right:
-        name: InverseKinematicsController
-        motor_type: velocity
-        command_input_limits: null
-        command_output_limits: null
-        mode : pose_absolute_ori
-        kv: 3.0
-      gripper_left:
-        name: JointController
-        motor_type: position
-        command_input_limits: [-1, 1]
-        command_output_limits: null
-        use_delta_commands: true
-      gripper_right:
+        command_input_limits: default
+        command_output_limits:
+          - [-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]
+          - [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
+        mode: pose_absolute_ori
+        kp: 300.0
+      gripper_0:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
@@ -74,10 +60,7 @@ robots:
         use_delta_commands: true
       camera:
         name: JointController
-        motor_type: position
-        command_input_limits: null
-        command_output_limits: null
-        use_delta_commands: false
+        use_delta_commands: False
 
 objects: []
 
