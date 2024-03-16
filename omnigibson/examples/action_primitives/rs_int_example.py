@@ -16,27 +16,27 @@ def execute_controller(ctrl_gen, env):
 
 def main():
     """
-    Demonstrates how to use the action primitives to solve a simple BEHAVIOR-1K task.
-    
-    It loads Benevolence_1_int with a Fetch robot, and the robot attempts to solve the
-    picking_up_trash task using a hardcoded sequence of primitives.
+    Demonstrates how to use the action primitives to pick and place an object in a crowded scene.
+
+    It loads Rs_int with a Fetch robot, and the robot picks and places an apple.
     """
     # Load the config
     config_filename = os.path.join(og.example_config_path, "fetch_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # Update it to run a grocery shopping task
-    config["scene"]["scene_model"] = "Benevolence_1_int"
-    config["scene"]["load_task_relevant_only"] = True
+    config["scene"]["scene_model"] = "Rs_int"
     config["scene"]["not_load_object_categories"] = ["ceilings"]
-    config["task"] = {
-        "type": "BehaviorTask",
-        "activity_name": "picking_up_trash",
-        "activity_definition_id": 0,
-        "activity_instance_id": 0,
-        "predefined_problem": None,
-        "online_object_sampling": False,
-    }
+    config["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "apple",
+            "category": "apple",
+            "model": "agveuv",
+            "position": [-0.3, -1.1, 0.5],
+            "orientation": [0, 0, 0, 1]
+        },
+    ]
 
     # Load the environment
     env = og.Environment(configs=config)
@@ -47,17 +47,17 @@ def main():
     og.sim.enable_viewer_camera_teleoperation()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    cabinet = scene.object_registry("name", "bottom_cabinet_slgzfc_0")
+    apple = scene.object_registry("name", "apple")
 
-    # Grasp can of soda
-    grasp_obj = scene.object_registry("name", "can_of_soda_89")
+    # Grasp apple
     print("Executing controller")
-    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
+    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, apple), env)
     print("Finished executing grasp")
 
-    # Place can in trash can
+    # Place on cabinet
     print("Executing controller")
-    trash = scene.object_registry("name", "trash_can_85")
-    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
+    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, cabinet), env)
     print("Finished executing place")
 
 if __name__ == "__main__":
