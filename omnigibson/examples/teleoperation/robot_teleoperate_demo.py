@@ -22,7 +22,7 @@ TELEOP_METHOD = {
     "keyboard": "Keyboard (default)",
     "spacemouse": "SpaceMouse",
     "oculus": "Oculus Quest",
-    "human_kpt": "Human Keypoints with Camera",
+    "vision": "Human Keypoints with Camera",
 }
 
 def main():
@@ -35,10 +35,12 @@ def main():
     # Generate teleop config
     teleop_config.arm_left_controller = arm_teleop_method
     teleop_config.arm_right_controller = arm_teleop_method
-    teleop_config.interface_kwargs[arm_teleop_method] = {} if arm_teleop_method != "human_kpt" else {"camera": RealSenseCamera()}
     teleop_config.base_controller = base_teleop_method
-    teleop_config.interface_kwargs[base_teleop_method] = {} if base_teleop_method != "human_kpt" else {"camera": RealSenseCamera()}
-
+    teleop_config.interface_kwargs["keyboard"] = {"arm_speed_scaledown": 0.04}
+    teleop_config.interface_kwargs["spacemouse"] = {"arm_speed_scaledown": 0.04}
+    if arm_teleop_method == "vision" or base_teleop_method == "vision":
+        teleop_config.interface_kwargs["vision"] = {"camera": RealSenseCamera()}
+    
     # Create the config for generating the environment we want
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
