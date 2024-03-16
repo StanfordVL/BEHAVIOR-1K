@@ -47,7 +47,7 @@ def main():
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
     cabinet = scene.object_registry("name", "bottom_cabinet_slgzfc_0")
     apple = scene.object_registry("name", "apple")
-    # laptop = scene.object_registry("name", "laptop_nvulcs_0")
+
     # Grasp apple
     print("Executing controller")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, apple), env)
