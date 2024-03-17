@@ -79,7 +79,7 @@ info:
 
 ### Vision Sensor
 
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
             <strong>RGB</strong><br><br>  
@@ -217,7 +217,7 @@ info:
 
 ### Range Sensor
 
-<table>
+<table markdown="span">
     <tr>
         <td valign="top" width="60%">
             <strong>2D LiDAR</strong><br><br>  
@@ -242,40 +242,50 @@ info:
 
 ### Proprioception
 
-<table>
+<table markdown="span">
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Joint Positions</strong><br><br>  
             Joint positions.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
+        <td>
+        </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Joint Velocities</strong><br><br>  
             Joint velocities.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
+        <td>
+        </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Joint Efforts</strong><br><br>  
             Torque measured at each joint.<br><br>
             Size: # of joints, numpy.float64<br><br>
         </td>
+        <td>
+        </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Robot Position</strong><br><br>  
             Robot position in the world frame.<br><br>
             Size: (x, y, z), numpy.float64<br><br>
         </td>
+        <td>
+        </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Robot Orientation</strong><br><br>  
             Robot global euler orientation.<br><br>
             Size: (roll, pitch, yaw), numpy.float64<br><br>
+        </td>
+        <td>
         </td>
     </tr>
     <tr>
@@ -284,31 +294,37 @@ info:
             Robot orientation on the XY plane of the world frame.<br><br>
             Size: angle, numpy.float64<br><br>
         </td>
+        <td>
+        </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Robot Linear Velocity</strong><br><br>  
             Robot linear velocity.<br><br>
             Size: (x_vel, y_vel, z_vel), numpy.float64<br><br>
         </td>
     </tr>
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Robot Angular Velocity</strong><br><br>  
             Robot angular velocity.<br><br>
             Size: (x_vel, y_vel, z_vel), numpy.float64<br><br>
+        </td>
+        <td>
         </td>
     </tr>
 </table>
 
 ### Task Observation
 
-<table>
+<table markdown="span" style="width: 100%;">
     <tr>
-        <td>
+        <td valign="top" width="100%">
             <strong>Low-dim task observation</strong><br><br>  
             Task-specific observation, e.g. navigation goal position.<br><br>
             Size: # of low-dim observation, numpy.float64<br><br>
+        </td>
+        <td>
         </td>
     </tr>
 </table>
