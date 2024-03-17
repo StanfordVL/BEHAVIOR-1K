@@ -558,7 +558,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.step()
 
         # Grab and return observations
-        obs, obs_info = self.get_obs()
+        obs, _ = self.get_obs()
 
         if self._loaded:
             # Sanity check to make sure received observations match expected observation space
@@ -598,7 +598,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 raise ValueError("Observation space does not match returned observations!")
 
 
-        return obs, obs_info
+        return obs
 
     @property
     def episode_steps(self):

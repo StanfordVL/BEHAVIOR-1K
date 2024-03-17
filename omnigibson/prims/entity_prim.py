@@ -478,6 +478,20 @@ class EntityPrim(XFormPrim):
         """
         return self._links
     
+    @cached_property
+    def has_attachment_points(self):
+        """
+        Returns:
+            bool: Whether this object has any attachment points
+        """
+        children = list(self.prim.GetChildren())
+        while children:
+            child_prim = children.pop()
+            children.extend(child_prim.GetChildren())
+            if "attachment" in child_prim.GetName():
+                return True
+        return False
+    
     def _compute_articulation_tree(self):
         """
         Get a graph of the articulation tree, where nodes are link names and edges
