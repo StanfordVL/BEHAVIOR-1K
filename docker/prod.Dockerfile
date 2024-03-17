@@ -4,6 +4,9 @@ FROM stanfordvl/omnigibson-dev:latest
 ADD . /omnigibson-src
 WORKDIR /omnigibson-src
 
+# Copy over the kit file
+COPY /omnigibson-src/omnigibson/omnigibson.kit /isaac-sim/apps/omnigibson.kit
+
 SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
 
 # Install OmniGibson
