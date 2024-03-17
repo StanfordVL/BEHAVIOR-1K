@@ -33,6 +33,9 @@ echo:
 FOR /F "tokens=*" %%g IN ('%ISAAC_SIM_PATH%\python.bat -c "import platform; print(platform.python_version())"') do (SET ISAAC_PYTHON_VERSION=%%g)
 echo Using Python version [4m%ISAAC_PYTHON_VERSION%[0m matching your current Isaac Sim version
 
+:: Install the OmniGibson kit file
+copy omnigibson\omnigibson.kit %ISAAC_SIM_PATH%\apps\omnigibson.kit || goto :error
+
 :: Create a conda environment with the appropriate python version
 call conda create -y -n %conda_name% python=%ISAAC_PYTHON_VERSION% || goto :error
 call conda activate %conda_name% || goto :error
