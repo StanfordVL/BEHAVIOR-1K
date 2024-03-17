@@ -3,6 +3,7 @@ import itertools
 import contextlib
 import logging
 import os
+import shutil
 import socket
 from pathlib import Path
 import atexit
@@ -72,6 +73,17 @@ def _launch_app():
         # sys.argv.append("--/log/fileLogLevel=warning")
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / "omnigibson.kit"
+    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
     with launch_context(None):
