@@ -87,7 +87,7 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=f'{os.environ["EXP_PATH"]}/omnigibson.kit')
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     assert meets_minimum_isaac_version("2023.1.1"), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
 
