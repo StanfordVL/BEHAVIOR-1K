@@ -4,15 +4,17 @@ icon: material/home-outline
 
 # 🏠 **Scene**
 
-Scene are one level higher than objects. A scene consists of multiple objects that interacts with each other. OmniGibson currently supports two scenes:
+Scene are one level higher than objects. A scene consists of multiple objects that interacts with each other. OmniGibson currently supports two types of scenes:
 
-- `EmptyScene`: This is an empty scene that 
-- `InteractiveTraversableScene`: This type of scene are interactive and . It comes with traversable maps that enables robots to perform navigation tasks. Users can choose from the predefined 51 scenes in the OmniGibson dataset.
+- `EmptyScene`: This is an empty scene that can be used to create custom scenes. It does not contain any pre-defined objects.
+- `InteractiveTraversableScene`: This type of scene are interactive and traversible. It comes with traversable maps that enables robots to perform navigation tasks. Users can choose from the predefined 51 scenes in the OmniGibson dataset.
+
+Here's a list of all the `InteractiveTraversableScene` scenes available in OmniGibson:
 
 <table markdown="span">
     <tr>
         <td valign="top" width="30%">
-            [**`Beechwood_0_garden`**](../reference/scene/Beechwood_0_garden.html)<br><br>  
+            **`Beechwood_0_garden`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Beechwood_0_garden.png" alt="Beechwood_0_garden">
@@ -23,7 +25,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Beechwood_0_int`**](../reference/scene/Beechwood_0_int.html)<br><br>  
+            **`Beechwood_0_int`**<br><br> 
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Beechwood_0_int.png" alt="Beechwood_0_int">
@@ -34,7 +36,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Beechwood_1_int`**](../reference/scene/Beechwood_1_int.html)<br><br>  
+            **`Beechwood_1_int`**<br><br> 
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Beechwood_1_int.png" alt="Beechwood_1_int">
@@ -45,7 +47,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Benevolence_0_int`**](../reference/scene/Benevolence_0_int.html)<br><br>  
+            **`Benevolence_0_int`**<br><br>
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Benevolence_0_int.png" alt="Benevolence_0_int">
@@ -56,7 +58,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Benevolence_1_int`**](../reference/scene/Benevolence_1_int.html)<br><br>  
+            **`Benevolence_1_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Benevolence_1_int.png" alt="Benevolence_1_int">
@@ -67,7 +69,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Benevolence_2_int`**](../reference/scene/Benevolence_2_int.html)<br><br>  
+            **`Benevolence_2_int`** 
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Benevolence_2_int.png" alt="Benevolence_2_int">
@@ -78,7 +80,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Ihlen_0_int`**](../reference/scene/Ihlen_0_int.html)<br><br>  
+            **`Ihlen_0_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Ihlen_0_int.png" alt="Ihlen_0_int">
@@ -89,7 +91,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Ihlen_1_int`**](../reference/scene/Ihlen_1_int.html)<br><br>  
+            **`Ihlen_1_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Ihlen_1_int.png" alt="Ihlen_1_int">
@@ -100,7 +102,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Merom_0_garden`**](../reference/scene/Merom_0_garden.html)<br><br>  
+            **`Merom_0_garden`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Merom_0_garden.png" alt="Merom_0_garden">
@@ -111,7 +113,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Merom_0_int`**](../reference/scene/Merom_0_int.html)<br><br>  
+            **`Merom_0_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Merom_0_int.png" alt="Merom_0_int">
@@ -122,7 +124,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Merom_1_int`**](../reference/scene/Merom_1_int.html)<br><br>  
+            **`Merom_1_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Merom_1_int.png" alt="Merom_1_int">
@@ -133,7 +135,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Pomaria_0_garden`**](../reference/scene/Pomaria_0_garden.html)<br><br>  
+            **`Pomaria_0_garden`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Pomaria_0_garden.png" alt="Pomaria_0_garden">
@@ -144,7 +146,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Pomaria_0_int`**](../reference/scene/Pomaria_0_int.html)<br><br>  
+            **`Pomaria_0_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Pomaria_0_int.png" alt="Pomaria_0_int">
@@ -155,7 +157,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Pomaria_1_int`**](../reference/scene/Pomaria_1_int.html)<br><br>  
+            **`Pomaria_1_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Pomaria_1_int.png" alt="Pomaria_1_int">
@@ -166,7 +168,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Pomaria_2_int`**](../reference/scene/Pomaria_2_int.html)<br><br>  
+            **`Pomaria_2_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Pomaria_2_int.png" alt="Pomaria_2_int">
@@ -177,7 +179,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Rs_garden`**](../reference/scene/Rs_garden.html)<br><br>  
+            **`Rs_garden`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Rs_garden.png" alt="Rs_garden">
@@ -188,7 +190,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Rs_int`**](../reference/scene/Rs_int.html)<br><br>  
+            **`Rs_int`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Rs_int.png" alt="Rs_int">
@@ -199,7 +201,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Wainscott_0_garden`**](../reference/scene/Wainscott_0_garden.html)<br><br>  
+            **`Wainscott_0_garden`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Wainscott_0_garden.png" alt="Wainscott_0_garden">
@@ -232,7 +234,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`grocery_store_asian`**](../reference/scene/grocery_store_asian.html)<br><br>  
+            **`grocery_store_asian`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/grocery_store_asian.png" alt="grocery_store_asian">
@@ -243,7 +245,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`grocery_store_cafe`**](../reference/scene/grocery_store_cafe.html)<br><br>  
+            **`grocery_store_cafe`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/grocery_store_cafe.png" alt="grocery_store_cafe">
@@ -254,7 +256,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`grocery_store_convenience`**](../reference/scene/grocery_store_convenience.html)<br><br>  
+            **`grocery_store_convenience`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/grocery_store_convenience.png" alt="grocery_store_convenience">
@@ -265,7 +267,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`grocery_store_half_stocked`**](../reference/scene/grocery_store_half_stocked.html)<br><br>  
+            **`grocery_store_half_stocked`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/grocery_store_half_stocked.png" alt="grocery_store_half_stocked">
@@ -276,7 +278,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hall_arch_wood`**](../reference/scene/hall_arch_wood.html)<br><br>  
+            **`hall_arch_wood`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hall_arch_wood.png" alt="hall_arch_wood">
@@ -287,7 +289,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hall_conference_large`**](../reference/scene/hall_conference_large.html)<br><br>  
+            **`hall_conference_large`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hall_conference_large.png" alt="hall_conference_large">
@@ -298,7 +300,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hall_glass_ceiling`**](../reference/scene/hall_glass_ceiling.html)<br><br>  
+            **`hall_glass_ceiling`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hall_glass_ceiling.png
@@ -310,7 +312,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hall_train_station`**](../reference/scene/hall_train_station.html)<br><br>  
+            **`hall_train_station`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hall_train_station.png" alt="hall_train_station">
@@ -321,7 +323,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hotel_gym_spa`**](../reference/scene/hotel_gym_spa.html)<br><br>  
+            **`hotel_gym_spa`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hotel_gym_spa.png" alt="hotel_gym_spa">
@@ -332,7 +334,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hotel_suite_large`**](../reference/scene/hotel_suite_large.html)<br><br>  
+            **`hotel_suite_large`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hotel_suite_large.png" alt="hotel_suite_large">
@@ -343,7 +345,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`hotel_suite_small`**](../reference/scene/hotel_suite_small.html)<br><br>  
+            **`hotel_suite_small`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/hotel_suite_small.png" alt="hotel_suite_small">
@@ -354,7 +356,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`house_double_floor_lower`**](../reference/scene/house_double_floor_lower.html)<br><br>  
+            **`house_double_floor_lower`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/house_double_floor_lower.png" alt="house_double_floor_lower">
@@ -365,7 +367,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`house_double_floor_upper`**](../reference/scene/house_double_floor_upper.html)<br><br>  
+            **`house_double_floor_upper`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/house_double_floor_upper.png" alt="house_double_floor_upper">
@@ -376,7 +378,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`house_single_floor`**](../reference/scene/house_single_floor.html)<br><br>  
+            **`house_single_floor`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/house_single_floor.png" alt="house_single_floor">
@@ -387,7 +389,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`office_bike`**](../reference/scene/office_bike.html)<br><br>  
+            **`office_bike`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/office_bike.png" alt="office_bike">
@@ -398,7 +400,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`office_cubicles_left`**](../reference/scene/office_cubicles_left.html)<br><br>  
+            **`office_cubicles_left`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/office_cubicles_left.png" alt="office_cubicles_left">
@@ -409,7 +411,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`office_cubicles_right`**](../reference/scene/office_cubicles_right.html)<br><br>  
+            **`office_cubicles_right`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/office_cubicles_right.png" alt="office_cubicles_right">
@@ -420,7 +422,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`office_large`**](../reference/scene/office_large.html)<br><br>  
+            **`office_large`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/office_large.png" alt="office_large">
@@ -431,7 +433,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`office_vendor_machine`**](../reference/scene/office_vendor_machine.html)<br><br>  
+            **`office_vendor_machine`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/office_vendor_machine.png" alt="office_vendor_machine">
@@ -442,7 +444,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_asian`**](../reference/scene/restaurant_asian.html)<br><br>  
+            **`restaurant_asian`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_asian.png" alt="restaurant_asian">
@@ -453,7 +455,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_brunch`**](../reference/scene/restaurant_brunch.html)<br><br>  
+            **`restaurant_brunch`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_brunch.png" alt="restaurant_brunch">
@@ -464,7 +466,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_cafeteria`**](../reference/scene/restaurant_cafeteria.html)<br><br>  
+            **`restaurant_cafeteria`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_cafeteria.png" alt="restaurant_cafeteria">
@@ -475,7 +477,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_diner`**](../reference/scene/restaurant_diner.html)<br><br>  
+            **`restaurant_diner`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_diner.png" alt="restaurant_diner">
@@ -486,7 +488,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_hotel`**](../reference/scene/restaurant_hotel.html)<br><br>  
+            **`restaurant_hotel`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_hotel.png" alt="restaurant_hotel">
@@ -497,7 +499,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`restaurant_urban`**](../reference/scene/restaurant_urban.html)<br><br>  
+            **`restaurant_urban`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/restaurant_urban.png" alt="restaurant_urban">
@@ -508,7 +510,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`school_biology`**](../reference/scene/school_biology.html)<br><br>  
+            **`school_biology`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/school_biology.png" alt="school_biology">
@@ -519,7 +521,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`school_chemistry`**](../reference/scene/school_chemistry.html)<br><br>  
+            **`school_chemistry`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/school_chemistry.png" alt="school_chemistry">
@@ -530,7 +532,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`school_computer_lab_and_infirmary`**](../reference/scene/school_computer_lab_and_infirmary.html)<br><br>  
+            **`school_computer_lab_and_infirmary`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/school_computer_lab_and_infirmary.png" alt="school_computer_lab_and_infirmary">
@@ -541,7 +543,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`school_geography`**](../reference/scene/school_geography.html)<br><br>  
+            **`school_geography`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/school_geography.png" alt="school_geography">
@@ -552,7 +554,7 @@ Scene are one level higher than objects. A scene consists of multiple objects th
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`school_gym`**](../reference/scene/school_gym.html)<br><br>  
+            **`school_gym`**<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/school_gym.png" alt="school_gym">
