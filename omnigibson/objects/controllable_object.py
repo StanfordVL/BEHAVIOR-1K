@@ -248,13 +248,11 @@ class ControllableObject(BaseObject):
             else self._create_continuous_action_space()
 
     def reset(self):
-        # Make sure simulation is playing, otherwise, we cannot reset because physx requires active running
-        # simulation in order to set joints
-        assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+        # Call super first
+        super().reset()
 
-        # Additionally set the joint states based on the reset values
+        # Override the reset joint state based on reset values
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
-        self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
     @abstractmethod
     def _create_discrete_action_space(self):

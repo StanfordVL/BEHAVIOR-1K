@@ -1,6 +1,7 @@
 import json
 import bddl
 import os
+import random
 import numpy as np
 import networkx as nx
 from collections import defaultdict
@@ -16,7 +17,7 @@ from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models_with_abilities
+from omnigibson.utils.asset_utils import get_attachment_metalinks, get_all_object_categories, get_all_object_category_models_with_abilities
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import Wrapper
 from omnigibson.objects.dataset_object import DatasetObject
@@ -37,6 +38,87 @@ m = create_module_macros(module_path=__file__)
 m.MIN_DYNAMIC_SCALE = 0.5
 m.DYNAMIC_SCALE_INCREMENT = 0.1
 
+GOOD_MODELS = {
+    "jar": {"kijnrj"},
+    "carton": {"causya", "msfzpz", "sxlklf"},
+    "hamper": {"drgdfh", "hlgjme", "iofciz", "pdzaca", "ssfvij"},
+    "hanging_plant": set(),
+    "hardback": {"esxakn"},
+    "notebook": {"hwhisw"},
+    "paperback": {"okcflv"},
+    "plant_pot": {"ihnfbi", "vhglly", "ygrtaz"},
+    "pot_plant": {"cvthyv", "dbjcic", "cecdwu"},
+    "recycling_bin": {"nuoypc"},
+    "tray": {"gsxbym", "huwhjg", "txcjux", "uekqey", "yqtlhy"},
+}
+
+GOOD_BBOXES = {
+    "basil": {
+        "dkuhvb": [0.07286304, 0.0545199 , 0.03108144],
+    },
+    "basil_jar": {
+        "swytaw": [0.22969539, 0.19492961, 0.30791675],
+    },
+    "bicycle_chain": {
+        "czrssf": [0.242, 0.012, 0.021],
+    },
+    "clam": {
+        "ihhbfj": [0.078, 0.081, 0.034],
+    },
+    "envelope": {
+        "urcigc": [0.004, 0.06535058, 0.10321216],
+    },
+    "mail": {
+        "azunex": [0.19989018, 0.005, 0.12992871],
+        "gvivdi": [0.28932137, 0.005, 0.17610794],
+        "mbbwhn": [0.27069291, 0.005, 0.13114884],
+        "ojkepk": [0.19092424, 0.005, 0.13252979],
+        "qpwlor": [0.22472473, 0.005, 0.18983322],
+    },
+    "pill_bottle": {
+        "csvdbe": [0.078, 0.078, 0.109],
+        "wsasmm": [0.078, 0.078, 0.109],
+    },
+    "plant_pot": {
+        "ihnfbi": [0.24578613, 0.2457865 , 0.18862737],
+    },
+    "razor": {
+        "jocsgp": [0.046, 0.063, 0.204],
+    },
+    "recycling_bin": {
+        "nuoypc": [0.69529409, 0.80712041, 1.07168694],
+    },
+    "tupperware": {
+        "mkstwr": [0.33, 0.33, 0.21],
+    },
+}
+
+BAD_MODELS = {
+    "bandana": {"wbhliu"},
+    "curtain": {"ohvomi"},
+    "cardigan": {"itrkhr"},
+    "sweatshirt": {"nowqqh"},
+    "jeans": {"nmvvil", "pvzxyp"},
+    "pajamas": {"rcgdde"},
+    "polo_shirt": {"vqbvph"},
+    "vest": {"girtqm"}, # bddl NOT FIXED
+    "onesie": {"pbytey"},
+    "dishtowel": {"ltydgg"},
+    "dress": {"gtghon"},
+    "hammock": {'aiftuk', 'fglfga', 'klhkgd', 'lqweda', 'qewdqa'},
+    'jacket': {'kiiium', 'nogevo', 'remcyk'},
+    "quilt": {"mksdlu", "prhems"},
+    "pennant": {"tfnwti"},
+    "pillowcase": {"dtoahb", "yakvci"},
+    "rubber_glove": {"leuiso"},
+    "scarf": {"kclcrj"},
+    "sock": {"vpafgj"},
+    "tank_top": {"fzldgi"},
+    "curtain": {"shbakk"}
+}
+
+DO_NOT_REMESH_CLOTHS = {}
+DO_NOT_REMESH_CLOTHS.update(BAD_MODELS)
 
 class UnsampleablePredicate:
     def _sample(self, *args, **kwargs):
@@ -152,6 +234,7 @@ SUPPORTED_PREDICATES = {
     "hot": get_unary_predicate_for_state(object_states.Heated, "hot"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
+    "on_fire": get_unary_predicate_for_state(object_states.OnFire, "on_fire"),
     "attached": get_binary_predicate_for_state(object_states.AttachedTo, "attached"),
     "overlaid": get_binary_predicate_for_state(object_states.Overlaid, "overlaid"),
     "folded": get_unary_predicate_for_state(object_states.Folded, "folded"),
@@ -162,7 +245,7 @@ SUPPORTED_PREDICATES = {
     "insource": ObjectStateInsourcePredicate,
 }
 
-KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET])
+KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET] + ["attached"])
 
 
 # BEHAVIOR-related
@@ -476,6 +559,7 @@ class BDDLSampler:
         self._future_obj_instances = None                   # set of str
         self._inroom_object_conditions = None       # list of (condition, positive) tuple
         self._inroom_object_scope_filtered_initial = None   # dict mapping str to BDDLEntity
+        self._attached_objects = defaultdict(set)           # dict mapping str to set of str
 
     def sample(self, validate_goal=False):
         """
@@ -554,6 +638,11 @@ class BDDLSampler:
             log.error(error_msg)
             return False, error_msg
 
+        error_msg = self._parse_attached_states()
+        if error_msg:
+            log.error(error_msg)
+            return False, error_msg
+
         error_msg = self._build_sampling_order()
         if error_msg:
             log.error(error_msg)
@@ -600,6 +689,51 @@ class BDDLSampler:
                     return f"Object [{obj_inst}] has more than one room assignment"
 
                 self._inroom_object_instances.add(obj_inst)
+
+    def _parse_attached_states(self):
+        """
+        Infers which objects are attached to which other objects.
+        If a category-level attachment is specified, it will be expanded to all instances of that category.
+        E.g. if the goal condition requires corks to be attached to bottles, every cork needs to be able to
+        attach to every bottle.
+        """
+        for cond in self._activity_conditions.parsed_initial_conditions:
+            if cond[0] == "attached":
+                obj_inst, parent_inst = cond[1], cond[2]
+                if obj_inst not in self._object_scope or parent_inst not in self._object_scope:
+                    return f"Object [{obj_inst}] or parent [{parent_inst}] in attached initial condition not found in object scope"
+                self._attached_objects[obj_inst].add(parent_inst)
+
+        ground_attached_conditions = []
+        conditions_to_check = self._activity_conditions.parsed_goal_conditions.copy()
+        while conditions_to_check:
+            new_conditions_to_check = []
+            for cond in conditions_to_check:
+                if cond[0] == "attached":
+                    ground_attached_conditions.append(cond)
+                else:
+                    new_conditions_to_check.extend([ele for ele in cond if isinstance(ele, list)])
+            conditions_to_check = new_conditions_to_check
+
+        for cond in ground_attached_conditions:
+            obj_inst, parent_inst = cond[1].lstrip("?"), cond[2].lstrip("?")
+            if obj_inst in self._object_scope:
+                obj_insts = [obj_inst]
+            elif obj_inst in self._activity_conditions.parsed_objects:
+                obj_insts = self._activity_conditions.parsed_objects[obj_inst]
+            else:
+                return f"Object [{obj_inst}] in attached goal condition not found in object scope or parsed objects"
+
+            if parent_inst in self._object_scope:
+                parent_insts = [parent_inst]
+            elif parent_inst in self._activity_conditions.parsed_objects:
+                parent_insts = self._activity_conditions.parsed_objects[parent_inst]
+            else:
+                return f"Parent [{parent_inst}] in attached goal condition not found in object scope or parsed objects"
+
+            for obj_inst in obj_insts:
+                for parent_inst in parent_insts:
+                    self._attached_objects[obj_inst].add(parent_inst)
 
     def _build_sampling_order(self):
         """
@@ -735,12 +869,13 @@ class BDDLSampler:
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
                 categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
-                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
 
                 # Grab all models that fully support all abilities for the corresponding category
-                valid_models = {cat: set(get_all_object_category_models_with_abilities(cat, abilities))
-                                for cat in categories}
-
+                valid_models = {cat: set(get_all_object_category_models_with_abilities(
+                    cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))))
+                    for cat in categories}
+                valid_models = {cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat])) - BAD_MODELS.get(cat, set()) for cat, models in valid_models.items()}
+                valid_models = {cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst) for cat, models in valid_models.items()}
                 room_insts = [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
@@ -799,12 +934,29 @@ class BDDLSampler:
                                 entity = self._object_scope[child_scope_name]
                                 conditions_to_sample.append((condition, positive, entity, child_scope_name))
 
-                        # Sort children based on their AABB so the larger objects are sampled first
-                        conditions_to_sample = reversed(sorted(conditions_to_sample, key=lambda x: np.product(x[2].aabb_extent)))
+                        # If we're sampling kinematics, sort children based on (a) whether they are cloth or not, and
+                        # then (b) their AABB, so that first all rigid objects are sampled before all cloth objects,
+                        # and within each group the larger objects are sampled first. This is needed because rigid
+                        # objects currently don't detect collisions with cloth objects (rigid_obj.states[ContactBodies]
+                        # is empty even when a cloth object is in contact with it).
+                        rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
+                        cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
+                        conditions_to_sample = (
+                                list(reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))) +
+                                list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                        )
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
-                            success = condition.sample(binary_state=positive)
+                            kwargs = dict()
+                            # Reset if we're sampling a kinematic state
+                            if condition.STATE_NAME in {"inside", "ontop", "under"}:
+                                kwargs["reset_before_sampling"] = True
+                            elif condition.STATE_NAME in {"attached"}:
+                                kwargs["bypass_alignment_checking"] = True
+                                kwargs["check_physics_stability"] = True
+                                kwargs["can_joint_break"] = False
+                            success = condition.sample(binary_state=positive, **kwargs)
                             log_msg = " ".join(
                                 [
                                     f"{condition_type} kinematic condition sampling",
@@ -885,6 +1037,69 @@ class BDDLSampler:
                     if key in room_inst_satisfied
                 }
 
+    def _filter_model_choices_by_attached_states(self, model_choices, category, obj_inst):
+        # If obj_inst is a child object that depends on a parent object that has been imported or exists in the scene,
+        # we filter in only models that match the parent object's attachment metalinks.
+        if obj_inst in self._attached_objects:
+            parent_insts = self._attached_objects[obj_inst]
+            parent_objects = []
+            for parent_inst in parent_insts:
+                # If parent_inst is not an inroom object, it must be a non-sampleable object that has already been imported.
+                # Grab it from the object_scope
+                if parent_inst not in self._inroom_object_instances:
+                    assert self._object_scope[parent_inst] is not None
+                    parent_objects.append([self._object_scope[parent_inst].wrapped_obj])
+                # If parent_inst is an inroom object, it can refer to multiple objects in the scene in different rooms.
+                # We gather all of them and require that the model choice supports attachment to at least one of them.
+                else:
+                    for _, parent_inst_to_parent_objs in self._inroom_object_scope.items():
+                        if parent_inst in parent_inst_to_parent_objs:
+                            parent_objects.append(sum(parent_inst_to_parent_objs[parent_inst].values(), []))
+
+            # Help function to check if a child object can attach to a parent object
+            def can_attach(child_attachment_links, parent_attachment_links):
+                for child_link_name in child_attachment_links:
+                    child_category = child_link_name.split("_")[1]
+                    if child_category.endswith("F"):
+                        continue
+                    assert child_category.endswith("M")
+                    parent_category = child_category[:-1] + "F"
+                    for parent_link_name in parent_attachment_links:
+                        if parent_category in parent_link_name:
+                            return True
+                return False
+
+            # Filter out models that don't support the attached states
+            new_model_choices = set()
+            for model_choice in model_choices:
+                child_attachment_links = get_attachment_metalinks(category, model_choice)
+                # The child model choice needs to be able to attach to all parent instances.
+                # For in-room parent instances, there might be multiple parent objects (e.g. different wall nails),
+                # and the child object needs to be able to attach to at least one of them.
+                if all(
+                        any(
+                            can_attach(child_attachment_links, get_attachment_metalinks(parent_obj.category, parent_obj.model))
+                            for parent_obj in parent_objs_per_inst
+                        )
+                    for parent_objs_per_inst in parent_objects):
+                    new_model_choices.add(model_choice)
+
+            return new_model_choices
+
+        # If obj_inst is a prent object that other objects depend on, we filter in only models that have at least some
+        # attachment links.
+        elif any(obj_inst in parents for parents in self._attached_objects.values()):
+            # Filter out models that don't support the attached states
+            new_model_choices = set()
+            for model_choice in model_choices:
+                if len(get_attachment_metalinks(category, model_choice)) > 0:
+                    new_model_choices.add(model_choice)
+            return new_model_choices
+
+        # If neither of the above cases apply, we don't need to filter the model choices
+        else:
+            return model_choices
+
     def _import_sampleable_objects(self):
         """
         Import all objects that can be sampled
@@ -901,7 +1116,15 @@ class BDDLSampler:
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
         available_categories = set(get_all_object_categories())
-        for obj_synset in self._activity_conditions.parsed_objects:
+
+        # Attached states introduce dependencies among objects during import time.
+        # For example, when importing a child object instance, we need to make sure the imported model can be attached
+        # to the parent object instance. We sort the object instances such that parent object instances are imported
+        # before child object instances.
+        dependencies = {key: self._attached_objects.get(key, {}) for key in self._object_instance_to_synset.keys()}
+        for obj_inst in list(reversed(list(nx.algorithms.topological_sort(nx.DiGraph(dependencies))))):
+            obj_synset = self._object_instance_to_synset[obj_inst]
+
             # Don't populate agent
             if obj_synset == "agent.n.01":
                 continue
@@ -922,52 +1145,60 @@ class BDDLSampler:
                     return f"None of the following categories could be found in the dataset for synset {obj_synset}: " \
                            f"{valid_categories}"
 
-                for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
-                    # Don't explicitly sample if future
-                    if obj_inst in self._future_obj_instances:
-                        self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
-                        continue
-                    # Don't sample if already in room
-                    if obj_inst in self._inroom_object_instances:
-                        continue
+                # Don't explicitly sample if future
+                if obj_inst in self._future_obj_instances:
+                    self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
+                    continue
+                # Don't sample if already in room
+                if obj_inst in self._inroom_object_instances:
+                    continue
 
-                    # Shuffle categories and sample to find a valid model
-                    np.random.shuffle(categories)
-                    model_choices, category = set(), None
-                    for category in categories:
-                        # Get all available models that support all of its synset abilities
-                        model_choices = set(get_all_object_category_models_with_abilities(
-                            category=category,
-                            abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
-                        ))
-                        if len(model_choices) > 0:
-                            break
-
-                    if len(model_choices) == 0:
-                        # We failed to find ANY valid model across ALL valid categories
-                        return f"Missing valid object models for all categories: {categories}"
-
-                    # Randomly select an object model
-                    model = np.random.choice(list(model_choices))
-
-                    # create the object
-                    simulator_obj = DatasetObject(
-                        name=f"{category}_{len(og.sim.scene.objects)}",
+                # Shuffle categories and sample to find a valid model
+                np.random.shuffle(categories)
+                model_choices = set()
+                for category in categories:
+                    # Get all available models that support all of its synset abilities
+                    model_choices = set(get_all_object_category_models_with_abilities(
                         category=category,
-                        model=model,
-                        prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
-                    )
-                    num_new_obj += 1
+                        abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
+                    ))
+                    model_choices = model_choices if category not in GOOD_MODELS else model_choices.intersection(GOOD_MODELS[category])
+                    model_choices -= BAD_MODELS.get(category, set())
+                    model_choices = self._filter_model_choices_by_attached_states(model_choices, category, obj_inst)
+                    if len(model_choices) > 0:
+                        break
 
-                    # Load the object into the simulator
-                    assert og.sim.scene.loaded, "Scene is not loaded"
-                    og.sim.import_object(simulator_obj)
+                if len(model_choices) == 0:
+                    # We failed to find ANY valid model across ALL valid categories
+                    return f"Missing valid object models for all categories: {categories}"
 
-                    # Set these objects to be far-away locations
-                    simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
+                # Randomly select an object model
+                model = np.random.choice(list(model_choices))
 
-                    self._sampled_objects.add(simulator_obj)
-                    self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
+                # Potentially add additional kwargs
+                obj_kwargs = dict()
+
+                obj_kwargs["bounding_box"] = GOOD_BBOXES.get(category, dict()).get(model, None)
+
+                # create the object
+                simulator_obj = DatasetObject(
+                    name=f"{category}_{len(og.sim.scene.objects)}",
+                    category=category,
+                    model=model,
+                    prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
+                    **obj_kwargs,
+                )
+                num_new_obj += 1
+
+                # Load the object into the simulator
+                assert og.sim.scene.loaded, "Scene is not loaded"
+                og.sim.import_object(simulator_obj)
+
+                # Set these objects to be far-away locations
+                simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
+
+                self._sampled_objects.add(simulator_obj)
+                self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
 
         og.sim.play()
         og.sim.stop()
@@ -1039,18 +1270,34 @@ class BDDLSampler:
                             entity = self._object_scope[child_scope_name]
                             conditions_to_sample.append((condition, positive, entity, child_scope_name))
 
-                    # If we're sampling kinematics, sort children based on their AABB, so that the larger objects
-                    # are sampled first
+                    # If we're sampling kinematics, sort children based on (a) whether they are cloth or not, and then
+                    # (b) their AABB, so that first all rigid objects are sampled before cloth objects, and within each
+                    # group the larger objects are sampled first
                     if group == "kinematic":
-                        conditions_to_sample = reversed(sorted(conditions_to_sample, key=lambda x: np.product(x[2].aabb_extent)))
+                        rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
+                        cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
+                        conditions_to_sample = (
+                                list(reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))) +
+                                list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                        )
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
                         success = False
+
+                        kwargs = dict()
+                        # Reset if we're sampling a kinematic state
+                        if condition.STATE_NAME in {"inside", "ontop", "under"}:
+                            kwargs["reset_before_sampling"] = True
+                        elif condition.STATE_NAME in {"attached"}:
+                            kwargs["bypass_alignment_checking"] = True
+                            kwargs["check_physics_stability"] = True
+                            kwargs["can_joint_break"] = False
+
                         while True:
                             num_trials = 1
                             for _ in range(num_trials):
-                                success = condition.sample(binary_state=positive)
+                                success = condition.sample(binary_state=positive, **kwargs)
                                 if success:
                                     # Update state
                                     state = og.sim.dump_state(serialized=False)
@@ -1066,7 +1313,7 @@ class BDDLSampler:
 
                             # Can't re-sample non-kinematics or rescale cloth or agent, so in
                             # those cases terminate immediately
-                            if group != "kinematic" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
+                            if group != "kinematic" or condition.STATE_NAME == "attached" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
                                 break
 
                             # If any scales are equal or less than the lower threshold, terminate immediately
@@ -1118,8 +1365,9 @@ class BDDLSampler:
             og.sim.stop()
             for obj_inst in problematic_objs:
                 obj = self._object_scope[obj_inst]
-                # Can't rescale cloth or agent, so play again and then terminate immediately if found
-                if "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
+                # If the object's initial condition is attachment, or it's agent or cloth, we can't / shouldn't scale
+                # down, so play again and then terminate immediately
+                if obj_inst in self._attached_objects or "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
                     og.sim.play()
                     return error_msg, None
                 assert np.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)

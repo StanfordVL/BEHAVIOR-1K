@@ -32,6 +32,9 @@ m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
 
+BOUNDING_CUBE_OBJECTS = {
+    "xbfgjc": {"base_link"},
+}
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
     """
@@ -181,7 +184,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Disable collision between building structures
         CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
 
-        # Disable collision between building structures and fixed base objects
+        # Disable collision between building structures and 1. fixed base objects, 2. attached objects
         CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
         CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
 
@@ -237,6 +240,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             obj = create_object_from_init_info(obj_info)
             # Import into the simulator
             og.sim.import_object(obj)
+            if isinstance(obj, DatasetObject) and obj.model in BOUNDING_CUBE_OBJECTS:
+                link_names = BOUNDING_CUBE_OBJECTS[obj.model]
+                for link_name in link_names:
+                    link = obj.links[link_name]
+                    for col_mesh in link.collision_meshes.values():
+                        col_mesh.set_collision_approximation("boundingCube")
             # Set the init pose accordingly
             obj.set_position_orientation(
                 position=init_state[obj_name]["root_link"]["pos"],

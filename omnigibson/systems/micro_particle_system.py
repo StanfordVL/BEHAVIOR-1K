@@ -41,6 +41,9 @@ m.CLOTH_DAMPING = 0.2
 m.CLOTH_FRICTION = 0.4
 m.CLOTH_DRAG = 0.001
 m.CLOTH_LIFT = 0.003
+m.MIN_PARTICLE_CONTACT_OFFSET = 0.005   # Minimum particle contact offset for physical micro particles
+m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE = 0.8   # How much overlap expected between fluid particles at rest
+m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None     # If set, the maximum particle velocity for micro particle systems
 
 
 def set_carb_settings_for_fluid_isosurface():
@@ -633,6 +636,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Run super
         super().initialize()
 
+        # Potentially set system prim's max velocity value
+        if m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY is not None:
+            cls.system_prim.GetProperty("maxVelocity").Set(m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY)
+
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = dict()
 
@@ -902,7 +909,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_idn=None,
             particle_group=0,
             sampling_distance=None,
-            max_samples=5e5,
+            max_samples=None,
             prototype_indices=None,
     ):
         """
@@ -929,7 +936,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 Only used if a new particle instancer is created!
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
         """
@@ -953,7 +960,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_idn=None,
             particle_group=0,
             sampling_distance=None,
-            max_samples=5e5,
+            max_samples=None,
             min_samples_for_success=1,
             prototype_indices=None,
     ):
@@ -972,7 +979,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 Only used if a new particle instancer is created!
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
@@ -1297,6 +1304,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return 0.99 * 0.6 * cls.particle_contact_offset
 
     @classproperty
+    def particle_particle_rest_distance(cls):
+        # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
+        return cls.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
+
+    @classproperty
     def _material_mtl_name(cls):
         """
         Returns:
@@ -1471,8 +1483,14 @@ class GranularSystem(MicroPhysicalParticleSystem):
         )
 
         # Store the contact offset based on a minimum sphere
+        # Threshold the lower-bound to avoid super small particles
         vertices = np.array(prototype.get_attribute("points")) * prototype.scale
-        _, cls._particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        _, particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        if particle_contact_offset < m.MIN_PARTICLE_CONTACT_OFFSET:
+            prototype.scale *= m.MIN_PARTICLE_CONTACT_OFFSET / particle_contact_offset
+            particle_contact_offset = m.MIN_PARTICLE_CONTACT_OFFSET
+
+        cls._particle_contact_offset = particle_contact_offset
 
         return [prototype]
 

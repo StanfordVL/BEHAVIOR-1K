@@ -104,6 +104,10 @@ class DatasetObject(USDObject):
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
 
+        # TODO: Remove once meshes are fixed
+        from omnigibson.utils.bddl_utils import DO_NOT_REMESH_CLOTHS
+        load_config["remesh"] = model not in DO_NOT_REMESH_CLOTHS.get(category, set())
+
         # Infer the correct usd path to use
         if model is None:
             available_models = get_all_object_category_models(category=category)

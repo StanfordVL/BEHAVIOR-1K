@@ -88,6 +88,12 @@ gm.GPU_AGGR_PAIRS_CAPACITY = (2 ** 14) * 1024
 # Maximum particle contacts allowed
 gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
 
+# Maximum rigid contacts -- 524288 is default value from omni, but increasing too much can sometimes lead to crashes
+gm.GPU_MAX_RIGID_CONTACT_COUNT = 524288 * 4
+
+# Maximum rigid patches -- 81920 is default value from omni, but increasing too much can sometimes lead to crashes
+gm.GPU_MAX_RIGID_PATCH_COUNT = 81920 * 4
+
 # Whether to enable object state logic or not
 gm.ENABLE_OBJECT_STATES = True
 
