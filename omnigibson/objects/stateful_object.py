@@ -11,6 +11,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
     get_default_states,
     get_state_name,
+    get_requirements_for_ability,
     get_states_for_ability,
     get_states_by_dependency_order,
     get_texture_change_states,
@@ -42,6 +43,20 @@ m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]    # (x,y,z) scale of generated ste
 m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1        # scale of steam density relative to its object, range [0, inf)
 m.STEAM_EMITTER_HEIGHT_RATIO = 0.6              # z-height of generated steam relative to its object's native height, range [0, inf)
 m.FIRE_EMITTER_HEIGHT_RATIO = 0.4               # z-height of generated fire relative to its object's native height, range [0, inf)
+
+class FlowEmitterLayerRegistry:
+    """
+    Registry for flow emitter layers. This is used to ensure that all flow emitters are placed on unique layers, so that
+    they do not interfere with each other.
+    """
+    def __init__(self):
+        self._layer = 0
+
+    def __call__(self):
+        self._layer += 1
+        return self._layer
+
+LAYER_REGISTRY = FlowEmitterLayerRegistry()
 
 
 class StatefulObject(BaseObject):
@@ -197,9 +212,22 @@ class StatefulObject(BaseObject):
 
         # Map the state type (class) to ability name and params
         if gm.ENABLE_OBJECT_STATES:
-            for ability, params in self._abilities.items():
-                for state_type in get_states_for_ability(ability):
-                    states_info[state_type] = {"ability": ability, "params": state_type.postprocess_ability_params(params)}
+            for ability in tuple(self._abilities.keys()):
+                # First, sanity check all ability requirements
+                compatible = True
+                for requirement in get_requirements_for_ability(ability):
+                    compatible, reason = requirement.is_compatible(obj=self)
+                    if not compatible:
+                        # Print out warning and pop ability
+                        log.warning(f"Ability '{ability}' is incompatible with obj {self.name}, "
+                                    f"because requirement {requirement.__name__} was not met. Reason: {reason}")
+                        self._abilities.pop(ability)
+                        break
+                if compatible:
+                    params = self._abilities[ability]
+                    for state_type in get_states_for_ability(ability):
+                        states_info[state_type] = {"ability": ability,
+                                                   "params": state_type.postprocess_ability_params(params)}
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -306,6 +334,8 @@ class StatefulObject(BaseObject):
         colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
         self._emitters[emitter_type] = emitter
+        
+        layer_number = LAYER_REGISTRY()
 
         # Update emitter general settings.
         emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
@@ -314,6 +344,10 @@ class StatefulObject(BaseObject):
         emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["coupleRateFuel"])
         emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
         emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
+        emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+        simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+        offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+        renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["buoyancyPerTemp"])
         advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["burnPerTemp"])
         advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["gravity"])
@@ -394,8 +428,8 @@ class StatefulObject(BaseObject):
                 if state_type in get_fire_states():
                     emitter_enabled[EmitterType.FIRE] |= state.get_value()
 
-                for emitter_type in emitter_enabled:
-                    self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
+            for emitter_type in emitter_enabled:
+                self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
 
             texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
             object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None

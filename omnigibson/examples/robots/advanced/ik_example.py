@@ -38,32 +38,32 @@ def main(random_selection=False, headless=False, short_exec=False):
         programmatic_pos = True
 
     # Import scene and robot (Fetch)
-    scene = Scene()
-    og.sim.import_scene(scene)
+    scene_cfg = {"type": "Scene"}
+    # Create Fetch robot
+    # Note that since we only care about IK functionality, we fix the base (this also makes the robot more stable)
+    # (any object can also have its fixed_base attribute set to True!)
+    # Note that since we're going to be setting joint position targets, we also need to make sure the robot's arm joints
+    # (which includes the trunk) are being controlled using joint positions
+    robot_cfg = {
+        "type": "Fetch",
+        "fixed_base": True,
+        "controller_config": {
+            "arm_0": {
+                "name": "NullJointController",
+                "motor_type": "position",
+            }
+        }
+    }
+    cfg = dict(scene=scene_cfg, robots=[robot_cfg])
+    env = og.Environment(configs=cfg)
 
     # Update the viewer camera's pose so that it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
         position=np.array([4.32248, -5.74338, 6.85436]),
         orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
     )
-
-    # Create Fetch robot
-    # Note that since we only care about IK functionality, we fix the base (this also makes the robot more stable)
-    # (any object can also have its fixed_base attribute set to True!)
-    # Note that since we're going to be setting joint position targets, we also need to make sure the robot's arm joints
-    # (which includes the trunk) are being controlled using joint positions
-    robot = Fetch(
-        prim_path="/World/robot",
-        name="robot",
-        fixed_base=True,
-        controller_config={
-            "arm_0": {
-                "name": "JointController",
-                "motor_type": "position",
-            }
-        }
-    )
-    og.sim.import_object(robot)
+    
+    robot = env.robots[0]
 
     # Set robot base at the origin
     robot.set_position_orientation(np.array([0, 0, 0]), np.array([0, 0, 0, 1]))
@@ -73,6 +73,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.step()
     # Make sure none of the joints are moving
     robot.keep_still()
+    # Since this demo aims to showcase how users can directly control the robot with IK, 
+    # we will need to disable the built-in controllers in OmniGibson
+    robot.control_enabled = False
 
     # Create the IK solver -- note that we are controlling both the trunk and the arm since both are part of the
     # controllable kinematic chain for the end-effector!
@@ -91,7 +94,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         joint_pos = ik_solver.solve(
             target_pos=pos,
             target_quat=quat,
+            tolerance_pos=0.002,
+            tolerance_quat=0.01,
+            weight_pos=20.0,
+            weight_quat=0.05,
             max_iterations=max_iter,
+            initial_joint_pos=robot.get_joint_positions()[control_idx],
         )
         if joint_pos is not None:
             og.log.info("Solution found. Setting new arm configuration.")
@@ -185,7 +193,7 @@ def print_message():
     print("Move the marker to a desired position to query IK and press ENTER")
     print("W/S: move marker further away or closer to the robot")
     print("A/D: move marker to the left or the right of the robot")
-    print("T/G: move marker up and down")
+    print("UP/DOWN: move marker up and down")
     print("ESC: quit")
 
 

@@ -27,8 +27,8 @@ m.ATTACHMENT_LINK_PREFIX = "attachment"
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
 m.DEFAULT_ORIENTATION_THRESHOLD = np.deg2rad(5.0)  # 5 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
-m.DEFAULT_BREAK_FORCE = 10000  # Newton
-m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
+m.DEFAULT_BREAK_FORCE = 1000  # Newton
+m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
 
 
 class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateMixin, JointBreakSubscribedStateMixin, LinkBasedStateMixin):

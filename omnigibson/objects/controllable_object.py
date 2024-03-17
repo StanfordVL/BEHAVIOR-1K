@@ -87,6 +87,7 @@ class ControllableObject(BaseObject):
         self._last_action = None
         self._controllers = None
         self.dof_names_ordered = None
+        self._control_enabled = True
 
         # Run super init
         super().__init__(
@@ -314,11 +315,23 @@ class ControllableObject(BaseObject):
             controller.update_goal(command=action[idx : idx + controller.command_dim], control_dict=self.get_control_dict())
             # Update idx
             idx += controller.command_dim
+            
+    @property
+    def control_enabled(self):
+        return self._control_enabled
+    
+    @control_enabled.setter
+    def control_enabled(self, value):
+        self._control_enabled = value
 
     def step(self):
         """
         Takes a controller step across all controllers and deploys the computed control signals onto the object.
         """
+        # Skip if we don't have control enabled
+        if not self.control_enabled:
+            return
+        
         # Skip this step if our articulation view is not valid
         if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
             return
