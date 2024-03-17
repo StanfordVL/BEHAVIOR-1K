@@ -93,7 +93,7 @@ GOOD_BBOXES = {
     },
 }
 
-BAD_MODELS = {
+BAD_CLOTH_MODELS = {
     "bandana": {"wbhliu"},
     "curtain": {"ohvomi"},
     "cardigan": {"itrkhr"},
@@ -117,8 +117,6 @@ BAD_MODELS = {
     "curtain": {"shbakk"}
 }
 
-DO_NOT_REMESH_CLOTHS = {}
-DO_NOT_REMESH_CLOTHS.update(BAD_MODELS)
 
 class UnsampleablePredicate:
     def _sample(self, *args, **kwargs):
@@ -874,7 +872,7 @@ class BDDLSampler:
                 valid_models = {cat: set(get_all_object_category_models_with_abilities(
                     cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))))
                     for cat in categories}
-                valid_models = {cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat])) - BAD_MODELS.get(cat, set()) for cat, models in valid_models.items()}
+                valid_models = {cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat])) - BAD_CLOTH_MODELS.get(cat, set()) for cat, models in valid_models.items()}
                 valid_models = {cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst) for cat, models in valid_models.items()}
                 room_insts = [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 for room_inst in room_insts:
@@ -1163,7 +1161,7 @@ class BDDLSampler:
                         abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
                     ))
                     model_choices = model_choices if category not in GOOD_MODELS else model_choices.intersection(GOOD_MODELS[category])
-                    model_choices -= BAD_MODELS.get(category, set())
+                    model_choices -= BAD_CLOTH_MODELS.get(category, set())
                     model_choices = self._filter_model_choices_by_attached_states(model_choices, category, obj_inst)
                     if len(model_choices) > 0:
                         break
