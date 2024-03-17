@@ -76,6 +76,8 @@ def _launch_app():
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
 
+    assert meets_minimum_isaac_version("2023.1.1"), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
@@ -128,14 +130,18 @@ def _launch_app():
             og_log.set_channel_enabled(channel, False, lazy.omni.log.SettingBehavior.OVERRIDE)
 
     # Possibly hide windows if in debug mode
+    hide_window_names = []
+    if not gm.RENDER_VIEWER_CAMERA:
+        hide_window_names.append("Viewport")
     if gm.GUI_VIEWPORT_ONLY:
-        hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
-                             "Flow", "Semantics Schema Editor"]
-        for name in hide_window_names:
-            window = lazy.omni.ui.Workspace.get_window(name)
-            if window is not None:
-                window.visible = False
-                app.update()
+        hide_window_names.extend(["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
+                             "Flow", "Semantics Schema Editor"])
+        
+    for name in hide_window_names:
+        window = lazy.omni.ui.Workspace.get_window(name)
+        if window is not None:
+            window.visible = False
+            app.update()
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
     
@@ -235,9 +241,9 @@ def launch_simulator(*args, **kwargs):
             self.clear()
 
             # Set the viewer dimensions
-            # TODO: Make this toggleable so we don't always have a viewer if we don't want to
-            self.viewer_width = viewer_width
-            self.viewer_height = viewer_height
+            if gm.RENDER_VIEWER_CAMERA:
+                self.viewer_width = viewer_width
+                self.viewer_height = viewer_height
 
             # Toggle simulator state once so that downstream omni features can be used without bugs
             # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -310,11 +316,7 @@ def launch_simulator(*args, **kwargs):
             # default collide with each other, and modify settings for speed optimization
             self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
-            else:
-                self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -331,14 +333,20 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
         def _set_renderer_settings(self):
-            # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            if gm.ENABLE_HQ_RENDERING:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)                    
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)                 
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)   # "Auto"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)                
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
+            else:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)              
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)   # "Performance"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)             
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) 
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-            # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
-            # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
 
         @property
         def viewer_visibility(self):
@@ -409,6 +417,7 @@ def launch_simulator(*args, **kwargs):
             """
             Enables keyboard control of the active viewer camera for this simulation
             """
+            assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
             self._camera_mover = CameraMover(cam=self._viewer_camera)
             self._camera_mover.print_info()
             return self._camera_mover
@@ -1067,9 +1076,8 @@ def launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
-            # Clear all transition rules if being used
-            if gm.ENABLE_TRANSITION_RULES:
-                TransitionRuleAPI.clear()
+            # Clear all transition rules
+            TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_pu()
@@ -1209,8 +1217,7 @@ def launch_simulator(*args, **kwargs):
 
             # Clear physics context
             self._physics_context = None
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physx_fabric_interface = None
+            self._physx_fabric_interface = None
 
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
@@ -1289,12 +1296,12 @@ def launch_simulator(*args, **kwargs):
             self.set_lighting_mode(mode=LightingMode.STAGE)
 
             # Set the viewer camera, and then set its default pose
-            self._set_viewer_camera()
-            self.viewer_camera.set_position_orientation(
-                position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
-            )
-            self.viewer_visibility = gm.RENDER_VIEWER_CAMERA
+            if gm.RENDER_VIEWER_CAMERA:
+                self._set_viewer_camera()
+                self.viewer_camera.set_position_orientation(
+                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                )
 
         def close(self):
             """

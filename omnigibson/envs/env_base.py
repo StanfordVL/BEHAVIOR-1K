@@ -234,11 +234,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 og.sim.import_object(robot)
                 robot.set_position_orientation(position=position, orientation=orientation)
 
-            # Auto-initialize all robots
-            og.sim.play()
-            self.scene.reset()
-            self.scene.update_initial_state()
-            og.sim.stop()
+            if len(self.robots_config) > 0:
+                # Auto-initialize all robots
+                og.sim.play()
+                self.scene.reset()
+                self.scene.update_initial_state()
+                og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -264,11 +265,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
             og.sim.import_object(obj)
             obj.set_position_orientation(position=position, orientation=orientation)
 
-        # Auto-initialize all objects
-        og.sim.play()
-        self.scene.reset()
-        self.scene.update_initial_state()
-        og.sim.stop()
+        if len(self.objects_config) > 0:
+            # Auto-initialize all objects
+            og.sim.play()
+            self.scene.reset()
+            self.scene.update_initial_state()
+            og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -556,7 +558,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.step()
 
         # Grab and return observations
-        obs, obs_info = self.get_obs()
+        obs, _ = self.get_obs()
 
         if self._loaded:
             # Sanity check to make sure received observations match expected observation space
@@ -596,7 +598,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 raise ValueError("Observation space does not match returned observations!")
 
 
-        return obs, obs_info
+        return obs
 
     @property
     def episode_steps(self):

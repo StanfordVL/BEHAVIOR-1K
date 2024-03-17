@@ -50,7 +50,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         name,
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -92,8 +91,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -165,7 +162,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super().__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -713,7 +709,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
-        if og.sim.is_playing():
+        if og.sim.is_playing() and self.initialized:
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.

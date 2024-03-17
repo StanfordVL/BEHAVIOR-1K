@@ -62,12 +62,12 @@ def camera_pose_test(flatcache):
     
     robot_to_sensor_mat = pose2mat(relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori))
 
-    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.3833847])
+    sensor_world_pos_gt = np.array([150.16513062, 150., 101.38952637])
     sensor_world_ori_gt = np.array([-0.29444987, 0.29444981, 0.64288363, -0.64288352])
     
     assert np.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert np.allclose(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
-    
+
     # Now, we want to move the robot and check if the sensor pose has been updated
     old_camera_local_pose = vision_sensor.get_local_pose()
 
@@ -134,7 +134,7 @@ def test_camera_semantic_segmentation():
     agent_label = semantic_class_name_to_id()['agent']
     background_label = semantic_class_name_to_id()['background']
     assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
-    assert set(seg_semantic_info.keys()) == {str(agent_label), str(background_label)}
+    assert set(seg_semantic_info.keys()) == {agent_label, background_label}
     og.sim.clear()
 
 def test_object_in_FOV_of_robot():

@@ -28,9 +28,9 @@ try:
 except ModuleNotFoundError:
     og.log.error("torch, stable-baselines3, or tensorboard is not installed. "
                  "See which packages are missing, and then run the following for any missing packages:\n"
-                 "pip install torch\n"
-                 "pip install stable-baselines3==1.7.0\n"
+                 "pip install stable-baselines3[extra]\n"
                  "pip install tensorboard\n"
+                 "pip install shimmy>=0.2.1\n"
                  "Also, please update gym to >=0.26.1 after installing sb3: pip install gym>=0.26.1")
     exit(1)
 

@@ -8,12 +8,14 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import CollisionAPI
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
@@ -220,7 +222,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create desired systems
         for system_name in init_systems:
-            get_system(system_name)
+            if gm.USE_GPU_DYNAMICS:
+                get_system(system_name)
+            else:
+                log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly
@@ -441,10 +446,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
         # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
         # We do this by adding the object to our tracked collision groups
-        structure_categories = {"walls", "floors", "ceilings"}
         if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
             # TODO: Remove structure hotfix once asset collision meshes are fixed!!
-            if obj.category in structure_categories:
+            if obj.category in STRUCTURE_CATEGORIES:
                 CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
             else:
                 for link in obj.links.values():
@@ -616,6 +620,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane = XFormPrim(
             prim_path=plane.prim_path,
             name=plane.name,
+        )
+
+        # Assign floors category to the floor plane
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=self._floor_plane.prim,
+            semantic_label="floors",
+            type_label="class",
         )
 
     def update_initial_state(self, state=None):

@@ -42,7 +42,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="table_knife",
         model="lrdmpf",
         bounding_box=[0.401, 0.044, 0.009],
-        position=[0, 0, 10.0],
+        position=[0, 0, 20.0],
     )
 
     light0_cfg = dict(

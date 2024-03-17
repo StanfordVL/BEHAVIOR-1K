@@ -1,4 +1,3 @@
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
@@ -32,7 +31,6 @@ class LightObject(StatefulObject):
         light_type,
         prim_path=None,
         category="light",
-        class_id=None,
         uuid=None,
         scale=None,
         fixed_base=False,
@@ -51,8 +49,6 @@ class LightObject(StatefulObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -88,7 +84,6 @@ class LightObject(StatefulObject):
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=True,
@@ -160,7 +155,7 @@ class LightObject(StatefulObject):
         Returns:
             float: radius for this light
         """
-        return self._light_link.get_attribute("inputs:radius" if meets_minimum_isaac_version("2023.0.0") else "radius")
+        return self._light_link.get_attribute("inputs:radius")
 
     @radius.setter
     def radius(self, radius):
@@ -170,7 +165,7 @@ class LightObject(StatefulObject):
         Args:
             radius (float): radius to set
         """
-        self._light_link.set_attribute("inputs:radius" if meets_minimum_isaac_version("2023.0.0") else "radius", radius)
+        self._light_link.set_attribute("inputs:radius", radius)
 
     @property
     def intensity(self):
@@ -180,8 +175,7 @@ class LightObject(StatefulObject):
         Returns:
             float: intensity for this light
         """
-        return self._light_link.get_attribute(
-            "inputs:intensity" if meets_minimum_isaac_version("2023.0.0") else "intensity")
+        return self._light_link.get_attribute("inputs:intensity")
 
     @intensity.setter
     def intensity(self, intensity):
@@ -192,7 +186,7 @@ class LightObject(StatefulObject):
             intensity (float): intensity to set
         """
         self._light_link.set_attribute(
-            "inputs:intensity" if meets_minimum_isaac_version("2023.0.0") else "intensity",
+            "inputs:intensity",
             intensity)
         
     @property
@@ -203,8 +197,7 @@ class LightObject(StatefulObject):
         Returns:
             float: color for this light
         """
-        return tuple(float(x) for x in self._light_link.get_attribute(
-            "inputs:color" if meets_minimum_isaac_version("2023.0.0") else "color"))
+        return tuple(float(x) for x in self._light_link.get_attribute("inputs:color"))
 
     @color.setter
     def color(self, color):
@@ -215,7 +208,7 @@ class LightObject(StatefulObject):
             color ([float, float, float]): color to set, each value in range [0, 1]
         """
         self._light_link.set_attribute(
-            "inputs:color" if meets_minimum_isaac_version("2023.0.0") else "color",
+            "inputs:color",
             lazy.pxr.Gf.Vec3f(color))
 
     @property
@@ -226,8 +219,7 @@ class LightObject(StatefulObject):
         Returns:
             str: texture file path for this light
         """
-        return str(self._light_link.get_attribute(
-            "inputs:texture:file" if meets_minimum_isaac_version("2023.0.0") else "texture:file"))
+        return str(self._light_link.get_attribute("inputs:texture:file"))
 
     @texture_file_path.setter
     def texture_file_path(self, texture_file_path):
@@ -238,7 +230,7 @@ class LightObject(StatefulObject):
             texture_file_path (str): path of texture file that should be used for this light
         """
         self._light_link.set_attribute(
-            "inputs:texture:file" if meets_minimum_isaac_version("2023.0.0") else "texture:file",
+            "inputs:texture:file",
             lazy.pxr.Sdf.AssetPath(texture_file_path))
 
 

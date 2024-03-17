@@ -17,7 +17,6 @@ import omnigibson.lazy as lazy
 from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
-import random
 import imageio
 from IPython import embed
 
@@ -282,7 +281,7 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = random.choice(range(len(options)))
+        k = np.random.choice(range(len(options)))
 
     # Return requested option
     return list(options)[k]

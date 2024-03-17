@@ -21,7 +21,7 @@ from omnigibson.macros import gm, create_module_macros
 m = create_module_macros(module_path=__file__)
 
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
-m.DEFAULT_SLEEP_THRESHOLD = 0.005
+m.DEFAULT_SLEEP_THRESHOLD = 0.001
 
 
 class EntityPrim(XFormPrim):
@@ -239,6 +239,7 @@ class EntityPrim(XFormPrim):
             link_load_config = {
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
+                "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),
@@ -476,6 +477,20 @@ class EntityPrim(XFormPrim):
             dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
+    
+    @cached_property
+    def has_attachment_points(self):
+        """
+        Returns:
+            bool: Whether this object has any attachment points
+        """
+        children = list(self.prim.GetChildren())
+        while children:
+            child_prim = children.pop()
+            children.extend(child_prim.GetChildren())
+            if "attachment" in child_prim.GetName():
+                return True
+        return False
     
     def _compute_articulation_tree(self):
         """
@@ -1245,20 +1260,8 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
                                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
-            points_world = []
-            for link in self._links.values():
-                hull_points = link.collision_boundary_points
-                if hull_points is None:
-                    continue
-                
-                position, orientation = link.get_position_orientation()
-                scale = link.scale
-                points_scaled = hull_points * scale
-                points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-                points_transformed = points_rotated + position
-                points_world.append(points_transformed)
-
-            all_points = np.concatenate(points_world, axis=0)
+            points_world = [link.collision_boundary_points_world for link in self._links.values()]
+            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
             aabb_lo = np.min(all_points, axis=0)
             aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
@@ -1427,6 +1430,7 @@ class EntityPrim(XFormPrim):
         link.visible = False
         # Set a very small mass
         link.mass = 1e-6
+        link.density = 0.0
 
         self._links[link_name] = link
 

@@ -77,42 +77,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
         assert isinstance(self._evaluator_class, type)
 
 
-class Utils2022(OmniUtils):
-    """
-    Subclass that overrides a specific function within Omni's Utils class to fix a bug
-    """
-    def create_material(self, name):
-        # TODO: THIS IS THE ONLY LINE WE CHANGE! "/" SHOULD BE ""
-        material_path = ""
-        default_prim = self.stage.GetDefaultPrim()
-        if default_prim:
-            material_path = default_prim.GetPath().pathString
-
-        if not self.stage.GetPrimAtPath(material_path + "/Looks"):
-            self.stage.DefinePrim(material_path + "/Looks", "Scope")
-        material_path += "/Looks/" + name
-        material_path = ou.get_stage_next_free_path(
-            self.stage, material_path, False
-        )
-        material = UsdShade.Material.Define(self.stage, material_path)
-
-        shader_path = material_path + "/Shader"
-        shader = UsdShade.Shader.Define(self.stage, shader_path)
-
-        # Update Neuraylib MDL search paths
-        import omni.particle.system.core as core
-        core.update_mdl_search_paths()
-
-        shader.SetSourceAsset(name + ".mdl", "mdl")
-        shader.SetSourceAssetSubIdentifier(name, "mdl")
-        shader.GetImplementationSourceAttr().Set(UsdShade.Tokens.sourceAsset)
-        shader.CreateOutput("out", Sdf.ValueTypeNames.Token)
-        material.CreateSurfaceOutput().ConnectToSource(shader, "out")
-
-        return [material_path]
-
-
-class Utils2023(OmniUtils):
+class Utils(OmniUtils):
     def create_material(self, name):
         material_url = carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
 
@@ -143,8 +108,7 @@ class Core(OmniCore):
     """
     def __init__(self, popup_callback: Callable[[str], None], particle_system_name: str):
         self._popup_callback = popup_callback
-        from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-        self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
+        self.utils = Utils()
         self.context = ou.get_context()
         self.stage = self.context.get_stage()
         self.selection = self.context.get_selection()

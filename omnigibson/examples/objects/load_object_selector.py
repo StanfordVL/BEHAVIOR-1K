@@ -39,7 +39,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="obj",
         category=obj_category,
         model=obj_model,
-        bounding_box=avg_category_spec.get(obj_category),
         position=[0, 0, 50.0],
     )
 

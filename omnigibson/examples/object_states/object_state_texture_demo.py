@@ -12,21 +12,13 @@ gm.ENABLE_HQ_RENDERING = True
 
 
 def main():
-    # Create the scene config to load -- empty scene plus a light and a cabinet
+    # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
         "scene": {
             "type": "Scene",
             "floor_plane_visible": True,
         },
         "objects": [
-            {
-                "type": "LightObject",
-                "name": "light",
-                "light_type": "Sphere",
-                "radius": 0.01,
-                "intensity": 1e8,
-                "position": [-2.0, -2.0, 1.0],
-            },
             {
                 "type": "DatasetObject",
                 "name": "cabinet",

@@ -8,7 +8,52 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 REGISTERED_OBJECT_STATES = dict()
 
 
-class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
+class BaseObjectRequirement:
+    """
+    Base ObjectRequirement class. This allows for sanity checking a given asset / BaseObject to check whether a set
+    of conditions are met or not. This can be useful for sanity checking dependencies for properties such as requested
+    abilities or object states.
+    """
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        """
+        Determines whether this requirement is compatible with object @obj or not (i.e.: whether this requirement is
+        satisfied by @obj given other constructor arguments **kwargs).
+
+        NOTE: Must be implemented by subclass.
+
+        Args:
+            obj (StatefulObject): Object whose compatibility with this state should be checked
+
+        Returns:
+            2-tuple:
+                - bool: Whether the given object is compatible with this requirement or not
+                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        """
+        Determines whether this requirement is compatible with prim @prim or not (i.e.: whether this requirement is
+        satisfied by @prim given other constructor arguments **kwargs).
+        This is a useful check to evaluate an object's USD that hasn't been explicitly imported into OmniGibson yet.
+
+        NOTE: Must be implemented by subclass
+
+        Args:
+            prim (Usd.Prim): Object prim whose compatibility with this requirement should be checked
+
+        Returns:
+            2-tuple:
+                - bool: Whether the given prim is compatible with this requirement or not
+                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
+        """
+        raise NotImplementedError
+
+
+class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreatable, ABC):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.
@@ -50,20 +95,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
-        """
-        Determines whether this object state is compatible with object @obj or not (i.e.: whether the state can be
-        successfully instantiated with @self.obj given other constructor arguments **kwargs.
-
-        NOTE: Can be further extended by subclass
-
-        Args:
-            obj (StatefulObject): Object whose compatibility with this state should be checked
-
-        Returns:
-            2-tuple:
-                - bool: Whether the given object is compatible with this object state or not
-                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
-        """
         # Make sure all required dependencies are included in this object's state dictionary
         for dep in cls.get_dependencies():
             if dep not in obj.states:
@@ -78,22 +109,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     @classmethod
     def is_compatible_asset(cls, prim, **kwargs):
-        """
-        Determines whether this object state is compatible with object with corresponding prim @prim or not
-        (i.e.: whether the state can be successfully instantiated with @self.obj given other constructor
-        arguments **kwargs. This is a useful check to evaluate an object's USD that hasn't been explicitly imported
-        into OmniGibson yet.
-
-        NOTE: Can be further extended by subclass
-
-        Args:
-            prim (Usd.Prim): Object prim whose compatibility with this state should be checked
-
-        Returns:
-            2-tuple:
-                - bool: Whether the given object is compatible with this object state or not
-                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
-        """
         # Make sure all required kwargs are specified
         default_kwargs = inspect.signature(cls.__init__).parameters
         for kwarg, val in default_kwargs.items():
