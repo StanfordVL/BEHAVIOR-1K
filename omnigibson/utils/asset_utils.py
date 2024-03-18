@@ -286,6 +286,34 @@ def get_all_object_category_models_with_abilities(category, abilities):
     return valid_models
 
 
+def get_attachment_metalinks(category, model):
+    """
+    Get attachment metalinks for an object model
+
+    Args:
+        category (str): Object category name
+        model (str): Object model name
+
+    Returns:
+        list of str: all attachment metalinks for the object model
+    """
+    # Avoid circular imports
+    from omnigibson.objects.dataset_object import DatasetObject
+    from omnigibson.object_states import AttachedTo
+
+    usd_path = DatasetObject.get_usd_path(category=category, model=model)
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
+    with decrypted(usd_path) as fpath:
+        stage = lazy.pxr.Usd.Stage.Open(fpath)
+        prim = stage.GetDefaultPrim()
+        attachment_metalinks = []
+        for child in prim.GetChildren():
+            if child.GetTypeName() == "Xform":
+                if AttachedTo.metalink_prefix in child.GetName():
+                    attachment_metalinks.append(child.GetName())
+        return attachment_metalinks
+
+
 def get_og_assets_version():
     """
     Returns:

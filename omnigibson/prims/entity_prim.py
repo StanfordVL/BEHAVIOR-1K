@@ -608,6 +608,23 @@ class EntityPrim(XFormPrim):
         for link in self._links.values():
             link.disable_gravity()
 
+    def reset(self):
+        """
+        Resets this entity to some default, pre-defined state
+        """
+        # Make sure simulation is playing, otherwise, we cannot reset because physx requires active running
+        # simulation in order to set joints
+        assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+
+        # If this is a cloth, reset the particle positions
+        if self.prim_type == PrimType.CLOTH:
+            self.root_link.reset()
+
+        # Otherwise, set all joints to have 0 position and 0 velocity if this object has joints
+        elif self.n_joints > 0:
+            self.set_joint_positions(positions=np.zeros(self.n_dof), drive=False)
+            self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
+
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
         Set the joint positions (both actual value and target values) in simulation. Note: only works if the simulator

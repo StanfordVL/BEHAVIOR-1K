@@ -1976,6 +1976,7 @@ class ToggleableMachineRule(RecipeRule):
             # Exclude washer and clothes dryer because they are handled by WasherRule and DryerRule
             NotFilter(CategoryFilter("washer")),
             NotFilter(CategoryFilter("clothes_dryer")),
+            NotFilter(CategoryFilter("hot_tub")),
         ])
         return candidate_filters
 

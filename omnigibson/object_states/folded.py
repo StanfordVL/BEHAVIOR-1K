@@ -1,6 +1,6 @@
 import numpy as np
 from collections import namedtuple
-from scipy.spatial import ConvexHull, distance_matrix
+from scipy.spatial import ConvexHull, distance_matrix, QhullError
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
@@ -98,7 +98,13 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         """
         cloth = self.obj.root_link
         points = cloth.keypoint_particle_positions[:, dims]
-        hull = ConvexHull(points)
+        try:
+            hull = ConvexHull(points)
+
+        # The points may be 2D-degenerate, so catch the error and return 0 if so
+        except QhullError:
+            # This is a degenerate hull, so return 0 area and diagonal
+            return 0.0, 0.0
 
         # When input points are 2-dimensional, this is the area of the convex hull.
         # Ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
