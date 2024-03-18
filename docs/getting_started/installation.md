@@ -104,7 +104,7 @@ There are two ways to setup **`OmniGibson`**:
                 
                     ??? note "Nightly build"
 
-                        The main branch contains the stable version of **`OmniGibson`**. If you want to be up-to-date with our latest developed (yet not fully tested) features and bug fixes, you can clone from the `og-develop` branch.
+                        The main branch contains the stable version of **`OmniGibson`**. For our latest developed (yet not fully tested) features and bug fixes, please clone from the `og-develop` branch.
 
                 3. Setup a virtual conda environment to run **`OmniGibson`**:
 
@@ -114,7 +114,7 @@ There are two ways to setup **`OmniGibson`**:
 
                     1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `~/.local/share/ov/pkg/isaac_sim-2023.1.1`
 
-                    This will create a conda environment with `omnigibson` installed. Simply call `conda activate` to activate it.
+                    This will create a conda env with `omnigibson` installed. Simply call `conda activate` to activate it.
 
                 4. Download **`OmniGibson`** dataset (within the conda env):
 
@@ -132,7 +132,7 @@ There are two ways to setup **`OmniGibson`**:
 
                 1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) and NVIDIA's [Omniverse Isaac Sim](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html)
 
-                    !! warning "Please make sure you have the latest version of Isaac Sim (2023.1.1) installed."
+                    !!! warning "Please make sure you have the latest version of Isaac Sim (2023.1.1) installed."
 
                 2. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
 
@@ -143,7 +143,7 @@ There are two ways to setup **`OmniGibson`**:
 
                     ??? note "Nightly build"
 
-                        The main branch contains the stable version of **`OmniGibson`**. If you want to be up-to-date with our latest developed (yet not fully tested) features and bug fixes, you can clone from the `og-develop` branch.
+                        The main branch contains the stable version of **`OmniGibson`**. For our latest developed (yet not fully tested) features and bug fixes, please clone from the `og-develop` branch.
 
                 3. Setup a virtual conda environment to run **`OmniGibson`**:
 
@@ -198,10 +198,6 @@ python -m omnigibson.examples.robots.robot_control_example # (1)!
 ??? question "I cannot open Omniverse Launcher AppImage on Linux"
 
     You probably need to [install FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) to run the Omniverse Launcher AppImage.
-
-??? question "OmniGibson is stuck upon first startup"
-
-    The process could take up to 5 minutes. This is expected behavior, and should only occur once when you import OmniGibson for the first time.
 
 ??? question "OmniGibson is stuck at `HydraEngine rtx failed creating scene renderer.`"
 

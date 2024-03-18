@@ -5,6 +5,9 @@ import omnigibson as og
 from omnigibson.utils.teleop_utils import OVXRSystem
 
 def main():
+    """
+    Spawn a BehaviorRobot in Rs_int and users can navigate around and interact with the scene using VR.
+    """
     # Create the config for generating the environment we want
     scene_cfg = {"type": "Scene"} #"InteractiveTraversableScene", "scene_model": "Rs_int"}
     robot0_cfg = {
