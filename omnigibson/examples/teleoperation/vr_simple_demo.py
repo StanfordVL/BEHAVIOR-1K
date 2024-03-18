@@ -9,24 +9,21 @@ def main():
     Spawn a BehaviorRobot in Rs_int and users can navigate around and interact with the scene using VR.
     """
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
-    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int"}
+    scene_cfg = {"type": "Scene"} #"InteractiveTraversableScene", "scene_model": "Rs_int"}
     robot0_cfg = {
-        "type": "BehaviorRobot",
+        "type": "Tiago",
         "controller_config": {
-            "gripper_0": {"command_input_limits": "default"},
-            "gripper_1": {"command_input_limits": "default"},
+            "gripper_left": {"command_input_limits": "default"},
+            "gripper_right": {"command_input_limits": "default"},
         }
     }
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys
-    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="SteamVR", enable_touchpad_movement=True)
-    # We want a lower movement speed for controlling with VR headset
-    vrsys.base_movement_speed = 0.03
+    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="SteamVR", align_anchor_to_robot_base=True)
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
     vrsys.set_initial_transform(pos=[0, 0, 1], orn=[0, 0, 0, 1])

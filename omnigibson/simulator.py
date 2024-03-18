@@ -3,6 +3,7 @@ import itertools
 import contextlib
 import logging
 import os
+import shutil
 import socket
 from pathlib import Path
 import atexit
@@ -45,6 +46,7 @@ m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.7313801
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
+
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
     log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
@@ -72,9 +74,20 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / "omnigibson.kit"
+    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
+
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     assert meets_minimum_isaac_version("2023.1.1"), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
 
@@ -331,6 +344,8 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
+            self._physics_context.set_gpu_max_rigid_contact_count(gm.GPU_MAX_RIGID_CONTACT_COUNT)
+            self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
             if gm.ENABLE_HQ_RENDERING:
@@ -953,7 +968,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_play.pop(name)
+            self._callbacks_on_play.pop(name, None)
 
         def remove_callback_on_stop(self, name):
             """
@@ -962,7 +977,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_stop.pop(name)
+            self._callbacks_on_stop.pop(name, None)
 
         def remove_callback_on_import_obj(self, name):
             """
@@ -971,7 +986,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_import_obj.pop(name)
+            self._callbacks_on_import_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
@@ -980,7 +995,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_remove_obj.pop(name)
+            self._callbacks_on_remove_obj.pop(name, None)
 
         @classmethod
         def clear_instance(cls):

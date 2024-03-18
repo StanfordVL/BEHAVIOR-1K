@@ -5,7 +5,6 @@ import numpy as np
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.teleop_utils import TeleopData
 
 
 class TwoWheelRobot(LocomotionRobot):
@@ -150,23 +149,18 @@ class TwoWheelRobot(LocomotionRobot):
         classes.add("TwoWheelRobot")
         return classes
     
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         """
-        Generate action data from teleoperation data
+        Generate action data from teleoperation action data
         NOTE: This implementation only supports DifferentialDriveController. 
         Overwrite this function if the robot is using a different base controller.
         Args:
-            teleop_data (TeleopData): teleoperation data
+            teleop_action (TeleopAction): teleoperation action data
         Returns:
             np.ndarray: array of action data
         """
-        action = super().teleop_data_to_action(teleop_data)
+        action = super().teleop_data_to_action(teleop_action)
         assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
-        if teleop_data.robot_attached:
-            translation_offset = teleop_data.transforms["base"][0]
-            rotation_offset = teleop_data.transforms["base"][3]
-        else:
-            translation_offset, rotation_offset = 0, 0
-        action[self.base_action_idx] = np.array([translation_offset, rotation_offset])
+        action[self.base_action_idx] = np.array([teleop_action.base[0], teleop_action.base[2]]) * 0.3
         return action
 

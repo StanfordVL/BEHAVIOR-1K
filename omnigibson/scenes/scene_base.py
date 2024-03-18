@@ -181,7 +181,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Disable collision between building structures
         CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
 
-        # Disable collision between building structures and fixed base objects
+        # Disable collision between building structures and 1. fixed base objects, 2. attached objects
         CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
         CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
 

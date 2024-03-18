@@ -16,7 +16,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         deps.update({AABB, HorizontalAdjacency, VerticalAdjacency})
         return deps
 
-    def _set_value(self, other, new_value):
+    def _set_value(self, other, new_value, reset_before_sampling=False):
         if not new_value:
             raise NotImplementedError("Inside does not support set_value(False)")
 
@@ -24,6 +24,10 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             raise ValueError("Cannot set an object inside a cloth object.")
 
         state = og.sim.dump_state(serialized=False)
+
+        # Possibly reset this object if requested
+        if reset_before_sampling:
+            self.obj.reset()
 
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
             if sample_kinematics("inside", self.obj, other) and self.get_value(other):
