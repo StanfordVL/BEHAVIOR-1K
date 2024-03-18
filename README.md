@@ -13,7 +13,7 @@
 -------
 
 ### Latest Updates
-- [03/17/2024] **v1.0.0**: First full release with 1,004 pre-sampled tasks, all 50 scenes, and manu new objects! [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v1.0.0)
+- [03/17/24] **v1.0.0**: First full release with 1,004 pre-sampled tasks, all 50 scenes, and many new objects! [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v1.0.0)
 
 - [08/04/23] **v0.2.0**: More assets! 600 pre-sampled tasks, 7 new scenes, and many new objects 📈 [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.2.0)
 
