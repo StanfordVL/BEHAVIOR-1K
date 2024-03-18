@@ -138,9 +138,9 @@ class ControllableObject(BaseObject):
                 callback_fn=lambda x: self.step(),
             )
 
-    def load(self):
+    def load(self, scene):
         # Run super first
-        prim = super().load()
+        prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
         expected_control_freq = 1.0 / og.sim.get_rendering_dt()

@@ -132,6 +132,7 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         og.sim.step_physics()
 
     # Standardize inputs
+    #@TODO: Which scene
     prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
@@ -300,7 +301,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = og.sim.scene.dump_state(serialized=False)
+    state = obj.scene.dump_state(serialized=False)
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)

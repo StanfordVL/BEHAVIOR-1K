@@ -111,12 +111,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["name"] = self.name
         self._init_info["args"]["uuid"] = self.uuid
 
-    def load(self):
+    def load(self, scene):
         # Run super method ONLY if we're not loaded yet
         if self.loaded:
             prim = self._prim
         else:
-            prim = super().load()
+            self.scene = scene
+            # self._name = self.name + f"_{self.scene.id}"
+            # self._prim_path = self.prim_path + f"_{self.scene.id}"
+            prim = super().load(scene)
             log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
 

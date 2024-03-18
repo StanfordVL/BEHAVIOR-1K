@@ -1236,7 +1236,9 @@ def is_fluid_system(system_name):
 
 def get_system(system_name, force_active=True):
     # Make sure scene exists
-    assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
+    #@TODO: Which scene
+    for scene in og.sim.scenes:
+        assert scene is not None, "Cannot get systems until scene is imported!"
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
     system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
         else _create_system_from_metadata(system_name=system_name)

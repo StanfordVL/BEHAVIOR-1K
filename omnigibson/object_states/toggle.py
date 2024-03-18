@@ -47,9 +47,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # Clear finger contact objects since it will be refreshed now
         cls._finger_contact_objs = set()
 
+        robots = [robot for scene in og.sim.scenes for robot in scene.robots]
         # detect marker and hand interaction
         robot_finger_links = set(link
-                                 for robot in og.sim.scene.robots if isinstance(robot, ManipulationRobot)
+                                 for robot in robots if isinstance(robot, ManipulationRobot)
                                  for finger_links in robot.finger_links.values()
                                  for link in finger_links)
         cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
@@ -66,6 +67,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         if len(touching_bodies_idxs) > 0:
             for idx in touching_bodies_idxs:
                 body_prim_path = RigidContactAPI.get_row_idx_prim_path(idx=idx)
+                #@TODO: Which scene
                 obj = og.sim.scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
                 if obj is not None:
                     cls._finger_contact_objs.add(obj)

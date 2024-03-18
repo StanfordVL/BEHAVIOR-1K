@@ -209,7 +209,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             def overlap_callback(hit):
                 nonlocal affected_objects
                 # global affected_objects
-                obj = og.sim.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
+                obj = self.obj.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
                 if obj is not None:
                     affected_objects.add(obj)
                 # Always continue traversal
@@ -229,7 +229,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
                 # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
                     cloth_positions = np.zeros((n_cloth_objs, 3))
@@ -255,7 +255,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
                 # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
                     cloth_positions = np.zeros((n_cloth_objs, 3))

@@ -161,7 +161,7 @@ def plan_base_motion(
 
     # set lower and upper bounds
     bbox_vals = []
-    for floor in filter(lambda o: o.category == "floors", og.sim.scene.objects):
+    for floor in filter(lambda o: o.category == "floors", robot.scene.objects):
         bbox_vals += floor.aabb[0][:2].tolist()
         bbox_vals += floor.aabb[1][:2].tolist()
     bounds = ob.RealVectorBounds(2)
@@ -541,7 +541,7 @@ def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True
     for col_prim in collision_prims:
         tokens = col_prim.prim_path.split("/")
         obj_prim_path = "/".join(tokens[:-1])
-        col_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+        col_obj = robot.scene.object_registry("prim_path", obj_prim_path)
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
     return len(collision_prims) > 0

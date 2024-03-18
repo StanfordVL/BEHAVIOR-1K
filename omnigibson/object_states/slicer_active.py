@@ -118,6 +118,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
+        #@TODO: Which scene
         sliceable_objs = og.sim.scene.object_registry("abilities", "sliceable", [])
 
         # If there's no sliceables, then obviously no slicer is touching any sliceable so immediately return all Falses

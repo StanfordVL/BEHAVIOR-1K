@@ -51,8 +51,7 @@ class XFormPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, scene):
-        self.scene = scene
+    def _load(self):
         return og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
     def _post_load(self):

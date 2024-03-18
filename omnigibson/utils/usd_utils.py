@@ -193,6 +193,7 @@ class RigidContactAPI:
         # mapping aligns with omni's ordering!
         i = 0
         cls._PATH_TO_COL_IDX = dict()
+        #@TODO: Which scene
         for obj in og.sim.scene.objects:
             if obj.prim_type == PrimType.RIGID:
                 for link in obj.links.values():

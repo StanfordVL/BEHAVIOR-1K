@@ -588,6 +588,7 @@ class BDDLSampler:
                     # Invalid room assignment
                     return f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. " \
                            f"Only non-sampleable (scene) objects can have room assignment."
+                #@TODO: Which scene
                 if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
@@ -740,10 +741,11 @@ class BDDLSampler:
                 # Grab all models that fully support all abilities for the corresponding category
                 valid_models = {cat: set(get_all_object_category_models_with_abilities(cat, abilities))
                                 for cat in categories}
-
+                #@TODO: Which scene
                 room_insts = [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
+                    #@TODO: Which scene
                     room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [obj for obj in room_objs if obj.category in categories and obj.model in valid_models[obj.category]]
 
@@ -951,6 +953,7 @@ class BDDLSampler:
                     model = np.random.choice(list(model_choices))
 
                     # create the object
+                    #@TODO: Which scene
                     simulator_obj = DatasetObject(
                         name=f"{category}_{len(og.sim.scene.objects)}",
                         category=category,
@@ -960,6 +963,7 @@ class BDDLSampler:
                     num_new_obj += 1
 
                     # Load the object into the simulator
+                    #@TODO: Which scene
                     assert og.sim.scene.loaded, "Scene is not loaded"
                     og.sim.import_object(simulator_obj)
 
@@ -1084,10 +1088,12 @@ class BDDLSampler:
                             og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
+                            #@TODO: Which scene
                             og.sim.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
+        #@TODO: Which scene
         og.sim.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly

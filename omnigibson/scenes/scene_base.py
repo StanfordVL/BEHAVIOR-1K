@@ -69,6 +69,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane = None
         self._use_skybox = use_skybox
         self._skybox = None
+        self.id = None
+        self.origin_offset = None
 
         # Call super init
         super().__init__()
@@ -103,7 +105,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value="object_registry")
+        return self._registry(key="name", value="object_registry_{}".format(self.id))
 
     @property
     def system_registry(self):
@@ -174,34 +176,35 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
-        # Create collision group for fixed base objects' non root links, root links, and building structures
-        CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
-        # Disable collision between root links of fixed base objects
-        CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
-        # Disable collision between building structures
-        CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+        if self.id == 'scene_0':
+            # Create collision group for fixed base objects' non root links, root links, and building structures
+            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+            # Disable collision between root links of fixed base objects
+            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            # Disable collision between building structures
+            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
 
-        # Disable collision between building structures and fixed base objects
-        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
-        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+            # Disable collision between building structures and fixed base objects
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
 
-        # We just add a ground plane if requested
-        if self._use_floor_plane:
-            self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
+            # We just add a ground plane if requested
+            if self._use_floor_plane:
+                self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
 
-        # Also add skybox if requested
-        if self._use_skybox:
-            self._skybox = LightObject(
-                prim_path="/World/skybox",
-                name="skybox",
-                category="background",
-                light_type="Dome",
-                intensity=1500,
-                fixed_base=True,
-            )
-            og.sim.import_object(self._skybox, register=False)
-            self._skybox.color = (1.07, 0.85, 0.61)
-            self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
+            # Also add skybox if requested
+            if self._use_skybox:
+                self._skybox = LightObject(
+                    prim_path="/World/skybox",
+                    name="skybox",
+                    category="background",
+                    light_type="Dome",
+                    intensity=1500,
+                    fixed_base=True,
+                )
+                self.add_object(self._skybox, register=False)
+                self._skybox.color = (1.07, 0.85, 0.61)
+                self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
 
     def _load_objects_from_scene_file(self):
         """
@@ -210,7 +213,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Grab objects info from the scene file
         with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
+            scene_info = self._update_objects_info(json.load(f))
         init_info = scene_info["objects_info"]["init_info"]
         init_state = scene_info["state"]["object_registry"]
         init_systems = scene_info["state"]["system_registry"].keys()
@@ -233,10 +236,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
             # Import into the simulator
-            og.sim.import_object(obj)
+            self.add_object(obj, register=True)
             # Set the init pose accordingly
+            init_pos = [sum(x) for x in zip(init_state[obj_name]["root_link"]["pos"], self.origin_offset)]
             obj.set_position_orientation(
-                position=init_state[obj_name]["root_link"]["pos"],
+                position=init_pos,
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
 
@@ -245,11 +249,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Loads metadata from self.scene_file and stores it within the world prim's CustomData
         """
         with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
+            scene_info = self._update_objects_info(json.load(f))
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
             og.sim.write_metadata(key=key, data=data)
+    
+    def _update_objects_info(self, scene_info):
+        """
+        Updates objects info base on scene ID
+        """
+        init_info = scene_info["objects_info"]["init_info"]
+        for obj_name, obj_info in init_info.items():
+            obj_info['args']['name'] = obj_info['args']['name'] + '_' + self.id
+            obj_info['args']['prim_path'] = obj_info['args']['prim_path'] + '_' + self.id
+        return scene_info
 
     def _should_load_object(self, obj_info, task_metadata):
         """
@@ -347,7 +361,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name="master_registry",
+            name=self.id,
             class_types=SerializableRegistry,
         )
 
@@ -356,7 +370,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Add registry for objects
         registry.add(obj=SerializableRegistry(
-            name="object_registry",
+            name="object_registry_{}".format(self.id),
             class_types=BaseObject,
             default_key="name",
             unique_keys=self.object_registry_unique_keys,
@@ -433,8 +447,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
                 (in that case, the object is stored to be loaded together with the scene)
         """
-        # Make sure the simulator is the one calling this function
-        assert _is_call_from_simulator, "Use import_object() for adding objects to a simulator and scene!"
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
@@ -461,6 +473,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Run any additional scene-specific logic with the created object
             self._add_object(obj)
 
+        og.sim.import_object(obj)
         return prim
 
     def remove_object(self, obj):

@@ -207,6 +207,7 @@ def launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scene = None
+            self._scenes = []
             self._physx_interface = None
             self._physx_simulation_interface = None
             self._physx_scene_query_interface = None
@@ -225,8 +226,6 @@ def launch_simulator(*args, **kwargs):
 
             # Mapping from link IDs assigned from omni to the object that they reference
             self._link_id_to_objects = dict()
-
-            self.scenes = [self._scene]
 
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
@@ -292,7 +291,8 @@ def launch_simulator(*args, **kwargs):
                 viewport_name=viewport_name,
             )
             if not self._viewer_camera.loaded:
-                self._viewer_camera.load()
+                #@TODO: How to access scene here
+                self._viewer_camera.load(None)
 
             # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
             # nearby objects (default min is 1 m)
@@ -437,7 +437,7 @@ def launch_simulator(*args, **kwargs):
             assert isinstance(scene, Scene), "import_scene can only be called with Scene"
 
             # Clear the existing scene if any
-            self.clear()
+            # self.clear()
 
             # Initialize all global updatable object states
             for state in self.object_state_types_requiring_update:
@@ -445,14 +445,15 @@ def launch_simulator(*args, **kwargs):
                     state.global_initialize()
 
             self._scene = scene
-            self._scene.load()
+            self._scenes.append(scene)
+            self._scenes[-1].load()
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
 
             # Initialize the scene
-            self._scene.initialize()
+            self._scenes[-1].initialize()
 
             # Need to one more step for particle systems to work
             self.step()
@@ -482,7 +483,7 @@ def launch_simulator(*args, **kwargs):
             assert self.scene is not None, "import_object needs to be called after import_scene"
 
             # Load the object in omniverse by adding it to the scene
-            self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
+            # self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
 
             # Run any callbacks
             for callback in self._callbacks_on_import_obj.values():
@@ -1028,6 +1029,14 @@ def launch_simulator(*args, **kwargs):
                 None or Scene: Scene currently loaded in this simulator. If no scene is loaded, returns None
             """
             return self._scene
+        
+        @property
+        def scenes(self):
+            """
+            Returns:
+                Empty list or [Scene]: Scenes currently loaded in this simulator. If no scenes are loaded, returns empty list
+            """
+            return self._scenes
 
         @property
         def viewer_camera(self):

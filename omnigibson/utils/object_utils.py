@@ -115,8 +115,8 @@ def compute_obj_kinematic_metadata(obj):
         - "native_bbox_extent": (x,y,z) native bounding box extent
         - "base_aligned_bboxes": TODO
     """
-    assert og.sim.scene is not None
-    assert og.sim.scene.floor_plane is not None, "An empty scene must be used in order to compute kinematic metadata!"
+    assert obj.scene is not None
+    assert obj.scene.floor_plane is not None, "An empty scene must be used in order to compute kinematic metadata!"
     assert np.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
     og.sim.stop()
 

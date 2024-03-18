@@ -804,7 +804,7 @@ class ManipulationRobot(BaseRobot):
         for prim_path in candidates_set:
             # Calculate position of the object link. Only allow this for objects currently.
             obj_prim_path, link_name = prim_path.rsplit("/", 1)
-            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
+            candidate_obj = self.scene.object_registry("prim_path", obj_prim_path, None)
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
@@ -827,7 +827,7 @@ class ManipulationRobot(BaseRobot):
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
         ag_obj_link_name = ag_prim_path.split("/")[-1]
-        ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
+        ag_obj = self.scene.object_registry("prim_path", ag_obj_prim_path)
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
         if ag_obj is None or not touching_at_least_two_fingers:
@@ -1313,7 +1313,7 @@ class ManipulationRobot(BaseRobot):
         if not gripper_finger_close:
             return None
 
-        cloth_objs = og.sim.scene.object_registry("prim_type", PrimType.CLOTH)
+        cloth_objs = self.scene.object_registry("prim_type", PrimType.CLOTH)
         if cloth_objs is None:
             return None
 
@@ -1425,7 +1425,7 @@ class ManipulationRobot(BaseRobot):
         for arm in state["ag_obj_constraint_params"].keys():
             if len(state["ag_obj_constraint_params"][arm]) > 0:
                 data = state["ag_obj_constraint_params"][arm]
-                obj = og.sim.scene.object_registry("prim_path", data["ag_obj_prim_path"])
+                obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 

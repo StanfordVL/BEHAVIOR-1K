@@ -349,7 +349,7 @@ class VisionSensor(BaseSensor):
                         if value == "/World/groundPlane":
                             value = "groundPlane"
                         else:
-                            obj = og.sim.scene.object_registry("prim_path", value)
+                            obj = self.scene.object_registry("prim_path", value)
                             # Remap instance segmentation labels from prim path to object name
                             assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
                             value = obj.name

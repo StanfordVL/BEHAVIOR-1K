@@ -78,7 +78,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
         self._initialized = True
 
-    def load(self):
+    def load(self, scene):
         """
         Load this prim into omniverse, and return loaded prim reference.
 

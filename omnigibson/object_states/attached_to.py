@@ -282,7 +282,7 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
         if uuid == -1:
             attached_obj = None
         else:
-            attached_obj = og.sim.scene.object_registry("uuid", uuid)
+            attached_obj = self.scene.object_registry("uuid", uuid)
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         # If it's currently attached to something, detach.

@@ -124,7 +124,7 @@ class TransitionRuleAPI:
         Args:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
         """
-        objects = og.sim.scene.objects
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
         for rule in rules:
             # Check if rule is still valid, if so, update its entry
             object_candidates = cls.get_rule_candidates(rule=rule, objects=objects)
@@ -747,7 +747,8 @@ class WasherDryerRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all obj
-        obj_positions = np.array([obj.aabb_center for obj in og.sim.scene.objects])
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
+        obj_positions = np.array([obj.aabb_center for obj in objects])
         return dict(obj_positions=obj_positions)
 
     @classmethod
@@ -770,7 +771,8 @@ class WasherDryerRule(BaseTransitionRule):
         obj_positions = global_info["obj_positions"]
         in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
-        in_volume_objs = list(np.array(og.sim.scene.objects)[in_volume])
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
+        in_volume_objs = list(np.array(objects)[in_volume])
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
@@ -1162,6 +1164,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
+        #@TODO: Which scene
         for system in og.sim.scene.system_registry.objects:
             # Skip cloth system
             if system.name == "cloth":
@@ -1422,6 +1425,7 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input objects exist in the scene
         """
         for obj_category, obj_quantity in recipe["input_objects"].items():
+            #@TODO: Which scene
             if len(og.sim.scene.object_registry("category", obj_category, default_val=set())) < obj_quantity:
                 return False
         return True
@@ -1443,6 +1447,7 @@ class RecipeRule(BaseTransitionRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
+            #@TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -1567,6 +1572,7 @@ class RecipeRule(BaseTransitionRule):
         cls._OBJECTS = []
         cls._OBJECTS_TO_IDX = dict()
 
+        #@TODO: Which scene
         # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
         objects_by_category = og.sim.scene.object_registry.get_dict("category")
 
@@ -1730,7 +1736,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-
+            #@TODO: Which scene
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
@@ -2132,6 +2138,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
+            #@TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -2155,6 +2162,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
+            #@TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 

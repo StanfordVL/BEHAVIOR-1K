@@ -1173,7 +1173,7 @@ class ParticleApplier(ParticleModifier):
             modifier_avg_scale = np.cbrt(np.product(self.obj.scale))
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
-                hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
+                hit_obj = self.obj.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
                 if hit_obj is not None:
                     # Create an attachment group if necessary
                     group = system.get_group_name(obj=hit_obj)
