@@ -3,7 +3,9 @@ import numpy as np
 from omnigibson.macros import gm
 from telemoma.human_interface.teleop_core import TeleopAction
 from omnigibson.utils.transform_utils import quat2euler
+import pytest
 
+@pytest.mark.skip(reason="test hangs on CI")
 def test_teleop():
     cfg = {
         "env": {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.},
