@@ -398,8 +398,31 @@ def download_demo_data():
     """
     Download OmniGibson demo dataset
     """
-    # TODO: Update. Right now, OG just downloads beta release
-    download_og_dataset()
+    # Print user agreement
+    if os.path.exists(gm.KEY_PATH):
+        print("OmniGibson dataset encryption key already installed.")
+    else:
+        print("\n")
+        print_user_agreement()
+        while (
+            input(
+                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
+            )
+            != "y"
+        ):
+            print("You need to agree to the terms for using OmniGibson dataset.")
+
+        download_key()
+
+    if os.path.exists(gm.DATASET_PATH):
+        print("OmniGibson dataset already installed.")
+    else:
+        tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
+        os.makedirs(gm.DATASET_PATH, exist_ok=True)
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_demo_1_0_0.tar.gz"
+        log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
+        assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
+        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."
 
 
 def print_user_agreement():
@@ -448,7 +471,7 @@ def download_og_dataset():
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(gm.DATASET_PATH, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_dataset_1_0_0.tar.gz"
-        log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
+        log.info(f"Downloading and decompressing OmniGibson dataset from {path}")
         assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
