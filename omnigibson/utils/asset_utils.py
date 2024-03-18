@@ -286,6 +286,34 @@ def get_all_object_category_models_with_abilities(category, abilities):
     return valid_models
 
 
+def get_attachment_metalinks(category, model):
+    """
+    Get attachment metalinks for an object model
+
+    Args:
+        category (str): Object category name
+        model (str): Object model name
+
+    Returns:
+        list of str: all attachment metalinks for the object model
+    """
+    # Avoid circular imports
+    from omnigibson.objects.dataset_object import DatasetObject
+    from omnigibson.object_states import AttachedTo
+
+    usd_path = DatasetObject.get_usd_path(category=category, model=model)
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
+    with decrypted(usd_path) as fpath:
+        stage = lazy.pxr.Usd.Stage.Open(fpath)
+        prim = stage.GetDefaultPrim()
+        attachment_metalinks = []
+        for child in prim.GetChildren():
+            if child.GetTypeName() == "Xform":
+                if AttachedTo.metalink_prefix in child.GetName():
+                    attachment_metalinks.append(child.GetName())
+        return attachment_metalinks
+
+
 def get_og_assets_version():
     """
     Returns:
@@ -359,7 +387,7 @@ def download_assets():
         with tempfile.TemporaryDirectory() as td:
             tmp_file = os.path.join(td, "og_assets.tar.gz")
             os.makedirs(gm.ASSET_PATH, exist_ok=True)
-            path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets_1_0_0.tar.gz"
             log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
             assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
             assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0, "Assets extraction failed."
@@ -419,7 +447,7 @@ def download_og_dataset():
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(gm.DATASET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_1_0_0.tar.gz"
         log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
         assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."

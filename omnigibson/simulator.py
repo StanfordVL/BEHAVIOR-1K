@@ -344,6 +344,8 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
+            self._physics_context.set_gpu_max_rigid_contact_count(gm.GPU_MAX_RIGID_CONTACT_COUNT)
+            self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
             if gm.ENABLE_HQ_RENDERING:
@@ -966,7 +968,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_play.pop(name)
+            self._callbacks_on_play.pop(name, None)
 
         def remove_callback_on_stop(self, name):
             """
@@ -975,7 +977,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_stop.pop(name)
+            self._callbacks_on_stop.pop(name, None)
 
         def remove_callback_on_import_obj(self, name):
             """
@@ -984,7 +986,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_import_obj.pop(name)
+            self._callbacks_on_import_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
@@ -993,7 +995,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_remove_obj.pop(name)
+            self._callbacks_on_remove_obj.pop(name, None)
 
         @classmethod
         def clear_instance(cls):

@@ -776,20 +776,27 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
 
 def check_extent_radius_ratio(mesh_prim):
     """
-    Checks if the extent radius ratio of @mesh_prim is within the acceptable range for PhysX GPU acceleration (not too oblong)
+    Checks if the min extent in world frame and the extent radius ratio in local frame of @mesh_prim is within the
+    acceptable range for PhysX GPU acceleration (not too thin, and not too oblong)
 
     Ref: https://github.com/NVIDIA-Omniverse/PhysX/blob/561a0df858d7e48879cdf7eeb54cfe208f660f18/physx/source/geomutils/src/convex/GuConvexMeshData.h#L183-L190
 
     Args:
-        mesh_prim (Usd.Prim): Mesh prim to check the extent radius ratio for
+        mesh_prim (Usd.Prim): Mesh prim to check
 
     Returns:
-        bool: True if the extent radius ratio is within the acceptable range, False otherwise
+        bool: True if the min extent (world) and the extent radius ratio (local frame) is acceptable, False otherwise
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     # Non-mesh prims are always considered to be within the acceptable range
     if mesh_type != "Mesh":
         return True
+
+    trimesh_mesh_world = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=True)
+    min_extent = trimesh_mesh_world.extents.min()
+    # If the mesh is too flat in the world frame, omniverse cannot create convex mesh for it
+    if min_extent < 1e-5:
+        return False
 
     trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=False)
     if not trimesh_mesh.is_volume:

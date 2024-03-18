@@ -20,6 +20,11 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.MIN_PARTICLE_RADIUS = 0.01   # Minimum particle radius for physical macro particles -- this reduces the chance of omni physx crashing
+
 
 class MacroParticleSystem(BaseSystem):
     """
@@ -527,7 +532,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             cls.set_particle_position_orientation(idx=-1, position=position, orientation=orientation)
 
     @classmethod
-    def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
+    def generate_group_particles_on_object(cls, group, max_samples=None, min_samples_for_success=1):
+        # This function does not support max_samples=None. Must be explicitly specified
+        assert max_samples is not None, f"max_samples must be specified for {cls.name}'s generate_group_particles_on_object!"
         assert max_samples >= min_samples_for_success, "number of particles to sample should exceed the min for success"
 
         # Make sure the group exists
@@ -1173,7 +1180,17 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         # Compute particle radius
         vertices = np.array(cls.particle_object.get_attribute("points")) * cls.particle_object.scale * cls.max_scale.reshape(1, 3)
-        cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+
+        particle_offset, particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+
+        if particle_radius < m.MIN_PARTICLE_RADIUS:
+            ratio = m.MIN_PARTICLE_RADIUS / particle_radius
+            cls.particle_object.scale *= ratio
+            particle_offset *= ratio
+            particle_radius = m.MIN_PARTICLE_RADIUS
+
+        cls._particle_offset = particle_offset
+        cls._particle_radius = particle_radius
 
     @classmethod
     def refresh_particles_view(cls):
