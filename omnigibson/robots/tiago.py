@@ -1,7 +1,5 @@
 import os
-
 import numpy as np
-
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
@@ -11,7 +9,6 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.teleop_utils import TeleopData
 from omnigibson.utils.usd_utils import JointType
 
 # Create settings for this module
@@ -764,8 +761,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def eef_usd_path(self):
         return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
-        action = ManipulationRobot.teleop_data_to_action(self, teleop_data)
-        # compute base movement (x, y, yaw)
-        action[self.base_action_idx] = teleop_data.transforms["base"][[0, 1, 3]]
+    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+        action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
+        action[self.base_action_idx] = teleop_action.base * 0.1
         return action

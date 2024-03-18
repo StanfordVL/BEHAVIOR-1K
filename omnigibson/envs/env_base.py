@@ -15,6 +15,7 @@ from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
     Recreatable
+from omnigibson.macros import gm
 
 
 # Create module logger
@@ -202,8 +203,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.import_scene(scene)
 
         # Set the rendering settings
-        og.sim.viewer_width = self.render_config["viewer_width"]
-        og.sim.viewer_height = self.render_config["viewer_height"]
+        if gm.RENDER_VIEWER_CAMERA:
+            og.sim.viewer_width = self.render_config["viewer_width"]
+            og.sim.viewer_height = self.render_config["viewer_height"]
         og.sim.device = self.device
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"

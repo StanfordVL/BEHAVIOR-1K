@@ -44,7 +44,7 @@ setup(
         "pymeshlab~=2022.2",
         "click~=8.1.3",
         "aenum~=3.1.15",
-        "rtree~=1.2.0"
+        "rtree~=1.2.0",
     ],
     tests_require=[],
     python_requires=">=3",
