@@ -384,6 +384,7 @@ class VisionSensor(BaseSensor):
                 # we will label this as "unlabelled" for now
                 else:
                     value = "unlabelled"
+                    self._register_instance(value, id=id)
                 replicator_mapping[key] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
