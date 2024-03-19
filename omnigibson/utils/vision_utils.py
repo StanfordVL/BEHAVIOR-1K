@@ -2,6 +2,8 @@ import colorsys
 
 import numpy as np
 from PIL import Image, ImageDraw
+import omnigibson as og
+from omnigibson.utils.constants import semantic_class_name_to_id
 
 try:
     import accimage
@@ -66,6 +68,7 @@ class Remapper:
     def __init__(self):
         self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
         self.known_ids = set()
+        self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
@@ -137,7 +140,11 @@ class Remapper:
         Returns:
             int: The remapped id.
         """
-        assert semantic_id < len(self.key_array), f"Semantic id {semantic_id} is out of range!"
+        if semantic_id >= len(self.key_array):
+            if semantic_id not in self.warning_printed:
+                og.log.warning(f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled.")
+                self.warning_printed.add(semantic_id)
+            return semantic_class_name_to_id()['unlabelled']
         return self.key_array[semantic_id]
 
 
