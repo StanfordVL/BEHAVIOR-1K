@@ -382,8 +382,16 @@ class VisionSensor(BaseSensor):
                 # If the category name is not in the registered systems, 
                 # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
                 # we will label this as "unlabelled" for now
+                # This only happens with a very small number of pixels, e.g. 0.1% of the image
                 else:
+                    num_of_pixels = len(np.where(img == key)[0])
+                    resolution = (self._load_config["image_width"], self._load_config["image_height"])
+                    percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
+                    if percentage > 2:
+                        og.log.warning(f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
+                                       f"Percentage of pixels: {percentage}%")
                     value = "unlabelled"
+                    self._register_instance(value, id=id)
                 replicator_mapping[key] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
