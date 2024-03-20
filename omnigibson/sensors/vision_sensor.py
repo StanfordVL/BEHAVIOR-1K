@@ -310,9 +310,10 @@ class VisionSensor(BaseSensor):
 
             assert replicator_mapping[key] in semantic_class_id_to_name().values(), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        assert set(np.unique(img)).issubset(set(replicator_mapping.keys())), "Semantic segmentation image does not match the original id_to_labels mapping."
+        image_keys = np.unique(img)
+        assert set(image_keys).issubset(set(replicator_mapping.keys())), "Semantic segmentation image does not match the original id_to_labels mapping."
 
-        return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img)
+        return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
     def _remap_instance_segmentation(self, img, id_to_labels, semantic_img, semantic_labels, id=False):
         """
@@ -371,7 +372,8 @@ class VisionSensor(BaseSensor):
         # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
         # They show up in the image, but not in the info (id_to_labels).
         # We identify these values, find the corresponding semantic label (system name), and add the mapping.
-        for key, img_idx in zip(*np.unique(img, return_index=True)):
+        image_keys, key_indices = np.unique(img, return_index=True)
+        for key, img_idx in zip(image_keys, key_indices):
             if str(key) not in id_to_labels:
                 semantic_label = semantic_img.flatten()[img_idx]
                 assert semantic_label in semantic_labels, f"Semantic map value {semantic_label} is not in the semantic labels!"
@@ -382,16 +384,24 @@ class VisionSensor(BaseSensor):
                 # If the category name is not in the registered systems, 
                 # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
                 # we will label this as "unlabelled" for now
+                # This only happens with a very small number of pixels, e.g. 0.1% of the image
                 else:
+                    num_of_pixels = len(np.where(img == key)[0])
+                    resolution = (self._load_config["image_width"], self._load_config["image_height"])
+                    percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
+                    if percentage > 2:
+                        og.log.warning(f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
+                                       f"Percentage of pixels: {percentage}%")
                     value = "unlabelled"
+                    self._register_instance(value, id=id)
                 replicator_mapping[key] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
+        
+        assert set(image_keys).issubset(set(replicator_mapping.keys())), "Instance segmentation image does not match the original id_to_labels mapping."
 
-        assert set(np.unique(img)).issubset(set(replicator_mapping.keys())), "Instance segmentation image does not match the original id_to_labels mapping."
-
-        return remapper.remap(replicator_mapping, registry, img)
+        return remapper.remap(replicator_mapping, registry, img, image_keys)
 
     def _register_instance(self, instance_name, id=False):
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
