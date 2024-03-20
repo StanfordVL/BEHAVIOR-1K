@@ -2,12 +2,11 @@
 set -e -o pipefail
 
 docker build \
-    -t stanfordvl/omnigibson:latest \
-    -t stanfordvl/omnigibson:$(sed -ne "s/.*version= *['\"]\([^'\"]*\)['\"] *.*/\1/p" setup.py) \
+    -t stanfordvl/omnigibson:colab-docker \
     -f docker/prod.Dockerfile \
     .
 
 docker build \
-    -t stanfordvl/omnigibson-vscode:latest \
-    -f docker/vscode.Dockerfile \
+    -t stanfordvl/omnigibson-colab \
+    -f docker/colab.Dockerfile \
     .

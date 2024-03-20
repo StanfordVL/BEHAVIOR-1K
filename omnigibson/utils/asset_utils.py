@@ -394,7 +394,7 @@ def download_assets():
             # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
-def download_demo_data():
+def download_demo_data(accept_license=False):
     """
     Download OmniGibson demo dataset
     """
@@ -402,15 +402,16 @@ def download_demo_data():
     if os.path.exists(gm.KEY_PATH):
         print("OmniGibson dataset encryption key already installed.")
     else:
-        print("\n")
-        print_user_agreement()
-        while (
-            input(
-                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
-            )
-            != "y"
-        ):
-            print("You need to agree to the terms for using OmniGibson dataset.")
+        if not accept_license:
+            print("\n")
+            print_user_agreement()
+            while (
+                input(
+                    "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
+                )
+                != "y"
+            ):
+                print("You need to agree to the terms for using OmniGibson dataset.")
 
         download_key()
 
@@ -445,7 +446,7 @@ def download_key():
         assert urlretrieve(path, gm.KEY_PATH, show_progress), "Key download failed."
 
 
-def download_og_dataset():
+def download_og_dataset(accept_license=False):
     """
     Download OmniGibson dataset
     """
@@ -453,15 +454,16 @@ def download_og_dataset():
     if os.path.exists(gm.KEY_PATH):
         print("OmniGibson dataset encryption key already installed.")
     else:
-        print("\n")
-        print_user_agreement()
-        while (
-            input(
-                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
-            )
-            != "y"
-        ):
-            print("You need to agree to the terms for using OmniGibson dataset.")
+        if not accept_license:
+            print("\n")
+            print_user_agreement()
+            while (
+                input(
+                    "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
+                )
+                != "y"
+            ):
+                print("You need to agree to the terms for using OmniGibson dataset.")
 
         download_key()
 
@@ -475,28 +477,6 @@ def download_og_dataset():
         assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
-
-
-def change_data_path():
-    """
-    Changes the data paths for this repo
-    """
-    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml")) as f:
-        global_config = yaml.load(f, Loader=yaml.FullLoader)
-    print("Current dataset path:")
-    for k, v in global_config.items():
-        print("{}: {}".format(k, v))
-    for k, v in global_config.items():
-        new_path = input("Change {} from {} to: ".format(k, v))
-        global_config[k] = new_path
-
-    print("New dataset path:")
-    for k, v in global_config.items():
-        print("{}: {}".format(k, v))
-    response = input("Save? [y/n]")
-    if response == "y":
-        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml"), "w") as f:
-            yaml.dump(global_config, f)
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
@@ -543,17 +523,14 @@ if __name__ == "__main__":
     parser.add_argument("--download_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_demo_data", action="store_true", help="download demo data Rs")
     parser.add_argument("--download_og_dataset", action="store_true", help="download OmniGibson Dataset")
-    parser.add_argument("--change_data_path", action="store_true", help="change the path to store assets and datasets")
-
+    parser.add_argument("--accept_license", action="store_true", help="pre-accept the OmniGibson dataset license")
     args = parser.parse_args()
 
     if args.download_assets:
         download_assets()
-    elif args.download_demo_data:
-        download_demo_data()
-    elif args.download_og_dataset:
-        download_og_dataset()
-    elif args.change_data_path:
-        change_data_path()
+    if args.download_demo_data:
+        download_demo_data(accept_license=args.accept_license)
+    if args.download_og_dataset:
+        download_og_dataset(accept_license=args.accept_license)
 
     og.shutdown()
