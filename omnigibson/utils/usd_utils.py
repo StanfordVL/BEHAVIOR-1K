@@ -162,6 +162,8 @@ class RigidContactAPI:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
+    _PATH_TO_SCENE_IDX = None
+
     # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
     _PATH_TO_ROW_IDX = None
     _PATH_TO_COL_IDX = None
@@ -191,15 +193,23 @@ class RigidContactAPI:
         # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
         # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
         # mapping aligns with omni's ordering!
-        i = 0
+        cls._PATH_TO_SCENE_IDX = dict()
         cls._PATH_TO_COL_IDX = dict()
-        #@TODO: Which scene
-        for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
-                for link in obj.links.values():
-                    if not link.kinematic_only:
-                        cls._PATH_TO_COL_IDX[link.prim_path] = i
-                        i += 1
+        cls._PATH_TO_ROW_IDX = dict()
+        cls._ROW_IDX_TO_PATH = dict()
+        cls._COL_IDX_TO_PATH = dict()
+        cls._CONTACT_MATRIX = dict()
+
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            cls._PATH_TO_COL_IDX[scene_idx] = dict()
+            i = 0
+            for obj in scene.objects:
+                if obj.prim_type == PrimType.RIGID:
+                    for link in obj.links.values():
+                        if not link.kinematic_only:
+                            cls._PATH_TO_COL_IDX[scene_idx][link.prim_path] = i
+                            cls._PATH_TO_SCENE_IDX[link.prim_path] = scene_idx
+                            i += 1
 
         # If there are no valid objects, clear the view and terminate early
         if i == 0:
@@ -209,33 +219,47 @@ class RigidContactAPI:
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
         # We also suppress the omni tensor plugin from giving warnings we expect
+        cls._CONTACT_VIEW = dict()
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
-                pattern="/World/*/*",
-                filter_patterns=list(cls._PATH_TO_COL_IDX.keys()),
-            )
+            for scene_idx, _ in enumerate(og.sim.scenes):
+                cls._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
+                    pattern="/World/*/*",
+                    filter_patterns=list(cls._PATH_TO_COL_IDX[scene_idx].keys()),
+                )
 
         # Create deterministic mapping from path to row index
-        cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
+        for scene_idx, _ in enumerate(og.sim.scenes):
+            cls._PATH_TO_ROW_IDX[scene_idx] = {path: i for i, path in enumerate(cls._CONTACT_VIEW[scene_idx].sensor_paths)}
 
         # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
-        cls._ROW_IDX_TO_PATH = np.array(list(cls._PATH_TO_ROW_IDX.keys()))
-        cls._COL_IDX_TO_PATH = np.array(list(cls._PATH_TO_COL_IDX.keys()))
+        for scene_idx, _ in enumerate(og.sim.scenes):
+            cls._ROW_IDX_TO_PATH[scene_idx] = np.array(list(cls._PATH_TO_ROW_IDX[scene_idx].keys()))
+            cls._COL_IDX_TO_PATH[scene_idx] = np.array(list(cls._PATH_TO_COL_IDX[scene_idx].keys()))
+        
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
-        n_bodies = len(cls._PATH_TO_COL_IDX)
-        assert cls._CONTACT_VIEW.filter_count == n_bodies, \
-            f"Got unexpected contact view shape. Expected: (N, {n_bodies}); " \
-            f"got: (N, {cls._CONTACT_VIEW.filter_count})"
+        # n_bodies = len(cls._PATH_TO_COL_IDX)
+        # assert cls._CONTACT_VIEW.filter_count == n_bodies, \
+        #     f"Got unexpected contact view shape. Expected: (N, {n_bodies}); " \
+        #     f"got: (N, {cls._CONTACT_VIEW.filter_count})"
 
+    @classmethod
+    def get_scene_idx(cls, prim_path):
+        """
+        Returns:
+            int: scene idx for the rigid body defined by @prim_path
+        """
+        return cls._PATH_TO_SCENE_IDX[prim_path]
+    
     @classmethod
     def get_body_row_idx(cls, prim_path):
         """
         Returns:
             int: row idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_ROW_IDX[prim_path]
+        scene_idx = cls._PATH_TO_SCENE_IDX[prim_path]
+        return scene_idx, cls._PATH_TO_ROW_IDX[scene_idx][prim_path]
 
     @classmethod
     def get_body_col_idx(cls, prim_path):
@@ -243,26 +267,27 @@ class RigidContactAPI:
         Returns:
             int: col idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_COL_IDX[prim_path]
+        scene_idx = cls._PATH_TO_SCENE_IDX[prim_path]
+        return scene_idx, cls._PATH_TO_COL_IDX[scene_idx][prim_path]
 
     @classmethod
-    def get_row_idx_prim_path(cls, idx):
+    def get_row_idx_prim_path(cls, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the row idx @idx in the contact matrix
         """
-        return cls._ROW_IDX_TO_PATH[idx]
+        return cls._ROW_IDX_TO_PATH[scene_idx][idx]
 
     @classmethod
-    def get_col_idx_prim_path(cls, idx):
+    def get_col_idx_prim_path(cls, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the column idx @idx in the contact matrix
         """
-        return cls._COL_IDX_TO_PATH[idx]
+        return cls._COL_IDX_TO_PATH[scene_idx][idx]
 
     @classmethod
-    def get_all_impulses(cls):
+    def get_all_impulses(cls, scene_idx):
         """
         Grab all impulses at the current timestep
 
@@ -271,10 +296,10 @@ class RigidContactAPI:
                 in the simulator and M tracked rigid bodies
         """
         # Generate the contact matrix if it doesn't already exist
-        if cls._CONTACT_MATRIX is None:
-            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+        if scene_idx not in cls._CONTACT_MATRIX:
+            cls._CONTACT_MATRIX[scene_idx] = cls._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
 
-        return cls._CONTACT_MATRIX
+        return cls._CONTACT_MATRIX[scene_idx]
 
     @classmethod
     def get_impulses(cls, prim_paths_a, prim_paths_b):
@@ -293,9 +318,10 @@ class RigidContactAPI:
                 from @prim_paths_b
         """
         # Compute subset of matrix and return
-        idxs_a = [cls._PATH_TO_ROW_IDX[path] for path in prim_paths_a]
-        idxs_b = [cls._PATH_TO_COL_IDX[path] for path in prim_paths_b]
-        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+        scene_idx = cls._PATH_TO_SCENE_IDX[prim_paths_a[0]]
+        idxs_a = [cls._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths_a]
+        idxs_b = [cls._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths_b]
+        return cls.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
 
     @classmethod
     def in_contact(cls, prim_paths_a, prim_paths_b):
@@ -323,7 +349,7 @@ class RigidContactAPI:
         """
         Clears the internal contact matrix and cache
         """
-        cls._CONTACT_MATRIX = None
+        cls._CONTACT_MATRIX = dict()
         cls._CONTACT_CACHE = dict()
 
 

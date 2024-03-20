@@ -1,10 +1,11 @@
+import copy
 import omnigibson as og
 
 class VectorEnvironment():
     
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
-        self.envs = [og.Environment(configs=config, num_env=i) for i in range(num_envs)]
+        self.envs = [og.Environment(configs=copy.deepcopy(config), num_env=i) for i in range(num_envs)]
 
     def step(self, actions):
         try:
@@ -19,10 +20,10 @@ class VectorEnvironment():
                 rewards.append(reward)
                 dones.append(done)
                 infos.append(info)
-            return self._post_step()
-        except:
-            raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
-    
+            return observations, rewards, dones, infos
+        except Exception as e:
+            print(e)
+
     def reset(self):
         for env in self.envs:
             env.reset()

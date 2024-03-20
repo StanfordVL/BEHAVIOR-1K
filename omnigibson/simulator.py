@@ -590,14 +590,15 @@ def launch_simulator(*args, **kwargs):
             self._physics_sim_view.set_subspace_roots("/")
 
             # Then update the handles for all objects
-            if self.scene is not None and self.scene.initialized:
-                for obj in self.scene.objects:
-                    # Only need to update if object is already initialized as well
-                    if obj.initialized:
-                        obj.update_handles()
-                for system in self.scene.systems:
-                    if issubclass(system, MacroPhysicalParticleSystem):
-                        system.refresh_particles_view()
+            for scene in self.scenes:
+                if scene is not None and scene.initialized:
+                    for obj in scene.objects:
+                        # Only need to update if object is already initialized as well
+                        if obj.initialized:
+                            obj.update_handles()
+                    for system in scene.systems:
+                        if issubclass(system, MacroPhysicalParticleSystem):
+                            system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
@@ -708,12 +709,11 @@ def launch_simulator(*args, **kwargs):
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
-                    if self.scene is not None and self.scene.initialized:
-                        for robot in self.scene.robots:
-                            if robot.initialized:
-                                robot.update_controller_mode()
-
-                        # Also refresh any transition rules that became stale while sim was stopped
+                    if len(self.scenes) > 0 and all([scene.initialized for scene in self.scenes]):
+                        for scene in self.scenes:
+                            for robot in scene.robots:
+                                if robot.initialized:
+                                    robot.update_controller_mode()
                         TransitionRuleAPI.refresh_all_rules()
 
                 # Additionally run non physics things

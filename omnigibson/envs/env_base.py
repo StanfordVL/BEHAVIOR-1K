@@ -75,10 +75,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
           
         self.num_env = num_env
-
         origin_offset_x = (self.num_env % NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
         origin_offset_y = int(self.num_env / NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
         self.origin_offset = [origin_offset_x, origin_offset_y, 0.0]
+
         # Load this environment
         self.load()
 
@@ -210,6 +210,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         
         scene.id = "scene_{}".format(str(self.num_env))
         scene.origin_offset = self.origin_offset
+        self._scene = scene
         og.sim.import_scene(scene)
 
         # Set the rendering settings
@@ -231,9 +232,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}"
+                    robot_config["name"] = f"robot{i}_{str(self.num_env)}"
+                else:
+                    robot_config["name"] = f"{robot_config['name']}_{str(self.num_env)}"
                 # Update robot config so name is unique amongst robots in all scenes
-                robot_config["name"] = f"{robot_config['name']}_{str(self.scene.id)}"
                 position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
@@ -264,9 +266,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for i, obj_config in enumerate(self.objects_config):
             # Add a name for the object if necessary
             if "name" not in obj_config:
-                obj_config["name"] = f"obj{i}"
+                obj_config["name"] = f"obj{i}_{str(self.num_env)}"
+            else:
+                obj_config["name"] = f"{obj_config['name']}_{str(self.num_env)}"
             # Pop the desired position and orientation
-            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
+            position, orientation = obj_config.pop("position", [0.0, 0.0, 0.0]), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
             obj = create_class_from_registry_and_config(
                 cls_name=obj_config["type"],
@@ -274,9 +278,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 cfg=obj_config,
                 cls_type_descriptor="object",
             )
+
             # Import the robot into the simulator and set the pose
-            og.sim.import_object(obj)
-            obj.set_position_orientation(position=position, orientation=orientation)
+            self.scene.add_object(obj)
+            init_position = [sum(x) for x in zip(position, self.origin_offset)]
+            obj.set_position_orientation(position=init_position, orientation=orientation)
 
         if len(self.objects_config) > 0:
             # Auto-initialize all objects
@@ -379,8 +385,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load the scene, robots, and task
         self._load_scene()
-        # self._load_robots()
-        # self._load_objects()
+        self._load_robots()
+        self._load_objects()
         self._load_task()
         # self._load_external_sensors()
 
@@ -647,7 +653,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             Scene: Active scene in this environment
         """
-        return og.sim.scene
+        return self._scene
 
     @property
     def robots(self):

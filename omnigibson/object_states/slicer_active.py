@@ -118,25 +118,25 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
-        #@TODO: Which scene
-        sliceable_objs = og.sim.scene.object_registry("abilities", "sliceable", [])
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 
-        # If there's no sliceables, then obviously no slicer is touching any sliceable so immediately return all Falses
-        if len(sliceable_objs) == 0:
+            # If there's no sliceables, then obviously no slicer is touching any sliceable so immediately return all Falses
+            if len(sliceable_objs) == 0:
+                return currently_touching
+
+            # Aggregate all link prim path indices
+            all_slicer_idxs = [[list(RigidContactAPI.get_body_row_idx(prim_path))[1] for prim_path in link_paths] for link_paths in cls.SLICER_LINK_PATHS]
+            sliceable_idxs = [list(RigidContactAPI.get_body_col_idx(link.prim_path))[1] for obj in sliceable_objs for link in obj.links.values()]
+            impulses = RigidContactAPI.get_all_impulses(scene_idx)
+
+            # Batch check each slicer against all sliceables
+            for i, slicer_idxs in enumerate(all_slicer_idxs):
+                if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
+                    # We are touching at least one sliceable
+                    currently_touching[i] = True
+
             return currently_touching
-
-        # Aggregate all link prim path indices
-        all_slicer_idxs = [[RigidContactAPI.get_body_row_idx(prim_path) for prim_path in link_paths] for link_paths in cls.SLICER_LINK_PATHS]
-        sliceable_idxs = [RigidContactAPI.get_body_col_idx(link.prim_path) for obj in sliceable_objs for link in obj.links.values()]
-        impulses = RigidContactAPI.get_all_impulses()
-
-        # Batch check each slicer against all sliceables
-        for i, slicer_idxs in enumerate(all_slicer_idxs):
-            if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
-                # We are touching at least one sliceable
-                currently_touching[i] = True
-
-        return currently_touching
 
     @classproperty
     def value_name(cls):

@@ -347,6 +347,8 @@ class EntityPrim(XFormPrim):
         if self._articulation_view_direct is None:
             return None
 
+        # if not self._articulation_view_direct.is_physics_handle_valid() or not self._articulation_view_direct._physics_view.check():
+        #     from IPython import embed; embed()
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
@@ -803,6 +805,7 @@ class EntityPrim(XFormPrim):
             if not joint.initialized:
                 joint.initialize()
             joint.update_handles()
+            
 
     def get_joint_positions(self, normalized=False):
         """
