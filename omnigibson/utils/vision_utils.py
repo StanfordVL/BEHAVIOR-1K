@@ -75,7 +75,7 @@ class Remapper:
         self.key_array = np.array([], dtype=np.uint32)
         self.known_ids = set()
 
-    def remap(self, old_mapping, new_mapping, image):
+    def remap(self, old_mapping, new_mapping, image, image_keys=None):
         """
         Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
         If the image contains values that are not in old_mapping, they are remapped to the value in new_mapping
@@ -87,6 +87,7 @@ class Remapper:
             new_mapping (dict): The new mapping dictionary that maps another set of image values to labels,
                 e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
             image (np.ndarray): The 2D image to remap, e.g. [[1, 3], [1, 2]].
+            image_keys (np.ndarray): The unique keys in the image, e.g. [1, 2, 3].
         
         Returns:
             np.ndarray: The remapped image, e.g. [[5,100],[5,7]].
@@ -116,7 +117,7 @@ class Remapper:
         # For all the values that exist in the image but not in old_mapping.keys(), we map them to whichever key in
         # new_mapping that equals to 'unlabelled'. This is needed because some values in the image don't necessarily
         # show up in the old_mapping, i.e. particle systems.
-        for key in np.unique(image):
+        for key in np.unique(image) if image_keys is None else image_keys:
             if key not in old_mapping.keys():
                 new_key = next((k for k, v in new_mapping.items() if v == 'unlabelled'), None)
                 assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
