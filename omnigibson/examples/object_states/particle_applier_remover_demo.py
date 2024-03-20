@@ -129,8 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.61340969, -1.79803028,  2.53167412]),
-        orientation=np.array([ 0.46291845, -0.12381886, -0.22679218,  0.84790371]),
+        position=np.array([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=np.array([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
@@ -139,7 +139,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="dishtowel",
         model="dtfspn",
         bounding_box=[0.34245, 0.46798, 0.07],
-        visual_only=method_type == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
+        visual_only=method_type
+        == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
@@ -209,4 +210,3 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 if __name__ == "__main__":
     main()
-

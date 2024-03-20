@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 from omnigibson.macros import gm
 import trimesh.transformations
 
+
 class XFormPrim(BasePrim):
     """
     Provides high level functions to deal with an Xform prim and its attributes/ properties.
@@ -65,12 +66,18 @@ class XFormPrim(BasePrim):
         self.original_scale = np.array(self.get_attribute("xformOp:scale"))
 
         # Create collision filter API
-        self._collision_filter_api = lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim) if \
-            self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI) else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        self._collision_filter_api = (
+            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
+            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        )
 
         # Create binding API
-        self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim) if \
-            self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI) else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+        self._binding_api = (
+            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
+            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+        )
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -115,7 +122,9 @@ class XFormPrim(BasePrim):
             if prop_name in properties_to_remove:
                 self.prim.RemoveProperty(prop_name)
         if "xformOp:scale" not in prop_names:
-            xform_op_scale = xformable.AddXformOp(lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, "")
+            xform_op_scale = xformable.AddXformOp(
+                lazy.pxr.UsdGeom.XformOp.TypeScale, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+            )
             xform_op_scale.Set(lazy.pxr.Gf.Vec3d([1.0, 1.0, 1.0]))
         else:
             xform_op_scale = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
@@ -128,7 +137,9 @@ class XFormPrim(BasePrim):
             xform_op_translate = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
 
         if "xformOp:orient" not in prop_names:
-            xform_op_rot = xformable.AddXformOp(lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, "")
+            xform_op_rot = xformable.AddXformOp(
+                lazy.pxr.UsdGeom.XformOp.TypeOrient, lazy.pxr.UsdGeom.XformOp.PrecisionDouble, ""
+            )
         else:
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
@@ -138,9 +149,10 @@ class XFormPrim(BasePrim):
         r1 = R.from_quat(current_orientation).as_matrix()
         r2 = R.from_quat(new_orientation).as_matrix()
         # Make sure setting is done correctly
-        assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), \
-            f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, " \
+        assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
+            f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
+        )
 
     def has_material(self):
         """
@@ -161,11 +173,12 @@ class XFormPrim(BasePrim):
                 Default is None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
-        
+
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
-            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        assert np.isclose(
+            np.linalg.norm(orientation), 1, atol=1e-3
+        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         my_world_transform = T.pose2mat((position, orientation))
 
@@ -231,19 +244,19 @@ class XFormPrim(BasePrim):
             3-array: (roll, pitch, yaw) global euler orientation of this prim
         """
         return quat2euler(self.get_orientation())
-    
+
     def get_2d_orientation(self):
         """
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.
         """
         fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
-        fwd[2] = 0.
+        fwd[2] = 0.0
 
         # If the object is facing close to straight up, then we can't compute a 2D orientation
         # in that case, we return zero.
         if np.linalg.norm(fwd) < 1e-4:
-            return 0.
+            return 0.0
 
         fwd /= np.linalg.norm(fwd)
         return np.arctan2(fwd[1], fwd[0])
@@ -269,7 +282,7 @@ class XFormPrim(BasePrim):
                 (with respect to its parent prim). Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
-        """            
+        """
         properties = self.prim.GetPropertyNames()
         if position is not None:
             position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
@@ -295,8 +308,12 @@ class XFormPrim(BasePrim):
             # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
             # Ideally we should call usdrt's set local pose directly, but there is no such API.
             # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-            xformable_prim = lazy.usdrt.Rt.Xformable(lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True))
-            assert not xformable_prim.HasWorldXform(), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
+            xformable_prim = lazy.usdrt.Rt.Xformable(
+                lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+            )
+            assert (
+                not xformable_prim.HasWorldXform()
+            ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
             xformable_prim.SetLocalXformFromUsd()
         return
 
@@ -311,7 +328,7 @@ class XFormPrim(BasePrim):
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
         return np.array(transform.GetScale())
-    
+
     @property
     def scaled_transform(self):
         """
@@ -364,7 +381,9 @@ class XFormPrim(BasePrim):
         Args:
             material (MaterialPrim): Material to bind to this prim
         """
-        self._binding_api.Bind(lazy.pxr.UsdShade.Material(material.prim), bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants)
+        self._binding_api.Bind(
+            lazy.pxr.UsdShade.Material(material.prim), bindingStrength=lazy.pxr.UsdShade.Tokens.weakerThanDescendants
+        )
         self._material = material
 
     def add_filtered_collision_pair(self, prim):

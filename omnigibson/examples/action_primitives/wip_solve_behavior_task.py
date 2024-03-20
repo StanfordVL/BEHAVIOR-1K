@@ -4,20 +4,25 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
 # gm.ENABLE_FLATCACHE = True
 
+
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
 
+
 def main():
     """
     Demonstrates how to use the action primitives to solve a simple BEHAVIOR-1K task.
-    
+
     It loads Benevolence_1_int with a Fetch robot, and the robot attempts to solve the
     picking_up_trash task using a hardcoded sequence of primitives.
     """
@@ -59,6 +64,7 @@ def main():
     trash = scene.object_registry("name", "trash_can_85")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
     print("Finished executing place")
+
 
 if __name__ == "__main__":
     main()

@@ -2,13 +2,18 @@ import numpy as np
 import pytest
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
+
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
+
 
 def primitive_tester(load_object_categories, objects, primitives, primitives_args):
     cfg = {
@@ -36,22 +41,19 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                     "arm_0": {
                         "name": "InverseKinematicsController",
                         "command_input_limits": "default",
-                        "command_output_limits": [[-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]], 
+                        "command_output_limits": [[-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]],
                         "mode": "pose_absolute_ori",
-                        "kp": 300.0
+                        "kp": 300.0,
                     },
                     "gripper_0": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True
+                        "use_delta_commands": True,
                     },
-                    "camera": {
-                        "name": "JointController",
-                        "use_delta_commands": False
-                    }
-                }
+                    "camera": {"name": "JointController", "use_delta_commands": False},
+                },
             }
         ],
     }
@@ -71,8 +73,8 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     env.reset()
 
     for obj in objects:
-        og.sim.import_object(obj['object'])
-        obj['object'].set_position_orientation(obj['position'], obj['orientation'])
+        og.sim.import_object(obj["object"])
+        obj["object"].set_position_orientation(obj["position"], obj["orientation"])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
@@ -86,79 +88,66 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     finally:
         # Clear the sim
         og.sim.clear()
-    
+
     return True
+
 
 def test_navigate():
     categories = ["floors", "ceilings", "walls"]
 
     objects = []
     obj_1 = {
-        "object": DatasetObject(
-            name="cologne",
-            category="bottle_of_cologne",
-            model="lyipur"
-        ),
+        "object": DatasetObject(name="cologne", category="bottle_of_cologne", model="lyipur"),
         "position": [-0.3, -0.8, 0.5],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     objects.append(obj_1)
 
     primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
-    primitives_args = [(obj_1['object'],)]    
+    primitives_args = [(obj_1["object"],)]
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
 
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
     objects = []
     obj_1 = {
-        "object": DatasetObject(
-            name="cologne",
-            category="bottle_of_cologne",
-            model="lyipur"
-        ),
+        "object": DatasetObject(name="cologne", category="bottle_of_cologne", model="lyipur"),
         "position": [-0.3, -0.8, 0.5],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     objects.append(obj_1)
 
     primitives = [StarterSemanticActionPrimitiveSet.GRASP]
-    primitives_args = [(obj_1['object'],)]    
+    primitives_args = [(obj_1["object"],)]
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
 
 def test_place():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
     objects = []
     obj_1 = {
-        "object": DatasetObject(
-                name="table",
-                category="breakfast_table",
-                model="rjgmmy",
-                scale=[0.3, 0.3, 0.3]
-            ),
+        "object": DatasetObject(name="table", category="breakfast_table", model="rjgmmy", scale=[0.3, 0.3, 0.3]),
         "position": [-0.7, 0.5, 0.2],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     obj_2 = {
-        "object": DatasetObject(
-            name="cologne",
-            category="bottle_of_cologne",
-            model="lyipur"
-        ),
+        "object": DatasetObject(name="cologne", category="bottle_of_cologne", model="lyipur"),
         "position": [-0.3, -0.8, 0.5],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     objects.append(obj_1)
     objects.append(obj_2)
 
     primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
-    primitives_args = [(obj_2['object'],), (obj_1['object'],)]    
+    primitives_args = [(obj_2["object"],), (obj_1["object"],)]
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
 
 @pytest.mark.skip(reason="primitives are broken")
 def test_open_prismatic():
@@ -167,20 +156,18 @@ def test_open_prismatic():
     objects = []
     obj_1 = {
         "object": DatasetObject(
-            name="bottom_cabinet",
-            category="bottom_cabinet",
-            model="bamfsz",
-            scale=[0.7, 0.7, 0.7]
+            name="bottom_cabinet", category="bottom_cabinet", model="bamfsz", scale=[0.7, 0.7, 0.7]
         ),
         "position": [-1.2, -0.4, 0.5],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     objects.append(obj_1)
 
     primitives = [StarterSemanticActionPrimitiveSet.OPEN]
-    primitives_args = [(obj_1['object'],)]    
+    primitives_args = [(obj_1["object"],)]
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
 
 @pytest.mark.skip(reason="primitives are broken")
 def test_open_revolute():
@@ -188,18 +175,13 @@ def test_open_revolute():
 
     objects = []
     obj_1 = {
-        "object": DatasetObject(
-            name="fridge",
-            category="fridge",
-            model="dszchb",
-            scale=[0.7, 0.7, 0.7]
-        ),
+        "object": DatasetObject(name="fridge", category="fridge", model="dszchb", scale=[0.7, 0.7, 0.7]),
         "position": [-1.2, -0.4, 0.5],
-        "orientation": [0, 0, 0, 1]
+        "orientation": [0, 0, 0, 1],
     }
     objects.append(obj_1)
 
     primitives = [StarterSemanticActionPrimitiveSet.OPEN]
-    primitives_args = [(obj_1['object'],)]    
+    primitives_args = [(obj_1["object"],)]
 
     assert primitive_tester(categories, objects, primitives, primitives_args)

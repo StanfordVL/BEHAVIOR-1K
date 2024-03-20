@@ -15,6 +15,7 @@ class PredicateGoal(SuccessCondition):
 
             where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
     """
+
     def __init__(self, goal_fcn):
         # Store internal vars
         self._goal_fcn = goal_fcn

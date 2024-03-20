@@ -76,8 +76,8 @@ class TwoWheelRobot(LocomotionRobot):
         ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
         # Add info
-        dic["dd_base_lin_vel"] = lin_vel        # lin_vel is already 1D np array of length 1
-        dic["dd_base_ang_vel"] = ang_vel        # lin_vel is already 1D np array of length 1
+        dic["dd_base_lin_vel"] = lin_vel  # lin_vel is already 1D np array of length 1
+        dic["dd_base_ang_vel"] = ang_vel  # lin_vel is already 1D np array of length 1
 
         return dic
 
@@ -148,11 +148,11 @@ class TwoWheelRobot(LocomotionRobot):
         classes = super()._do_not_register_classes
         classes.add("TwoWheelRobot")
         return classes
-    
+
     def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         """
         Generate action data from teleoperation action data
-        NOTE: This implementation only supports DifferentialDriveController. 
+        NOTE: This implementation only supports DifferentialDriveController.
         Overwrite this function if the robot is using a different base controller.
         Args:
             teleop_action (TeleopAction): teleoperation action data
@@ -160,7 +160,8 @@ class TwoWheelRobot(LocomotionRobot):
             np.ndarray: array of action data
         """
         action = super().teleop_data_to_action(teleop_action)
-        assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
+        assert isinstance(
+            self._controllers["base"], DifferentialDriveController
+        ), "Only DifferentialDriveController is supported!"
         action[self.base_action_idx] = np.array([teleop_action.base[0], teleop_action.base[2]]) * 0.3
         return action
-

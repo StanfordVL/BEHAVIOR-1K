@@ -29,52 +29,61 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Define objects we want to sample at runtime
     microwave_cfg = dict(
-            type="DatasetObject",
-            name="microwave",
-            category="microwave",
-            model="hjjxmi",
-            bounding_box=[0.768, 0.512, 0.392],
+        type="DatasetObject",
+        name="microwave",
+        category="microwave",
+        model="hjjxmi",
+        bounding_box=[0.768, 0.512, 0.392],
     )
 
     cabinet_cfg = dict(
-            type="DatasetObject",
-            name="cabinet",
-            category="bottom_cabinet",
-            model="bamfsz",
-            bounding_box=[1.075, 1.131, 1.355],
+        type="DatasetObject",
+        name="cabinet",
+        category="bottom_cabinet",
+        model="bamfsz",
+        bounding_box=[1.075, 1.131, 1.355],
     )
 
-    plate_cfgs = [dict(
+    plate_cfgs = [
+        dict(
             type="DatasetObject",
             name=f"plate{i}",
             category="plate",
             model="iawoof",
             bounding_box=np.array([0.20, 0.20, 0.05]),
-    ) for i in range(2)]
+        )
+        for i in range(2)
+    ]
 
-    apple_cfgs = [dict(
+    apple_cfgs = [
+        dict(
             type="DatasetObject",
             name=f"apple{i}",
             category="apple",
             model="agveuv",
             bounding_box=[0.065, 0.065, 0.077],
-    ) for i in range(4)]
+        )
+        for i in range(4)
+    ]
 
     shelf_cfg = dict(
-            type="DatasetObject",
-            name=f"shelf",
-            category="shelf",
-            model="pkgbcp",
-            bounding_box=np.array([1.0, 0.4, 2.0]),
+        type="DatasetObject",
+        name=f"shelf",
+        category="shelf",
+        model="pkgbcp",
+        bounding_box=np.array([1.0, 0.4, 2.0]),
     )
 
-    box_cfgs = [dict(
+    box_cfgs = [
+        dict(
             type="DatasetObject",
             name=f"box{i}",
             category="box_of_crackers",
             model="cmdigf",
             bounding_box=np.array([0.2, 0.05, 0.3]),
-    ) for i in range(5)]
+        )
+        for i in range(5)
+    ]
 
     # Compose objects cfg
     objects_cfg = [

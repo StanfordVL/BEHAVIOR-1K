@@ -1,6 +1,7 @@
 """
 Example script for using external devices to teleoperate a robot.
 """
+
 import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
 
@@ -16,6 +17,7 @@ TELEOP_METHOD = {
     "vision": "Human Keypoints with Camera",
 }
 
+
 def main():
     """
     Spawn a robot in an empty scene with a breakfast table and some toys.
@@ -30,7 +32,7 @@ def main():
     if robot_name != "FrankaPanda":
         base_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot base teleop method")
     else:
-        base_teleop_method = "keyboard" # Dummy value since FrankaPanda does not have a base
+        base_teleop_method = "keyboard"  # Dummy value since FrankaPanda does not have a base
     # Generate teleop config
     teleop_config.arm_left_controller = arm_teleop_method
     teleop_config.arm_right_controller = arm_teleop_method
@@ -39,7 +41,7 @@ def main():
     teleop_config.interface_kwargs["spacemouse"] = {"arm_speed_scaledown": 0.04}
     if arm_teleop_method == "vision" or base_teleop_method == "vision":
         teleop_config.interface_kwargs["vision"] = {"camera": RealSenseCamera()}
-    
+
     # Create the config for generating the environment we want
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
@@ -107,7 +109,7 @@ def main():
             "model": "eulekw",
             "scale": [0.25, 0.25, 0.25],
             "position": [0.6, 0.3, 0.5],
-        }
+        },
     ]
     cfg = dict(scene=scene_cfg, robots=[robot_cfg], objects=object_cfg)
 
@@ -122,15 +124,16 @@ def main():
     # Initialize teleoperation system
     teleop_sys = TeleopSystem(config=teleop_config, robot=robot, show_control_marker=True)
     teleop_sys.start()
-    
+
     # main simulation loop
     for _ in range(10000):
         action = teleop_sys.get_action(teleop_sys.get_obs())
-        env.step(action) 
-    
+        env.step(action)
+
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
     env.close()
+
 
 if __name__ == "__main__":
     main()

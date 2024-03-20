@@ -31,7 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="apple",
         model="agveuv",
         bounding_box=[0.098, 0.098, 0.115],
-        position=[0.085, 0,  0.92],
+        position=[0.085, 0, 0.92],
     )
 
     knife_cfg = dict(
@@ -65,7 +65,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         "scene": {
             "type": "Scene",
         },
-        "objects": [table_cfg, apple_cfg, knife_cfg, light0_cfg, light1_cfg]
+        "objects": [table_cfg, apple_cfg, knife_cfg, light0_cfg, light1_cfg],
     }
 
     # Create the environment
@@ -77,7 +77,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the table
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 0.544888, -0.412084,  1.11569 ]),
+        position=np.array([0.544888, -0.412084, 1.11569]),
         orientation=np.array([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
     )
 

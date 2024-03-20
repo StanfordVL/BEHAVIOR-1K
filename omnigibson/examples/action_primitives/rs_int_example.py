@@ -4,15 +4,20 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
 # gm.ENABLE_FLATCACHE = True
 
+
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
+
 
 def main():
     """
@@ -34,7 +39,7 @@ def main():
             "category": "apple",
             "model": "agveuv",
             "position": [-0.3, -1.1, 0.5],
-            "orientation": [0, 0, 0, 1]
+            "orientation": [0, 0, 0, 1],
         },
     ]
 
@@ -59,6 +64,7 @@ def main():
     print("Executing controller")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, cabinet), env)
     print("Finished executing place")
+
 
 if __name__ == "__main__":
     main()

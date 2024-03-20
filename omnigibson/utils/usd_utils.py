@@ -77,10 +77,19 @@ def get_prim_nested_children(prim):
     return prims
 
 
-def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
-                 joint_frame_in_parent_frame_pos=None, joint_frame_in_parent_frame_quat=None,
-                 joint_frame_in_child_frame_pos=None, joint_frame_in_child_frame_quat=None,
-                 break_force=None, break_torque=None):
+def create_joint(
+    prim_path,
+    joint_type,
+    body0=None,
+    body1=None,
+    enabled=True,
+    joint_frame_in_parent_frame_pos=None,
+    joint_frame_in_parent_frame_quat=None,
+    joint_frame_in_child_frame_pos=None,
+    joint_frame_in_child_frame_quat=None,
+    break_force=None,
+    break_torque=None,
+):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
@@ -103,12 +112,12 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
         Usd.Prim: Created joint prim
     """
     # Make sure we have valid joint_type
-    assert JointType.is_valid(joint_type=joint_type), \
-        f"Invalid joint specified for creation: {joint_type}"
+    assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
     # Make sure at least body0 or body1 is specified
-    assert body0 is not None or body1 is not None, \
-        f"At least either body0 or body1 must be specified when creating a joint!"
+    assert (
+        body0 is not None or body1 is not None
+    ), f"At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
     joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
@@ -135,11 +144,15 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
     if joint_frame_in_parent_frame_pos is not None:
         joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
     if joint_frame_in_parent_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]))
+        joint_prim.GetAttribute("physics:localRot0").Set(
+            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]])
+        )
     if joint_frame_in_child_frame_pos is not None:
         joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
     if joint_frame_in_child_frame_quat is not None:
-        joint_prim.GetAttribute("physics:localRot1").Set(lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]]))
+        joint_prim.GetAttribute("physics:localRot1").Set(
+            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]])
+        )
 
     if break_force is not None:
         joint_prim.GetAttribute("physics:breakForce").Set(break_force)
@@ -162,6 +175,7 @@ class RigidContactAPI:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
+
     # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
     _PATH_TO_ROW_IDX = None
     _PATH_TO_COL_IDX = None
@@ -224,9 +238,10 @@ class RigidContactAPI:
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         n_bodies = len(cls._PATH_TO_COL_IDX)
-        assert cls._CONTACT_VIEW.filter_count == n_bodies, \
-            f"Got unexpected contact view shape. Expected: (N, {n_bodies}); " \
+        assert cls._CONTACT_VIEW.filter_count == n_bodies, (
+            f"Got unexpected contact view shape. Expected: (N, {n_bodies}); "
             f"got: (N, {cls._CONTACT_VIEW.filter_count})"
+        )
 
     @classmethod
     def get_body_row_idx(cls, prim_path):
@@ -330,6 +345,7 @@ class CollisionAPI:
     """
     Class containing class methods to facilitate collision handling, e.g. collision groups
     """
+
     ACTIVE_COLLISION_GROUPS = dict()
 
     @classmethod
@@ -345,8 +361,9 @@ class CollisionAPI:
         assert og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
         # Make sure the group doesn't already exist
-        assert col_group not in cls.ACTIVE_COLLISION_GROUPS, \
-            f"Cannot create collision group {col_group} because it already exists!"
+        assert (
+            col_group not in cls.ACTIVE_COLLISION_GROUPS
+        ), f"Cannot create collision group {col_group} because it already exists!"
 
         # Create the group
         col_group_prim_path = f"/World/collision_groups/{col_group}"
@@ -366,8 +383,9 @@ class CollisionAPI:
             prim_path (str): Prim (and all nested prims) to assign to this @col_group
         """
         # Make sure collision group exists
-        assert col_group in cls.ACTIVE_COLLISION_GROUPS, \
-            f"Cannot add to collision group {col_group} because it does not exist!"
+        assert (
+            col_group in cls.ACTIVE_COLLISION_GROUPS
+        ), f"Cannot add to collision group {col_group} because it does not exist!"
 
         # Add this prim to the collision group
         cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
@@ -382,9 +400,10 @@ class CollisionAPI:
         """
         # Make sure the group doesn't already exist
         for group_name in (col_group, filter_group):
-            assert group_name in cls.ACTIVE_COLLISION_GROUPS, \
-                (f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
-                 f"does not exist!")
+            assert group_name in cls.ACTIVE_COLLISION_GROUPS, (
+                f"Cannot add group filter {filter_group} to collision group {col_group} because at least one group "
+                f"does not exist!"
+            )
 
         # Grab the group, and add the filter
         filter_group_prim_path = f"/World/collision_groups/{filter_group}"
@@ -403,6 +422,7 @@ class FlatcacheAPI:
     """
     Monolithic class for leveraging functionality meant to be used EXCLUSIVELY with flatcache.
     """
+
     # Modified prims since transition from sim being stopped to sim being played occurred
     # This should get cleared every time og.sim.stop() gets called
     MODIFIED_PRIMS = set()
@@ -440,7 +460,9 @@ class FlatcacheAPI:
                 joints_pos = prim.get_joint_positions()
                 for joint, joint_pos in zip(prim.joints.values(), joints_pos):
                     state_name = "linear" if joint.joint_type == JointType.JOINT_PRISMATIC else "angular"
-                    joint_pos = joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / np.pi
+                    joint_pos = (
+                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / np.pi
+                    )
                     joint.set_attribute(f"state:{state_name}:physics:position", float(joint_pos))
 
             # Update the simulation without taking any time
@@ -505,19 +527,20 @@ class PoseAPI:
     """
     This is a singleton class for getting world poses.
     Whenever we directly set the pose of a prim, we should call PoseAPI.invalidate().
-    After that, if we need to access the pose of a prim without stepping physics, 
+    After that, if we need to access the pose of a prim without stepping physics,
     this class will refresh the poses by syncing across USD-fabric-PhysX depending on the flatcache setting.
     """
+
     VALID = False
-    
+
     @classmethod
     def invalidate(cls):
         cls.VALID = False
-        
+
     @classmethod
     def mark_valid(cls):
         cls.VALID = True
-        
+
     @classmethod
     def _refresh(cls):
         if og.sim is not None and not cls.VALID:
@@ -530,7 +553,7 @@ class PoseAPI:
                 # no time step is taken here
                 og.sim.psi.fetch_results()
             cls.mark_valid()
-        
+
     @classmethod
     def get_world_pose(cls, prim_path):
         cls._refresh()
@@ -540,7 +563,7 @@ class PoseAPI:
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
         """
-        This is used when information about the prim's global scale is needed, 
+        This is used when information about the prim's global scale is needed,
         e.g. when converting points in the prim frame to the world frame.
         """
         cls._refresh()
@@ -600,6 +623,7 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
 
     # Import now to avoid too-eager load of Omni classes due to inheritance
     from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
+
     CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
     lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
@@ -645,6 +669,7 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
 
     return trimesh.Trimesh(**kwargs)
 
+
 def mesh_prim_shape_to_trimesh_mesh(mesh_prim):
     """
     Generates trimesh mesh from @mesh_prim if mesh_type is "Sphere", "Cube", "Cone" or "Cylinder"
@@ -678,6 +703,7 @@ def mesh_prim_shape_to_trimesh_mesh(mesh_prim):
 
     return trimesh_mesh
 
+
 def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True, world_frame=False):
     """
     Generates trimesh mesh from @mesh_prim
@@ -702,6 +728,7 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
         trimesh_mesh.apply_transform(PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString))
 
     return trimesh_mesh
+
 
 def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
@@ -735,12 +762,18 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     # Sample vertices
     unique_vertices = np.unique(faces_flat)
     assert len(unique_vertices) == n_unique_vertices
-    keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
-        n_unique_vertices > n_keypoints else unique_vertices
+    keypoint_idx = (
+        np.random.choice(unique_vertices, size=n_keypoints, replace=False)
+        if n_unique_vertices > n_keypoints
+        else unique_vertices
+    )
 
     # Sample faces
-    keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
-        n_unique_faces > n_keyfaces else np.arange(n_unique_faces)
+    keyface_idx = (
+        np.random.choice(n_unique_faces, size=n_keyfaces, replace=False)
+        if n_unique_faces > n_keyfaces
+        else np.arange(n_unique_faces)
+    )
 
     return keypoint_idx, keyface_idx
 
@@ -757,7 +790,9 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
         Tuple[float, np.array]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
 
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=world_frame)
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(
+        mesh_prim, include_normals=False, include_texcoord=False, world_frame=world_frame
+    )
     if trimesh_mesh.is_volume:
         volume = trimesh_mesh.volume
         com = trimesh_mesh.center_mass
@@ -773,6 +808,7 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
             com = np.zeros(3)
 
     return volume, com
+
 
 def check_extent_radius_ratio(mesh_prim):
     """
@@ -792,13 +828,17 @@ def check_extent_radius_ratio(mesh_prim):
     if mesh_type != "Mesh":
         return True
 
-    trimesh_mesh_world = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=True)
+    trimesh_mesh_world = mesh_prim_to_trimesh_mesh(
+        mesh_prim, include_normals=False, include_texcoord=False, world_frame=True
+    )
     min_extent = trimesh_mesh_world.extents.min()
     # If the mesh is too flat in the world frame, omniverse cannot create convex mesh for it
     if min_extent < 1e-5:
         return False
 
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False, world_frame=False)
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(
+        mesh_prim, include_normals=False, include_texcoord=False, world_frame=False
+    )
     if not trimesh_mesh.is_volume:
         trimesh_mesh = trimesh_mesh.convex_hull
 
@@ -808,6 +848,7 @@ def check_extent_radius_ratio(mesh_prim):
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
     return ratio < 95.0
+
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """
@@ -833,7 +874,9 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-    create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage)
+    create_mesh_prim_with_default_xform(
+        primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
+    )
     mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
@@ -843,7 +886,9 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = np.array(attr.Get()).astype(np.float64)
         attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
-    mesh.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))]))
+    mesh.GetExtentAttr().Set(
+        lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))])
+    )
 
     return mesh
 

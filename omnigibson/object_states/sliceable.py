@@ -11,6 +11,7 @@ class SliceableRequirement(BaseObjectRequirement):
     def is_compatible(cls, obj, **kwargs):
         # Avoid circular imports
         from omnigibson.objects.dataset_object import DatasetObject
+
         # Make sure object is dataset object
         if not isinstance(obj, DatasetObject):
             return False, f"Only compatible with DatasetObject, but {obj} is of type {type(obj)}"

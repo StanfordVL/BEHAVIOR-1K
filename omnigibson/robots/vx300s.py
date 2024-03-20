@@ -24,25 +24,20 @@ class VX300S(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -139,7 +134,7 @@ class VX300S(ManipulationRobot):
         controllers[f"arm_{self.default_arm}"] = "InverseKinematicsController"
         controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
         return controllers
-    
+
     @property
     def _default_joint_pos(self):
         return np.array([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
@@ -168,27 +163,31 @@ class VX300S(ManipulationRobot):
 
     @property
     def arm_link_names(self):
-        return {self.default_arm: [
-            "base_link",
-            "shoulder_link",
-            "upper_arm_link",
-            "upper_forearm_link",
-            "lower_forearm_link",
-            "wrist_link",
-            "gripper_link",
-            "gripper_bar_link",
-        ]}
+        return {
+            self.default_arm: [
+                "base_link",
+                "shoulder_link",
+                "upper_arm_link",
+                "upper_forearm_link",
+                "lower_forearm_link",
+                "wrist_link",
+                "gripper_link",
+                "gripper_bar_link",
+            ]
+        }
 
     @property
     def arm_joint_names(self):
-        return {self.default_arm: [
-            "waist",
-            "shoulder",
-            "elbow",
-            "forearm_roll",
-            "wrist_angle",
-            "wrist_rotate",
-        ]}
+        return {
+            self.default_arm: [
+                "waist",
+                "shoulder",
+                "elbow",
+                "forearm_roll",
+                "wrist_angle",
+                "wrist_rotate",
+            ]
+        }
 
     @property
     def eef_link_names(self):
@@ -205,32 +204,36 @@ class VX300S(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s/vx300s.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description.yaml")}
-    
+
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
-    
+
     @property
     def eef_usd_path(self):
         # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
         raise NotImplementedError
-    
+
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-np.pi, 0, 0])}
-    
+
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="right_finger_link", position=[0.0, 0.001, 0.057]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="right_finger_link", position=[0.0, 0.001, 0.057]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="left_finger_link", position=[0.0, 0.001, 0.057]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="left_finger_link", position=[0.0, 0.001, 0.057]),
+            ]
+        }

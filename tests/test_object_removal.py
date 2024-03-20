@@ -48,6 +48,7 @@ def test_removal_and_readdition():
     # Clear the stuff we added
     og.sim.remove_object(apple2)
 
+
 @og_test
 def test_readdition():
     # Make a copy of NAMES

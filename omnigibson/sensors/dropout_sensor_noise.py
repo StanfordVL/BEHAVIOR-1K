@@ -15,10 +15,10 @@ class DropoutSensorNoise(BaseSensorNoise):
     """
 
     def __init__(
-            self,
-            dropout_prob=0.05,
-            dropout_value=1.0,
-            enabled=True,
+        self,
+        dropout_prob=0.05,
+        dropout_value=1.0,
+        enabled=True,
     ):
         # Store args, and make sure values are in acceptable range
         for name, val in zip(("dropout_prob", "dropout_value"), (dropout_prob, dropout_value)):

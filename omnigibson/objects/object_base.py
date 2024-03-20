@@ -25,31 +25,32 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 # Settings for highlighting objects
-m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color when highlighting objects
-m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
+m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]  # Default highlighting (R,G,B) color when highlighting objects
+m.HIGHLIGHT_INTENSITY = 10000.0  # Highlight intensity to apply, range [0, 10000)
 
 # Physics settings for objects -- see https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/docs/RigidBodyDynamics.html?highlight=velocity%20iteration#solver-iterations
 m.DEFAULT_SOLVER_POSITION_ITERATIONS = 32
 m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = 1
 
+
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     """This is the interface that all OmniGibson objects must implement."""
 
     def __init__(
-            self,
-            name,
-            prim_path=None,
-            category="object",
-            uuid=None,
-            scale=None,
-            visible=True,
-            fixed_base=False,
-            visual_only=False,
-            kinematic_only=None,
-            self_collisions=False,
-            prim_type=PrimType.RIGID,
-            load_config=None,
-            **kwargs,
+        self,
+        name,
+        prim_path=None,
+        category="object",
+        uuid=None,
+        scale=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        kinematic_only=None,
+        self_collisions=False,
+        prim_type=PrimType.RIGID,
+        load_config=None,
+        **kwargs,
     ):
         """
         Args:
@@ -137,13 +138,19 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
             scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
-            if self.n_joints == 0 and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0) and (self._load_config["kinematic_only"] != False) and not self.has_attachment_points:
+            if (
+                self.n_joints == 0
+                and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0)
+                and (self._load_config["kinematic_only"] != False)
+                and not self.has_attachment_points
+            ):
                 kinematic_only = True
-        
+
         # Validate that we didn't make a kinematic-only decision that does not match
-        assert self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"], \
-            f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
-        
+        assert (
+            self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"]
+        ), f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
+
         # Actually apply the kinematic-only decision
         self._load_config["kinematic_only"] = kinematic_only
 
@@ -182,7 +189,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
         # Potentially add articulation root APIs and also set self collisions
-        root_prim = None if self.articulation_root_path is None else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+        root_prim = (
+            None
+            if self.articulation_root_path is None
+            else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+        )
         if root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
@@ -310,8 +321,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     "emissive_intensity": material.emissive_intensity,
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
-            material.emissive_color = m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
-            material.emissive_intensity = m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
+            material.emissive_color = (
+                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
+            )
+            material.emissive_intensity = (
+                m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
+            )
 
         # Update internal value
         self._highlighted = enabled
@@ -365,10 +380,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate([
-                particle_positions - particle_contact_offset,
-                particle_positions + particle_contact_offset
-            ], axis=0)
+            particles_in_world_frame = np.concatenate(
+                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], axis=0
+            )
             points_in_world.extend(particles_in_world_frame)
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
@@ -411,4 +425,3 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Global robot registry
         global REGISTERED_OBJECTS
         return REGISTERED_OBJECTS
-
