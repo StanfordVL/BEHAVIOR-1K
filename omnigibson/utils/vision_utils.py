@@ -93,7 +93,8 @@ class Remapper:
             np.ndarray: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
-        # TODO: we need to make sure that max uint32 doesn't match any value in the new mapping; removing assertion for performance
+        # Make sure that max uint32 doesn't match any value in the new mapping
+        assert np.all(np.array(list(new_mapping.keys())) != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
         image_max_key = np.max(image)
         key_array_max_key =  len(self.key_array) - 1
         if image_max_key > key_array_max_key:

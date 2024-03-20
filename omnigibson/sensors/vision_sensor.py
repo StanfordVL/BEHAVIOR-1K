@@ -310,7 +310,10 @@ class VisionSensor(BaseSensor):
 
             assert replicator_mapping[key] in semantic_class_id_to_name().values(), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img)
+        image_keys = np.unique(img)
+        assert set(image_keys).issubset(set(replicator_mapping.keys())), "Semantic segmentation image does not match the original id_to_labels mapping."
+
+        return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
     def _remap_instance_segmentation(self, img, id_to_labels, semantic_img, semantic_labels, id=False):
         """
@@ -395,6 +398,8 @@ class VisionSensor(BaseSensor):
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
+        
+        assert set(image_keys).issubset(set(replicator_mapping.keys())), "Instance segmentation image does not match the original id_to_labels mapping."
 
         return remapper.remap(replicator_mapping, registry, img, image_keys)
 
