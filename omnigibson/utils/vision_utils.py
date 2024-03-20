@@ -60,11 +60,13 @@ class RandomScale:
         else:
             raise NotImplementedError()
 
+
 class Remapper:
     """
     Remaps values in an image from old_mapping to new_mapping using an efficient key_array.
     See more details in the remap method.
     """
+
     def __init__(self):
         self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
         self.known_ids = set()
@@ -80,7 +82,7 @@ class Remapper:
         Remaps values in the given image from old_mapping to new_mapping using an efficient key_array.
         If the image contains values that are not in old_mapping, they are remapped to the value in new_mapping
         that corresponds to 'unlabelled'.
-        
+
         Args:
             old_mapping (dict): The old mapping dictionary that maps a set of image values to labels
                 e.g. {1: 'desk', 2: 'chair'}.
@@ -88,21 +90,23 @@ class Remapper:
                 e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
             image (np.ndarray): The 2D image to remap, e.g. [[1, 3], [1, 2]].
             image_keys (np.ndarray): The unique keys in the image, e.g. [1, 2, 3].
-        
+
         Returns:
             np.ndarray: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
-        assert np.all(np.array(list(new_mapping.keys())) != np.iinfo(np.uint32).max), "New mapping contains default unmapped value!"
+        assert np.all(
+            np.array(list(new_mapping.keys())) != np.iinfo(np.uint32).max
+        ), "New mapping contains default unmapped value!"
         image_max_key = np.max(image)
-        key_array_max_key =  len(self.key_array) - 1
+        key_array_max_key = len(self.key_array) - 1
         if image_max_key > key_array_max_key:
             prev_key_array = self.key_array.copy()
             # We build a new key array and use max uint32 as the default value.
             self.key_array = np.full(image_max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
             # Copy the previous key array into the new key array
-            self.key_array[:len(prev_key_array)] = prev_key_array
+            self.key_array[: len(prev_key_array)] = prev_key_array
 
         new_keys = old_mapping.keys() - self.known_ids
         if new_keys:
@@ -119,7 +123,7 @@ class Remapper:
         # show up in the old_mapping, i.e. particle systems.
         for key in np.unique(image) if image_keys is None else image_keys:
             if key not in old_mapping.keys():
-                new_key = next((k for k, v in new_mapping.items() if v == 'unlabelled'), None)
+                new_key = next((k for k, v in new_mapping.items() if v == "unlabelled"), None)
                 assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
                 self.key_array[key] = new_key
 
@@ -143,9 +147,11 @@ class Remapper:
         """
         if semantic_id >= len(self.key_array):
             if semantic_id not in self.warning_printed:
-                og.log.warning(f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled.")
+                og.log.warning(
+                    f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled."
+                )
                 self.warning_printed.add(semantic_id)
-            return semantic_class_name_to_id()['unlabelled']
+            return semantic_class_name_to_id()["unlabelled"]
         return self.key_array[semantic_id]
 
 
@@ -201,16 +207,16 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     """
     Project 3D bounding box data onto 2D and colorize the bounding boxes for visualization.
     Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
-    
+
     Args:
         bbox_3d_data (np.ndarray): 3D bounding box data
         rgb_image (np.ndarray): RGB image
         camera_params (dict): Camera parameters
-    
+
     Returns:
         np.ndarray: RGB image with 3D bounding boxes drawn
     """
-    
+
     def world_to_image_pinhole(world_points, camera_params):
         # Project corners to image space (assumes pinhole camera model)
         proj_mat = camera_params["cameraProjection"].reshape(4, 4)
@@ -227,39 +233,52 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
 
         # Define connections between the corners of the bounding box
         connections = [
-            (0, 1), (1, 3), (3, 2), (2, 0),  # Front face
-            (4, 5), (5, 7), (7, 6), (6, 4),  # Back face
-            (0, 4), (1, 5), (2, 6), (3, 7)   # Side edges connecting front and back faces
+            (0, 1),
+            (1, 3),
+            (3, 2),
+            (2, 0),  # Front face
+            (4, 5),
+            (5, 7),
+            (7, 6),
+            (6, 4),  # Back face
+            (0, 4),
+            (1, 5),
+            (2, 6),
+            (3, 7),  # Side edges connecting front and back faces
         ]
-        
+
         # Calculate the number of bounding boxes
         num_boxes = len(all_image_points) // 8
-        
+
         # Generate random colors for each bounding box
         from omni.replicator.core import random_colours
+
         box_colors = random_colours(num_boxes, enable_random=True, num_channels=3)
-        
+
         # Ensure colors are in the correct format for drawing (255 scale)
         box_colors = [(int(r), int(g), int(b)) for r, g, b in box_colors]
 
         # Iterate over each set of 8 points (each bounding box)
         for i in range(0, len(all_image_points), 8):
-            image_points = all_image_points[i:i+8]
+            image_points = all_image_points[i : i + 8]
             image_points[:, 1] = height - image_points[:, 1]  # Flip Y-axis to match image coordinates
-            
+
             # Use a distinct color for each bounding box
             line_color = box_colors[i // 8]
 
             # Draw lines for each connection
             for start, end in connections:
-                draw.line((image_points[start][0], image_points[start][1],
-                        image_points[end][0], image_points[end][1]),
-                        fill=line_color, width=2)
+                draw.line(
+                    (image_points[start][0], image_points[start][1], image_points[end][0], image_points[end][1]),
+                    fill=line_color,
+                    width=2,
+                )
 
     rgb = Image.fromarray(rgb_image)
-    
+
     # Get 3D corners
     from omni.syntheticdata.scripts.helpers import get_bbox_3d_corners
+
     corners_3d = get_bbox_3d_corners(bbox_3d_data)
     corners_3d = corners_3d.reshape(-1, 3)
 

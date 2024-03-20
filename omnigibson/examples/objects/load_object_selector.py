@@ -24,11 +24,15 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
-    obj_category = choose_from_options(options=available_obj_categories, name="object category", random_selection=random_selection)
+    obj_category = choose_from_options(
+        options=available_obj_categories, name="object category", random_selection=random_selection
+    )
 
     # Select a model to load
     available_obj_models = get_all_object_category_models(obj_category)
-    obj_model = choose_from_options(options=available_obj_models, name="object model", random_selection=random_selection)
+    obj_model = choose_from_options(
+        options=available_obj_models, name="object model", random_selection=random_selection
+    )
 
     # Load the specs of the object categories, e.g., common scaling factor
     avg_category_spec = get_og_avg_category_specs()

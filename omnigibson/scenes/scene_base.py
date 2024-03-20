@@ -9,8 +9,13 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
-from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
-    create_object_from_init_info
+from omnigibson.utils.python_utils import (
+    classproperty,
+    Serializable,
+    Registerable,
+    Recreatable,
+    create_object_from_init_info,
+)
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import CollisionAPI
@@ -38,13 +43,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     Base class for all Scene objects.
     Contains the base functionalities for an arbitrary scene with an arbitrary set of added objects
     """
+
     def __init__(
-            self,
-            scene_file=None,
-            use_floor_plane=True,
-            floor_plane_visible=True,
-            use_skybox=True,
-            floor_plane_color=(1.0, 1.0, 1.0),
+        self,
+        scene_file=None,
+        use_floor_plane=True,
+        floor_plane_visible=True,
+        use_skybox=True,
+        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -57,12 +63,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Store internal variables
         self.scene_file = scene_file
-        self._loaded = False                    # Whether this scene exists in the stage or not
-        self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
+        self._loaded = False  # Whether this scene exists in the stage or not
+        self._initialized = False  # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self._world_prim = None
         self._initial_state = None
-        self._objects_info = None                       # Information associated with this scene
+        self._objects_info = None  # Information associated with this scene
         self._use_floor_plane = use_floor_plane
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
@@ -358,13 +364,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(obj=SYSTEM_REGISTRY)
 
         # Add registry for objects
-        registry.add(obj=SerializableRegistry(
-            name="object_registry",
-            class_types=BaseObject,
-            default_key="name",
-            unique_keys=self.object_registry_unique_keys,
-            group_keys=self.object_registry_group_keys,
-        ))
+        registry.add(
+            obj=SerializableRegistry(
+                name="object_registry",
+                class_types=BaseObject,
+                default_key="name",
+                unique_keys=self.object_registry_unique_keys,
+                group_keys=self.object_registry_group_keys,
+            )
+        )
 
         return registry
 
@@ -517,7 +525,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             dict: Keyword-mapped objects that are fixed in the scene, IGNORING any robots.
                 Maps object name to their object class instances (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[]) if obj.category != robot_macros.ROBOT_CATEGORY}
+        return {
+            obj.name: obj
+            for obj in self.object_registry("fixed_base", True, default_val=[])
+            if obj.category != robot_macros.ROBOT_CATEGORY
+        }
 
     def get_random_floor(self):
         """
@@ -536,7 +548,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
-                                 Warning: if @reference_point is given, @floor must be given; 
+                                 Warning: if @reference_point is given, @floor must be given;
                                           otherwise, this would lead to undefined behavior
             reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
@@ -610,7 +622,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             size=size,
             color=None if color is None else np.array(color),
             visible=visible,
-
             # TODO: update with new PhysicsMaterial API
             # static_friction=static_friction,
             # dynamic_friction=dynamic_friction,

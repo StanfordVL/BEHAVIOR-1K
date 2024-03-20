@@ -53,33 +53,27 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         visual_only=False,
         self_collisions=False,
         load_config=None,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-
         # Unique to Tiago
         variant="default",
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_reset_mode="untuck",
         default_arm_pose="vertical",
-
         **kwargs,
     ):
         """
@@ -137,7 +131,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
-                If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored. 
+                If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored.
                 Otherwise the reset_joint_pos will be initialized to the precomputed joint positions that represents default_arm_pose.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
@@ -184,9 +178,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_joint_names(self):
         names = dict()
         for arm in self.arm_names:
-            names[arm] = ["torso_lift_joint"] + [
-                f"arm_{arm}_{i}_joint" for i in range(1, 8)
-            ]
+            names[arm] = ["torso_lift_joint"] + [f"arm_{arm}_{i}_joint" for i in range(1, 8)]
         return names
 
     @property
@@ -210,9 +202,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         pos[self.camera_control_idx] = np.array([0.0, 0.0])
         for arm in self.arm_names:
             pos[self.gripper_control_idx[arm]] = np.array([0.045, 0.045])  # open gripper
-            pos[self.arm_control_idx[arm]] = np.array(
-                [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
-            )
+            pos[self.arm_control_idx[arm]] = np.array([-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0])
         return pos
 
     @property
@@ -237,7 +227,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 pos[self.arm_control_idx[arm]] = np.array(
                     [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, 2.03113]
                 )
-            elif self.default_arm_pose == "diagonal45"  :
+            elif self.default_arm_pose == "diagonal45":
                 pos[self.arm_control_idx[arm]] = np.array(
                     [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, 1.81302]
                 )
@@ -287,11 +277,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visual_only = True
             self.eef_links[arm].visible = False
 
-        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{self._prim_path}/rootJoint")
+        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
+            f"{self._prim_path}/rootJoint"
+        )
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+        )
 
     def _initialize(self):
         # Run super method first
@@ -325,7 +319,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         base_orn = self.base_footprint_link.get_orientation()
         root_link_orn = self.root_link.get_orientation()
 
-        cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T  @ T.quat2mat(base_orn))
+        cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
 
         # Rotate the linear and angular velocity to the desired frame
         lin_vel_global, _ = T.pose_transform([0, 0, 0], cur_orn, u_vec[self.base_idx[:3]], [0, 0, 0, 1])
@@ -364,7 +358,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # hand, which does not control the trunk
         fcns = super().get_control_dict()
         native_fcn = fcns.get_fcn("eef_right_pos_relative")
-        fcns["eef_right_pos_relative"] = lambda: (native_fcn() + np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]]))
+        fcns["eef_right_pos_relative"] = lambda: (
+            native_fcn() + np.array([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
+        )
 
         return fcns
 
@@ -431,10 +427,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving
                 # via the left arm??
                 if self.rigid_trunk:
-                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = \
-                        self.untucked_default_joint_pos[self.trunk_control_idx]
-                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = \
-                        self.untucked_default_joint_pos[self.trunk_control_idx]
+                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = self.untucked_default_joint_pos[
+                        self.trunk_control_idx
+                    ]
+                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = self.untucked_default_joint_pos[
+                        self.trunk_control_idx
+                    ]
 
         return cfg
 
@@ -469,12 +467,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             n-array: Indices in low-level control vector corresponding to the three controllable 1DoF base joints
         """
         joints = list(self.joints.keys())
-        return np.array(
-            [
-                joints.index(f"base_footprint_{component}_joint")
-                for component in ["x", "y", "rz"]
-            ]
-        )
+        return np.array([joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "rz"]])
 
     @property
     def base_idx(self):
@@ -484,10 +477,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         joints = list(self.joints.keys())
         return np.array(
-            [
-                joints.index(f"base_footprint_{component}_joint")
-                for component in ["x", "y", "z", "rx", "ry", "rz"]
-            ]
+            [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
         )
 
     @property
@@ -508,9 +498,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def arm_control_idx(self):
-        return {"left": np.array([7, 10, 13, 15, 17, 19, 21]),
-                "right": np.array([8, 11, 14, 16, 18, 20, 22]),
-                "combined": np.array([7, 8, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])}
+        return {
+            "left": np.array([7, 10, 13, 15, 17, 19, 21]),
+            "right": np.array([8, 11, 14, 16, 18, 20, 22]),
+            "combined": np.array([7, 8, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]),
+        }
 
     @property
     def gripper_control_idx(self):
@@ -524,7 +516,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def disabled_collision_link_names(self):
         # These should NEVER have collisions in the first place (i.e.: these are poorly modeled geoms from the source
         # asset) -- they are strictly engulfed within ANOTHER collision mesh from a DIFFERENT link
-        return [name for arm in self.arm_names for name in [f"arm_{arm}_tool_link", f"wrist_{arm}_ft_link", f"wrist_{arm}_ft_tool_link"]]
+        return [
+            name
+            for arm in self.arm_names
+            for name in [f"arm_{arm}_tool_link", f"wrist_{arm}_ft_link", f"wrist_{arm}_ft_tool_link"]
+        ]
 
     @property
     def disabled_collision_pairs(self):
@@ -580,64 +576,64 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             ["arm_left_tool_link", "wrist_left_ft_link"],
             ["wrist_left_ft_link", "wrist_left_ft_tool_link"],
             ["wrist_left_ft_tool_link", "gripper_left_link"],
-            ['gripper_left_grasping_frame', 'gripper_left_left_finger_link'], 
-            ['gripper_left_grasping_frame', 'gripper_left_right_finger_link'], 
-            ['wrist_right_ft_link', 'arm_right_tool_link'], 
-            ['wrist_right_ft_tool_link', 'wrist_right_ft_link'], 
-            ['gripper_right_link', 'wrist_right_ft_tool_link'], 
-            ['head_1_link', 'head_2_link'],
-            ['torso_fixed_column_link', 'arm_right_1_link'],
-            ['torso_fixed_column_link', 'arm_left_1_link'],
-            ['arm_left_1_link', 'arm_left_3_link'],
-            ['arm_right_1_link', 'arm_right_3_link'],
-            ['base_link', 'arm_right_4_link'],
-            ['base_link', 'arm_right_5_link'],
-            ['base_link', 'arm_left_4_link'],
-            ['base_link', 'arm_left_5_link'],
-            ['wrist_left_ft_tool_link', 'arm_left_5_link'],
-            ['wrist_right_ft_tool_link', 'arm_right_5_link'],
-            ['arm_left_tool_link', 'wrist_left_ft_tool_link'],
-            ['arm_right_tool_link', 'wrist_right_ft_tool_link']
+            ["gripper_left_grasping_frame", "gripper_left_left_finger_link"],
+            ["gripper_left_grasping_frame", "gripper_left_right_finger_link"],
+            ["wrist_right_ft_link", "arm_right_tool_link"],
+            ["wrist_right_ft_tool_link", "wrist_right_ft_link"],
+            ["gripper_right_link", "wrist_right_ft_tool_link"],
+            ["head_1_link", "head_2_link"],
+            ["torso_fixed_column_link", "arm_right_1_link"],
+            ["torso_fixed_column_link", "arm_left_1_link"],
+            ["arm_left_1_link", "arm_left_3_link"],
+            ["arm_right_1_link", "arm_right_3_link"],
+            ["base_link", "arm_right_4_link"],
+            ["base_link", "arm_right_5_link"],
+            ["base_link", "arm_left_4_link"],
+            ["base_link", "arm_left_5_link"],
+            ["wrist_left_ft_tool_link", "arm_left_5_link"],
+            ["wrist_right_ft_tool_link", "arm_right_5_link"],
+            ["arm_left_tool_link", "wrist_left_ft_tool_link"],
+            ["arm_right_tool_link", "wrist_right_ft_tool_link"],
         ]
 
     @property
     def manipulation_link_names(self):
         return [
-            "torso_fixed_link", 
-            "torso_lift_link", 
-            "arm_left_1_link", 
-            "arm_left_2_link", 
-            "arm_left_3_link", 
-            "arm_left_4_link", 
-            "arm_left_5_link", 
-            "arm_left_6_link", 
-            "arm_left_7_link", 
-            "arm_left_tool_link", 
-            "wrist_left_ft_link", 
-            "wrist_left_ft_tool_link", 
-            "gripper_left_link", 
-            # "gripper_left_grasping_frame", 
-            "gripper_left_left_finger_link", 
-            "gripper_left_right_finger_link", 
-            "gripper_left_tool_link", 
-            "arm_right_1_link", 
-            "arm_right_2_link", 
-            "arm_right_3_link", 
-            "arm_right_4_link", 
-            "arm_right_5_link", 
-            "arm_right_6_link", 
-            "arm_right_7_link", 
-            "arm_right_tool_link", 
-            "wrist_right_ft_link", 
-            "wrist_right_ft_tool_link", 
-            "gripper_right_link", 
-            # "gripper_right_grasping_frame", 
-            "gripper_right_left_finger_link", 
-            "gripper_right_right_finger_link", 
-            "gripper_right_tool_link", 
-            "head_1_link", 
-            "head_2_link", 
-            "xtion_link", 
+            "torso_fixed_link",
+            "torso_lift_link",
+            "arm_left_1_link",
+            "arm_left_2_link",
+            "arm_left_3_link",
+            "arm_left_4_link",
+            "arm_left_5_link",
+            "arm_left_6_link",
+            "arm_left_7_link",
+            "arm_left_tool_link",
+            "wrist_left_ft_link",
+            "wrist_left_ft_tool_link",
+            "gripper_left_link",
+            # "gripper_left_grasping_frame",
+            "gripper_left_left_finger_link",
+            "gripper_left_right_finger_link",
+            "gripper_left_tool_link",
+            "arm_right_1_link",
+            "arm_right_2_link",
+            "arm_right_3_link",
+            "arm_right_4_link",
+            "arm_right_5_link",
+            "arm_right_6_link",
+            "arm_right_7_link",
+            "arm_right_tool_link",
+            "wrist_right_ft_link",
+            "wrist_right_ft_tool_link",
+            "gripper_right_link",
+            # "gripper_right_grasping_frame",
+            "gripper_right_left_finger_link",
+            "gripper_right_right_finger_link",
+            "gripper_right_tool_link",
+            "head_1_link",
+            "head_2_link",
+            "xtion_link",
         ]
 
     @property
@@ -650,39 +646,59 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def finger_link_names(self):
-        return {arm: ["gripper_{}_right_finger_link".format(arm), "gripper_{}_left_finger_link".format(arm)] for arm in
-                self.arm_names}
+        return {
+            arm: ["gripper_{}_right_finger_link".format(arm), "gripper_{}_left_finger_link".format(arm)]
+            for arm in self.arm_names
+        }
 
     @property
     def finger_joint_names(self):
-        return {arm: ["gripper_{}_right_finger_joint".format(arm), "gripper_{}_left_finger_joint".format(arm)] for arm
-                in self.arm_names}
+        return {
+            arm: ["gripper_{}_right_finger_joint".format(arm), "gripper_{}_left_finger_joint".format(arm)]
+            for arm in self.arm_names
+        }
 
     @property
     def usd_path(self):
         if self._variant == "wrist_cam":
-            return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
-        
+            return os.path.join(
+                gm.ASSET_PATH,
+                "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd",
+            )
+
         # Default variant
-        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
+        return os.path.join(
+            gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd"
+        )
 
     @property
     def simplified_mesh_usd_path(self):
         # TODO: How can we make this more general - maybe some automatic way to generate these?
-        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd")
+        return os.path.join(
+            gm.ASSET_PATH,
+            "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd",
+        )
 
     @property
     def robot_arm_descriptor_yamls(self):
         # TODO: Remove the need to do this by making the arm descriptor yaml files generated automatically
-        return {"left": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
-                "left_fixed": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_fixed_trunk_descriptor.yaml"),
-                "right": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"),
-                "combined": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.yaml")}
+        return {
+            "left": os.path.join(
+                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"
+            ),
+            "left_fixed": os.path.join(
+                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_fixed_trunk_descriptor.yaml"
+            ),
+            "right": os.path.join(
+                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"
+            ),
+            "combined": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.yaml"),
+        }
 
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
-    
+
     @property
     def arm_workspace_range(self):
         return {
@@ -701,8 +717,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         if orientation is None:
             orientation = current_orientation
         position, orientation = np.array(position), np.array(orientation)
-        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
-            f"{self.name} desired orientation {orientation} is not a unit quaternion."
+        assert np.isclose(
+            np.linalg.norm(orientation), 1, atol=1e-3
+        ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
@@ -729,7 +746,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist()))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
+                )
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
@@ -756,10 +775,13 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def get_angular_velocity(self) -> np.ndarray:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
-    
+
     @property
     def eef_usd_path(self):
-        return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
+        return {
+            arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd")
+            for arm in self.arm_names
+        }
 
     def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)

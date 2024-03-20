@@ -1,10 +1,12 @@
 """
 Set of utilities for helping to execute robot control
 """
+
 import omnigibson.lazy as lazy
 import numpy as np
 from numba import jit
 import omnigibson.utils.transform_utils as T
+
 
 class FKSolver:
     """
@@ -31,7 +33,7 @@ class FKSolver:
         Args:
             joint positions (n-array): Joint positions in configuration space
             link_names (list): List of robot link names we want to specify (e.g. "gripper_link")
-        
+
         Returns:
             link_poses (dict): Dictionary mapping each robot link name to its pose
         """
@@ -51,7 +53,7 @@ class FKSolver:
                 rotation_lula.z(),
                 rotation_lula.w(),
             )
-            link_poses[link_name] =  (link_position, link_orientation)
+            link_poses[link_name] = (link_position, link_orientation)
         return link_poses
 
 

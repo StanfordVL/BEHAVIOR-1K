@@ -44,7 +44,7 @@ def main():
                             # enabled!
                             "water": [],
                         },
-            },
+                    },
                 },
                 "position": [0, 0, 0.59],
             },
@@ -56,8 +56,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 1.7789 , -1.68822,  1.13551]),
-        orientation=np.array([0.57065614, 0.20331904, 0.267029  , 0.74947212]),
+        position=np.array([1.7789, -1.68822, 1.13551]),
+        orientation=np.array([0.57065614, 0.20331904, 0.267029, 0.74947212]),
     )
 
     # Grab reference to object of interest

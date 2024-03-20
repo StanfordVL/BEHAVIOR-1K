@@ -8,6 +8,7 @@ from utils import og_test, place_obj_on_floor_plane, SYSTEM_EXAMPLES
 import pytest
 import numpy as np
 
+
 @og_test
 def test_seg():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
@@ -15,7 +16,7 @@ def test_seg():
     robot = og.sim.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
-    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi/2]))
+    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
     robot.reset()
 
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
@@ -41,56 +42,57 @@ def test_seg():
     vision_sensor = sensors[0]
     all_observation, all_info = vision_sensor.get_obs()
 
-    seg_semantic = all_observation['seg_semantic']
-    seg_semantic_info = all_info['seg_semantic']
+    seg_semantic = all_observation["seg_semantic"]
+    seg_semantic_info = all_info["seg_semantic"]
     assert set(np.unique(seg_semantic)) == set(seg_semantic_info.keys())
     expected_dict = {
-        335706086: 'diced__apple',
-        825831922: 'floors',
-        884110082: 'stain',
-        1949122937: 'breakfast_table',
-        2814990211: 'agent',
-        3051938632: 'white_rice',
-        3330677804: 'water',
-        4207839377: 'dishtowel'
+        335706086: "diced__apple",
+        825831922: "floors",
+        884110082: "stain",
+        1949122937: "breakfast_table",
+        2814990211: "agent",
+        3051938632: "white_rice",
+        3330677804: "water",
+        4207839377: "dishtowel",
     }
     assert set(seg_semantic_info.values()) == set(expected_dict.values())
 
-    seg_instance = all_observation['seg_instance']
-    seg_instance_info = all_info['seg_instance']
+    seg_instance = all_observation["seg_instance"]
+    seg_instance_info = all_info["seg_instance"]
     assert set(np.unique(seg_instance)) == set(seg_instance_info.keys())
     expected_dict = {
-        2: 'robot0',
-        3: 'groundPlane',
-        4: 'dishtowel',
-        5: 'breakfast_table',
-        6: 'stain',
-        7: 'water',
-        8: 'white_rice',
-        9: 'diced__apple'
+        2: "robot0",
+        3: "groundPlane",
+        4: "dishtowel",
+        5: "breakfast_table",
+        6: "stain",
+        7: "water",
+        8: "white_rice",
+        9: "diced__apple",
     }
     assert set(seg_instance_info.values()) == set(expected_dict.values())
 
-    seg_instance_id = all_observation['seg_instance_id']
-    seg_instance_id_info = all_info['seg_instance_id']
+    seg_instance_id = all_observation["seg_instance_id"]
+    seg_instance_id_info = all_info["seg_instance_id"]
     assert set(np.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
     expected_dict = {
-        3: '/World/robot0/gripper_link/visuals',
-        4: '/World/robot0/wrist_roll_link/visuals',
-        5: '/World/robot0/forearm_roll_link/visuals',
-        6: '/World/robot0/wrist_flex_link/visuals',
-        8: '/World/groundPlane/geom',
-        9: '/World/dishtowel/base_link_cloth',
-        10: '/World/robot0/r_gripper_finger_link/visuals',
-        11: '/World/robot0/l_gripper_finger_link/visuals',
-        12: '/World/breakfast_table/base_link/visuals',
-        13: 'stain',
-        14: 'white_rice',
-        15: 'diced__apple',
-        16: 'water'
+        3: "/World/robot0/gripper_link/visuals",
+        4: "/World/robot0/wrist_roll_link/visuals",
+        5: "/World/robot0/forearm_roll_link/visuals",
+        6: "/World/robot0/wrist_flex_link/visuals",
+        8: "/World/groundPlane/geom",
+        9: "/World/dishtowel/base_link_cloth",
+        10: "/World/robot0/r_gripper_finger_link/visuals",
+        11: "/World/robot0/l_gripper_finger_link/visuals",
+        12: "/World/breakfast_table/base_link/visuals",
+        13: "stain",
+        14: "white_rice",
+        15: "diced__apple",
+        16: "water",
     }
     # Temporarily disable this test because og_assets are outdated on CI machines
     # assert set(seg_instance_id_info.values()) == set(expected_dict.values())
+
 
 def test_clear_sim():
     og.sim.clear()

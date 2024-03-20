@@ -16,7 +16,7 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.systems import get_system
 
 # Params to be set as needed.
-SCENES = ["Rs_int"] # house_single_floor
+SCENES = ["Rs_int"]  # house_single_floor
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 NUM_STEPS = 2000
 
@@ -32,7 +32,7 @@ gm.DEFAULT_VIEWER_HEIGHT = 128
 
 
 # Launch the simulator
-launch_simulator(physics_dt=1/60., rendering_dt=1/60.)
+launch_simulator(physics_dt=1 / 60.0, rendering_dt=1 / 60.0)
 
 
 def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
@@ -47,7 +47,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     print(time.time() - start)
 
     if import_robot:
-        turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=['rgb'])
+        turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=["rgb"])
         og.sim.import_object(turtlebot)
         og.sim.step()
 
@@ -65,11 +65,8 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         og.sim.step()
         water_system = get_system("water")
         for i in range(100):
-            water_system.generate_particles(
-                positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1]
-            )
+            water_system.generate_particles(positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
         og.sim.step()
-
 
     og.sim.play()
     if non_rigid_simulation:
@@ -127,9 +124,11 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     ax.set_xlabel("Overall fps with time, converge to {}".format(np.mean(fps[-100:])))
     ax.set_ylabel("fps")
     plt.tight_layout()
-    plt.savefig(os.path.join(
-        OUTPUT_DIR,
-        "scene_benchmark_{}_np_{}_r_{}.pdf".format(scene_name, non_rigid_simulation, import_robot)))
+    plt.savefig(
+        os.path.join(
+            OUTPUT_DIR, "scene_benchmark_{}_np_{}_r_{}.pdf".format(scene_name, non_rigid_simulation, import_robot)
+        )
+    )
 
 
 def main():

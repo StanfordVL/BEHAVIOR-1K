@@ -11,25 +11,29 @@ def main():
     # Define object configurations for objects to load -- we want to load a light and three bowls
     obj_configs = []
 
-    obj_configs.append(dict(
-        type="LightObject",
-        light_type="Sphere",
-        name="light",
-        radius=0.01,
-        intensity=1e8,
-        position=[-2.0, -2.0, 1.0],
-    ))
+    obj_configs.append(
+        dict(
+            type="LightObject",
+            light_type="Sphere",
+            name="light",
+            radius=0.01,
+            intensity=1e8,
+            position=[-2.0, -2.0, 1.0],
+        )
+    )
 
     for i, (scale, x) in enumerate(zip([0.5, 1.0, 2.0], [-0.6, 0, 0.8])):
-        obj_configs.append(dict(
-            type="DatasetObject",
-            name=f"bowl{i}",
-            category="bowl",
-            model="ajzltc",
-            bounding_box=np.array([0.329, 0.293, 0.168]) * scale,
-            abilities={"heatable": {}},
-            position=[x, 0, 0.2],
-        ))
+        obj_configs.append(
+            dict(
+                type="DatasetObject",
+                name=f"bowl{i}",
+                category="bowl",
+                model="ajzltc",
+                bounding_box=np.array([0.329, 0.293, 0.168]) * scale,
+                abilities={"heatable": {}},
+                position=[x, 0, 0.2],
+            )
+        )
 
     # Create the scene config to load -- empty scene with light object and bowls
     cfg = {
@@ -44,7 +48,7 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 0.182103, -2.07295 ,  0.14017 ]),
+        position=np.array([0.182103, -2.07295, 0.14017]),
         orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
 

@@ -10,10 +10,18 @@ import omnigibson as og
 from omnigibson.macros import macros as m
 from scipy.spatial.transform import Rotation as R
 
-from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane, retrieve_obj_cfg, remove_all_systems
+from utils import (
+    og_test,
+    get_random_pose,
+    place_objA_on_objB_bbox,
+    place_obj_on_floor_plane,
+    retrieve_obj_cfg,
+    remove_all_systems,
+)
 
 import pytest
 import numpy as np
+
 
 @pytest.mark.skip(reason="dryer is not fillable yet.")
 @og_test
@@ -61,6 +69,7 @@ def test_dryer_rule():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_washer_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -69,12 +78,12 @@ def test_washer_rule():
     remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
     bowl = og.sim.scene.object_registry("name", "bowl")
     water = get_system("water")
-    dust = get_system("dust") # always remove
-    salt = get_system("salt") # always remove (not explicitly specified)
-    rust = get_system("rust") # never remove
-    spray_paint = get_system("spray_paint") # requires acetone
-    acetone = get_system("acetone") # solvent for spray paint
-    cooking_oil = get_system("cooking_oil") # requires vinegar, lemon_juice, vinegar, etc.
+    dust = get_system("dust")  # always remove
+    salt = get_system("salt")  # always remove (not explicitly specified)
+    rust = get_system("rust")  # never remove
+    spray_paint = get_system("spray_paint")  # requires acetone
+    acetone = get_system("acetone")  # solvent for spray paint
+    cooking_oil = get_system("cooking_oil")  # requires vinegar, lemon_juice, vinegar, etc.
 
     place_obj_on_floor_plane(washer)
     og.sim.step()
@@ -129,6 +138,7 @@ def test_washer_rule():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_slicing_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -177,6 +187,7 @@ def test_slicing_rule():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_dicing_rule_cooked():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -222,6 +233,7 @@ def test_dicing_rule_cooked():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_dicing_rule_uncooked():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -264,6 +276,7 @@ def test_dicing_rule_uncooked():
         obj = DatasetObject(**obj_cfg)
         og.sim.import_object(obj)
     og.sim.step()
+
 
 @og_test
 def test_melting_rule():
@@ -314,6 +327,7 @@ def test_melting_rule():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_cooking_physical_particle_rule_failure_recipe_systems():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -352,6 +366,7 @@ def test_cooking_physical_particle_rule_failure_recipe_systems():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_physical_particle_rule_success():
@@ -399,6 +414,7 @@ def test_cooking_physical_particle_rule_success():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_mixing_rule_failure_recipe_systems():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -438,6 +454,7 @@ def test_mixing_rule_failure_recipe_systems():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_mixing_rule_failure_nonrecipe_systems():
@@ -484,6 +501,7 @@ def test_mixing_rule_failure_nonrecipe_systems():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_mixing_rule_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -520,6 +538,7 @@ def test_mixing_rule_success():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_system_rule_failure_recipe_systems():
@@ -574,6 +593,7 @@ def test_cooking_system_rule_failure_recipe_systems():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_system_rule_failure_nonrecipe_systems():
@@ -633,6 +653,7 @@ def test_cooking_system_rule_failure_nonrecipe_systems():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_cooking_system_rule_failure_nonrecipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -690,6 +711,7 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_system_rule_success():
@@ -754,6 +776,7 @@ def test_cooking_system_rule_success():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_cooking_object_rule_failure_wrong_container():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -796,6 +819,7 @@ def test_cooking_object_rule_failure_wrong_container():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_cooking_object_rule_failure_recipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -836,6 +860,7 @@ def test_cooking_object_rule_failure_recipe_objects():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_object_rule_failure_unary_states():
@@ -879,6 +904,7 @@ def test_cooking_object_rule_failure_unary_states():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_cooking_object_rule_failure_binary_system_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -921,6 +947,7 @@ def test_cooking_object_rule_failure_binary_system_states():
     # Clean up
     remove_all_systems()
 
+
 @og_test
 def test_cooking_object_rule_failure_binary_object_states():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -962,6 +989,7 @@ def test_cooking_object_rule_failure_binary_object_states():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_object_rule_failure_wrong_heat_source():
@@ -1007,6 +1035,7 @@ def test_cooking_object_rule_failure_wrong_heat_source():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_cooking_object_rule_success():
@@ -1076,6 +1105,7 @@ def test_cooking_object_rule_success():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1125,6 +1155,7 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_recipe_systems():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1172,6 +1203,7 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems():
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_recipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1210,6 +1242,7 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_objects():
 
     # Clean up
     remove_all_systems()
+
 
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems():
@@ -1261,6 +1294,7 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1310,6 +1344,7 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
         og.sim.import_object(obj)
     og.sim.step()
 
+
 @og_test
 def test_single_toggleable_machine_rule_output_system_success():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -1357,6 +1392,7 @@ def test_single_toggleable_machine_rule_output_system_success():
         obj = DatasetObject(**obj_cfg)
         og.sim.import_object(obj)
     og.sim.step()
+
 
 @og_test
 def test_single_toggleable_machine_rule_output_object_failure_unary_states():
@@ -1430,6 +1466,7 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
         obj = DatasetObject(**obj_cfg)
         og.sim.import_object(obj)
     og.sim.step()
+
 
 @og_test
 def test_single_toggleable_machine_rule_output_object_success():

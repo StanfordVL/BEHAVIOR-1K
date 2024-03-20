@@ -31,6 +31,7 @@ m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 1000  # Newton
 m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
 
+
 # TODO: Make AttachedTo into a global state that manages all the attachments in the scene.
 # When an attachment of a child and a parent is about to happen:
 # 1. stop the sim
@@ -40,18 +41,25 @@ m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
 # 5. reload the state
 # 6. restore all existing attachment joints
 # 7. create the joint
-class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateMixin, JointBreakSubscribedStateMixin, LinkBasedStateMixin):
+class AttachedTo(
+    RelativeObjectState,
+    BooleanStateMixin,
+    ContactSubscribedStateMixin,
+    JointBreakSubscribedStateMixin,
+    LinkBasedStateMixin,
+):
     """
-        Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
-        other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
-        a parent can have multiple children, but a child can only have one parent.
-        Note that generally speaking only child.states[AttachedTo].get_value(parent) will return True.
-        One of the child's male meta links will be attached to one of the parent's female meta links.
+    Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
+    other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
+    a parent can have multiple children, but a child can only have one parent.
+    Note that generally speaking only child.states[AttachedTo].get_value(parent) will return True.
+    One of the child's male meta links will be attached to one of the parent's female meta links.
 
-        Subclasses ContactSubscribedStateMixin, JointBreakSubscribedStateMixin
-        on_contact function attempts to attach self.obj to other when a CONTACT_FOUND event happens
-        on_joint_break function breaks the current attachment
+    Subclasses ContactSubscribedStateMixin, JointBreakSubscribedStateMixin
+    on_contact function attempts to attach self.obj to other when a CONTACT_FOUND event happens
+    on_joint_break function breaks the current attachment
     """
+
     # This is to force the __init__ args to be "self" and "obj" only.
     # Otherwise, it will inherit from LinkBasedStateMixin and the __init__ args will be "self", "args", "kwargs".
     def __init__(self, obj):
@@ -112,7 +120,9 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
                 if self.set_value(other, True):
                     break
 
-    def _set_value(self, other, new_value, bypass_alignment_checking=False, check_physics_stability=False, can_joint_break=True):
+    def _set_value(
+        self, other, new_value, bypass_alignment_checking=False, check_physics_stability=False, can_joint_break=True
+    ):
         """
         Args:
             other (DatasetObject): parent object to attach to.
@@ -136,8 +146,10 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
                 # Already attached to this object. Do nothing.
                 return True
             elif self.parent is not None:
-                log.debug(f"Trying to attach object {self.obj.name} to object {other.name},"
-                          f"but it is already attached to object {self.parent.name}. Try detaching first.")
+                log.debug(
+                    f"Trying to attach object {self.obj.name} to object {other.name},"
+                    f"but it is already attached to object {self.parent.name}. Try detaching first."
+                )
                 return False
             else:
                 # Find attachment links that satisfy the proximity requirements
@@ -175,11 +187,13 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
         # Simply return if the current parent matches other
         return other == self.parent
 
-    def _find_attachment_links(self,
-                               other,
-                               bypass_alignment_checking=False,
-                               pos_thresh=m.DEFAULT_POSITION_THRESHOLD,
-                               orn_thresh=m.DEFAULT_ORIENTATION_THRESHOLD):
+    def _find_attachment_links(
+        self,
+        other,
+        bypass_alignment_checking=False,
+        pos_thresh=m.DEFAULT_POSITION_THRESHOLD,
+        orn_thresh=m.DEFAULT_ORIENTATION_THRESHOLD,
+    ):
         """
         Args:
             other (DatasetObject): parent object to find potential attachment links.
@@ -207,7 +221,9 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
                     if bypass_alignment_checking:
                         return child_link, parent_link
                     pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
-                    orn_diff = T.get_orientation_diff_in_radian(child_link.get_orientation(), parent_link.get_orientation())
+                    orn_diff = T.get_orientation_diff_in_radian(
+                        child_link.get_orientation(), parent_link.get_orientation()
+                    )
                     if pos_diff < pos_thresh and orn_diff < orn_thresh:
                         return child_link, parent_link
 
@@ -241,7 +257,9 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
 
     @property
     def attachment_joint_prim_path(self):
-        return f"{self.parent_link.prim_path}/{self.obj.name}_attachment_joint" if self.parent_link is not None else None
+        return (
+            f"{self.parent_link.prim_path}/{self.obj.name}_attachment_joint" if self.parent_link is not None else None
+        )
 
     def _attach(self, other, child_link, parent_link, joint_type=m.DEFAULT_JOINT_TYPE, can_joint_break=True):
         """
@@ -265,8 +283,12 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
 
         if joint_type == JointType.JOINT_FIXED:
             # For FixedJoint: find the relation transformation of the two frames and apply it to self.obj.
-            rel_pos, rel_quat = T.mat2pose(T.pose2mat((parent_pos, parent_quat)) @ T.pose_inv(T.pose2mat((child_pos, child_quat))))
-            new_child_root_pos, new_child_root_quat = T.pose_transform(rel_pos, rel_quat, child_root_pos, child_root_quat)
+            rel_pos, rel_quat = T.mat2pose(
+                T.pose2mat((parent_pos, parent_quat)) @ T.pose_inv(T.pose2mat((child_pos, child_quat)))
+            )
+            new_child_root_pos, new_child_root_quat = T.pose_transform(
+                rel_pos, rel_quat, child_root_pos, child_root_quat
+            )
         else:
             # For SphericalJoint: move the position of self.obj to align the two frames and keep the rotation unchanged.
             new_child_root_pos = child_root_pos + (parent_pos - child_pos)
@@ -295,7 +317,11 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
         # Set the child reference for @other
         other.states[AttachedTo].children[parent_link.body_name] = self.obj
 
-        kwargs = {"break_force": m.DEFAULT_BREAK_FORCE, "break_torque": m.DEFAULT_BREAK_TORQUE} if can_joint_break else dict()
+        kwargs = (
+            {"break_force": m.DEFAULT_BREAK_FORCE, "break_torque": m.DEFAULT_BREAK_TORQUE}
+            if can_joint_break
+            else dict()
+        )
 
         # Create the joint
         create_joint(
@@ -307,7 +333,7 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
             joint_frame_in_parent_frame_quat=parent_local_quat,
             joint_frame_in_child_frame_pos=np.zeros(3),
             joint_frame_in_child_frame_quat=np.array([0.0, 0.0, 0.0, 1.0]),
-            **kwargs
+            **kwargs,
         )
 
     def _disable_collision_between_child_and_parent(self, child, parent):
@@ -392,7 +418,13 @@ class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateM
 
             # If the loaded state requires attachment, attach.
             if attached_obj is not None:
-                self.set_value(attached_obj, True, bypass_alignment_checking=True, check_physics_stability=False, can_joint_break=True)
+                self.set_value(
+                    attached_obj,
+                    True,
+                    bypass_alignment_checking=True,
+                    check_physics_stability=False,
+                    can_joint_break=True,
+                )
                 # assert self.parent == attached_obj, "parent reference is not updated after attachment"
                 if self.parent != attached_obj:
                     log.warning(f"parent reference is not updated after attachment")

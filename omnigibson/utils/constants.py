@@ -1,6 +1,7 @@
 """
 Constant Definitions
 """
+
 from functools import cache
 import hashlib
 import os
@@ -91,6 +92,7 @@ GEOM_TYPES = {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
 # Valid joint axis
 JointAxis = ["X", "Y", "Z"]
 
+
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types
 class JointType:
@@ -174,6 +176,7 @@ UNDER_OBJECTS = [
     "bench",
 ]
 
+
 @cache
 def semantic_class_name_to_id():
     """
@@ -184,13 +187,15 @@ def semantic_class_name_to_id():
     """
     categories = get_all_object_categories()
     from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+
     systems = sorted(REGISTERED_SYSTEMS)
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
-    
+
     # Assign a unique class id to each class name with hashing
-    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32) for s in all_semantics}
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**32) for s in all_semantics}
 
     return class_name_to_class_id
+
 
 @cache
 def semantic_class_id_to_name():
@@ -201,4 +206,3 @@ def semantic_class_id_to_name():
         dict: class id to class name
     """
     return {v: k for k, v in semantic_class_name_to_id().items()}
-

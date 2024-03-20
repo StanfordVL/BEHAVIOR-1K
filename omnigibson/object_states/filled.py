@@ -18,8 +18,9 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
-        assert is_physical_particle_system(system_name=system.name), \
-            "Can only get Filled state with a valid PhysicalParticleSystem!"
+        assert is_physical_particle_system(
+            system_name=system.name
+        ), "Can only get Filled state with a valid PhysicalParticleSystem!"
 
         # Check what volume is filled
         if system.n_particles > 0:
@@ -39,8 +40,9 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _set_value(self, system, new_value):
         # Sanity check to make sure system is valid
-        assert is_physical_particle_system(system_name=system.name), \
-            "Can only set Filled state with a valid PhysicalParticleSystem!"
+        assert is_physical_particle_system(
+            system_name=system.name
+        ), "Can only set Filled state with a valid PhysicalParticleSystem!"
 
         # First, check our current state
         current_state = self.get_value(system)
@@ -54,8 +56,11 @@ class Filled(RelativeObjectState, BooleanStateMixin):
                     obj=self.obj,
                     link=contained_particles_state.link,
                     check_contact=True,
-                    max_samples=m.N_MAX_MACRO_PARTICLE_SAMPLES
-                    if issubclass(system, MacroParticleSystem) else m.N_MAX_MICRO_PARTICLE_SAMPLES
+                    max_samples=(
+                        m.N_MAX_MACRO_PARTICLE_SAMPLES
+                        if issubclass(system, MacroParticleSystem)
+                        else m.N_MAX_MICRO_PARTICLE_SAMPLES
+                    ),
                 )
             else:
                 # Cannot set False

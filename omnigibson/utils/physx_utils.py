@@ -10,6 +10,7 @@ m = create_module_macros(module_path=__file__)
 
 m.PROTOTYPE_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
+
 def create_physx_particle_system(
     prim_path,
     physics_scene_path,
@@ -158,11 +159,15 @@ def create_physx_particleset_pointinstancer(
 
     # Create point instancer
     instancer_prim_path = f"{prim_path}/instancer"
-    assert not stage.GetPrimAtPath(instancer_prim_path), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
+    assert not stage.GetPrimAtPath(
+        instancer_prim_path
+    ), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
     instancer = lazy.pxr.UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
 
-    is_isosurface = particle_system.HasAPI(lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI) and \
-                    particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
+    is_isosurface = (
+        particle_system.HasAPI(lazy.pxr.PhysxSchema.PhysxParticleIsosurfaceAPI)
+        and particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
+    )
 
     # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
     # We need to make copies of prototypes for each instancer currently because particles won't render properly
@@ -196,8 +201,9 @@ def create_physx_particleset_pointinstancer(
     velocities = np.zeros((n_particles, 3)) if velocities is None else velocities
     angular_velocities = np.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
     scales = np.ones((n_particles, 3)) if scales is None else scales
-    assert particle_mass is not None or particle_density is not None, \
-        "Either particle mass or particle density must be specified when creating particle instancer!"
+    assert (
+        particle_mass is not None or particle_density is not None
+    ), "Either particle mass or particle density must be specified when creating particle instancer!"
     particle_mass = 0.0 if particle_mass is None else particle_mass
     particle_density = 0.0 if particle_density is None else particle_density
 
@@ -246,14 +252,18 @@ def create_physx_particleset_pointinstancer(
 
     # Isosurfaces require an additional physics timestep before they're actually rendered
     if is_isosurface:
-        og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. "
-                       f"The rendering of these particles will have a delay of one timestep.")
+        og.log.warning(
+            f"Creating an instancer that uses isosurface {instancer_prim_path}. "
+            f"The rendering of these particles will have a delay of one timestep."
+        )
 
     return instancer_prim
+
 
 def apply_force_at_pos(prim, force, pos):
     prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
     og.sim.psi.apply_force_at_pos(og.sim.stage_id, prim_id, force, pos)
+
 
 def apply_torque(prim, foward_vect, roll_torque_scalar):
     prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)

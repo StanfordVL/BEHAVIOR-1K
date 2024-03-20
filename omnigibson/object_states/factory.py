@@ -92,8 +92,10 @@ _TEXTURE_CHANGE_PRIORITY = {
     ToggledOn: 0,
 }
 
+
 def get_system_states():
     return _SYSTEM_STATE_SET
+
 
 def get_fire_states():
     return _FIRE_STATE_SET

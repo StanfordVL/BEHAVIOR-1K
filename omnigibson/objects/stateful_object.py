@@ -39,22 +39,25 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]    # (x,y,z) scale of generated steam relative to its object, range [0, inf)
-m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1        # scale of steam density relative to its object, range [0, inf)
-m.STEAM_EMITTER_HEIGHT_RATIO = 0.6              # z-height of generated steam relative to its object's native height, range [0, inf)
-m.FIRE_EMITTER_HEIGHT_RATIO = 0.4               # z-height of generated fire relative to its object's native height, range [0, inf)
+m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]  # (x,y,z) scale of generated steam relative to its object, range [0, inf)
+m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1  # scale of steam density relative to its object, range [0, inf)
+m.STEAM_EMITTER_HEIGHT_RATIO = 0.6  # z-height of generated steam relative to its object's native height, range [0, inf)
+m.FIRE_EMITTER_HEIGHT_RATIO = 0.4  # z-height of generated fire relative to its object's native height, range [0, inf)
+
 
 class FlowEmitterLayerRegistry:
     """
     Registry for flow emitter layers. This is used to ensure that all flow emitters are placed on unique layers, so that
     they do not interfere with each other.
     """
+
     def __init__(self):
         self._layer = 0
 
     def __call__(self):
         self._layer += 1
         return self._layer
+
 
 LAYER_REGISTRY = FlowEmitterLayerRegistry()
 
@@ -63,22 +66,22 @@ class StatefulObject(BaseObject):
     """Objects that support object states."""
 
     def __init__(
-            self,
-            name,
-            prim_path=None,
-            category="object",
-            uuid=None,
-            scale=None,
-            visible=True,
-            fixed_base=False,
-            visual_only=False,
-            kinematic_only=None,
-            self_collisions=False,
-            prim_type=PrimType.RIGID,
-            load_config=None,
-            abilities=None,
-            include_default_states=True,
-            **kwargs,
+        self,
+        name,
+        prim_path=None,
+        category="object",
+        uuid=None,
+        scale=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        kinematic_only=None,
+        self_collisions=False,
+        prim_type=PrimType.RIGID,
+        load_config=None,
+        abilities=None,
+        include_default_states=True,
+        **kwargs,
     ):
         """
         Args:
@@ -177,8 +180,9 @@ class StatefulObject(BaseObject):
             state (ObjectStateBase): Object state instance to add to this object
         """
         assert self._states is not None, "Cannot add state since states have not been initialized yet!"
-        assert state.__class__ not in self._states, f"State {state.__class__.__name__} " \
-                                                    f"has already been added to this object!"
+        assert state.__class__ not in self._states, (
+            f"State {state.__class__.__name__} " f"has already been added to this object!"
+        )
         self._states[state.__class__] = state
 
     @property
@@ -207,8 +211,11 @@ class StatefulObject(BaseObject):
         This uses the abilities of the object and the state dependency graph to
         find & instantiate all relevant states.
         """
-        states_info = {state_type: {"ability": None, "params": dict()} for state_type in get_default_states()} if \
-            self._include_default_states else dict()
+        states_info = (
+            {state_type: {"ability": None, "params": dict()} for state_type in get_default_states()}
+            if self._include_default_states
+            else dict()
+        )
 
         # Map the state type (class) to ability name and params
         if gm.ENABLE_OBJECT_STATES:
@@ -219,15 +226,19 @@ class StatefulObject(BaseObject):
                     compatible, reason = requirement.is_compatible(obj=self)
                     if not compatible:
                         # Print out warning and pop ability
-                        log.warning(f"Ability '{ability}' is incompatible with obj {self.name}, "
-                                    f"because requirement {requirement.__name__} was not met. Reason: {reason}")
+                        log.warning(
+                            f"Ability '{ability}' is incompatible with obj {self.name}, "
+                            f"because requirement {requirement.__name__} was not met. Reason: {reason}"
+                        )
                         self._abilities.pop(ability)
                         break
                 if compatible:
                     params = self._abilities[ability]
                     for state_type in get_states_for_ability(ability):
-                        states_info[state_type] = {"ability": ability,
-                                                   "params": state_type.postprocess_ability_params(params)}
+                        states_info[state_type] = {
+                            "ability": ability,
+                            "params": state_type.postprocess_ability_params(params),
+                        }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -245,7 +256,9 @@ class StatefulObject(BaseObject):
             if state_type not in states_info:
                 continue
 
-            relevant_params = extract_class_init_kwargs_from_dict(cls=state_type, dic=states_info[state_type]["params"], copy=False)
+            relevant_params = extract_class_init_kwargs_from_dict(
+                cls=state_type, dic=states_info[state_type]["params"], copy=False
+            )
             compatible, reason = state_type.is_compatible(obj=self, **relevant_params)
             if compatible:
                 self._states[state_type] = state_type(obj=self, **relevant_params)
@@ -290,8 +303,9 @@ class StatefulObject(BaseObject):
 
             emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
-            emitter_config["position"] = (0.0, 0.0, 0.0) if fire_at_metalink \
-                else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
+            emitter_config["position"] = (
+                (0.0, 0.0, 0.0) if fire_at_metalink else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
+            )
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
             emitter_config["buoyancyPerTemp"] = 0.04
@@ -334,25 +348,35 @@ class StatefulObject(BaseObject):
         colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
         self._emitters[emitter_type] = emitter
-        
+
         layer_number = LAYER_REGISTRY()
 
         # Update emitter general settings.
         emitter.CreateAttribute("enabled", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(False)
         emitter.CreateAttribute("position", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["position"])
         emitter.CreateAttribute("fuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["fuel"])
-        emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["coupleRateFuel"])
+        emitter.CreateAttribute("coupleRateFuel", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            emitter_config["coupleRateFuel"]
+        )
         emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
         emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
         emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["buoyancyPerTemp"])
-        advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["burnPerTemp"])
+        advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            emitter_config["buoyancyPerTemp"]
+        )
+        advection.CreateAttribute("burnPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            emitter_config["burnPerTemp"]
+        )
         advection.CreateAttribute("gravity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(emitter_config["gravity"])
-        vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["constantMask"])
-        rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(emitter_config["attenuation"])
+        vorticity.CreateAttribute("constantMask", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            emitter_config["constantMask"]
+        )
+        rayMarch.CreateAttribute("attenuation", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            emitter_config["attenuation"]
+        )
 
         # Update emitter unique settings.
         if emitter_type == EmitterType.FIRE:
@@ -366,7 +390,7 @@ class StatefulObject(BaseObject):
                 # Radius is the average x-y half-extent of the object
                 radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
             emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius*0.2)
+            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
             smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
             # Set fire colormap.
             rgbaPoints = []
@@ -379,8 +403,11 @@ class StatefulObject(BaseObject):
             colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
             emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0))
-            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO)
+                tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+            )
+            simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+                bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+            )
 
     def set_emitter_enabled(self, emitter_type, value):
         """
@@ -527,10 +554,16 @@ class StatefulObject(BaseObject):
         state_flat = super()._serialize(state=state)
 
         # Iterate over all states and serialize them individually
-        non_kin_state_flat = np.concatenate([
-            self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
-            for state_name, state_dict in state["non_kin"].items()
-        ]) if len(state["non_kin"]) > 0 else np.array([])
+        non_kin_state_flat = (
+            np.concatenate(
+                [
+                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
+                    for state_name, state_dict in state["non_kin"].items()
+                ]
+            )
+            if len(state["non_kin"]) > 0
+            else np.array([])
+        )
 
         # Combine these two arrays
         return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
@@ -544,7 +577,7 @@ class StatefulObject(BaseObject):
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if state_instance.stateful:
-                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx:idx+state_instance.state_size])
+                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx : idx + state_instance.state_size])
                 idx += state_instance.state_size
         state_dic["non_kin"] = non_kin_state_dic
 

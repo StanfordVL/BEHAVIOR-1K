@@ -46,6 +46,7 @@ class ScanSensor(BaseSensor):
             occupancy grid, e.g.: if this scan sensor is attached to a robot, then this should possibly be the base link
             for that robot. If None is specified, then this will default to this own sensor's frame as the origin.
     """
+
     def __init__(
         self,
         prim_path,
@@ -54,7 +55,6 @@ class ScanSensor(BaseSensor):
         enabled=True,
         noise=None,
         load_config=None,
-
         # Basic LIDAR kwargs
         min_range=0.05,
         max_range=10.0,
@@ -66,7 +66,6 @@ class ScanSensor(BaseSensor):
         rotation_rate=0.0,
         draw_points=False,
         draw_lines=False,
-
         # Occupancy Grid kwargs
         occupancy_grid_resolution=128,
         occupancy_grid_range=5.0,
@@ -76,12 +75,13 @@ class ScanSensor(BaseSensor):
         # Store settings
         self.occupancy_grid_resolution = occupancy_grid_resolution
         self.occupancy_grid_range = occupancy_grid_range
-        self.occupancy_grid_inner_radius = int(occupancy_grid_inner_radius * occupancy_grid_resolution
-                                                / occupancy_grid_range)
+        self.occupancy_grid_inner_radius = int(
+            occupancy_grid_inner_radius * occupancy_grid_resolution / occupancy_grid_range
+        )
         self.occupancy_grid_local_link = self if occupancy_grid_local_link is None else occupancy_grid_local_link
 
         # Create variables that will be filled in at runtime
-        self._rs = None                 # Range sensor interface, analagous to others, e.g.: dynamic control interface
+        self._rs = None  # Range sensor interface, analagous to others, e.g.: dynamic control interface
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
@@ -197,8 +197,9 @@ class ScanSensor(BaseSensor):
 
         # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since
         # OG ranges from [0, resolution] x [0, resolution])
-        scan_local_in_map = scan_local / self.occupancy_grid_range * self.occupancy_grid_resolution + \
-                            (self.occupancy_grid_resolution / 2)
+        scan_local_in_map = scan_local / self.occupancy_grid_range * self.occupancy_grid_resolution + (
+            self.occupancy_grid_resolution / 2
+        )
         scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).astype(np.int32)
 
         # For each scan hit,

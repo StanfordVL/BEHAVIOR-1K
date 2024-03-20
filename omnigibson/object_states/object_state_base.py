@@ -91,7 +91,7 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         self._initialized = False
         self._cache = None
         self._changed = None
-        self._last_t_updated = -1               # Last timestep when this state was updated
+        self._last_t_updated = -1  # Last timestep when this state was updated
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -162,8 +162,9 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
 
         # Validate compatibility with the created object
         init_args = {k: v for k, v in self.get_init_info()["args"].items() if k != "obj"}
-        assert self.is_compatible(obj=self.obj, **init_args), \
-            f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
+        assert self.is_compatible(
+            obj=self.obj, **init_args
+        ), f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
 
         # Clear cache
         self.clear_cache()
@@ -222,8 +223,11 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
             bool: True if the cache is valid, else False
         """
         # If t == the current timestep, then our cache is obviously valid otherwise we assume it isn't
-        return True if self._cache[get_value_args]["t"] == og.sim.current_time_step_index else \
-            self._cache_is_valid(get_value_args=get_value_args)
+        return (
+            True
+            if self._cache[get_value_args]["t"] == og.sim.current_time_step_index
+            else self._cache_is_valid(get_value_args=get_value_args)
+        )
 
     def _cache_is_valid(self, get_value_args):
         """
@@ -417,10 +421,14 @@ class IntrinsicObjectState(BaseObjectState):
     """
 
     def _get_value(self):
-        raise NotImplementedError(f"_get_value not implemented for IntrinsicObjectState {self.__class__.__name__} state.")
+        raise NotImplementedError(
+            f"_get_value not implemented for IntrinsicObjectState {self.__class__.__name__} state."
+        )
 
     def _set_value(self, new_value):
-        raise NotImplementedError(f"_set_value not implemented for IntrinsicObjectState {self.__class__.__name__} state.")
+        raise NotImplementedError(
+            f"_set_value not implemented for IntrinsicObjectState {self.__class__.__name__} state."
+        )
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -434,4 +442,5 @@ class BooleanStateMixin(BaseObjectState):
     """
     This class is a mixin used to indicate that a state has a boolean value.
     """
+
     pass

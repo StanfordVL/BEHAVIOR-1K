@@ -17,6 +17,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     """
     Object state that handles contact checking between rigid bodies and individual particles.
     """
+
     def _get_value(self, system, link=None):
         """
         Args:
@@ -27,8 +28,9 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             set of int: Set of particle IDs in contact
         """
         # Make sure system is valid
-        assert is_physical_particle_system(system_name=system.name), \
-            "Can only get ContactParticles for a PhysicalParticleSystem!"
+        assert is_physical_particle_system(
+            system_name=system.name
+        ), "Can only get ContactParticles for a PhysicalParticleSystem!"
 
         # Variables to update mid-iteration
         contacts = set()

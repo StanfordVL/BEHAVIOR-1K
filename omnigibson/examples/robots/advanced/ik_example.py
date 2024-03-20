@@ -52,7 +52,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "name": "NullJointController",
                 "motor_type": "position",
             }
-        }
+        },
     }
     cfg = dict(scene=scene_cfg, robots=[robot_cfg])
     env = og.Environment(configs=cfg)
@@ -62,7 +62,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=np.array([4.32248, -5.74338, 6.85436]),
         orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
     )
-    
+
     robot = env.robots[0]
 
     # Set robot base at the origin
@@ -73,7 +73,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.step()
     # Make sure none of the joints are moving
     robot.keep_still()
-    # Since this demo aims to showcase how users can directly control the robot with IK, 
+    # Since this demo aims to showcase how users can directly control the robot with IK,
     # we will need to disable the built-in controllers in OmniGibson
     robot.control_enabled = False
 
@@ -137,8 +137,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         def keyboard_event_handler(event, *args, **kwargs):
             nonlocal command, exit_now
             # Check if we've received a key press or repeat
-            if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS \
-                    or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT:
+            if (
+                event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
+                or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
+            ):
                 if event.input == lazy.carb.input.KeyboardInput.ENTER:
                     # Execute the command
                     execute_ik(pos=command)

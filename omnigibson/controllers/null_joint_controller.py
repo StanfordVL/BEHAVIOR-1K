@@ -87,7 +87,8 @@ class NullJointController(JointController):
             target (n-array): New default command values to set for this controller.
                 Should be of dimension @command_dim
         """
-        assert len(target) == self.control_dim, \
-            f"Default control must be length: {self.control_dim}, got length: {len(target)}"
+        assert (
+            len(target) == self.control_dim
+        ), f"Default control must be length: {self.control_dim}, got length: {len(target)}"
 
         self._default_command = np.array(target)

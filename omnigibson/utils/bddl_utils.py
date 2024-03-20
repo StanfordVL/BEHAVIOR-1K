@@ -17,7 +17,11 @@ from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.asset_utils import get_attachment_metalinks, get_all_object_categories, get_all_object_category_models_with_abilities
+from omnigibson.utils.asset_utils import (
+    get_attachment_metalinks,
+    get_all_object_categories,
+    get_all_object_category_models_with_abilities,
+)
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import Wrapper
 from omnigibson.objects.dataset_object import DatasetObject
@@ -54,7 +58,7 @@ GOOD_MODELS = {
 
 GOOD_BBOXES = {
     "basil": {
-        "dkuhvb": [0.07286304, 0.0545199 , 0.03108144],
+        "dkuhvb": [0.07286304, 0.0545199, 0.03108144],
     },
     "basil_jar": {
         "swytaw": [0.22969539, 0.19492961, 0.30791675],
@@ -80,7 +84,7 @@ GOOD_BBOXES = {
         "wsasmm": [0.078, 0.078, 0.109],
     },
     "plant_pot": {
-        "ihnfbi": [0.24578613, 0.2457865 , 0.18862737],
+        "ihnfbi": [0.24578613, 0.2457865, 0.18862737],
     },
     "razor": {
         "jocsgp": [0.046, 0.063, 0.204],
@@ -101,12 +105,12 @@ BAD_CLOTH_MODELS = {
     "jeans": {"nmvvil", "pvzxyp"},
     "pajamas": {"rcgdde"},
     "polo_shirt": {"vqbvph"},
-    "vest": {"girtqm"}, # bddl NOT FIXED
+    "vest": {"girtqm"},  # bddl NOT FIXED
     "onesie": {"pbytey"},
     "dishtowel": {"ltydgg"},
     "dress": {"gtghon"},
-    "hammock": {'aiftuk', 'fglfga', 'klhkgd', 'lqweda', 'qewdqa'},
-    'jacket': {'kiiium', 'nogevo', 'remcyk'},
+    "hammock": {"aiftuk", "fglfga", "klhkgd", "lqweda", "qewdqa"},
+    "jacket": {"kiiium", "nogevo", "remcyk"},
     "quilt": {"mksdlu", "prhems"},
     "pennant": {"tfnwti"},
     "pillowcase": {"dtoahb", "yakvci"},
@@ -114,7 +118,7 @@ BAD_CLOTH_MODELS = {
     "scarf": {"kclcrj"},
     "sock": {"vpafgj"},
     "tank_top": {"fzldgi"},
-    "curtain": {"shbakk"}
+    "curtain": {"shbakk"},
 }
 
 
@@ -162,7 +166,9 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
         return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else False
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
-        return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
+        return (
+            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
+        )
 
 
 def get_unary_predicate_for_state(state_class, state_name):
@@ -184,10 +190,12 @@ def get_binary_predicate_for_state(state_class, state_name):
 def is_substance_synset(synset):
     return "substance" in OBJECT_TAXONOMY.get_abilities(synset)
 
+
 def get_system_name_by_synset(synset):
     system_names = OBJECT_TAXONOMY.get_subtree_substances(synset)
     assert len(system_names) == 1, f"Got zero or multiple systems for {synset}: {system_names}"
     return system_names[0]
+
 
 def process_single_condition(condition):
     """
@@ -250,21 +258,28 @@ KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATI
 OBJECT_TAXONOMY = ObjectTaxonomy()
 BEHAVIOR_ACTIVITIES = sorted(os.listdir(os.path.join(os.path.dirname(bddl.__file__), "activity_definitions")))
 
+
 def _populate_input_output_objects_systems(og_recipe, input_synsets, output_synsets):
     # Map input/output synsets into input/output objects and systems.
-    for synsets, obj_key, system_key in zip((input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")):
+    for synsets, obj_key, system_key in zip(
+        (input_synsets, output_synsets), ("input_objects", "output_objects"), ("input_systems", "output_systems")
+    ):
         for synset, count in synsets.items():
             assert OBJECT_TAXONOMY.is_leaf(synset), f"Synset {synset} must be a leaf node in the taxonomy!"
             if is_substance_synset(synset):
                 og_recipe[system_key].append(get_system_name_by_synset(synset))
             else:
                 obj_categories = OBJECT_TAXONOMY.get_categories(synset)
-                assert len(obj_categories) == 1, f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                assert (
+                    len(obj_categories) == 1
+                ), f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
                 og_recipe[obj_key][obj_categories[0]] = count
 
     # Assert only one of output_objects or output_systems is not None
-    assert len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0, \
-        "Recipe can only generate output objects or output systems, but not both!"
+    assert (
+        len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0
+    ), "Recipe can only generate output objects or output systems, but not both!"
+
 
 def _populate_input_output_states(og_recipe, input_states, output_states):
     # Apply post-processing for input/output states if specified
@@ -281,46 +296,67 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                 first_synset, second_synset = synset_split
 
             # Assert the first synset is an object because the systems don't have any states.
-            assert OBJECT_TAXONOMY.is_leaf(first_synset), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
-            assert not is_substance_synset(first_synset), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+            assert OBJECT_TAXONOMY.is_leaf(
+                first_synset
+            ), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+            assert not is_substance_synset(
+                first_synset
+            ), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
             obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
-            assert len(obj_categories) == 1, f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+            assert (
+                len(obj_categories) == 1
+            ), f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
             first_obj_category = obj_categories[0]
 
             if second_synset is None:
                 # Unary states for the first synset
                 for state_type, state_value in states:
                     state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                    assert issubclass(state_class, AbsoluteObjectState), f"Input/output state type {state_type} must be a unary state!"
+                    assert issubclass(
+                        state_class, AbsoluteObjectState
+                    ), f"Input/output state type {state_type} must be a unary state!"
                     # Example: (Cooked, True)
                     og_recipe[states_key][first_obj_category]["unary"].append((state_class, state_value))
             else:
-                assert OBJECT_TAXONOMY.is_leaf(second_synset), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                assert OBJECT_TAXONOMY.is_leaf(
+                    second_synset
+                ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
                 obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
                 else:
                     obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
-                    assert len(obj_categories) == 1, f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                    assert (
+                        len(obj_categories) == 1
+                    ), f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
                     second_obj_category = obj_categories[0]
                     is_substance = False
 
                 for state_type, state_value in states:
                     state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                    assert issubclass(state_class, RelativeObjectState), f"Input/output state type {state_type} must be a binary state!"
-                    assert is_substance == (state_class in get_system_states()), f"Input/output state type {state_type} system state inconsistency found!"
+                    assert issubclass(
+                        state_class, RelativeObjectState
+                    ), f"Input/output state type {state_type} must be a binary state!"
+                    assert is_substance == (
+                        state_class in get_system_states()
+                    ), f"Input/output state type {state_type} system state inconsistency found!"
                     if is_substance:
                         # Non-kinematic binary states, e.g. Covered, Saturated, Filled, Contains.
                         # Example: (Covered, "sesame_seed", True)
                         og_recipe[states_key][first_obj_category]["binary_system"].append(
-                            (state_class, second_obj_category, state_value))
+                            (state_class, second_obj_category, state_value)
+                        )
                     else:
                         # Kinematic binary states w.r.t. the second object.
                         # Example: (OnTop, "raw_egg", True)
-                        assert states_key != "output_states", f"Output state type {state_type} can only be used in input states!"
+                        assert (
+                            states_key != "output_states"
+                        ), f"Output state type {state_type} can only be used in input states!"
                         og_recipe[states_key][first_obj_category]["binary_object"].append(
-                            (state_class, second_obj_category, state_value))
+                            (state_class, second_obj_category, state_value)
+                        )
+
 
 def _populate_filter_categories(og_recipe, filter_name, synsets):
     # Map synsets to categories.
@@ -331,6 +367,7 @@ def _populate_filter_categories(og_recipe, filter_name, synsets):
             assert not is_substance_synset(synset), f"Synset {synset} must be applied to an object, not a substance!"
             for category in OBJECT_TAXONOMY.get_categories(synset):
                 og_recipe[f"{filter_name}_categories"].add(category)
+
 
 def translate_bddl_recipe_to_og_recipe(
     name,
@@ -381,12 +418,15 @@ def translate_bddl_recipe_to_og_recipe(
         "timesteps": timesteps if timesteps is not None else 1,
     }
 
-    _populate_input_output_objects_systems(og_recipe=og_recipe, input_synsets=input_synsets, output_synsets=output_synsets)
+    _populate_input_output_objects_systems(
+        og_recipe=og_recipe, input_synsets=input_synsets, output_synsets=output_synsets
+    )
     _populate_input_output_states(og_recipe=og_recipe, input_states=input_states, output_states=output_states)
     _populate_filter_categories(og_recipe=og_recipe, filter_name="fillable", synsets=fillable_synsets)
     _populate_filter_categories(og_recipe=og_recipe, filter_name="heatsource", synsets=heatsource_synsets)
 
     return og_recipe
+
 
 def translate_bddl_washer_rule_to_og_washer_rule(conditions):
     """
@@ -423,6 +463,7 @@ def translate_bddl_washer_rule_to_og_washer_rule(conditions):
             og_washer_rule[solute_name] = solvent_names
     return og_washer_rule
 
+
 class OmniGibsonBDDLBackend(BDDLBackend):
     def get_predicate_class(self, predicate_name):
         return SUPPORTED_PREDICATES[predicate_name]
@@ -433,6 +474,7 @@ class BDDLEntity(Wrapper):
     Thin wrapper class that wraps an object or system if it exists, or nothing if it does not exist. Will
     dynamically reference an object / system as they become real in the sim
     """
+
     def __init__(
         self,
         bddl_inst,
@@ -451,8 +493,11 @@ class BDDLEntity(Wrapper):
         self.is_system = is_substance_synset(self.synset)
 
         # Infer the correct category to assign
-        self.og_categories = OBJECT_TAXONOMY.get_subtree_substances(self.synset) \
-            if self.is_system else OBJECT_TAXONOMY.get_subtree_categories(self.synset)
+        self.og_categories = (
+            OBJECT_TAXONOMY.get_subtree_substances(self.synset)
+            if self.is_system
+            else OBJECT_TAXONOMY.get_subtree_categories(self.synset)
+        )
 
         super().__init__(obj=entity)
 
@@ -518,8 +563,7 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
         """
-        assert self.exists, \
-            f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
+        assert self.exists, f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
 
@@ -534,7 +578,9 @@ class BDDLSampler:
     ):
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
+        self._scene_model = (
+            self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
+        )
         self._agent = self._env.robots[0]
         if debug:
             gm.DEBUG = True
@@ -546,18 +592,21 @@ class BDDLSampler:
             for obj_cat in self._activity_conditions.parsed_objects
             for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
         }
-        self._substance_instances = {obj_inst for obj_inst in self._object_scope.keys() if
-                                     is_substance_synset(self._object_instance_to_synset[obj_inst])}
+        self._substance_instances = {
+            obj_inst
+            for obj_inst in self._object_scope.keys()
+            if is_substance_synset(self._object_instance_to_synset[obj_inst])
+        }
 
         # Initialize other variables that will be filled in later
-        self._room_type_to_object_instance = None           # dict
-        self._inroom_object_instances = None        # set of str
-        self._object_sampling_orders = None                 # dict mapping str to list of str
-        self._sampled_objects = None                        # set of BaseObject
-        self._future_obj_instances = None                   # set of str
-        self._inroom_object_conditions = None       # list of (condition, positive) tuple
-        self._inroom_object_scope_filtered_initial = None   # dict mapping str to BDDLEntity
-        self._attached_objects = defaultdict(set)           # dict mapping str to set of str
+        self._room_type_to_object_instance = None  # dict
+        self._inroom_object_instances = None  # set of str
+        self._object_sampling_orders = None  # dict mapping str to list of str
+        self._sampled_objects = None  # set of BaseObject
+        self._future_obj_instances = None  # set of str
+        self._inroom_object_conditions = None  # list of (condition, positive) tuple
+        self._inroom_object_scope_filtered_initial = None  # dict mapping str to BDDLEntity
+        self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
     def sample(self, validate_goal=False):
         """
@@ -673,8 +722,10 @@ class BDDLSampler:
                 abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
                 if "sceneObject" not in abilities:
                     # Invalid room assignment
-                    return f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. " \
-                           f"Only non-sampleable (scene) objects can have room assignment."
+                    return (
+                        f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
+                        f"Only non-sampleable (scene) objects can have room assignment."
+                    )
                 if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
@@ -772,9 +823,10 @@ class BDDLSampler:
             if len(condition.body) == 2:
                 group = "particle" if condition.body[1] in self._substance_instances else "kinematic"
             else:
-                assert len(condition.body) == 1, \
-                    f"Got invalid parsed initial condition; body length should either be 2 or 1. " \
+                assert len(condition.body) == 1, (
+                    f"Got invalid parsed initial condition; body length should either be 2 or 1. "
                     f"Got body: {condition.body} for condition: {condition}"
+                )
                 group = "unary"
             sampling_groups[group].append(condition.body)
             self._object_sampling_conditions[group].append((condition, positive))
@@ -814,13 +866,19 @@ class BDDLSampler:
         # Aggregate future objects and any unsampleable obj instances
         # Unsampleable obj instances are strictly a superset of future obj instances
         unsampleable_obj_instances = {cond.body[-1] for cond in unsampleable_conditions}
-        self._future_obj_instances = {cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)}
+        self._future_obj_instances = {
+            cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)
+        }
 
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
-        remaining_kinematic_entities = nonparticle_entities - unsampleable_obj_instances - \
-            self._inroom_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
+        remaining_kinematic_entities = (
+            nonparticle_entities
+            - unsampleable_obj_instances
+            - self._inroom_object_instances
+            - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
+        )
 
         # Possibly remove the agent entity if we're in an empty scene -- i.e.: no kinematic sampling needed for the
         # agent
@@ -828,14 +886,18 @@ class BDDLSampler:
             remaining_kinematic_entities -= {"agent.n.01_1"}
 
         if len(remaining_kinematic_entities) != 0:
-            return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
-                   f"{', '.join(remaining_kinematic_entities)}"
+            return (
+                f"Some objects do not have any kinematic condition defined for them in the initial conditions: "
+                f"{', '.join(remaining_kinematic_entities)}"
+            )
 
         # Sanity check particle systems -- any non-future system must be sampled as part of particle groups
         remaining_particle_entities = self._substance_instances - unsampleable_obj_instances - sampled_particle_entities
         if len(remaining_particle_entities) != 0:
-            return f"Some systems do not have any particle condition defined for them in the initial conditions: " \
-                   f"{', '.join(remaining_particle_entities)}"
+            return (
+                f"Some systems do not have any particle condition defined for them in the initial conditions: "
+                f"{', '.join(remaining_particle_entities)}"
+            )
 
     def _build_inroom_object_scope(self):
         """
@@ -869,16 +931,34 @@ class BDDLSampler:
                 categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
 
                 # Grab all models that fully support all abilities for the corresponding category
-                valid_models = {cat: set(get_all_object_category_models_with_abilities(
-                    cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))))
-                    for cat in categories}
-                valid_models = {cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat])) - BAD_CLOTH_MODELS.get(cat, set()) for cat, models in valid_models.items()}
-                valid_models = {cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst) for cat, models in valid_models.items()}
-                room_insts = [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                valid_models = {
+                    cat: set(
+                        get_all_object_category_models_with_abilities(
+                            cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))
+                        )
+                    )
+                    for cat in categories
+                }
+                valid_models = {
+                    cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat]))
+                    - BAD_CLOTH_MODELS.get(cat, set())
+                    for cat, models in valid_models.items()
+                }
+                valid_models = {
+                    cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst)
+                    for cat, models in valid_models.items()
+                }
+                room_insts = (
+                    [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
                     room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
-                    scene_objs = [obj for obj in room_objs if obj.category in categories and obj.model in valid_models[obj.category]]
+                    scene_objs = [
+                        obj
+                        for obj in room_objs
+                        if obj.category in categories and obj.model in valid_models[obj.category]
+                    ]
 
                     if len(scene_objs) != 0:
                         room_type_to_scene_objs[room_type][obj_inst][room_inst] = scene_objs
@@ -927,7 +1007,11 @@ class BDDLSampler:
                         conditions_to_sample = []
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
-                            if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
+                            if (
+                                condition.STATE_NAME in KINEMATIC_STATES_BDDL
+                                and positive
+                                and scene_obj in condition.body
+                            ):
                                 child_scope_name = condition.body[0]
                                 entity = self._object_scope[child_scope_name]
                                 conditions_to_sample.append((condition, positive, entity, child_scope_name))
@@ -939,10 +1023,9 @@ class BDDLSampler:
                         # is empty even when a cloth object is in contact with it).
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
-                        conditions_to_sample = (
-                                list(reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))) +
-                                list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
-                        )
+                        conditions_to_sample = list(
+                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -970,8 +1053,9 @@ class BDDLSampler:
                             log.info(log_msg)
 
                             # Record the result for the child object
-                            assert parent_obj_name not in problematic_objs[child_scope_name], \
-                                f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            assert (
+                                parent_obj_name not in problematic_objs[child_scope_name]
+                            ), f"Multiple kinematic relationships attempted for pair {condition.body}"
                             problematic_objs[child_scope_name][parent_obj_name] = success
                             # If any condition fails for this candidate object, skip
                             if not success:
@@ -1075,11 +1159,14 @@ class BDDLSampler:
                 # For in-room parent instances, there might be multiple parent objects (e.g. different wall nails),
                 # and the child object needs to be able to attach to at least one of them.
                 if all(
-                        any(
-                            can_attach(child_attachment_links, get_attachment_metalinks(parent_obj.category, parent_obj.model))
-                            for parent_obj in parent_objs_per_inst
+                    any(
+                        can_attach(
+                            child_attachment_links, get_attachment_metalinks(parent_obj.category, parent_obj.model)
                         )
-                    for parent_objs_per_inst in parent_objects):
+                        for parent_obj in parent_objs_per_inst
+                    )
+                    for parent_objs_per_inst in parent_objects
+                ):
                     new_model_choices.add(model_choice)
 
             return new_model_choices
@@ -1140,8 +1227,10 @@ class BDDLSampler:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
                 categories = list(valid_categories.intersection(available_categories))
                 if len(categories) == 0:
-                    return f"None of the following categories could be found in the dataset for synset {obj_synset}: " \
-                           f"{valid_categories}"
+                    return (
+                        f"None of the following categories could be found in the dataset for synset {obj_synset}: "
+                        f"{valid_categories}"
+                    )
 
                 # Don't explicitly sample if future
                 if obj_inst in self._future_obj_instances:
@@ -1156,11 +1245,17 @@ class BDDLSampler:
                 model_choices = set()
                 for category in categories:
                     # Get all available models that support all of its synset abilities
-                    model_choices = set(get_all_object_category_models_with_abilities(
-                        category=category,
-                        abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
-                    ))
-                    model_choices = model_choices if category not in GOOD_MODELS else model_choices.intersection(GOOD_MODELS[category])
+                    model_choices = set(
+                        get_all_object_category_models_with_abilities(
+                            category=category,
+                            abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
+                        )
+                    )
+                    model_choices = (
+                        model_choices
+                        if category not in GOOD_MODELS
+                        else model_choices.intersection(GOOD_MODELS[category])
+                    )
                     model_choices -= BAD_CLOTH_MODELS.get(category, set())
                     model_choices = self._filter_model_choices_by_attached_states(model_choices, category, obj_inst)
                     if len(model_choices) > 0:
@@ -1183,7 +1278,9 @@ class BDDLSampler:
                     name=f"{category}_{len(og.sim.scene.objects)}",
                     category=category,
                     model=model,
-                    prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
+                    prim_type=(
+                        PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID
+                    ),
                     **obj_kwargs,
                 )
                 num_new_obj += 1
@@ -1221,7 +1318,9 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         activity_goal_conditions = get_goal_conditions(self._activity_conditions, self._backend, self._object_scope)
-        ground_goal_state_options = get_ground_goal_state_options(self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions)
+        ground_goal_state_options = get_ground_goal_state_options(
+            self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions
+        )
         np.random.shuffle(ground_goal_state_options)
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
@@ -1274,10 +1373,9 @@ class BDDLSampler:
                     if group == "kinematic":
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
-                        conditions_to_sample = (
-                                list(reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))) +
-                                list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
-                        )
+                        conditions_to_sample = list(
+                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1311,7 +1409,12 @@ class BDDLSampler:
 
                             # Can't re-sample non-kinematics or rescale cloth or agent, so in
                             # those cases terminate immediately
-                            if group != "kinematic" or condition.STATE_NAME == "attached" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
+                            if (
+                                group != "kinematic"
+                                or condition.STATE_NAME == "attached"
+                                or "agent" in child_scope_name
+                                or entity.prim_type == PrimType.CLOTH
+                            ):
                                 break
 
                             # If any scales are equal or less than the lower threshold, terminate immediately
@@ -1323,7 +1426,9 @@ class BDDLSampler:
                             # Re-scaling is not respected unless sim cycle occurs
                             og.sim.stop()
                             entity.scale = new_scale
-                            log.info(f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}")
+                            log.info(
+                                f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}"
+                            )
                             og.sim.play()
                             og.sim.load_state(state, serialized=False)
                             og.sim.step_physics()
@@ -1354,8 +1459,12 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         error_msg, problematic_objs = "", []
-        while not np.any([np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]):
-            filtered_object_scope, problematic_objs = self._filter_object_scope(input_object_scope, conditions, condition_type)
+        while not np.any(
+            [np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
+        ):
+            filtered_object_scope, problematic_objs = self._filter_object_scope(
+                input_object_scope, conditions, condition_type
+            )
             error_msg = self._consolidate_room_instance(filtered_object_scope, condition_type)
             if error_msg is None:
                 break

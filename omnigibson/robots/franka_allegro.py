@@ -23,25 +23,20 @@ class FrankaAllegro(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -140,7 +135,7 @@ class FrankaAllegro(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
+
     @property
     def _default_gripper_multi_finger_controller_configs(self):
         conf = super()._default_gripper_multi_finger_controller_configs
@@ -190,7 +185,7 @@ class FrankaAllegro(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro_description.yaml")}
@@ -198,28 +193,32 @@ class FrankaAllegro(ManipulationRobot):
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.urdf")
-    
+
     @property
     def disabled_collision_pairs(self):
         return [
             ["link_12_0", "part_studio_link"],
         ]
-    
+
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
-            GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
-            GraspingPoint(link_name=f"link_15_0_tip", position=[0, 0.015, 0.007]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
+                GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
+                GraspingPoint(link_name=f"link_15_0_tip", position=[0, 0.015, 0.007]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"link_3_0_tip", position=[0.012, 0, 0.007]),
-            GraspingPoint(link_name=f"link_7_0_tip", position=[0.012, 0, 0.007]),
-            GraspingPoint(link_name=f"link_11_0_tip", position=[0.012, 0, 0.007]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"link_3_0_tip", position=[0.012, 0, 0.007]),
+                GraspingPoint(link_name=f"link_7_0_tip", position=[0.012, 0, 0.007]),
+                GraspingPoint(link_name=f"link_11_0_tip", position=[0.012, 0, 0.007]),
+            ]
+        }
 
     @property
     def teleop_rotation_offset(self):

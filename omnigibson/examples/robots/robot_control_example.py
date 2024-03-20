@@ -3,6 +3,7 @@ Example script demo'ing robot control.
 
 Options for random actions, as well as selection of robot action space
 """
+
 import numpy as np
 
 import omnigibson as og
@@ -102,7 +103,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         "base": "DifferentialDriveController",
         "arm_0": "InverseKinematicsController",
         "gripper_0": "MultiFingerGripperController",
-        "camera": "JointController"
+        "camera": "JointController",
     }
     if not quickstart:
         controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
@@ -155,7 +156,9 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
-        action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
+        action = (
+            action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
+        )
         env.step(action=action)
         step += 1
 
@@ -165,6 +168,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Teleoperate a robot in a BEHAVIOR scene.")
 
     parser.add_argument(

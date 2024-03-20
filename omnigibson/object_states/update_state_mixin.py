@@ -1,10 +1,12 @@
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.python_utils import classproperty
 
+
 class UpdateStateMixin(BaseObjectState):
     """
     A state-mixin that allows for per-sim-step updates via the update() call
     """
+
     def update(self):
         """
         Updates the object state. This function will be called for every simulator step
@@ -27,11 +29,11 @@ class UpdateStateMixin(BaseObjectState):
         return classes
 
 
-
 class GlobalUpdateStateMixin(BaseObjectState):
     """
     A state-mixin that allows for per-sim-step global updates via the global_update() call
     """
+
     @classmethod
     def global_initialize(cls):
         """

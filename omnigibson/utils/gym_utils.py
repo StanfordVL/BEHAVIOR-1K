@@ -70,6 +70,7 @@ class GymObservable(metaclass=ABCMeta):
     Args:
         kwargs: dict, does nothing, used to sink any extraneous arguments during initialization
     """
+
     def __init__(self, *args, **kwargs):
         # Initialize variables that we will fill in later
         self.observation_space = None

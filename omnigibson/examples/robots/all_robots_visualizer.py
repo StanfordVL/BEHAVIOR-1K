@@ -25,7 +25,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         robot = robot_cls(
             prim_path=f"/World/{robot_name}",
             name=robot_name,
-            obs_modalities=[],              # We're just moving robots around so don't load any observation modalities
+            obs_modalities=[],  # We're just moving robots around so don't load any observation modalities
         )
         og.sim.import_object(robot)
 
@@ -44,8 +44,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         if not headless:
             # Set viewer in front facing robot
             og.sim.viewer_camera.set_position_orientation(
-                position=np.array([ 2.69918369, -3.63686664,  4.57894564]),
-                orientation=np.array([0.39592411, 0.1348514 , 0.29286304, 0.85982   ]),
+                position=np.array([2.69918369, -3.63686664, 4.57894564]),
+                orientation=np.array([0.39592411, 0.1348514, 0.29286304, 0.85982]),
             )
 
         og.sim.enable_viewer_camera_teleoperation()

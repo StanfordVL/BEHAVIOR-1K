@@ -6,6 +6,7 @@ from utils import og_test, SYSTEM_EXAMPLES
 
 import pytest
 
+
 @og_test
 def test_dump_load():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
@@ -25,6 +26,7 @@ def test_dump_load():
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = get_system(system_name)
         system.clear()
+
 
 @og_test
 def test_dump_load_serialized():
