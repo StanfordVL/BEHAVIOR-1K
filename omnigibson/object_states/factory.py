@@ -4,9 +4,8 @@ from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {
-    "robot": [IsGrasping],
+    "robot": [IsGrasping, ObjectsInFOVOfRobot],
     "attachable": [AttachedTo],
-    "blender": [],
     "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],
     "particleSource": [ParticleSource],
@@ -17,7 +16,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "freezable": [Frozen],
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
-    "meltable": [],
+    "meltable": [MaxTemperature],
     "mixingTool": [],
     "openable": [Open],
     "flammable": [OnFire],
@@ -67,6 +66,15 @@ _TEXTURE_CHANGE_STATE_SET = frozenset(
     ]
 )
 
+_SYSTEM_STATE_SET = frozenset(
+    [
+        Covered,
+        Saturated,
+        Filled,
+        Contains,
+    ]
+)
+
 _VISUAL_STATE_SET = frozenset(_FIRE_STATE_SET | _STEAM_STATE_SET | _TEXTURE_CHANGE_STATE_SET)
 
 _TEXTURE_CHANGE_PRIORITY = {
@@ -77,6 +85,8 @@ _TEXTURE_CHANGE_PRIORITY = {
     ToggledOn: 0,
 }
 
+def get_system_states():
+    return _SYSTEM_STATE_SET
 
 def get_fire_states():
     return _FIRE_STATE_SET

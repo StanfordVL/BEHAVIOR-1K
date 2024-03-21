@@ -2,6 +2,7 @@ import numpy as np
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.prims.cloth_prim import ClothPrim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -104,5 +105,14 @@ class LinkBasedStateMixin(BaseObjectState):
         for name, link in self.obj.links.items():
             if self.metalink_prefix in name or (self._default_link is not None and link.name == self._default_link.name):
                 self._links[name] = link
-                assert np.allclose(link.scale, self.obj.scale), \
-                    f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
+                # Make sure the scale is similar if the link is not a cloth prim
+                if not isinstance(link, ClothPrim):
+                    assert np.allclose(link.scale, self.obj.scale), \
+                        f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LinkBasedStateMixin")
+        return classes

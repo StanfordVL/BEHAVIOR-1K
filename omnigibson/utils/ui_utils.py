@@ -17,7 +17,6 @@ import omnigibson.lazy as lazy
 from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
-import random
 import imageio
 from IPython import embed
 
@@ -282,7 +281,7 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = random.choice(range(len(options)))
+        k = np.random.choice(range(len(options)))
 
     # Return requested option
     return list(options)[k]
@@ -368,7 +367,7 @@ class CameraMover:
         Returns:
             np.array: (H, W, 3) sized RGB image array
         """
-        return self.cam.get_obs()["rgb"][:, :, :-1]
+        return self.cam.get_obs()[0]["rgb"][:, :, :-1]
 
     def record_image(self, fpath=None):
         """
@@ -915,3 +914,71 @@ class KeyboardRobotController:
             print()
         print("*" * 30)
         print()
+        
+def generate_box_edges(center, extents):
+    """
+    Generate the edges of a box given its center and extents.
+    
+    Parameters:
+    - center: Tuple of (x, y, z) coordinates for the box's center
+    - extents: Tuple of (width, height, depth) extents of the box
+    
+    Returns:
+    - A list of tuples, each containing two points (each a tuple of x, y, z) representing an edge of the box
+    """
+    x_c, y_c, z_c = center
+    w, h, d = extents
+    
+    # Calculate the corner points of the box
+    corners = [
+        (x_c - w, y_c - h, z_c - d),
+        (x_c - w, y_c - h, z_c + d),
+        (x_c - w, y_c + h, z_c - d),
+        (x_c - w, y_c + h, z_c + d),
+        (x_c + w, y_c - h, z_c - d),
+        (x_c + w, y_c - h, z_c + d),
+        (x_c + w, y_c + h, z_c - d),
+        (x_c + w, y_c + h, z_c + d)
+    ]
+    
+    # Define the edges by connecting the corners
+    edges = [
+        (corners[0], corners[1]), (corners[0], corners[2]), (corners[1], corners[3]),
+        (corners[2], corners[3]), (corners[4], corners[5]), (corners[4], corners[6]),
+        (corners[5], corners[7]), (corners[6], corners[7]), (corners[0], corners[4]),
+        (corners[1], corners[5]), (corners[2], corners[6]), (corners[3], corners[7])
+    ]
+    
+    return edges
+
+def draw_line(start, end, color=(1., 0., 0., 1.), size=1.):
+    """
+    Draws a single line between two points.
+    """
+    from omni.isaac.debug_draw import _debug_draw
+    draw = _debug_draw.acquire_debug_draw_interface()
+    draw.draw_lines([start], [end], [color], [size])
+
+def draw_box(center, extents, color=(1., 0., 0., 1.), size=1.):
+    """
+    Draws a box defined by its center and extents.
+    """
+    edges = generate_box_edges(center, extents)
+    for start, end in edges:
+        draw_line(start, end, color, size)
+
+def draw_aabb(obj):
+    """
+    Draws the axis-aligned bounding box of a given object.
+    """
+    ctr = obj.aabb_center
+    ext = obj.aabb_extent / 2.0
+    draw_box(ctr, ext)    
+
+def clear_debug_drawing():
+    """
+    Clears all debug drawings.
+    """
+    from omni.isaac.debug_draw import _debug_draw
+    draw = _debug_draw.acquire_debug_draw_interface()
+    draw.clear_lines()

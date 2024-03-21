@@ -3,11 +3,19 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.object_states import *
 from omnigibson.utils.constants import PrimType, ParticleModifyCondition, ParticleModifyMethod
+from omnigibson.systems import *
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
+
+SYSTEM_EXAMPLES = {
+    "water": FluidSystem,
+    "white_rice": GranularSystem,
+    "diced__apple": MacroPhysicalParticleSystem,
+    "stain": MacroVisualParticleSystem,
+}
 
 def og_test(func):
     def wrapper():
@@ -19,6 +27,18 @@ def og_test(func):
     return wrapper
 
 num_objs = 0
+
+def retrieve_obj_cfg(obj):
+    return {
+        "name": obj.name,
+        "category": obj.category,
+        "model": obj.model,
+        "prim_type": obj.prim_type,
+        "position": obj.get_position(),
+        "scale": obj.scale,
+        "abilities": obj.abilities,
+        "visual_only": obj.visual_only,
+    }
 
 def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, bounding_box=None, abilities=None, visual_only=False):
     global num_objs
@@ -61,28 +81,35 @@ def assert_test_scene():
                 get_obj_cfg("bracelet", "bracelet", "thqqmo"),
                 get_obj_cfg("oyster", "oyster", "enzocs"),
                 get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
-                get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}}),
+                get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}, "heatable": {}}),
                 get_obj_cfg("applier_dishtowel", "dishtowel", "dtfspn", abilities={"particleApplier": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
                 get_obj_cfg("remover_dishtowel", "dishtowel", "dtfspn", abilities={"particleRemover": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
                 get_obj_cfg("spray_bottle", "spray_bottle", "asztxi", visual_only=True, abilities={"toggleable": {}, "particleApplier": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
                 get_obj_cfg("vacuum", "vacuum", "bdmsbr", visual_only=True, abilities={"toggleable": {}, "particleRemover": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
-                get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "blender": {}, "toggleable": {}}),
+                get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "toggleable": {}, "heatable": {}}),
                 get_obj_cfg("oven", "oven", "cgtaer", bounding_box=[0.943, 0.837, 1.297]),
+                get_obj_cfg("baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]),
+                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm", scale=np.ones(3) * 0.8),
+                get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
+                get_obj_cfg("food_processor", "food_processor", "gamkbo"),
+                get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
+                get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.7),
+                get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
+                get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
+                get_obj_cfg("apple", "apple", "agveuv"),
+                get_obj_cfg("table_knife", "table_knife", "jxdfyy"),
+                get_obj_cfg("half_apple", "half_apple", "sguztn"),
+                get_obj_cfg("washer", "washer", "dobgmu"),
+                get_obj_cfg("carpet_sweeper", "carpet_sweeper", "xboreo"),
             ],
             "robots": [
                 {
                     "type": "Fetch",
-                    "obs_modalities": [],
+                    "obs_modalities": ["seg_semantic", "seg_instance", "seg_instance_id"],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
-                    "controller_config": {
-                        # Make sure to use null joint controller for the arm so that we can move the arm qpos
-                        # accordingly
-                        "arm_0": {
-                            "name": "NullJointController",
-                            "motor_type": "position",
-                        },
-                    },
                 }
             ]
         }
@@ -99,6 +126,15 @@ def assert_test_scene():
         # Create the environment
         env = og.Environment(configs=cfg)
 
+        # Additional processing for the tests to pass more deterministically
+        og.sim.stop()
+        bounding_box_object_names = ["bagel_dough", "raw_egg"]
+        for name in bounding_box_object_names:
+            obj = og.sim.scene.object_registry("name", name)
+            for collision_mesh in obj.root_link.collision_meshes.values():
+                collision_mesh.set_collision_approximation("boundingCube")
+        og.sim.play()
+
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = np.random.uniform(pos_low, pos_hi, 3)
@@ -106,7 +142,7 @@ def get_random_pose(pos_low=10.0, pos_hi=20.0):
     return pos, orn
 
 
-def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.001):
     objA.keep_still()
     objB.keep_still()
     # Reset pose if cloth object
@@ -133,3 +169,8 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
 
     target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
+
+def remove_all_systems():
+    for system in ParticleRemover.supported_active_systems.values():
+        system.remove_all_particles()
+    og.sim.step()

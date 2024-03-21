@@ -55,6 +55,9 @@ gm.WEBRTC_PORT = os.getenv("OMNIGIBSON_WEBRTC_PORT", 49100)
 # CANNOT be set at runtime
 gm.GUI_VIEWPORT_ONLY = False
 
+# Whether to use the viewer camera or not
+gm.RENDER_VIEWER_CAMERA = True
+
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
 # This includes extra information for things such as object sampling, and also any debug
 # logging messages

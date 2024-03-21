@@ -1,10 +1,14 @@
+from functools import cached_property
 import numpy as np
+import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
+import omnigibson.utils.transform_utils as T
 
 
 class GeomPrim(XFormPrim):
@@ -116,6 +120,78 @@ class GeomPrim(XFormPrim):
             self.material.opacity_constant = opacity
         else:
             self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+    
+    @property
+    def points(self):
+        """
+        Returns:
+            np.ndarray: Local poses of all points
+        """
+        # If the geom is a mesh we can directly return its points.
+        mesh = self.prim
+        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+        if mesh_type == "Mesh":
+            # If the geom is a mesh we can directly return its points.
+            return np.array(self.prim.GetAttribute("points").Get())
+        else:
+            # Return the vertices of the trimesh
+            return np.array(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
+
+    @property
+    def points_in_parent_frame(self):
+        points = self.points
+        if points is None:
+            return None
+        position, orientation = self.get_local_pose()
+        scale = self.scale
+        points_scaled = points * scale
+        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_transformed = points_rotated + position
+        return points_transformed
+
+    @property
+    def aabb(self):
+        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+        
+        # transform self.points into world frame
+        points = self.points
+        points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
+        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:,:3]
+
+        aabb_lo = np.min(points_transformed, axis=0)
+        aabb_hi = np.max(points_transformed, axis=0)
+        return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Bounding box extent of this geom prim
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Bounding box center of this geom prim
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
+
+    @cached_property
+    def extent(self):
+        """
+        Returns:
+            np.ndarray: The unscaled 3d extent of the mesh in its local frame.
+        """
+        points = self.points
+        return np.max(points, axis=0) - np.min(points, axis=0)
 
 
 class CollisionGeomPrim(GeomPrim):

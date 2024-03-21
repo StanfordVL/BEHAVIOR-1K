@@ -11,6 +11,7 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key, get_u
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
+import omnigibson.lazy as lazy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -32,7 +33,7 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
 # Modifiers denoting a semantic difference in the system
-SYSTEM_PREFIXES = {"diced", "cooked"}
+SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
@@ -139,11 +140,11 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
         # Add to registry
         SYSTEM_REGISTRY.add(obj=cls)
-        # Make sure to refresh any transition rules that require this system
-        # Import now to avoid circular imports
-        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-        system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-        TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+        # Avoid circular import
+        if og.sim.is_playing():
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
         for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
@@ -206,23 +207,27 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Clears this system, so that it may possibly be re-initialized. Useful for, e.g., when loading from a new
         scene during the same sim instance
         """
-        global SYSTEM_REGISTRY, _CALLBACKS_ON_SYSTEM_CLEAR
-
         if cls.initialized:
-            # Run any callbacks
-            for callback in _CALLBACKS_ON_SYSTEM_CLEAR.values():
-                callback(cls)
+            cls._clear()
 
-            cls.reset()
-            cls.initialized = False
+    @classmethod
+    def _clear(cls):
+        global SYSTEM_REGISTRY, _CALLBACKS_ON_SYSTEM_CLEAR
+        # Run any callbacks
+        for callback in _CALLBACKS_ON_SYSTEM_CLEAR.values():
+            callback(cls)
 
-            # Remove from active registry
-            SYSTEM_REGISTRY.remove(obj=cls)
-            # Make sure to refresh any transition rules that require this system
-            # Import now to avoid circular imports
-            from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-            system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
-            TransitionRuleAPI.refresh_rules(rules=system_rules)
+        cls.reset()
+        lazy.omni.isaac.core.utils.prims.delete_prim(cls.prim_path)
+        cls.initialized = False
+
+        # Remove from active registry
+        SYSTEM_REGISTRY.remove(obj=cls)
+
+        # Avoid circular import
+        if og.sim.is_playing():
+            from omnigibson.transition_rules import TransitionRuleAPI
+            TransitionRuleAPI.refresh_all_rules()
 
     @classmethod
     def reset(cls):
@@ -531,29 +536,18 @@ class VisualParticleSystem(BaseSystem):
         state_size = super().state_size
 
         # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
-        # particle ids and corresponding link info for each particle (m * 2)
+        # particle ids, particle indices, and corresponding link info for each particle (m * 3)
         return state_size + 1 + 2 * len(cls._group_particles) + \
-               sum(2 * cls.num_group_particles(group) for group in cls.groups)
+               sum(3 * cls.num_group_particles(group) for group in cls.groups)
 
     @classmethod
-    def clear(cls):
-        # Run super method first
-        super().clear()
+    def _clear(cls):
+        super()._clear()
 
         # Clear all groups as well
         cls._group_particles = dict()
         cls._group_objects = dict()
         cls._group_scales = dict()
-
-    @classmethod
-    def remove_particle_by_name(cls, name):
-        """
-        Remove particle with name @name from both the simulator and internal state
-
-        Args:
-            name (str): Name of the particle to remove
-        """
-        raise NotImplementedError()
 
     @classmethod
     def remove_all_group_particles(cls, group):
@@ -954,8 +948,8 @@ class PhysicalParticleSystem(BaseSystem):
         # Grab the link's AABB (or fallback to obj AABB if link does not have a valid AABB),
         # and generate a grid of points based on the sampling distance
         try:
-            low, high = link.aabb
-            extent = link.aabb_extent
+            low, high = link.visual_aabb
+            extent = link.visual_aabb_extent
         except ValueError:
             low, high = obj.aabb
             extent = obj.aabb_extent
@@ -979,7 +973,7 @@ class PhysicalParticleSystem(BaseSystem):
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
             particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)]
 
         return cls.generate_particles(
             positions=particle_positions,
@@ -1140,7 +1134,7 @@ def _create_system_from_metadata(system_name):
         if not has_asset:
             if system_type == "macro_visual_particle":
                 # Fallback to stain asset
-                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "stain.usd")
+                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "ahkjul.usd")
                 has_asset = True
         if has_asset:
             def generate_particle_template_fcn():
@@ -1213,7 +1207,9 @@ def import_og_systems():
 
 
 def is_system_active(system_name):
-    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    if system_name not in REGISTERED_SYSTEMS:
+        return False
+    # assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return system.initialized
 
@@ -1230,9 +1226,19 @@ def is_physical_particle_system(system_name):
     return issubclass(system, PhysicalParticleSystem)
 
 
+def is_fluid_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    # Avoid circular imports
+    from omnigibson.systems.micro_particle_system import FluidSystem
+    return issubclass(system, FluidSystem)
+
+
 def get_system(system_name, force_active=True):
     # Make sure scene exists
-    assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
+    #@TODO: Which scene
+    for scene in og.sim.scenes:
+        assert scene is not None, "Cannot get systems until scene is imported!"
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
     system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
         else _create_system_from_metadata(system_name=system_name)

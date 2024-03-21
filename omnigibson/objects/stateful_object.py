@@ -52,7 +52,6 @@ class StatefulObject(BaseObject):
             name,
             prim_path=None,
             category="object",
-            class_id=None,
             uuid=None,
             scale=None,
             visible=True,
@@ -72,8 +71,6 @@ class StatefulObject(BaseObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -117,7 +114,6 @@ class StatefulObject(BaseObject):
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -386,7 +382,7 @@ class StatefulObject(BaseObject):
                 state = self.states[state_type]
                 if state_type in get_texture_change_states():
                     if state_type == Saturated:
-                        for particle_system in ParticleRemover.supported_active_systems:
+                        for particle_system in ParticleRemover.supported_active_systems.values():
                             if state.get_value(particle_system):
                                 texture_change_states.append(state)
                                 # Only need to do this once, since soaked handles all fluid systems
@@ -451,16 +447,12 @@ class StatefulObject(BaseObject):
                 material.diffuse_tint = diffuse_tint
 
     def remove(self):
-        """
-        Removes this prim from omniverse stage.
-        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
-        """
+        # Run super
+        super().remove()
+
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
             state_instance.remove()
-
-        # Run super
-        super().remove()
 
     def _dump_state(self):
         # Grab state from super class
@@ -480,6 +472,10 @@ class StatefulObject(BaseObject):
         # Call super method first
         super()._load_state(state=state)
 
+        # Load non-kinematic states
+        self.load_non_kin_state(state)
+
+    def load_non_kin_state(self, state):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)

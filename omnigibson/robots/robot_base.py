@@ -38,7 +38,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Shared kwargs in hierarchy
         name,
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -69,8 +68,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -135,7 +132,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             usd_path=self.usd_path,
             name=name,
             category=m.ROBOT_CATEGORY,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -271,38 +267,63 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         pass
 
+    def step(self):
+        # Skip this step if our articulation view is not valid
+        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
+            return
+
+        # Before calling super, update the dummy robot's kinematic state based on this robot's kinematic state
+        # This is done prior to any state getter calls, since setting kinematic state results in physx backend
+        # having to re-fetch tensorized state.
+        # We do this so we have more optimal runtime performance
+        if self._use_dummy:
+            self._dummy.set_joint_positions(self.get_joint_positions())
+            self._dummy.set_joint_velocities(self.get_joint_velocities())
+            self._dummy.set_position_orientation(*self.get_position_orientation())
+
+        super().step()
+
     def get_obs(self):
         """
         Grabs all observations from the robot. This is keyword-mapped based on each observation modality
             (e.g.: proprio, rgb, etc.)
 
         Returns:
-            dict: Keyword-mapped dictionary mapping observation modality names to
-                observations (usually np arrays)
+            2-tuple:
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    observations (usually np arrays)
+                dict: Keyword-mapped dictionary mapping observation modality names to
+                    additional info
         """
         # Our sensors already know what observation modalities it has, so we simply iterate over all of them
         # and grab their observations, processing them into a flat dict
         obs_dict = dict()
+        info_dict = dict()
         for sensor_name, sensor in self._sensors.items():
-            obs_dict[sensor_name] = sensor.get_obs()
+            obs_dict[sensor_name], info_dict[sensor_name] = sensor.get_obs()
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
-            obs_dict["proprio"] = self.get_proprioception()
+            obs_dict["proprio"], info_dict["proprio"] = self.get_proprioception()
 
-        return obs_dict
+        return obs_dict, info_dict
 
     def get_proprioception(self):
         """
         Returns:
             n-array: numpy array of all robot-specific proprioceptive observations.
+            dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
+<<<<<<< HEAD
         proprio = []
         for obs_key in self._proprio_obs:
             obs = proprio_dict[obs_key] if isinstance(proprio_dict[obs_key], np.ndarray) else np.array([proprio_dict[obs_key]]) 
             proprio.append(obs)
         return np.concatenate(proprio)
+=======
+        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
+>>>>>>> multiple-envs
 
     def _get_proprioception_dict(self):
         """
@@ -379,7 +400,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         frames = dict()
         remaining_obs_modalities = deepcopy(self.obs_modalities)
         for sensor in self.sensors.values():
-            obs = sensor.get_obs()
+            obs, _ = sensor.get_obs()
             sensor_frames = []
             if isinstance(sensor, VisionSensor):
                 # We check for rgb, depth, normal, seg_instance
@@ -475,16 +496,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return np.zeros(self.action_dim)
 
-    def get_generalized_gravity_forces(self):
+    def get_generalized_gravity_forces(self, clone=True):
         # Override method based on whether we're using a dummy or not
-        if self._use_dummy:
-            # Update dummy pose and calculate values
-            self._dummy.set_joint_positions(self.get_joint_positions())
-            self._dummy.set_joint_velocities(self.get_joint_velocities())
-            self._dummy.set_position_orientation(*self.get_position_orientation())
-            return self._dummy.get_generalized_gravity_forces()
-        else:
-            return super().get_generalized_gravity_forces()
+        return self._dummy.get_generalized_gravity_forces(clone=clone) \
+            if self._use_dummy else super().get_generalized_gravity_forces(clone=clone)
 
     @property
     def sensors(self):
@@ -509,7 +524,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Returns:
             int: Size of self.get_proprioception() vector
         """
-        return len(self.get_proprioception())
+        return len(self.get_proprioception()[0])
 
     @property
     def _default_sensor_config(self):

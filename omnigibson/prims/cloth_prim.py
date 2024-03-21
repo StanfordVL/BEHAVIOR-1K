@@ -15,11 +15,11 @@ from omnigibson.systems import get_system
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
-from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
 
 import numpy as np
+from collections.abc import Iterable
 
 
 # Create settings for this module
@@ -27,7 +27,7 @@ m = create_module_macros(module_path=__file__)
 
 # Subsample cloth particle points to boost performance
 m.N_CLOTH_KEYPOINTS = 1000
-m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
+m.KEYPOINT_COVERAGE_THRESHOLD = 0.75
 m.N_CLOTH_KEYFACES = 500
 
 
@@ -61,6 +61,7 @@ class ClothPrim(GeomPrim):
         load_config=None,
     ):
         # Internal vars stored
+        self._centroid_idx = None
         self._keypoint_idx = None
         self._keyface_idx = None
 
@@ -87,7 +88,7 @@ class ClothPrim(GeomPrim):
             self.mass = self._load_config["mass"]
 
         # Clothify this prim, which is assumed to be a mesh
-        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self._prim)
+        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self._prim, remesh=self._load_config.get("remesh", True))
 
         # Track generated particle count
         positions = self.compute_particle_positions()
@@ -110,10 +111,16 @@ class ClothPrim(GeomPrim):
                 max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
                 max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
             true_vol = np.product(true_aabb[1] - true_aabb[0])
-            if overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
+            if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
                 success = True
                 break
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
+
+        # Compute centroid particle idx based on AABB
+        aabb_min, aabb_max = np.min(positions, axis=0), np.max(positions, axis=0)
+        aabb_center = (aabb_min + aabb_max) / 2.0
+        dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), axis=-1)
+        self._centroid_idx = np.argmin(dists)
 
     def _initialize(self):
         super()._initialize()
@@ -123,6 +130,18 @@ class ClothPrim(GeomPrim):
 
         # Store the default position of the points in the local frame
         self._default_positions = np.array(self.get_attribute(attr="points"))
+
+    @property
+    def visual_aabb(self):
+        return self.aabb
+
+    @property
+    def visual_aabb_extent(self):
+        return self.aabb_extent
+
+    @property
+    def visual_aabb_center(self):
+        return self.aabb_center
 
     @classproperty
     def cloth_system(cls):
@@ -244,6 +263,16 @@ class ClothPrim(GeomPrim):
         return self.compute_particle_positions(idxs=self._keypoint_idx)
 
     @property
+    def centroid_particle_position(self):
+        """
+        Grabs the individual particle that was pre-computed to be the closest to the centroid of this cloth prim.
+
+        Returns:
+            np.array: centroid particle's (x,y,z) cartesian coordinates relative to the world frame
+        """
+        return self.compute_particle_positions(idxs=[self._centroid_idx])[0]
+
+    @property
     def particle_velocities(self):
         """
         Grabs individual particle velocities for this cloth prim
@@ -338,26 +367,8 @@ class ClothPrim(GeomPrim):
 
     @property
     def volume(self):
-        mesh = self.prim
-        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
-        assert mesh_type in GEOM_TYPES, f"Invalid collision mesh type: {mesh_type}"
-        if mesh_type == "Mesh":
-            # We construct a trimesh object from this mesh in order to infer its volume
-            trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-            mesh_volume = trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
-        elif mesh_type == "Sphere":
-            mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
-        elif mesh_type == "Cube":
-            mesh_volume = mesh.GetAttribute("size").Get() ** 3
-        elif mesh_type == "Cone":
-            mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3
-        elif mesh_type == "Cylinder":
-            mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
-        else:
-            raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
-
-        mesh_volume *= np.product(self.get_world_scale())
-        return mesh_volume
+        mesh = mesh_prim_to_trimesh_mesh(self.prim, include_normals=False, include_texcoord=False, world_frame=True)
+        return mesh.volume if mesh.is_volume else mesh.convex_hull.volume
 
     @volume.setter
     def volume(self, volume):
@@ -534,12 +545,10 @@ class ClothPrim(GeomPrim):
 
         # Set values appropriately
         self._n_particles = state["n_particles"]
-        for attr in ("positions", "velocities"):
-            attr_name = f"particle_{attr}"
-            # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
-            # JSON-serialization
-            attr_val = np.array(state[attr_name]) if not isinstance(attr_name, np.ndarray) else state[attr_name]
-            setattr(self, attr_name, attr_val)
+        # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
+        # JSON-serialization
+        self.particle_velocities = np.array(state["particle_velocities"]) if not isinstance(state["particle_velocities"], np.ndarray) else state["particle_velocities"]
+        self.set_particle_positions(positions=np.array(state["particle_positions"]) if not isinstance(state["particle_positions"], np.ndarray) else state["particle_positions"])
 
     def _serialize(self, state):
         # Run super first

@@ -8,7 +8,7 @@ import builtins
 # TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
 from omnigibson.macros import gm
 
-from omnigibson.envs import Environment
+from omnigibson.envs import Environment, VectorEnvironment
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS

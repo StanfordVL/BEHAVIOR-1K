@@ -3,7 +3,7 @@ A set of helper utility functions for dealing with 3D geometry
 """
 import numpy as np
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh
 
 
 def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
@@ -238,7 +238,7 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
                 USD mesh
     """
     # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
+    trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
     assert trimesh_mesh.is_convex, \
         f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
     face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
@@ -385,9 +385,9 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             mesh.visible = True
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
-        aabb_volume = np.product(volume_link.aabb_extent)
+        aabb_volume = np.product(volume_link.visual_aabb_extent)
         sampling_distance = np.cbrt(aabb_volume / min_n_particles)
-        low, high = volume_link.aabb
+        low, high = volume_link.visual_aabb
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
         assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius

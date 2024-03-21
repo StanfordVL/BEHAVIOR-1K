@@ -65,19 +65,32 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
-    # Create the config for generating the environment we want
-    env_cfg = dict()
-    env_cfg["action_frequency"] = 10
-    env_cfg["physics_frequency"] = 60
+    # Choose scene to load
+    scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 
-    # # Add the robot we want to load
-    # robot0_cfg = dict()
-    # robot0_cfg["type"] = robot_name
-    # robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
-    # robot0_cfg["action_type"] = "continuous"
-    # robot0_cfg["action_normalize"] = True
+    # Choose robot to create
+    robot_name = choose_from_options(
+        options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
+    )
 
-    # # Create the environment
+    scene_cfg = dict()
+    if scene_model == "empty":
+        scene_cfg["type"] = "Scene"
+    else:
+        scene_cfg["type"] = "InteractiveTraversableScene"
+        scene_cfg["scene_model"] = scene_model
+
+    # Add the robot we want to load
+    robot0_cfg = dict()
+    robot0_cfg["type"] = robot_name
+    robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
+    robot0_cfg["action_type"] = "continuous"
+    robot0_cfg["action_normalize"] = True
+
+    # Compile config
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+
+    # Create the environment
     env = og.Environment(configs=cfg)
 
     # # Choose robot controller to use

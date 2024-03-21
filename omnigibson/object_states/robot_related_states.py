@@ -1,6 +1,7 @@
 import numpy as np
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
+from omnigibson.sensors import VisionSensor
 
 
 _IN_REACH_DISTANCE_THRESHOLD = 2.0
@@ -50,13 +51,20 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 #         return not body_ids.isdisjoint(robot.states[ObjectsInFOVOfRobot].get_value())
 
 
-# class ObjectsInFOVOfRobot(AbsoluteObjectState):
-#     def _get_value(self):
-#         # Pass the FOV through the instance-to-body ID mapping.
-#         seg = self.simulator.renderer.render_single_robot_camera(self.obj, modes="ins_seg")[0][:, :, 0]
-#         seg = np.round(seg * MAX_INSTANCE_COUNT).astype(int)
-#         body_ids = self.simulator.renderer.get_pb_ids_for_instance_ids(seg)
-
-#         # Pixels that don't contain an object are marked -1 but we don't want to include that
-#         # as a body ID.
-#         return set(np.unique(body_ids)) - {-1}
+class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
+    def _get_value(self):
+        """
+        Gets all objects in the robot's field of view.
+        
+        Returns:
+            list: List of objects in the robot's field of view
+        """
+        if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
+            raise ValueError("No vision sensors found on robot.")
+        obj_names = []
+        names_to_exclude = set(['background', 'unlabelled'])
+        for sensor in self.robot.sensors.values():
+            if isinstance(sensor, VisionSensor):
+                _, info = sensor.get_obs()
+                obj_names.extend([name for name in info['seg_instance'].values() if name not in names_to_exclude])
+        return [x for x in [self.obj.scene.object_registry("name", x) for x in obj_names] if x is not None]

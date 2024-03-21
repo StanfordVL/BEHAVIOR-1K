@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from functools import cached_property
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -9,11 +10,18 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
+from omnigibson.utils.constants import PrimType, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.usd_utils import PoseAPI
 
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
+m.DEFAULT_SLEEP_THRESHOLD = 0.001
 
 
 class EntityPrim(XFormPrim):
@@ -66,6 +74,9 @@ class EntityPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
+        # Set the default sleep threshold
+        self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
+
         # Force populate inputs and outputs of the shaders of all materials
         # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,
         # not the original location
@@ -112,6 +123,10 @@ class EntityPrim(XFormPrim):
         # Setup links info FIRST before running any other post loading behavior
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links()
+
+        # Optionally set the scale
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
 
         # Prepare the articulation view.
         if self.n_joints > 0:
@@ -178,10 +193,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        load_config = {
-            "scale": self._load_config.get("scale", None),
-        }
-
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
             for link in self._links.values():
@@ -227,11 +238,13 @@ class EntityPrim(XFormPrim):
         # Now actually create the links
         self._links = dict()
         for link_name, (link_cls, prim) in links_to_create.items():
+            # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
+            # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
             link_load_config = {
                 "kinematic_only": self._load_config.get("kinematic_only", False)
                 if link_name == self._root_link_name else False,
+                "remesh": self._load_config.get("remesh", True),
             }
-            link_load_config.update(load_config)
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),
                 name=f"{self._name}:{link_name}",
@@ -338,6 +351,8 @@ class EntityPrim(XFormPrim):
         if self._articulation_view_direct is None:
             return None
 
+        # if not self._articulation_view_direct.is_physics_handle_valid() or not self._articulation_view_direct._physics_view.check():
+        #     from IPython import embed; embed()
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
@@ -415,7 +430,7 @@ class EntityPrim(XFormPrim):
             int: Number of joints owned by this articulation
         """
         if self.initialized:
-            num = len(list(self._joints.keys()))
+            num = len(self._joints)
         else:
             # Manually iterate over all links and check for any joints that are not fixed joints!
             num = 0
@@ -428,7 +443,7 @@ class EntityPrim(XFormPrim):
                     num += 1
         return num
 
-    @property
+    @cached_property
     def n_fixed_joints(self):
         """
         Returns:
@@ -615,12 +630,11 @@ class EntityPrim(XFormPrim):
             positions = self._denormalize_positions(positions=positions, indices=indices)
 
         # Set the DOF states
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+        else:
             self._articulation_view.set_joint_positions(positions, joint_indices=indices)
-            BoundingBoxAPI.clear()
-
-        # Also set the target
-        self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
+            PoseAPI.invalidate()
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -647,11 +661,10 @@ class EntityPrim(XFormPrim):
             velocities = self._denormalize_velocities(velocities=velocities, indices=indices)
 
         # Set the DOF states
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
+        else:
             self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
-
-        # Also set the target
-        self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -801,6 +814,7 @@ class EntityPrim(XFormPrim):
             if not joint.initialized:
                 joint.initialize()
             joint.update_handles()
+            
 
     def get_joint_positions(self, normalized=False):
         """
@@ -906,44 +920,66 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
+        # If kinematic only, clear cache for the root link
+        if self.kinematic_only:
+            self.root_link.clear_kinematic_only_cache()
+        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.set_position_orientation(position=position, orientation=orientation)
-        
-        if position is not None:
-            position = np.asarray(position)[None, :]
-        if orientation is not None:
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-        self._articulation_view.set_world_poses(position, orientation)
-        BoundingBoxAPI.clear()
+        elif self._articulation_view is None:
+            self.root_link.set_position_orientation(position=position, orientation=orientation)
+        # Sim is running and articulation view exists, so use that physx API backend
+        else:
+            if position is not None:
+                position = np.asarray(position)[None, :]
+            if orientation is not None:
+                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            self._articulation_view.set_world_poses(position, orientation)
+            PoseAPI.invalidate()
 
     def get_position_orientation(self):
+        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            return XFormPrim.get_position_orientation(self)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
+        elif self._articulation_view is None:
             return self.root_link.get_position_orientation()
-
-        positions, orientations = self._articulation_view.get_world_poses()
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        # Sim is running and articulation view exists, so use that physx API backend
+        else:
+            positions, orientations = self._articulation_view.get_world_poses()
+            return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
+        # If kinematic only, clear cache for the root link
+        if self.kinematic_only:
+            self.root_link.clear_kinematic_only_cache()
+        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            return XFormPrim.set_local_pose(self, position, orientation)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
-            return self.root_link.set_local_pose(position=position, orientation=orientation)
-        
-        if position is not None:
-            position = np.asarray(position)[None, :]
-        if orientation is not None:
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-        self._articulation_view.set_local_poses(position, orientation)
-        BoundingBoxAPI.clear()
+        elif self._articulation_view is None:
+            self.root_link.set_local_pose(position=position, orientation=orientation)
+        # Sim is running and articulation view exists, so use that physx API backend
+        else:
+            if position is not None:
+                position = np.asarray(position)[None, :]
+            if orientation is not None:
+                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            self._articulation_view.set_local_poses(position, orientation)
+            PoseAPI.invalidate()
 
     def get_local_pose(self):
+        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            return XFormPrim.get_local_pose(self)
         # Delegate to RigidPrim if we are not articulated
-        if self._articulation_view is None:
+        elif self._articulation_view is None:
             return self.root_link.get_local_pose()
-        
-        positions, orientations = self._articulation_view.get_local_poses()
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        # Sim is running and articulation view exists, so use that physx API backend
+        else:
+            positions, orientations = self._articulation_view.get_local_poses()
+            return positions[0], orientations[0][[1, 2, 3, 0]]
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
@@ -1062,16 +1098,19 @@ class EntityPrim(XFormPrim):
 
     @property
     def scale(self):
-        # Since all rigid bodies owned by this object prim have the same scale, we simply grab it from the root prim
-        return self.root_link.scale
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
+        return self.root_link.scale / self.root_link.original_scale
 
     @scale.setter
     def scale(self, scale):
+        # For the EntityPrim (object) level, @self.scale represents the scale with respect to the original scale of
+        # the link (RigidPrim or ClothPrim), which might not be uniform ([1, 1, 1]) itself.
         # We iterate over all rigid bodies owned by this object prim and set their individual scales
         # We do this because omniverse cannot scale orientation of an articulated prim, so we get mesh mismatches as
-        # they rotate in the world
+        # they rotate in the world.
         for link in self._links.values():
-            link.scale = scale
+            link.scale = scale * link.original_scale
 
     @property
     def solver_position_iteration_count(self):
@@ -1143,6 +1182,19 @@ class EntityPrim(XFormPrim):
                 link.stabilization_threshold = threshold
 
     @property
+    def is_asleep(self):
+        """
+        Returns:
+            bool: whether this entity is asleep or not
+        """
+        # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
+        if self.kinematic_only:
+            return False
+        else:
+            return og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)) \
+                if self.articulated else self.root_link.is_asleep
+
+    @property
     def sleep_threshold(self):
         """
         Returns:
@@ -1206,54 +1258,92 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
                                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
-            aabb_lo, aabb_hi = super().aabb
-            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
-
+            points_world = [link.collision_boundary_points_world for link in self._links.values()]
+            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
+            aabb_lo = np.min(all_points, axis=0)
+            aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
 
-    def get_coriolis_and_centrifugal_forces(self):
+    @property
+    def aabb_extent(self):
         """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
+
+    def get_coriolis_and_centrifugal_forces(self, clone=True):
+        """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
         """
         assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
-        return self._articulation_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
+        return self._articulation_view.get_coriolis_and_centrifugal_forces(clone=clone).reshape(self.n_dof)
 
-    def get_generalized_gravity_forces(self):
+    def get_generalized_gravity_forces(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
-        return self._articulation_view.get_generalized_gravity_forces().reshape(self.n_dof)
+        return self._articulation_view.get_generalized_gravity_forces(clone=clone).reshape(self.n_dof)
 
-    def get_mass_matrix(self):
+    def get_mass_matrix(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N, N) shaped per-DOF mass matrix, if articulated
         """
         assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
-        return self._articulation_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
+        return self._articulation_view.get_mass_matrices(clone=clone).reshape(self.n_dof, self.n_dof)
 
-    def get_jacobian(self):
+    def get_jacobian(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link jacobian, if articulated. Note that the first
                 dimension is +1 and the final dimension is +6 if the entity does not have a fixed base
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        return self._articulation_view.get_jacobians().squeeze(axis=0)
+        return self._articulation_view.get_jacobians(clone=clone).squeeze(axis=0)
 
-    def get_relative_jacobian(self):
+    def get_relative_jacobian(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the underlying tensor buffer or not
+
         Returns:
             n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link relative jacobian, if articulated (expressed in
                 this entity's base frame). Note that the first dimension is +1 and the final dimension is +6 if the
                 entity does not have a fixed base (i.e.: there is an additional "floating" joint tying the robot to
                 the world frame)
         """
-        jac = self.get_jacobian()
+        jac = self.get_jacobian(clone=clone)
         ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
         tf = np.zeros((1, 6, 6), dtype=np.float32)
         tf[:, :3, :3] = ori_t
@@ -1338,6 +1428,7 @@ class EntityPrim(XFormPrim):
         link.visible = False
         # Set a very small mass
         link.mass = 1e-6
+        link.density = 0.0
 
         self._links[link_name] = link
 

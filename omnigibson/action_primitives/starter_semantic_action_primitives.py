@@ -8,7 +8,6 @@ runnable examples.
 # from functools import cached_property
 import inspect
 import logging
-import random
 from aenum import IntEnum, auto
 from math import ceil
 import cv2
@@ -193,7 +192,7 @@ class PlanningContext(object):
         # Disable original robot colliders so copy can't collide with it
         disabled_colliders += [link.prim_path for link in self.robot.links.values()]
         filter_categories = ["floors"]
-        for obj in og.sim.scene.objects:
+        for obj in og.sim.scenes[0].objects:
             if obj.category in filter_categories:
                 disabled_colliders += [link.prim_path for link in obj.links.values()]
 
@@ -647,7 +646,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Allow grasping from suboptimal extents if we've tried enough times.
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pose, object_direction = random.choice(grasp_poses)
+        grasp_pose, object_direction = np.random.choice(grasp_poses)
 
         # Prepare data for the approach later.
         approach_pos = grasp_pose[0] + object_direction * m.GRASP_APPROACH_DISTANCE
@@ -1651,8 +1650,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         aabb_center, aabb_extent = target_obj.aabb_center, target_obj.aabb_extent
         # We want to sample only from the side-facing faces.
-        face_normal_axis = random.choice([0, 1])
-        face_normal_direction = random.choice([-1, 1])
+        face_normal_axis = np.random.choice([0, 1])
+        face_normal_direction = np.random.choice([-1, 1])
         face_center = aabb_center + np.eye(3)[face_normal_axis] * aabb_extent * face_normal_direction
         face_lateral_axis = 0 if face_normal_axis == 1 else 1
         face_lateral_half_extent = np.eye(3)[face_lateral_axis] * aabb_extent / 2

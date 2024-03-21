@@ -19,7 +19,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
 from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
                                        print_icon, print_logo, logo_small)
 from omnigibson.scenes import Scene
@@ -28,8 +28,10 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
 
 # Create module logger
@@ -40,6 +42,8 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -79,7 +83,6 @@ def _launch_app():
     # Enable additional extensions we need
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":
@@ -125,14 +128,18 @@ def _launch_app():
             og_log.set_channel_enabled(channel, False, lazy.omni.log.SettingBehavior.OVERRIDE)
 
     # Possibly hide windows if in debug mode
+    hide_window_names = []
+    if not gm.RENDER_VIEWER_CAMERA:
+        hide_window_names.append("Viewport")
     if gm.GUI_VIEWPORT_ONLY:
-        hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
-                             "Flow", "Semantics Schema Editor"]
-        for name in hide_window_names:
-            window = lazy.omni.ui.Workspace.get_window(name)
-            if window is not None:
-                window.visible = False
-                app.update()
+        hide_window_names.extend(["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
+                             "Flow", "Semantics Schema Editor"])
+        
+    for name in hide_window_names:
+        window = lazy.omni.ui.Workspace.get_window(name)
+        if window is not None:
+            window.visible = False
+            app.update()
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
     
@@ -159,10 +166,10 @@ def launch_simulator(*args, **kwargs):
 
         Args:
             gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+            physics_dt (float): dt between physics steps. Defaults to 1.0 / 120.0.
             rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
                 application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 30.0.
             stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
                 Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
@@ -174,8 +181,8 @@ def launch_simulator(*args, **kwargs):
         def __init__(
                 self,
                 gravity=9.81,
-                physics_dt=1.0 / 60.0,
-                rendering_dt=1.0 / 60.0,
+                physics_dt=1.0 / 120.0,
+                rendering_dt=1.0 / 30.0,
                 stage_units_in_meters=1.0,
                 viewer_width=gm.DEFAULT_VIEWER_WIDTH,
                 viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -200,6 +207,7 @@ def launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scene = None
+            self._scenes = []
             self._physx_interface = None
             self._physx_simulation_interface = None
             self._physx_scene_query_interface = None
@@ -222,7 +230,7 @@ def launch_simulator(*args, **kwargs):
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
             self.object_state_types_requiring_update = \
-                [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
+                [state for state in self.object_state_types if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))]
             self.object_state_types_on_contact = \
                 {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
             self.object_state_types_on_joint_break = \
@@ -232,9 +240,9 @@ def launch_simulator(*args, **kwargs):
             self.clear()
 
             # Set the viewer dimensions
-            # TODO: Make this toggleable so we don't always have a viewer if we don't want to
-            self.viewer_width = viewer_width
-            self.viewer_height = viewer_height
+            if gm.RENDER_VIEWER_CAMERA:
+                self.viewer_width = viewer_width
+                self.viewer_height = viewer_height
 
             # Toggle simulator state once so that downstream omni features can be used without bugs
             # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -250,8 +258,8 @@ def launch_simulator(*args, **kwargs):
         def __new__(
             cls,
             gravity=9.81,
-            physics_dt=1.0 / 60.0,
-            rendering_dt=1.0 / 60.0,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -283,7 +291,8 @@ def launch_simulator(*args, **kwargs):
                 viewport_name=viewport_name,
             )
             if not self._viewer_camera.loaded:
-                self._viewer_camera.load()
+                #@TODO: How to access scene here
+                self._viewer_camera.load(None)
 
             # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
             # nearby objects (default min is 1 m)
@@ -303,9 +312,9 @@ def launch_simulator(*args, **kwargs):
             """
             assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
             self._physics_context.set_gravity(value=-self.gravity)
-            # Also make sure we invert the collision group filter settings so that different collision groups cannot
-            # collide with each other, and modify settings for speed optimization
-            self._physics_context.set_invert_collision_group_filter(True)
+            # Also make sure we don't invert the collision group filter settings so that different collision groups by
+            # default collide with each other, and modify settings for speed optimization
+            self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
 
             if meets_minimum_isaac_version("2023.0.0"):
@@ -328,10 +337,18 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
         def _set_renderer_settings(self):
-            # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            if gm.ENABLE_HQ_RENDERING:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)                    
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)                 
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)   # "Auto"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)                
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
+            else:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)              
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)   # "Performance"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)             
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) 
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
@@ -407,6 +424,7 @@ def launch_simulator(*args, **kwargs):
             """
             Enables keyboard control of the active viewer camera for this simulation
             """
+            assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
             self._camera_mover = CameraMover(cam=self._viewer_camera)
             self._camera_mover.print_info()
             return self._camera_mover
@@ -422,17 +440,23 @@ def launch_simulator(*args, **kwargs):
             assert isinstance(scene, Scene), "import_scene can only be called with Scene"
 
             # Clear the existing scene if any
-            self.clear()
+            # self.clear()
+
+            # Initialize all global updatable object states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
 
             self._scene = scene
-            self._scene.load()
+            self._scenes.append(scene)
+            self._scenes[-1].load()
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
 
             # Initialize the scene
-            self._scene.initialize()
+            self._scenes[-1].initialize()
 
             # Need to one more step for particle systems to work
             self.step()
@@ -462,7 +486,7 @@ def launch_simulator(*args, **kwargs):
             assert self.scene is not None, "import_object needs to be called after import_scene"
 
             # Load the object in omniverse by adding it to the scene
-            self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
+            # self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
 
             # Run any callbacks
             for callback in self._callbacks_on_import_obj.values():
@@ -477,7 +501,43 @@ def launch_simulator(*args, **kwargs):
 
         def remove_object(self, obj):
             """
-            Remove a non-robot object from the simulator.
+            Remove one or a list of non-robot object from the simulator.
+
+            Args:
+                obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
+            """
+            objs = [obj] if isinstance(obj, BaseObject) else obj
+
+            if self.is_playing():
+                state = self.dump_state()
+
+                # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+                # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+                # we first move the object to a safe location, then remove it.
+                pos = list(m.OBJECT_GRAVEYARD_POS)
+                for ob in objs:
+                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    pos[0] += max(ob.aabb_extent)
+
+                # One physics timestep will elapse
+                self.step_physics()
+
+            for ob in objs:
+                self._remove_object(ob)
+
+            if self.is_playing():
+                # Update all handles that are now broken because objects have changed
+                self.update_handles()
+
+                # Load the state back
+                self.load_state(state)
+
+            # Refresh all current rules
+            TransitionRuleAPI.prune_active_rules()
+
+        def _remove_object(self, obj):
+            """
+            Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
                 obj (BaseObject): a non-robot object to remove
@@ -495,15 +555,7 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-
             self._scene.remove_object(obj)
-            self.app.update()
-
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
-
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
 
         def remove_prim(self, prim):
             """
@@ -512,8 +564,11 @@ def launch_simulator(*args, **kwargs):
             Args:
                 prim (BasePrim): a prim to remove
             """
-            # Remove prim
-            prim.remove()
+            # [omni.physx.tensors.plugin] prim '[prim_path]' was deleted while being used by a shape in a tensor view
+            # class. The physics.tensors simulationView was invalidated.
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                # Remove prim
+                prim.remove()
 
             # Update all handles that are now broken because prims have changed
             self.update_handles()
@@ -522,6 +577,11 @@ def launch_simulator(*args, **kwargs):
             """
             Reset internal variables when a new stage is loaded
             """
+        
+        def render(self):
+            super().render()
+            # During rendering, the Fabric API is updated, so we can mark it as clean
+            PoseAPI.mark_valid()
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -533,11 +593,15 @@ def launch_simulator(*args, **kwargs):
             self._physics_sim_view.set_subspace_roots("/")
 
             # Then update the handles for all objects
-            if self.scene is not None and self.scene.initialized:
-                for obj in self.scene.objects:
-                    # Only need to update if object is already initialized as well
-                    if obj.initialized:
-                        obj.update_handles()
+            for scene in self.scenes:
+                if scene is not None and scene.initialized:
+                    for obj in scene.objects:
+                        # Only need to update if object is already initialized as well
+                        if obj.initialized:
+                            obj.update_handles()
+                    for system in scene.systems:
+                        if issubclass(system, MacroPhysicalParticleSystem):
+                            system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
@@ -588,9 +652,13 @@ def launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        for obj in self.scene.get_objects_with_state(state_type):
-                            # Only update objects that have been initialized so far
-                            if obj.initialized:
+                        if issubclass(state_type, GlobalUpdateStateMixin):
+                            state_type.global_update()
+                        if issubclass(state_type, UpdateStateMixin):
+                            for obj in self.scene.get_objects_with_state(state_type):
+                                # Update the state (object should already be initialized since
+                                # this step will only occur after objects are initialized and sim
+                                # is playing
                                 obj.states[state_type].update()
 
                     for obj in self.scene.objects:
@@ -607,7 +675,6 @@ def launch_simulator(*args, **kwargs):
             Step any omni-related things
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            BoundingBoxAPI.clear()
             RigidContactAPI.clear()
 
         def play(self):
@@ -631,10 +698,6 @@ def launch_simulator(*args, **kwargs):
                 with suppress_omni_log(channels=channels):
                     super().play()
 
-                # If we're stopped, take a physics step and update the physics sim view. This must happen BEFORE the
-                # handles are updated, since updating the physics view makes the per-object physics view invalid
-                self.step_physics()
-
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
@@ -649,10 +712,12 @@ def launch_simulator(*args, **kwargs):
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
-                    if self.scene is not None and self.scene.initialized:
-                        for robot in self.scene.robots:
-                            if robot.initialized:
-                                robot.update_controller_mode()
+                    if len(self.scenes) > 0 and all([scene.initialized for scene in self.scenes]):
+                        for scene in self.scenes:
+                            for robot in scene.robots:
+                                if robot.initialized:
+                                    robot.update_controller_mode()
+                        TransitionRuleAPI.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -720,6 +785,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
             self._omni_update_step()
+            PoseAPI.invalidate()
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -966,6 +1032,14 @@ def launch_simulator(*args, **kwargs):
                 None or Scene: Scene currently loaded in this simulator. If no scene is loaded, returns None
             """
             return self._scene
+        
+        @property
+        def scenes(self):
+            """
+            Returns:
+                Empty list or [Scene]: Scenes currently loaded in this simulator. If no scenes are loaded, returns empty list
+            """
+            return self._scenes
 
         @property
         def viewer_camera(self):
@@ -1010,9 +1084,16 @@ def launch_simulator(*args, **kwargs):
                 self._camera_mover.clear()
                 self._camera_mover = None
 
-            # Clear all transition rules if being used
-            if gm.ENABLE_TRANSITION_RULES:
-                TransitionRuleAPI.clear()
+            # Clear all global update states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_clear()
+
+            # Clear all materials
+            MaterialPrim.clear()
+
+            # Clear all transition rules
+            TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_pu()
@@ -1138,12 +1219,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1 / 60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1 / 120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1174,12 +1255,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1/60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1/120.
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1232,11 +1313,12 @@ def launch_simulator(*args, **kwargs):
             self.set_lighting_mode(mode=LightingMode.STAGE)
 
             # Set the viewer camera, and then set its default pose
-            self._set_viewer_camera()
-            self.viewer_camera.set_position_orientation(
-                position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
-            )
+            if gm.RENDER_VIEWER_CAMERA:
+                self._set_viewer_camera()
+                self.viewer_camera.set_position_orientation(
+                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                )
 
         def close(self):
             """

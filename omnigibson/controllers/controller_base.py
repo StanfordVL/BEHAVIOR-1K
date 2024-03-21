@@ -302,8 +302,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         )
 
     def _load_state(self, state):
+        # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = state["goal"]
+        self._goal = None if state["goal"] is None else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
 
     def _serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal

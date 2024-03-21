@@ -1,3 +1,5 @@
+from functools import cached_property
+from scipy.spatial import ConvexHull, QhullError
 import numpy as np
 
 import omnigibson as og
@@ -7,7 +9,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import BoundingBoxAPI, get_mesh_volume_and_com
+from omnigibson.utils.usd_utils import PoseAPI, get_mesh_volume_and_com, check_extent_radius_ratio
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -61,12 +63,12 @@ class RigidPrim(XFormPrim):
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
-        
+
         # Caches for kinematic-only objects
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
         self._kinematic_local_pose_cache = None
-
+    
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -180,7 +182,8 @@ class RigidPrim(XFormPrim):
             for child in prim.GetChildren():
                 prims_to_check.append(child)
         for prim in prims_to_check:
-            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+            mesh_type = prim.GetPrimTypeInfo().GetTypeName()
+            if mesh_type in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
@@ -193,17 +196,19 @@ class RigidPrim(XFormPrim):
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                     self._collision_meshes[mesh_name] = mesh
 
-                    is_volume, volume, com = get_mesh_volume_and_com(mesh_prim)
-                    vols.append(volume)
-                    # We need to translate the center of mass from the mesh's local frame to the link's local frame
+                    volume, com = get_mesh_volume_and_com(mesh_prim)
+                    # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
+                    vols.append(volume * np.product(mesh.scale))
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
-                    if not is_volume:
-                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
+                    # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
+                    # boundingCube approximation for the underlying collision approximation for GPU compatibility
+                    if not check_extent_radius_ratio(mesh_prim):
+                        log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                         mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
@@ -291,8 +296,7 @@ class RigidPrim(XFormPrim):
     def set_position_orientation(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
-            self._kinematic_world_pose_cache = None
-            self._kinematic_local_pose_cache = None
+            self.clear_kinematic_only_cache()
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -300,7 +304,7 @@ class RigidPrim(XFormPrim):
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
-        BoundingBoxAPI.clear()
+        PoseAPI.invalidate()
 
     def get_position_orientation(self):
         # Return cached pose if we're kinematic-only
@@ -321,14 +325,13 @@ class RigidPrim(XFormPrim):
     def set_local_pose(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
-            self._kinematic_world_pose_cache = None
-            self._kinematic_local_pose_cache = None
+            self.clear_kinematic_only_cache()
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_local_poses(position, orientation)
-        BoundingBoxAPI.clear()
+        PoseAPI.invalidate()
 
     def get_local_pose(self):
         # Return cached pose if we're kinematic-only
@@ -428,12 +431,7 @@ class RigidPrim(XFormPrim):
             float: total volume of all the collision meshes of the rigid body in m^3.
         """
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
-        volume = 0.0
-        for collision_mesh in self._collision_meshes.values():
-            _, mesh_volume, _ = get_mesh_volume_and_com(collision_mesh.prim)
-            volume += mesh_volume * np.product(collision_mesh.get_world_scale())
-
-        return volume
+        return sum(get_mesh_volume_and_com(collision_mesh.prim, world_frame=True)[0] for collision_mesh in self._collision_meshes.values())
 
     @volume.setter
     def volume(self, volume):
@@ -467,16 +465,15 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        raw_usd_mass = self._rigid_prim_view.get_masses()[0]
-        # We first check if the raw usd mass is specified, since mass overrides density
-        # If it's specified, we infer density based on that value divided by volume
-        # Otherwise, we try to directly grab the raw usd density value, and if that value
-        # does not exist, we return 1000 since that is the canonical density assigned by omniverse
-        if raw_usd_mass != 0:
-            density = raw_usd_mass / self.volume
+        mass = self._rigid_prim_view.get_masses()[0]
+        # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
+        # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
+        # we return 1000 since that is the canonical density assigned by omniverse
+        if mass != 0.0:
+            density = mass / self.volume
         else:
             density = self._rigid_prim_view.get_densities()[0]
-            if density == 0:
+            if density == 0.0:
                 density = 1000.0
 
         return density
@@ -555,6 +552,16 @@ class RigidPrim(XFormPrim):
         self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
 
     @property
+    def is_asleep(self):
+        """
+        Returns:
+            bool: whether this rigid prim is asleep or not
+        """
+        # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
+        return False if self.kinematic_only \
+            else og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path))
+
+    @property
     def sleep_threshold(self):
         """
         Returns:
@@ -596,6 +603,138 @@ class RigidPrim(XFormPrim):
         """
         return self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
 
+    def _compute_points_on_convex_hull(self, visual):
+        """
+        Returns:
+            np.ndarray or None: points on the convex hull of all points from child geom prims
+        """
+        meshes = self._visual_meshes if visual else self._collision_meshes
+        points = []
+
+        for mesh in meshes.values():
+            mesh_points = mesh.points_in_parent_frame
+            if mesh_points is not None and len(mesh_points) > 0:
+                points.append(mesh_points)
+        
+        if not points:
+            return None
+
+        points = np.concatenate(points, axis=0)
+        
+        try:
+            hull = ConvexHull(points)
+            return points[hull.vertices, :]
+        except:
+            # Handle the case where a convex hull cannot be formed (e.g., collinear points)
+            # return all the points in this case
+            return points
+        
+    @cached_property
+    def visual_boundary_points_local(self):
+        """
+        Returns:
+            np.ndarray: local coords of points on the convex hull of all points from child geom prims
+        """
+        return self._compute_points_on_convex_hull(visual=True)
+    
+    @property
+    def visual_boundary_points_world(self):
+        """
+        Returns:
+            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+        """
+        local_points = self.visual_boundary_points_local
+        if local_points is None:
+            return None
+        return self.transform_local_points_to_world(local_points)
+    
+    @cached_property
+    def collision_boundary_points_local(self):
+        """
+        Returns:
+            np.ndarray: local coords of points on the convex hull of all points from child geom prims
+        """
+        return self._compute_points_on_convex_hull(visual=False)
+    
+    @property
+    def collision_boundary_points_world(self):
+        """
+        Returns:
+            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+        """
+        local_points = self.collision_boundary_points_local
+        if local_points is None:
+            return None
+        return self.transform_local_points_to_world(local_points)
+        
+    @property
+    def aabb(self):
+        position, _ = self.get_position_orientation()
+        hull_points = self.collision_boundary_points_world
+        
+        if hull_points is None:
+            # When there's no points on the collision meshes
+            return position, position
+        
+        aabb_lo = np.min(hull_points, axis=0)
+        aabb_hi = np.max(hull_points, axis=0)
+        return aabb_lo, aabb_hi
+
+    @property
+    def aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
+    
+    @property
+    def visual_aabb(self):
+        hull_points = self.visual_boundary_points_world
+        assert hull_points is not None, "No visual boundary points found for this rigid prim"
+
+        # Calculate and return the AABB
+        aabb_lo = np.min(hull_points, axis=0)
+        aabb_hi = np.max(hull_points, axis=0)
+
+        return aabb_lo, aabb_hi
+
+    @property
+    def visual_aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.visual_aabb
+        return max_corner - min_corner
+
+    @property
+    def visual_aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.visual_aabb
+        return (max_corner + min_corner) / 2.0
+    
     def enable_gravity(self):
         """
         Enables gravity for this rigid body
@@ -621,6 +760,15 @@ class RigidPrim(XFormPrim):
         """
         prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
+
+    def clear_kinematic_only_cache(self):
+        """
+        Clears the internal kinematic only cached pose. Useful if the parent prim's pose
+        changes without explicitly calling this prim's pose setter
+        """
+        assert self.kinematic_only
+        self._kinematic_local_pose_cache = None
+        self._kinematic_world_pose_cache = None
 
     def _dump_state(self):
         # Grab pose from super class

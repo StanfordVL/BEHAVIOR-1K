@@ -16,7 +16,7 @@ class ContactBodies(AbsoluteObjectState):
             tokens = body.split("/")
             obj_prim_path = "/".join(tokens[:-1])
             link_name = tokens[-1]
-            obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+            obj = self.obj.scene.object_registry("prim_path", obj_prim_path)
             if obj is not None:
                 rigid_prims.add(obj.links[link_name])
         # Ignore_objs should either be None or tuple (CANNOT be list because we need to hash these inputs)

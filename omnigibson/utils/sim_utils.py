@@ -6,7 +6,6 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -64,6 +63,8 @@ def check_deletable_prim(prim_path):
     Returns:
         bool: Whether the prim can be deleted or not
     """
+    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+        return False
     if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
         return False
     if lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
@@ -131,6 +132,7 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         og.sim.step_physics()
 
     # Standardize inputs
+    #@TODO: Which scene
     prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
@@ -299,7 +301,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = og.sim.scene.dump_state(serialized=False)
+    state = obj.scene.dump_state(serialized=False)
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)

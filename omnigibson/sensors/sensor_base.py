@@ -73,24 +73,26 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         if not self._enabled:
             return dict()
 
-        obs = self._get_obs()
+        obs, info = self._get_obs()
 
         if self._noise is not None:
             for k, v in obs.items():
                 if k not in self.no_noise_modalities:
                     obs[k] = self._noise(v)
 
-        return obs
+        return obs, info
 
     def _get_obs(self):
         """
         Get sensor reading. Should generally be extended by subclass.
 
         Returns:
-            dict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
+            2-tuple:
+                dict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
+                dict: Additional information about the observations.
         """
         # Default is returning an empty dict
-        return dict()
+        return dict(), dict()
 
     def _load_observation_space(self):
         # Fill in observation space based on mapping and active modalities

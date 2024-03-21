@@ -1,0 +1,54 @@
+name: Profiling
+
+on: 
+  workflow_dispatch:
+  push:
+    branches:
+      - og-develop
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update profiling contents in gh-pages branch
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  profiling:
+    name: Speed Profiling
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+
+    defaults:
+      run:
+        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+
+    steps:
+      - name: Fix home
+        run: echo "HOME=/root" >> $GITHUB_ENV
+
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Install dev requirements
+        run: pip install -r requirements-dev.txt
+
+      - name: Install
+        run: pip install -e .
+      
+      - name: Run performance benchmark
+        run: bash scripts/profiling.sh
+          
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'customSmallerIsBetter'
+          output-file-path: output.json
+          benchmark-data-dir-path: profiling
+          fail-on-alert: false
+          alert-threshold: '200%'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: false
+          auto-push: true

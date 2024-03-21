@@ -20,12 +20,14 @@ from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, 
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+DIST_BETWEEN_ENVS = 10
+NUM_ENVS_PER_ROW = 5
 
 class Environment(gym.Env, GymObservable, Recreatable):
     """
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
-    def __init__(self, configs):
+    def __init__(self, configs, num_env=1):
         """
         Args:
             configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
@@ -77,6 +79,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
           
+        self.num_env = num_env
+        origin_offset_x = (self.num_env % NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
+        origin_offset_y = int(self.num_env / NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
+        self.origin_offset = [origin_offset_x, origin_offset_y, 0.0]
+
         # Load this environment
         self.load()
 
@@ -191,6 +198,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load the scene and robot specified in the config file.
         """
+        og.sim.stop()
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
         # Set the simulator settings
@@ -204,6 +212,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
+        
+        scene.id = "scene_{}".format(str(self.num_env))
+        scene.origin_offset = self.origin_offset
+        self._scene = scene
         og.sim.import_scene(scene)
 
         # Set the rendering settings
@@ -225,9 +237,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}"
-
-                position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
+                    robot_config["name"] = f"robot{i}_{str(self.num_env)}"
+                else:
+                    robot_config["name"] = f"{robot_config['name']}_{str(self.num_env)}"
+                # Update robot config so name is unique amongst robots in all scenes
+                position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -235,15 +249,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     cfg=robot_config,
                     cls_type_descriptor="robot",
                 )
+                self.scene.add_object(robot)
+                init_position = [sum(x) for x in zip(position, self.origin_offset)]
                 # Import the robot into the simulator
-                og.sim.import_object(robot)
-                robot.set_position_orientation(position=position, orientation=orientation)
+                robot.set_position_orientation(position=init_position, orientation=orientation)
 
-            # Auto-initialize all robots
-            og.sim.play()
-            self.scene.reset()
-            self.scene.update_initial_state()
-            og.sim.stop()
+            if len(self.robots_config) > 0:
+                # Auto-initialize all robots
+                og.sim.play()
+                self.scene.reset()
+                self.scene.update_initial_state()
+                og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -255,9 +271,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for i, obj_config in enumerate(self.objects_config):
             # Add a name for the object if necessary
             if "name" not in obj_config:
-                obj_config["name"] = f"obj{i}"
+                obj_config["name"] = f"obj{i}_{str(self.num_env)}"
+            else:
+                obj_config["name"] = f"{obj_config['name']}_{str(self.num_env)}"
             # Pop the desired position and orientation
-            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
+            position, orientation = obj_config.pop("position", [0.0, 0.0, 0.0]), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
             obj = create_class_from_registry_and_config(
                 cls_name=obj_config["type"],
@@ -265,15 +283,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 cfg=obj_config,
                 cls_type_descriptor="object",
             )
-            # Import the robot into the simulator and set the pose
-            og.sim.import_object(obj)
-            obj.set_position_orientation(position=position, orientation=orientation)
 
-        # Auto-initialize all objects
-        og.sim.play()
-        self.scene.reset()
-        self.scene.update_initial_state()
-        og.sim.stop()
+            # Import the robot into the simulator and set the pose
+            self.scene.add_object(obj)
+            init_position = [sum(x) for x in zip(position, self.origin_offset)]
+            obj.set_position_orientation(position=init_position, orientation=orientation)
+
+        if len(self.objects_config) > 0:
+            # Auto-initialize all objects
+            og.sim.play()
+            self.scene.reset()
+            self.scene.update_initial_state()
+            og.sim.stop()
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -300,7 +321,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
                 sensor = create_sensor(**sensor_config)
                 # Load an initialize this sensor
-                sensor.load()
+                sensor.load(self.scene)
                 sensor.initialize()
                 sensor.set_local_pose(local_position, local_orientation)
                 self._external_sensors[sensor.name] = sensor
@@ -383,7 +404,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_objects()
         self._load_task()
-        self._load_external_sensors()
+        # self._load_external_sensors()
 
         og.sim.play()
 
@@ -439,14 +460,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Get the current environment observation.
 
         Returns:
-            dict: Keyword-mapped observations, which are possibly nested
+            2-tuple:
+                dict: Keyword-mapped observations, which are possibly nested
+                dict: Additional information about the observations
         """
         obs = dict()
+        info = dict()
 
         # Grab all observations from each robot
         for robot in self.robots:
             if gym.spaces.utils.flatdim(robot.observation_space) > 0:
-                obs[robot.name] = robot.get_obs()
+                obs[robot.name], info[robot.name] = robot.get_obs()
+            
 
         # Add task observations
         if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
@@ -455,18 +480,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Add external sensor observations if they exist
         if self._external_sensors is not None:
             external_obs = dict()
+            external_info = dict()
             for sensor_name, sensor in self._external_sensors.items():
                 if not self._external_sensors_include_in_obs[sensor_name]:
                     continue
 
-                external_obs[sensor_name] = sensor.get_obs()
+                external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
             obs["external"] = external_obs
+            info["external"] = external_info
 
         # Possibly flatten obs if requested
         if self._flatten_obs_space:
             obs = recursively_generate_flat_dict(dic=obs)
 
-        return obs
+        return obs, info
     
     def get_scene_graph(self):
         """
@@ -493,6 +520,45 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if self._scene_graph_builder is not None:
             info["scene_graph"] = self.get_scene_graph()
 
+    def _pre_step(self, action):
+        # If the action is not a dictionary, convert into a dictionary
+        if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+            action_dict = dict()
+            idx = 0
+            for robot in self.robots:
+                action_dim = robot.action_dim
+                action_dict[robot.name] = action[idx: idx + action_dim]
+                idx += action_dim
+        else:
+            # Our inputted action is the action dictionary
+            action_dict = action
+
+        # Iterate over all robots and apply actions
+        for robot in self.robots:
+            robot.apply_action(action_dict[robot.name])
+
+    def _post_step(self, action):
+        # Grab observations
+        obs, obs_info = self.get_obs()
+
+        # Step the scene graph builder if necessary
+        if self._scene_graph_builder is not None:
+            self._scene_graph_builder.step(self.scene)
+
+        # Grab reward, done, and info, and populate with internal info
+        reward, done, info = self.task.step(self, action)
+        self._populate_info(info)
+        info["obs_info"] = obs_info
+
+        if done and self._automatic_reset:
+            # Add lost observation to our information dict, and reset
+            info["last_observation"] = obs
+            obs = self.reset()
+
+        # Increment step
+        self._current_step += 1
+        return obs, reward, done, info
+
     def step(self, action):
         """
         Apply robot's action and return the next state, reward, done and info,
@@ -512,66 +578,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - dict: info, i.e. dictionary with any useful information
         """
         try:
-            # If the action is not a dictionary, convert into a dictionary
-            if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-                action_dict = dict()
-                idx = 0
-                for robot in self.robots:
-                    action_dim = robot.action_dim
-                    action_dict[robot.name] = action[idx: idx + action_dim]
-                    idx += action_dim
-            else:
-                # Our inputted action is the action dictionary
-                action_dict = action
-
-            # Iterate over all robots and apply actions
-            for robot in self.robots:
-                robot.apply_action(action_dict[robot.name])
-
-            # Decide if rendering is necessary
-            visual_modalities = {"rgb", "depth", "normal", "seg_instance"}
-            should_render = any(
-                not visual_modalities.isdisjoint(robot.obs_modalities)
-                for robot in self.robots
-            )
-
+            
+            self._pre_step(action)
             # Run simulation step
-            og.sim.step(render=should_render)
-
-            # Grab observations
-            obs = self.get_obs()
-
-            # Step the scene graph builder if necessary
-            if self._scene_graph_builder is not None:
-                self._scene_graph_builder.step(self.scene)
-
-            # Grab reward, done, and info, and populate with internal info
-            reward, done, info = self.task.step(self, action)
-            self._populate_info(info)
-
-            if done and self._automatic_reset:
-                # Add lost observation to our information dict, and reset
-                info["last_observation"] = obs
-                obs = self.reset()
-
-            # Hacky way to check for time limit info to split terminated and truncated
-            terminated = False
-            truncated = False
-            for tc, tc_data in info["done"]["termination_conditions"].items():
-                if tc_data["done"]:
-                    if tc == "timeout":
-                        truncated = True
-                    else:
-                        terminated = True
-            assert (terminated or truncated) == done, "Terminated and truncated must match done!"
-
-            # Increment step
-            self._current_step += 1
-
-            # Hacky way of getting the success condition
-            info["is_success"] = info["reward"]["grasp"]["grasp_success"]
-
-            return obs, reward, terminated, truncated, info
+            og.sim.step()
+            return self._post_step(action)
         except:
             raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
 
@@ -617,7 +628,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.step()
 
         # Grab and return observations
-        obs = self.get_obs()
+        obs, obs_info = self.get_obs()
 
         if self._loaded:
             # Sanity check to make sure received observations match expected observation space
@@ -639,18 +650,25 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 missing_keys = exp_keys - real_keys
                 extra_keys = real_keys - exp_keys
 
-                log.error("MISSING OBSERVATION KEYS:")
-                log.error(missing_keys)
-                log.error("EXTRA OBSERVATION KEYS:")
-                log.error(extra_keys)
-                log.error("SHARED OBSERVATION KEY DTYPES AND SHAPES:")
+                if missing_keys:
+                    log.error("MISSING OBSERVATION KEYS:")
+                    log.error(missing_keys)
+                if extra_keys:
+                    log.error("EXTRA OBSERVATION KEYS:")
+                    log.error(extra_keys)
+                
+                mismatched_keys = []
                 for k in shared_keys:
-                    log.error(exp_obs[k])
-                    log.error(real_obs[k])
+                    if exp_obs[k][2:] != real_obs[k][2:]:  # Compare dtypes and shapes
+                        mismatched_keys.append(k)
+                        log.error(f"MISMATCHED OBSERVATION FOR KEY '{k}':")
+                        log.error(f"Expected: {exp_obs[k]}")
+                        log.error(f"Received: {real_obs[k]}")
 
                 raise ValueError("Observation space does not match returned observations!")
 
-        return obs, {}
+
+        return obs, obs_info
 
     @property
     def episode_steps(self):
@@ -682,7 +700,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             Scene: Active scene in this environment
         """
-        return og.sim.scene
+        return self._scene
 
     @property
     def robots(self):
@@ -767,8 +785,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_frequency": 60,
-                "physics_frequency": 60,
+                "action_frequency": 30,
+                "physics_frequency": 120,
                 "device": None,
                 "automatic_reset": False,
                 "flatten_action_space": False,

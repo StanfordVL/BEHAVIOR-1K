@@ -8,8 +8,7 @@ from omnigibson.macros import create_module_macros
 
 import omnigibson as og
 
-from scipy.spatial import ConvexHull, HalfspaceIntersection
-from scipy.spatial.qhull import QhullError
+from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
 import numpy as np
 import trimesh
 import itertools

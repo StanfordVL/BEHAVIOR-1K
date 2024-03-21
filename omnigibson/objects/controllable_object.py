@@ -26,7 +26,6 @@ class ControllableObject(BaseObject):
         name,
         prim_path=None,
         category="object",
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -48,8 +47,6 @@ class ControllableObject(BaseObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -97,7 +94,6 @@ class ControllableObject(BaseObject):
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -143,9 +139,9 @@ class ControllableObject(BaseObject):
                 callback_fn=lambda x: self.step(),
             )
 
-    def load(self):
+    def load(self, scene):
         # Run super first
-        prim = super().load()
+        prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
         expected_control_freq = 1.0 / og.sim.get_rendering_dt()
@@ -513,9 +509,9 @@ class ControllableObject(BaseObject):
         fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
         fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
         fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
-        fcns["mass_matrix"] = self.get_mass_matrix
-        fcns["gravity_force"] = self.get_generalized_gravity_forces
-        fcns["cc_force"] = self.get_coriolis_and_centrifugal_forces
+        fcns["mass_matrix"] = lambda: self.get_mass_matrix(clone=False)
+        fcns["gravity_force"] = lambda: self.get_generalized_gravity_forces(clone=False)
+        fcns["cc_force"] = lambda: self.get_coriolis_and_centrifugal_forces(clone=False)
 
         return fcns
 
@@ -533,13 +529,6 @@ class ControllableObject(BaseObject):
         if not drive:
             for controller in self._controllers.values():
                 controller.reset()
-
-    @property
-    def state_size(self):
-        # Grab size from super and add in controller state sizes
-        size = super().state_size
-
-        return size + sum([c.state_size for c in self._controllers.values()])
 
     def _dump_state(self):
         # Grab super state
