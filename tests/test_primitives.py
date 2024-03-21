@@ -10,6 +10,10 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
 
+# Make sure that Omniverse is launched before setting up the tests.
+og.launch()
+
+
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)

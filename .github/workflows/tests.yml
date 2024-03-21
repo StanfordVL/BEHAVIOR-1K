@@ -79,7 +79,6 @@ jobs:
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
-          working-directory: omnigibson-src
           path: test_*.xml
           reporter: java-junit
           fail-on-error: 'true'
