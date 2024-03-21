@@ -363,5 +363,5 @@ def land_object(obj, pos, quat=None, z_offset=None):
     obj.keep_still()
 
 
-def meets_minimum_isaac_version(minimum_version):
-    return python_utils.meets_minimum_version(lazy.omni.isaac.version.get_version()[0], minimum_version)
+def meets_minimum_isaac_version(minimum_version, isaac_version):
+    return python_utils.meets_minimum_version(isaac_version, minimum_version)
