@@ -1,16 +1,15 @@
 import itertools
+import time
 from collections import Counter, defaultdict
 
 import numpy as np
-
-import time
 import trimesh
 from scipy.spatial.transform import Rotation as R
 from scipy.stats import truncnorm
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, gm
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

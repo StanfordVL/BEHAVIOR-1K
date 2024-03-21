@@ -1,16 +1,17 @@
-import os
 import argparse
 import json
-import omnigibson as og
-import numpy as np
-import omnigibson.utils.transform_utils as T
+import os
 import time
 
+import numpy as np
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.systems import get_system
 from omnigibson.object_states import Covered
-from omnigibson.utils.profiling_utils import ProfilingEnv
+from omnigibson.systems import get_system
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.profiling_utils import ProfilingEnv
 
 parser = argparse.ArgumentParser()
 

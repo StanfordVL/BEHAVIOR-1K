@@ -2,15 +2,16 @@
 Constant Definitions
 """
 
-from functools import cache
 import hashlib
 import os
-import numpy as np
 from enum import Enum, IntEnum
+from functools import cache
+
+import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_all_object_categories
+from omnigibson.utils.asset_utils import get_all_object_categories, get_og_avg_category_specs
 
 MAX_INSTANCE_COUNT = np.iinfo(np.uint32).max
 MAX_CLASS_COUNT = np.iinfo(np.uint32).max

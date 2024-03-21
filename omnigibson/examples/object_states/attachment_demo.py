@@ -1,5 +1,5 @@
-import yaml
 import numpy as np
+import yaml
 
 import omnigibson as og
 from omnigibson.macros import gm

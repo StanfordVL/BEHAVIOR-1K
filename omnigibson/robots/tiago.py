@@ -1,13 +1,14 @@
 import os
+
 import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import JointType
 

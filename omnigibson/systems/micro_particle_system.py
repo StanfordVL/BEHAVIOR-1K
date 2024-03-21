@@ -1,26 +1,27 @@
-import uuid
-import omnigibson as og
-import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.prims.prim_base import BasePrim
-from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.prims.material_prim import MaterialPrim
-from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, PoseAPI
-from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
-from omnigibson.utils.ui_utils import disclaimer, create_module_logger
-
-from pathlib import Path
+import datetime
 import os
 import tempfile
-import datetime
-import trimesh
-import pymeshlab
-import numpy as np
+import uuid
 from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import pymeshlab
+import trimesh
+
+import omnigibson as og
+import omnigibson.lazy as lazy
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
+from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
+from omnigibson.utils.python_utils import assert_valid_key, classproperty, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
+from omnigibson.utils.ui_utils import create_module_logger, disclaimer
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

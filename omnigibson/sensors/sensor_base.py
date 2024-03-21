@@ -1,9 +1,10 @@
 from abc import ABCMeta
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, Registerable
-from omnigibson.utils.gym_utils import GymObservable
+
 from gym.spaces import Space
 
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.python_utils import Registerable, assert_valid_key, classproperty
 
 # Registered sensors
 REGISTERED_SENSORS = dict()

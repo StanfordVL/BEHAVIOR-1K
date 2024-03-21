@@ -2,9 +2,10 @@
 Set of utilities for helping to execute robot control
 """
 
-import omnigibson.lazy as lazy
 import numpy as np
 from numba import jit
+
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 
 

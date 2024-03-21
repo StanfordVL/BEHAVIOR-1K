@@ -1,4 +1,5 @@
 import numpy as np
+
 import omnigibson as og
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 

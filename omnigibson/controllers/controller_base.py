@@ -3,7 +3,7 @@ from enum import IntEnum
 
 import numpy as np
 
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable, Recreatable
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()

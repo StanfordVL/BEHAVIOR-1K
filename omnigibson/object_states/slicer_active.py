@@ -1,12 +1,12 @@
 import numpy as np
-from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanStateMixin
-from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+
 import omnigibson as og
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.object_state_base import BooleanStateMixin
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidContactAPI
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

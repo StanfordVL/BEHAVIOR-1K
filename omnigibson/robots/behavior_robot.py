@@ -1,19 +1,20 @@
+import itertools
+import os
 from abc import ABC
 from collections import OrderedDict
-import itertools
+from typing import Iterable, List, Tuple
+
 import numpy as np
-import os
 from scipy.spatial.transform import Rotation as R
-from typing import List, Tuple, Iterable
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.robots.locomotion_robot import LocomotionRobot
-from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
-from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names

@@ -1,35 +1,36 @@
-import numpy as np
 import os
+
+import numpy as np
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
-    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
+    get_natural_initial_conditions,
     get_object_scope,
 )
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import (
-    get_system,
-    add_callback_on_system_init,
-    add_callback_on_system_clear,
-    REGISTERED_SYSTEMS,
-)
-from omnigibson.scenes.scene_base import Scene
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
+from omnigibson.scenes.scene_base import Scene
+from omnigibson.systems.system_base import (
+    REGISTERED_SYSTEMS,
+    add_callback_on_system_clear,
+    add_callback_on_system_init,
+    get_system,
+)
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.bddl_utils import BEHAVIOR_ACTIVITIES, BDDLEntity, BDDLSampler, OmniGibsonBDDLBackend
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

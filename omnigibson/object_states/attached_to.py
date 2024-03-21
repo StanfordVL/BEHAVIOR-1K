@@ -1,20 +1,20 @@
-import numpy as np
 from collections import defaultdict
+
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import JointType
-from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import CollisionAPI
+from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import CollisionAPI, create_joint
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

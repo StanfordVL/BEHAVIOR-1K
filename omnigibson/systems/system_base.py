@@ -1,25 +1,26 @@
-import os
 import json
+import os
+
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
+import omnigibson.lazy as lazy
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import (
-    classproperty,
-    assert_valid_key,
-    get_uuid,
-    camel_case_to_snake_case,
-    snake_case_to_camel_case,
-    subclass_factory,
     SerializableNonInstance,
     UniquelyNamedNonInstance,
+    assert_valid_key,
+    camel_case_to_snake_case,
+    classproperty,
+    get_uuid,
+    snake_case_to_camel_case,
+    subclass_factory,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
-import omnigibson.lazy as lazy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

@@ -1,16 +1,17 @@
 from collections.abc import Iterable
+
 import numpy as np
+import trimesh.transformations
+from scipy.spatial.transform import Rotation as R
+
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
-from omnigibson.prims.prim_base import BasePrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
-import omnigibson.utils.transform_utils as T
-from scipy.spatial.transform import Rotation as R
-from omnigibson.macros import gm
-import trimesh.transformations
 
 
 class XFormPrim(BasePrim):

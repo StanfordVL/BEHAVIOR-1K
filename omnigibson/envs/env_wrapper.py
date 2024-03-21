@@ -1,7 +1,7 @@
-from omnigibson.utils.python_utils import Wrapper
-from omnigibson.utils.python_utils import Registerable, classproperty, create_class_from_registry_and_config
-from omnigibson.utils.ui_utils import create_module_logger
 from copy import deepcopy
+
+from omnigibson.utils.python_utils import Registerable, Wrapper, classproperty, create_class_from_registry_and_config
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Global dicts that will contain mappings
 REGISTERED_ENV_WRAPPERS = dict()

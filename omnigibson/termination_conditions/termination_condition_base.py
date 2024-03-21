@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
-from omnigibson.utils.python_utils import classproperty, Registerable
+
+from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_TERMINATION_CONDITIONS = dict()
 REGISTERED_SUCCESS_CONDITIONS = dict()

@@ -3,14 +3,14 @@ import os
 
 import networkx as nx
 import numpy as np
-from PIL import Image
 from matplotlib import pyplot as plt
+from PIL import Image
 
 from omnigibson import object_states
 from omnigibson.macros import create_module_macros
-from omnigibson.sensors import VisionSensor
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
+from omnigibson.sensors import VisionSensor
 from omnigibson.utils import transform_utils as T
 
 

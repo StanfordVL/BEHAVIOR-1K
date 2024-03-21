@@ -1,6 +1,7 @@
-import numpy as np
 import time
+
 import gym
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,8 +11,8 @@ from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
     MAX_VIEWER_SIZE,
-    semantic_class_name_to_id,
     semantic_class_id_to_name,
+    semantic_class_name_to_id,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting

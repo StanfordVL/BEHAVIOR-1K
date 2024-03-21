@@ -1,11 +1,11 @@
 import numpy as np
-from omnigibson.macros import gm, create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.utils.processing_utils import MovingAverageFilter
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 

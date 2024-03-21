@@ -7,7 +7,6 @@ from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 
-
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
 

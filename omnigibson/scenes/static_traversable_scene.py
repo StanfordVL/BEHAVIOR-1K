@@ -2,11 +2,11 @@ import os
 
 import numpy as np
 
-from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
+from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_scene_path
-from omnigibson.utils.usd_utils import add_asset_to_stage
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import add_asset_to_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

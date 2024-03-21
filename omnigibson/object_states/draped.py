@@ -1,11 +1,12 @@
+import numpy as np
+
+import omnigibson as og
+from omnigibson.object_states.cloth_mixin import ClothStateMixin
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.cloth_mixin import ClothStateMixin
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
-import omnigibson as og
-import numpy as np
 
 
 class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothStateMixin):

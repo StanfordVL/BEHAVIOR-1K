@@ -2,18 +2,19 @@
 
 import os
 import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 import omnigibson as og
-from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.simulator import launch_simulator
+from omnigibson.systems import get_system
 from omnigibson.utils.asset_utils import get_og_assets_version
 from omnigibson.utils.constants import PrimType
-from omnigibson.systems import get_system
 
 # Params to be set as needed.
 SCENES = ["Rs_int"]  # house_single_floor
