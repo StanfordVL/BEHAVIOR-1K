@@ -178,38 +178,12 @@ class MultiFingerGripperController(GripperController):
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
-<<<<<<< HEAD
-            u = (
-                self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                if target[0] >= 0.0
-                else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-            )
-
-        elif self._mode == "ternary":
-            if target[0] > 0.33:
-                u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-            elif target[0] < -0.33:
-                u = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-            else:
-                u = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
-
-        # If we're using delta commands, add this value
-        elif self._mode == "smooth_delta":
-            # Compute the base value for the command.
-            base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
-
-            # Apply the command to the base value.
-            u = base_value + target[0]
-
-        # Otherwise, control is simply the command itself        
-=======
             if target[0] >= 0.0:
                 u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx] \
                     if self._open_qpos is None else self._open_qpos
             else:
                 u = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx] \
                     if self._closed_qpos is None else self._closed_qpos
->>>>>>> multiple-envs
         else:
             # Use continuous signal
             u = target

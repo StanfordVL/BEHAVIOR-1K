@@ -315,15 +315,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
-<<<<<<< HEAD
-        proprio = []
-        for obs_key in self._proprio_obs:
-            obs = proprio_dict[obs_key] if isinstance(proprio_dict[obs_key], np.ndarray) else np.array([proprio_dict[obs_key]]) 
-            proprio.append(obs)
-        return np.concatenate(proprio)
-=======
         return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
->>>>>>> multiple-envs
 
     def _get_proprioception_dict(self):
         """

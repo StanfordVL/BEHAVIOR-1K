@@ -990,7 +990,7 @@ class EntityPrim(XFormPrim):
         """
         return np.concatenate([joint.damping for joint in self._joints.values()])
 
-    @property
+    @cached_property
     def joint_lower_limits(self):
         """
         Returns:
@@ -999,7 +999,7 @@ class EntityPrim(XFormPrim):
         """
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
-    @property
+    @cached_property
     def joint_upper_limits(self):
         """
         Returns:
