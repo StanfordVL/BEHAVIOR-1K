@@ -56,7 +56,7 @@ def main():
             cfg["robots"].append(
                 {
                     "type": "Fetch",
-                    "obs_modalities": "all",
+                    "obs_modalities": ["rgb"],
                     "position": [-1.3 + 0.75 * i + SCENE_OFFSET[args.scene][0], 0.5 + SCENE_OFFSET[args.scene][1], 0],
                     "orientation": [0.0, 0.0, 0.7071, -0.7071],
                 }
