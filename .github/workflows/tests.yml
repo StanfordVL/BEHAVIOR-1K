@@ -71,14 +71,20 @@ jobs:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+          path: omnigibson-src
       - name: Pull reports
         uses: actions/download-artifact@v3
         with:
-          path: .
+          path: omnigibson-src
       - name: Test Report
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
+          working-directory: omnigibson-src
           path: test_*.xml
           reporter: java-junit
           fail-on-error: 'true'
