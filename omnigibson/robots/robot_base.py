@@ -214,6 +214,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+                    # from IPython import embed; embed()
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]
@@ -222,14 +223,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                             sensor_cls.all_modalities.intersection(self._obs_modalities)
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
-                    sensor = create_sensor(
-                        sensor_type=prim_type,
-                        prim_path=str(prim.GetPrimPath()),
-                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
-                        **sensor_kwargs,
-                    )
-                    self._sensors[sensor.name] = sensor
-                    sensor_counts[prim_type] += 1
+                    # sensor = create_sensor(
+                    #     sensor_type=prim_type,
+                    #     prim_path=str(prim.GetPrimPath()),
+                    #     name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
+                    #     **sensor_kwargs,
+                    # )
+                    # self._sensors[sensor.name] = sensor
+                    # sensor_counts[prim_type] += 1
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
         if self._obs_modalities == "all" or "proprio" in self._obs_modalities:

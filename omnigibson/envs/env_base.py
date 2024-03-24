@@ -219,8 +219,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.import_scene(scene)
 
         # Set the rendering settings
-        og.sim.viewer_width = self.render_config["viewer_width"]
-        og.sim.viewer_height = self.render_config["viewer_height"]
+        # og.sim.viewer_width = self.render_config["viewer_width"]
+        # og.sim.viewer_height = self.render_config["viewer_height"]
         og.sim.device = self.device
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
