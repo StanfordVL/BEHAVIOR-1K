@@ -3,8 +3,12 @@ from collections import namedtuple
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
-from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, is_visual_particle_system, \
-    is_physical_particle_system
+from omnigibson.systems.system_base import (
+    VisualParticleSystem,
+    PhysicalParticleSystem,
+    is_visual_particle_system,
+    is_physical_particle_system,
+)
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
 import omnigibson.utils.transform_utils as T
@@ -13,7 +17,7 @@ import omnigibson.utils.transform_utils as T
 m = create_module_macros(module_path=__file__)
 
 m.CONTAINER_LINK_PREFIX = "container"
-m.VISUAL_PARTICLE_OFFSET = 0.01    # Offset to visual particles' poses when checking overlaps with container volume
+m.VISUAL_PARTICLE_OFFSET = 0.01  # Offset to visual particles' poses when checking overlaps with container volume
 
 
 """
@@ -29,11 +33,12 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
     """
     Object state for computing the number of particles of a given system contained in this object's container volume
     """
+
     def __init__(self, obj):
         super().__init__(obj)
-        self.check_in_volume = None         # Function to check whether particles are in volume for this container
-        self._volume = None                 # Volume of this container
-        self._compute_info = None           # Intermediate computation information to store
+        self.check_in_volume = None  # Function to check whether particles are in volume for this container
+        self._volume = None  # Volume of this container
+        self._compute_info = None  # Intermediate computation information to store
 
     @classproperty
     def metalink_prefix(cls):
@@ -53,7 +58,12 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                     object's container volume, else False
         """
         # Value is false by default
-        n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = 0, np.array([]), np.array([]), np.array([])
+        n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = (
+            0,
+            np.array([]),
+            np.array([]),
+            np.array([]),
+        )
 
         # Only run additional computations if there are any particles
         if system.n_particles > 0:
@@ -69,8 +79,10 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 raw_positions = system.get_particles_position_orientation()[0]
                 checked_positions = raw_positions
             else:
-                raise ValueError(f"Invalid system {system} received for getting ContainedParticles state!"
-                                 f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
+                raise ValueError(
+                    f"Invalid system {system} received for getting ContainedParticles state!"
+                    f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported."
+                )
 
         # Only calculate if we have valid positions
         if len(checked_positions) > 0:
@@ -84,8 +96,9 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         self.initialize_link_mixin()
 
         # Generate volume checker function for this object
-        self.check_in_volume, calculate_volume = \
-            generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
+        self.check_in_volume, calculate_volume = generate_points_in_volume_checker_function(
+            obj=self.obj, volume_link=self.link
+        )
 
         # Calculate volume
         self._volume = calculate_volume()

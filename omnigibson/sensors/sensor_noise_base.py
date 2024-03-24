@@ -15,6 +15,7 @@ class BaseSensorNoise(Registerable, metaclass=ABCMeta):
     Args:
         enabled (bool): Whether this sensor should be enabled by default
     """
+
     def __init__(self, enabled=True):
         # Store whether this noise model is enabled or not
         self._enabled = enabled

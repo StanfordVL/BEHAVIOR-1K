@@ -102,8 +102,10 @@ def prims_to_rigid_prim_set(inp_prims):
         elif isinstance(prim, RigidPrim):
             out.add(prim)
         else:
-            raise ValueError(f"Inputted prims must be either EntityPrim or RigidPrim instances "
-                             f"when getting collisions! Type: {type(prim)}")
+            raise ValueError(
+                f"Inputted prims must be either EntityPrim or RigidPrim instances "
+                f"when getting collisions! Type: {type(prim)}"
+            )
     return out
 
 
@@ -135,7 +137,9 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
     #@TODO: Which scene
     prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
-    prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
+    prims_exclude = (
+        [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
+    )
 
     # Convert into prim paths to check for collision
     def get_paths_from_rigid_prims(inp_prims):
@@ -153,9 +157,10 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
     paths_exclude = get_paths_from_rigid_prims(rprims_exclude)
 
     # Run sanity checks
-    assert paths_check.isdisjoint(paths_exclude), \
-        f"Paths to check and paths to ignore collisions for should be mutually exclusive! " \
+    assert paths_check.isdisjoint(paths_exclude), (
+        f"Paths to check and paths to ignore collisions for should be mutually exclusive! "
         f"paths_check: {paths_check}, paths_exclude: {paths_exclude}"
+    )
 
     # Determine whether we're checking / filtering any collision from collision set A
     should_check_collisions = len(paths_check) > 0
@@ -204,7 +209,9 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
             # Lastly, we only keep the intersection of this resulting set with the original collision set, so that
             # any previously filtered collisions are respected
             check_intersect_collisions = get_contacts(rprims_check_intersect)
-            valid_intersect_collisions = collisions.intersection({pair for pair in check_intersect_collisions if paths.issuperset(set(pair))})
+            valid_intersect_collisions = collisions.intersection(
+                {pair for pair in check_intersect_collisions if paths.issuperset(set(pair))}
+            )
 
             # Collisions is union of valid other and valid self collisions
             collisions = valid_other_collisions.union(valid_intersect_collisions)
@@ -233,11 +240,12 @@ def check_collision(prims=None, prims_check=None, prims_exclude=None, step_physi
     Returns:
         bool: True if a valid collision has occurred, else False
     """
-    return len(get_collisions(
-        prims=prims,
-        prims_check=prims_check,
-        prims_exclude=prims_exclude,
-        step_physics=step_physics)) > 0
+    return (
+        len(
+            get_collisions(prims=prims, prims_check=prims_check, prims_exclude=prims_exclude, step_physics=step_physics)
+        )
+        > 0
+    )
 
 
 def filter_collisions(collisions, filter_prims):

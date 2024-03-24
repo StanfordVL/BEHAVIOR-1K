@@ -41,6 +41,9 @@ m.CLOTH_DAMPING = 0.2
 m.CLOTH_FRICTION = 0.4
 m.CLOTH_DRAG = 0.001
 m.CLOTH_LIFT = 0.003
+m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for physical micro particles
+m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE = 0.8  # How much overlap expected between fluid particles at rest
+m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
 
 
 def set_carb_settings_for_fluid_isosurface():
@@ -56,7 +59,9 @@ def set_carb_settings_for_fluid_isosurface():
     isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_TO_USD, True)
     isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
     isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
+    isregistry.set_bool(
+        lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True
+    )  # TODO: Why does setting this value --> True result in no isosurface being rendered?
     isregistry.set_int("persistent/simulation/minFrameRate", 60)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
@@ -75,6 +80,7 @@ class PhysxParticleInstancer(BasePrim):
     Simple class that wraps the raw omniverse point instancer prim and provides convenience functions for
     particle access
     """
+
     def __init__(self, prim_path, name, idn):
         """
         Args:
@@ -101,12 +107,12 @@ class PhysxParticleInstancer(BasePrim):
         self._parent_prim.remove()
 
     def add_particles(
-            self,
-            positions,
-            velocities=None,
-            orientations=None,
-            scales=None,
-            prototype_indices=None,
+        self,
+        positions,
+        velocities=None,
+        orientations=None,
+        scales=None,
+        prototype_indices=None,
     ):
         """
         Adds particles to this particle instancer.
@@ -225,8 +231,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        assert quat.shape[0] == self.n_particles, \
-            f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert (
+            quat.shape[0] == self.n_particles
+        ), f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
         # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
         quat = quat.astype(float)
         if self.n_particles > 0:
@@ -251,8 +258,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert vel.shape[0] == self.n_particles, \
-            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert (
+            vel.shape[0] == self.n_particles
+        ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel.astype(float)))
 
     @property
@@ -273,8 +281,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        assert scales.shape[0] == self.n_particles, \
-            f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert (
+            scales.shape[0] == self.n_particles
+        ), f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales.astype(float)))
 
     @property
@@ -295,8 +304,9 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N,) numpy array, where each of the N particles' desired prototype_id
                 (i.e.: which prototype is being used for that particle)
         """
-        assert prototype_ids.shape[0] == self.n_particles, \
-            f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
+        assert (
+            prototype_ids.shape[0] == self.n_particles
+        ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
     @property
@@ -319,13 +329,23 @@ class PhysxParticleInstancer(BasePrim):
 
     def _load_state(self, state):
         # Sanity check the identification number and particle group
-        assert self._idn == state["idn"], f"Got mismatch in identification number for this particle instancer when " \
+        assert self._idn == state["idn"], (
+            f"Got mismatch in identification number for this particle instancer when "
             f"loading state! Should be: {self._idn}, got: {state['idn']}."
-        assert self.particle_group == state["particle_group"], f"Got mismatch in particle group for this particle " \
+        )
+        assert self.particle_group == state["particle_group"], (
+            f"Got mismatch in particle group for this particle "
             f"instancer when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
+        )
 
         # Set values appropriately
-        keys = ("particle_positions", "particle_velocities", "particle_orientations", "particle_scales", "particle_prototype_ids")
+        keys = (
+            "particle_positions",
+            "particle_velocities",
+            "particle_orientations",
+            "particle_scales",
+            "particle_prototype_ids",
+        )
         for key in keys:
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
             # JSON-serialization
@@ -334,21 +354,27 @@ class PhysxParticleInstancer(BasePrim):
 
     def _serialize(self, state):
         # Compress into a 1D array
-         return np.concatenate([
-             [state["idn"], state["particle_group"], state["n_particles"]],
-             state["particle_positions"].reshape(-1),
-             state["particle_velocities"].reshape(-1),
-             state["particle_orientations"].reshape(-1),
-             state["particle_scales"].reshape(-1),
-             state["particle_prototype_ids"],
-         ]).astype(float)
+        return np.concatenate(
+            [
+                [state["idn"], state["particle_group"], state["n_particles"]],
+                state["particle_positions"].reshape(-1),
+                state["particle_velocities"].reshape(-1),
+                state["particle_orientations"].reshape(-1),
+                state["particle_scales"].reshape(-1),
+                state["particle_prototype_ids"],
+            ]
+        ).astype(float)
 
     def _deserialize(self, state):
         # Sanity check the identification number
-        assert self._idn == state[0], f"Got mismatch in identification number for this particle instancer when " \
+        assert self._idn == state[0], (
+            f"Got mismatch in identification number for this particle instancer when "
             f"deserializing state! Should be: {self._idn}, got: {state[0]}."
-        assert self.particle_group == state[1], f"Got mismatch in particle group for this particle " \
+        )
+        assert self.particle_group == state[1], (
+            f"Got mismatch in particle group for this particle "
             f"instancer when deserializing state! Should be: {self.particle_group}, got: {state[1]}."
+        )
 
         # De-compress from 1D array
         n_particles = int(state[2])
@@ -359,13 +385,19 @@ class PhysxParticleInstancer(BasePrim):
         )
 
         # Process remaining keys and reshape automatically
-        keys = ("particle_positions", "particle_velocities", "particle_orientations", "particle_scales", "particle_prototype_ids")
+        keys = (
+            "particle_positions",
+            "particle_velocities",
+            "particle_orientations",
+            "particle_scales",
+            "particle_prototype_ids",
+        )
         sizes = ((n_particles, 3), (n_particles, 3), (n_particles, 4), (n_particles, 3), (n_particles,))
 
         idx = 3
         for key, size in zip(keys, sizes):
             length = np.product(size)
-            state_dict[key] = state[idx: idx + length].reshape(size)
+            state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 
         return state_dict, idx
@@ -376,6 +408,7 @@ class MicroParticleSystem(BaseSystem):
     Global system for modeling "micro" level particles, e.g.: water, seeds, cloth. This system leverages
     Omniverse's native physx particle systems
     """
+
     # Particle system prim in the scene, should be generated at runtime
     system_prim = None
 
@@ -397,8 +430,9 @@ class MicroParticleSystem(BaseSystem):
 
         # Make sure flatcache is not being used OR isosurface is enabled -- otherwise, raise an error, since
         # non-isosurface particles don't get rendered properly when flatcache is enabled
-        assert cls.use_isosurface or not gm.ENABLE_FLATCACHE, \
-            f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
+        assert (
+            cls.use_isosurface or not gm.ENABLE_FLATCACHE
+        ), f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
 
         cls.system_prim = cls._create_particle_system()
         # Get material
@@ -411,7 +445,9 @@ class MicroParticleSystem(BaseSystem):
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         # Also apply physics to this material
-        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
+            og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs
+        )
         # Force populate inputs and outputs of the shader
         cls._material.shader_force_populate()
         # Potentially modify the material
@@ -492,7 +528,7 @@ class MicroParticleSystem(BaseSystem):
             load_config={
                 "mdl_name": f"OmniPBR.mdl",
                 "mtl_name": f"OmniPBR",
-            }
+            },
         )
 
     @classmethod
@@ -579,6 +615,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     Global system for modeling physical "micro" level particles, e.g.: water, seeds, rice, etc. This system leverages
     Omniverse's native physx particle systems
     """
+
     # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
     particle_prototypes = None
 
@@ -633,11 +670,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Run super
         super().initialize()
 
+        # Potentially set system prim's max velocity value
+        if m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY is not None:
+            cls.system_prim.GetProperty("maxVelocity").Set(m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY)
+
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = dict()
 
         # TODO: remove this hack once omniverse fixes the issue (now we assume prototype IDs are all 0 always)
-        og.sim.add_callback_on_stop(name=f"{cls.name}_sync_particle_prototype_ids", callback=cls._sync_particle_prototype_ids)
+        og.sim.add_callback_on_stop(
+            name=f"{cls.name}_sync_particle_prototype_ids", callback=cls._sync_particle_prototype_ids
+        )
 
     @classmethod
     def _clear(cls):
@@ -681,8 +724,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Default instancer is the 0th ID instancer
         name = cls.particle_instancer_idn_to_name(idn=cls.default_instancer_idn)
         # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
-        return cls.particle_instancers[name] if name in cls.particle_instancers \
+        return (
+            cls.particle_instancers[name]
+            if name in cls.particle_instancers
             else cls.generate_particle_instancer(n_particles=0, idn=cls.default_instancer_idn)
+        )
 
     @classproperty
     def particle_contact_radius(cls):
@@ -709,9 +755,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def remove_particles(
-            cls,
-            idxs,
-            instancer_idn=None,
+        cls,
+        idxs,
+        instancer_idn=None,
     ):
         """
         Removes pre-existing particles from instancer @instancer_idn
@@ -722,8 +768,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 from. If None, this system will delete particles from the default particle instancer
         """
         # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
-        inst = cls.default_particle_instancer if instancer_idn is None else \
-            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
+        inst = (
+            cls.default_particle_instancer
+            if instancer_idn is None
+            else cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
+        )
 
         assert inst is not None, f"No instancer with ID {inst} exists!"
 
@@ -731,14 +780,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def generate_particles(
-            cls,
-            positions,
-            instancer_idn=None,
-            particle_group=0,
-            velocities=None,
-            orientations=None,
-            scales=None,
-            prototype_indices=None,
+        cls,
+        positions,
+        instancer_idn=None,
+        particle_group=0,
+        velocities=None,
+        orientations=None,
+        scales=None,
+        prototype_indices=None,
     ):
         """
         Generates new particles, either as part of a pre-existing instancer corresponding to @instancer_idn or as part
@@ -767,13 +816,19 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             PhysxParticleInstancer: Particle instancer that includes the generated particles
         """
         # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
-        inst = cls.default_particle_instancer if instancer_idn is None else \
-            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
+        inst = (
+            cls.default_particle_instancer
+            if instancer_idn is None
+            else cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
+        )
 
         n_particles = len(positions)
         if prototype_indices is not None:
-            prototype_indices = np.ones(n_particles, dtype=int) * prototype_indices if \
-                isinstance(prototype_indices, int) else np.array(prototype_indices, dtype=int)
+            prototype_indices = (
+                np.ones(n_particles, dtype=int) * prototype_indices
+                if isinstance(prototype_indices, int)
+                else np.array(prototype_indices, dtype=int)
+            )
         else:
             prototype_indices = np.random.choice(np.arange(len(cls.particle_prototypes)), size=(n_particles,))
 
@@ -796,7 +851,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 scales=scales,
                 prototype_indices=prototype_indices,
             )
-        
+
         # Update semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=cls.prim_path),
@@ -808,15 +863,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def generate_particle_instancer(
-            cls,
-            n_particles,
-            idn=None,
-            particle_group=0,
-            positions=None,
-            velocities=None,
-            orientations=None,
-            scales=None,
-            prototype_indices=None,
+        cls,
+        n_particles,
+        idn=None,
+        particle_group=0,
+        positions=None,
+        velocities=None,
+        orientations=None,
+        scales=None,
+        prototype_indices=None,
     ):
         """
         Generates a new particle instancer with unique identification number @idn, and registers it internally
@@ -848,8 +903,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         assert cls.initialized, "Must initialize system before generating particle instancers!"
 
         # Multiple particle instancers is NOT supported currently, since there is no clear use case for multiple
-        assert cls.n_instancers == 0, f"Cannot create multiple instancers for the same system! " \
-                                      f"There is already {cls.n_instancers} pre-existing instancers."
+        assert cls.n_instancers == 0, (
+            f"Cannot create multiple instancers for the same system! "
+            f"There is already {cls.n_instancers} pre-existing instancers."
+        )
 
         # Automatically generate an identification number for this instancer if none is specified
         if idn is None:
@@ -859,7 +916,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)
-        
+
         # Create the instancer
         instance = create_physx_particleset_pointinstancer(
             name=name,
@@ -893,17 +950,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def generate_particles_from_link(
-            cls,
-            obj,
-            link,
-            use_visual_meshes=True,
-            mesh_name_prefixes=None,
-            check_contact=True,
-            instancer_idn=None,
-            particle_group=0,
-            sampling_distance=None,
-            max_samples=5e5,
-            prototype_indices=None,
+        cls,
+        obj,
+        link,
+        use_visual_meshes=True,
+        mesh_name_prefixes=None,
+        check_contact=True,
+        instancer_idn=None,
+        particle_group=0,
+        sampling_distance=None,
+        max_samples=None,
+        prototype_indices=None,
     ):
         """
         Generates a new particle instancer with unique identification number @idn, with particles sampled from the mesh
@@ -929,7 +986,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 Only used if a new particle instancer is created!
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
         """
@@ -948,14 +1005,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def generate_particles_on_object(
-            cls,
-            obj,
-            instancer_idn=None,
-            particle_group=0,
-            sampling_distance=None,
-            max_samples=5e5,
-            min_samples_for_success=1,
-            prototype_indices=None,
+        cls,
+        obj,
+        instancer_idn=None,
+        particle_group=0,
+        sampling_distance=None,
+        max_samples=None,
+        min_samples_for_success=1,
+        prototype_indices=None,
     ):
         """
         Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
@@ -972,7 +1029,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 Only used if a new particle instancer is created!
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
@@ -1083,8 +1140,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         # We have to be careful here -- some particle instancers may have been deleted / are mismatched, so we need
         # to update accordingly, potentially deleting stale instancers and creating new instancers as needed
-        idn_to_info_mapping = {idn: {"group": group, "count": count}
-                               for idn, group, count in zip(idns, particle_groups, particle_counts)}
+        idn_to_info_mapping = {
+            idn: {"group": group, "count": count} for idn, group, count in zip(idns, particle_groups, particle_counts)
+        }
         current_instancer_names = set(cls.particle_instancers.keys())
         desired_instancer_names = set(cls.particle_instancer_idn_to_name(idn=idn) for idn in idns)
         instancers_to_delete = current_instancer_names - desired_instancer_names
@@ -1123,8 +1181,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_idns=cls.instancer_idns,
             instancer_particle_groups=[inst.particle_group for inst in cls.particle_instancers.values()],
             instancer_particle_counts=[inst.n_particles for inst in cls.particle_instancers.values()],
-            particle_states=dict(((name, inst.dump_state(serialized=False))
-                                  for name, inst in cls.particle_instancers.items())),
+            particle_states=dict(
+                ((name, inst.dump_state(serialized=False)) for name, inst in cls.particle_instancers.items())
+            ),
         )
 
     @classmethod
@@ -1143,14 +1202,18 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     @classmethod
     def _serialize(cls, state):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
-        return np.concatenate([
-            [state["n_instancers"]],
-            state["instancer_idns"],
-            state["instancer_particle_groups"],
-            state["instancer_particle_counts"],
-            *[cls.particle_instancers[name].serialize(inst_state)
-              for name, inst_state in state["particle_states"].items()],
-        ]).astype(float)
+        return np.concatenate(
+            [
+                [state["n_instancers"]],
+                state["instancer_idns"],
+                state["instancer_particle_groups"],
+                state["instancer_particle_counts"],
+                *[
+                    cls.particle_instancers[name].serialize(inst_state)
+                    for name, inst_state in state["particle_states"].items()
+                ],
+            ]
+        ).astype(float)
 
     @classmethod
     def _deserialize(cls, state):
@@ -1159,7 +1222,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         instancer_info = dict()
         idx = 1
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
-            instancer_info[info_name] = state[idx: idx + n_instancers].astype(int).tolist()
+            instancer_info[info_name] = state[idx : idx + n_instancers].astype(int).tolist()
             idx += n_instancers
 
         # Syncing is needed so that each particle instancer can further deserialize its own state
@@ -1175,14 +1238,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         for idn in instancer_info["instancer_idns"]:
             name = cls.particle_instancer_idn_to_name(idn=idn)
             state_size = cls.particle_instancers[name].state_size
-            particle_states[name] = cls.particle_instancers[name].deserialize(state[idx: idx + state_size])
+            particle_states[name] = cls.particle_instancers[name].deserialize(state[idx : idx + state_size])
             idx += state_size
 
-        return dict(
-            n_instancers=n_instancers,
-            **instancer_info,
-            particle_states=particle_states,
-        ), idx
+        return (
+            dict(
+                n_instancers=n_instancers,
+                **instancer_info,
+                particle_states=particle_states,
+            ),
+            idx,
+        )
 
     @classmethod
     def remove_all_particles(cls):
@@ -1249,7 +1315,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         for prototype in cls.particle_prototypes:
             cls._material.bind(prototype.prim_path)
         # Apply the physical material preset based on whether or not this fluid is viscous
-        apply_mat_physics = lazy.omni.physx.scripts.particleUtils.AddPBDMaterialViscous if cls.is_viscous else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
+        apply_mat_physics = (
+            lazy.omni.physx.scripts.particleUtils.AddPBDMaterialViscous
+            if cls.is_viscous
+            else lazy.omni.physx.scripts.particleUtils.AddPBDMaterialWater
+        )
         apply_mat_physics(p=cls._material.prim)
 
         # Compute the overall color of the fluid system
@@ -1263,9 +1333,10 @@ class FluidSystem(MicroPhysicalParticleSystem):
             base_color_weight /= total_weight
             transmission_weight /= total_weight
             # Weighted sum of base color and transmission color
-            color = base_color_weight * cls._material.diffuse_reflection_color + \
-                    transmission_weight * (0.5 * cls._material.specular_transmission_color + \
-                                           0.5 * cls._material.specular_transmission_scattering_color)
+            color = base_color_weight * cls._material.diffuse_reflection_color + transmission_weight * (
+                0.5 * cls._material.specular_transmission_color
+                + 0.5 * cls._material.specular_transmission_scattering_color
+            )
         cls._color = color
 
         # Set custom isosurface rendering settings if we are using high-quality rendering
@@ -1295,6 +1366,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Magic number from omni tutorials
         # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
         return 0.99 * 0.6 * cls.particle_contact_offset
+
+    @classproperty
+    def particle_particle_rest_distance(cls):
+        # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
+        return cls.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
 
     @classproperty
     def _material_mtl_name(cls):
@@ -1328,8 +1404,8 @@ class FluidSystem(MicroPhysicalParticleSystem):
             name=cls.mat_name,
             load_config={
                 "mdl_name": f"OmniSurface{'' if cls._material_mtl_name is None else 'Presets'}.mdl",
-                "mtl_name": f"OmniSurface{'' if cls._material_mtl_name is None else ('_' + cls._material_mtl_name)}"
-            }
+                "mtl_name": f"OmniSurface{'' if cls._material_mtl_name is None else ('_' + cls._material_mtl_name)}",
+            },
         )
 
     @classmethod
@@ -1369,6 +1445,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         Returns:
             FluidSystem: Generated system class
         """
+
         @classproperty
         def cp_particle_contact_offset(cls):
             return particle_contact_offset
@@ -1399,9 +1476,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
             **kwargs,
         )
 
+
 def customize_particle_material_factory(attr, value):
     def func(mat):
         setattr(mat, attr, np.array(value))
+
     return func
 
 
@@ -1409,6 +1488,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
     """
     Particle system class simulating granular materials. Individual particles are composed of custom USD objects.
     """
+
     # Cached particle contact offset determined from loaded prototype
     _particle_contact_offset = None
 
@@ -1448,7 +1528,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"
-        assert len(particle_template.root_link.visual_meshes) == 1, "GranularSystem particle template has more than one visual mesh"
+        assert (
+            len(particle_template.root_link.visual_meshes) == 1
+        ), "GranularSystem particle template has more than one visual mesh"
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -1471,8 +1553,14 @@ class GranularSystem(MicroPhysicalParticleSystem):
         )
 
         # Store the contact offset based on a minimum sphere
+        # Threshold the lower-bound to avoid super small particles
         vertices = np.array(prototype.get_attribute("points")) * prototype.scale
-        _, cls._particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        _, particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        if particle_contact_offset < m.MIN_PARTICLE_CONTACT_OFFSET:
+            prototype.scale *= m.MIN_PARTICLE_CONTACT_OFFSET / particle_contact_offset
+            particle_contact_offset = m.MIN_PARTICLE_CONTACT_OFFSET
+
+        cls._particle_contact_offset = particle_contact_offset
 
         return [prototype]
 
@@ -1548,6 +1636,7 @@ class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
+
     @classmethod
     def remove_all_particles(cls):
         # Override base method since there are no particles to be deleted
@@ -1571,14 +1660,18 @@ class Cloth(MicroParticleSystem):
         if not remesh:
             # We always load into trimesh to remove redundant particles (since natively omni redundantly represents
             # the number of vertices as 6x the total unique number of vertices)
-            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False)
+            tm = mesh_prim_to_trimesh_mesh(
+                mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
+            )
             texcoord = np.array(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
         else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
             scaled_world_transform = PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString)
             # Convert to trimesh mesh (in world frame)
-            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=True)
+            tm = mesh_prim_to_trimesh_mesh(
+                mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=True
+            )
             # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
             tmp_name = str(uuid.uuid4())
             tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
@@ -1587,7 +1680,9 @@ class Cloth(MicroParticleSystem):
             tm.export(tmp_fpath)
 
             # Start with the default particle distance
-            particle_distance = cls.particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
+            particle_distance = (
+                cls.particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
+            )
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
             for _ in range(10):
@@ -1605,8 +1700,12 @@ class Cloth(MicroParticleSystem):
                     if avg_edge_percentage_mismatch <= m.CLOTH_REMESHING_ERROR_THRESHOLD:
                         break
 
-                    ms.meshing_isotropic_explicit_remeshing(iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance))
-                    avg_edge_percentage_mismatch = abs(1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"])
+                    ms.meshing_isotropic_explicit_remeshing(
+                        iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
+                    )
+                    avg_edge_percentage_mismatch = abs(
+                        1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"]
+                    )
                 else:
                     # Terminate anyways, but don't fail
                     log.warn("The generated cloth may not have evenly distributed particles.")
@@ -1616,11 +1715,15 @@ class Cloth(MicroParticleSystem):
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
                     particle_distance *= np.sqrt(2)  # halve the number of vertices
-                    log.warn(f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}...")
+                    log.warn(
+                        f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
+                    )
                 else:
                     break
             else:
-                raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
+                raise ValueError(
+                    f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!"
+                )
 
             # Re-write data to @mesh_prim
             new_faces = cm.face_matrix()

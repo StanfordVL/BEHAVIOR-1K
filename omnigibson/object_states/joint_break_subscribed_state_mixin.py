@@ -11,7 +11,9 @@ class JointBreakSubscribedStateMixin(BaseObjectState):
 
     @abstractmethod
     def on_joint_break(self, joint_prim_path):
-        raise NotImplementedError("Subclasses of JointBreakSubscribedStateMixin should implement the on_joint_break method.")
+        raise NotImplementedError(
+            "Subclasses of JointBreakSubscribedStateMixin should implement the on_joint_break method."
+        )
 
     @classproperty
     def _do_not_register_classes(cls):

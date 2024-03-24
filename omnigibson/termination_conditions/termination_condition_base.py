@@ -21,6 +21,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
     Base TerminationCondition class
     Condition-specific _step() method is implemented in subclasses
     """
+
     def __init__(self):
         # Initialize internal vars that will be filled in at runtime
         self._done = None
@@ -117,6 +118,7 @@ class SuccessCondition(BaseTerminationCondition):
     """
     Termination condition corresponding to a success
     """
+
     def __init_subclass__(cls, **kwargs):
         # Register as part of locomotion controllers
         super().__init_subclass__(**kwargs)
@@ -139,6 +141,7 @@ class FailureCondition(BaseTerminationCondition):
     """
     Termination condition corresponding to a failure
     """
+
     def __init_subclass__(cls, **kwargs):
         # Register as part of locomotion controllers
         super().__init_subclass__(**kwargs)

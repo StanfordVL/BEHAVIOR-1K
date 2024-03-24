@@ -27,6 +27,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this sensor's prim at runtime.
     """
+
     def __init__(
         self,
         prim_path,

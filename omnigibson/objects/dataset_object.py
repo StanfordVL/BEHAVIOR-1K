@@ -6,7 +6,12 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
+from omnigibson.utils.constants import (
+    AVERAGE_CATEGORY_SPECS,
+    DEFAULT_JOINT_FRICTION,
+    SPECIAL_JOINT_FRICTIONS,
+    JointType,
+)
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
@@ -109,6 +114,17 @@ class DatasetObject(USDObject):
             available_models = get_all_object_category_models(category=category)
             assert len(available_models) > 0, f"No available models found for category {category}!"
             model = np.random.choice(available_models)
+
+        # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
+        # TODO: Remove this once the asset is fixed!
+        from omnigibson.utils.bddl_utils import BAD_CLOTH_MODELS
+
+        if prim_type == PrimType.CLOTH and model in BAD_CLOTH_MODELS.get(category, dict()):
+            raise ValueError(
+                f"Cannot create cloth object category: {category}, model: {model} because it is "
+                f"currently broken ): This will be fixed in the next release!"
+            )
+
         self._model = model
         usd_path = self.get_usd_path(category=category, model=model)
 
@@ -164,7 +180,9 @@ class DatasetObject(USDObject):
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = np.array(probabilities) / np.sum(probabilities)
-            chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
+            chosen_orientation = np.array(
+                np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
+            )
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
@@ -184,6 +202,7 @@ class DatasetObject(USDObject):
 
         # Apply any forced light intensity updates.
         if gm.FORCE_LIGHT_INTENSITY is not None:
+
             def recursive_light_update(child_prim):
                 if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
                     child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
@@ -195,8 +214,10 @@ class DatasetObject(USDObject):
 
         # Apply any forced roughness updates
         for material in self.materials:
-            if ("reflection_roughness_texture_influence" in material.shader_input_names and
-                "reflection_roughness_constant" in material.shader_input_names):
+            if (
+                "reflection_roughness_texture_influence" in material.shader_input_names
+                and "reflection_roughness_constant" in material.shader_input_names
+            ):
                 material.reflection_roughness_texture_influence = 0.0
                 material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
@@ -211,7 +232,9 @@ class DatasetObject(USDObject):
         if self._load_config["bounding_box"] is not None:
             scale = np.ones(3)
             valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+            scale[valid_idxes] = (
+                np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+            )
         else:
             scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
 
@@ -299,8 +322,9 @@ class DatasetObject(USDObject):
         if orientation is None:
             orientation = self.get_orientation()
         if position is not None:
-            rotated_offset = T.pose_transform([0, 0, 0], orientation,
-                                              self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]
+            rotated_offset = T.pose_transform(
+                [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]
+            )[0]
             position = position + rotated_offset
         self.set_position_orientation(position, orientation)
 
@@ -340,8 +364,9 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) bounding box
         """
-        assert "ig:nativeBB" in self.property_names, \
-            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        assert (
+            "ig:nativeBB" in self.property_names
+        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
         return np.array(self.get_attribute(attr="ig:nativeBB"))
 
     @property
@@ -420,8 +445,12 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
-                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            prim.GetAttribute("physics:localRot0").Get()
+                        )[[1, 2, 3, 0]]
+                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            prim.GetAttribute("physics:localRot1").Get()
+                        )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)

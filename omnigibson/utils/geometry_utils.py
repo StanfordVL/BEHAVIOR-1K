@@ -1,6 +1,7 @@
 """
 A set of helper utility functions for dealing with 3D geometry
 """
+
 import numpy as np
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh
@@ -110,8 +111,9 @@ def check_points_in_cone(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < \
-                (radius * (1 - (particle_positions[:, -1] + height / 2.0) / height ))
+    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < (
+        radius * (1 - (particle_positions[:, -1] + height / 2.0) / height)
+    )
     return in_height & in_radius
 
 
@@ -201,7 +203,7 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     mesh_normals = np.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
     particle_positions = np.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
     # All arrays are now (N, D, 3) shape -- efficient for batching
-    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(axis=-1) < 0         # shape (N, D)
+    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(axis=-1) < 0  # shape (N, D)
     # All D normals must be satisfied for a single point to be considered inside the hull
     in_range = in_range.sum(axis=-1) == D
     return in_range
@@ -238,9 +240,12 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
                 USD mesh
     """
     # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-    trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
-    assert trimesh_mesh.is_convex, \
-        f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
+    trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(
+        convex_hull_mesh, include_normals=False, include_texcoord=False
+    ).convex_hull
+    assert (
+        trimesh_mesh.is_convex
+    ), f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
     face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
     face_normals = trimesh_mesh.face_normals
 
@@ -252,7 +257,8 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
         mesh_face_normals=face_normals,
         pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
         quat=np.array(
-            [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+            [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]
+        ),
         scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
         particle_positions=particle_positions,
     )
@@ -313,7 +319,12 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
                 pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                quat=np.array(
+                    [
+                        *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
+                        mesh.GetAttribute("xformOp:orient").Get().real,
+                    ]
+                ),
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
@@ -321,7 +332,12 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
                 pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                quat=np.array(
+                    [
+                        *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
+                        mesh.GetAttribute("xformOp:orient").Get().real,
+                    ]
+                ),
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
@@ -329,7 +345,12 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
                 pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                quat=np.array(
+                    [
+                        *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
+                        mesh.GetAttribute("xformOp:orient").Get().real,
+                    ]
+                ),
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
@@ -337,7 +358,12 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
                 pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                quat=np.array(
+                    [
+                        *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
+                        mesh.GetAttribute("xformOp:orient").Get().real,
+                    ]
+                ),
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
@@ -378,7 +404,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         # respect to the volume link's global AABB
 
         # Convert precision to minimum number of particles to sample
-        min_n_particles = int(np.ceil(1. / precision))
+        min_n_particles = int(np.ceil(1.0 / precision))
 
         # Make sure container meshes are visible so AABB computation is correct
         for mesh in container_meshes:
@@ -391,8 +417,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
         assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius
-        arrs = [np.arange(l, h, sampling_distance)
-                for l, h, n in zip(low, high, n_particles_per_axis)]
+        arrs = [np.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
         points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
 

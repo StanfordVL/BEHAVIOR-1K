@@ -3,6 +3,7 @@ import itertools
 import contextlib
 import logging
 import os
+import shutil
 import socket
 from pathlib import Path
 import atexit
@@ -17,11 +18,22 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
-from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
+from omnigibson.utils.python_utils import (
+    clear as clear_pu,
+    create_object_from_init_info,
+    Serializable,
+    meets_minimum_version,
+)
 from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
-from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
-                                       print_icon, print_logo, logo_small)
+from omnigibson.utils.ui_utils import (
+    CameraMover,
+    disclaimer,
+    create_module_logger,
+    suppress_omni_log,
+    print_icon,
+    print_logo,
+    logo_small,
+)
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -40,10 +52,11 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
-m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
+m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -56,7 +69,7 @@ def _launch_app():
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
-    config_kwargs = {"headless":  gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
+    config_kwargs = {"headless": gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
@@ -66,15 +79,37 @@ def _launch_app():
         import sys
         from numba.core.errors import NumbaPerformanceWarning
         import warnings
+
         # TODO: Find a more elegant way to prune omni logging
         # sys.argv.append("--/log/level=warning")
         # sys.argv.append("--/log/fileLogLevel=warning")
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / "omnigibson.kit"
+    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
+
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+
+    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
+    with open(version_file_path, "r") as file:
+        version_content = file.read().strip()
+        isaac_version = version_content.split("-")[0]
+        assert meets_minimum_version(
+            isaac_version, "2023.1.1"
+        ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
@@ -114,13 +149,15 @@ def _launch_app():
             lazy.omni.isaac.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
-            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
+            raise ValueError(
+                f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc."
+            )
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
         og_log = lazy.omni.log.get_log()
         og_log.set_channel_enabled("carb.windowing-glfw.plugin", False, lazy.omni.log.SettingBehavior.OVERRIDE)
-        
+
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
         og_log = lazy.omni.log.get_log()
@@ -132,9 +169,20 @@ def _launch_app():
     if not gm.RENDER_VIEWER_CAMERA:
         hide_window_names.append("Viewport")
     if gm.GUI_VIEWPORT_ONLY:
-        hide_window_names.extend(["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
-                             "Flow", "Semantics Schema Editor"])
-        
+        hide_window_names.extend(
+            [
+                "Console",
+                "Main ToolBar",
+                "Stage",
+                "Layer",
+                "Property",
+                "Render Settings",
+                "Content",
+                "Flow",
+                "Semantics Schema Editor",
+            ]
+        )
+
     for name in hide_window_names:
         window = lazy.omni.ui.Workspace.get_window(name)
         if window is not None:
@@ -142,11 +190,11 @@ def _launch_app():
             app.update()
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
-    
+
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
     sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
-    
+
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
     signal.signal(signal.SIGINT, og.shutdown_handler)
 
@@ -175,18 +223,19 @@ def launch_simulator(*args, **kwargs):
             viewer_width (int): width of the camera image, in pixels
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
-            """
+        """
+
         _world_initialized = False
 
         def __init__(
-                self,
-                gravity=9.81,
-                physics_dt=1.0 / 120.0,
-                rendering_dt=1.0 / 30.0,
-                stage_units_in_meters=1.0,
-                viewer_width=gm.DEFAULT_VIEWER_WIDTH,
-                viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-                device=None,
+            self,
+            gravity=9.81,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
+            stage_units_in_meters=1.0,
+            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            device=None,
         ):
             # Store vars needed for initialization
             self.gravity = gravity
@@ -229,12 +278,17 @@ def launch_simulator(*args, **kwargs):
 
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
-            self.object_state_types_requiring_update = \
-                [state for state in self.object_state_types if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))]
-            self.object_state_types_on_contact = \
-                {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
-            self.object_state_types_on_joint_break = \
-                {state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)}
+            self.object_state_types_requiring_update = [
+                state
+                for state in self.object_state_types
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
+            ]
+            self.object_state_types_on_contact = {
+                state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)
+            }
+            self.object_state_types_on_joint_break = {
+                state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
+            }
 
             # Auto-load the dummy stage
             self.clear()
@@ -284,7 +338,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._viewer_camera = VisionSensor(
                 prim_path=prim_path,
-                name=prim_path.split("/")[-1],                  # Assume name is the lowest-level name in the prim_path
+                name=prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
                 image_height=self.viewer_height,
                 image_width=self.viewer_width,
@@ -316,11 +370,7 @@ def launch_simulator(*args, **kwargs):
             # default collide with each other, and modify settings for speed optimization
             self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
-            else:
-                self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -335,20 +385,22 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
+            self._physics_context.set_gpu_max_rigid_contact_count(gm.GPU_MAX_RIGID_CONTACT_COUNT)
+            self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
             if gm.ENABLE_HQ_RENDERING:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)                    
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)                 
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)   # "Auto"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)                
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)  # "Auto"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
                 lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
             else:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)                   
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)              
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)   # "Performance"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)             
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True) 
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
@@ -577,7 +629,7 @@ def launch_simulator(*args, **kwargs):
             """
             Reset internal variables when a new stage is loaded
             """
-        
+
         def render(self):
             super().render()
             # During rendering, the Fabric API is updated, so we can mark it as clean
@@ -808,23 +860,35 @@ def launch_simulator(*args, **kwargs):
                     if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
                         continue
                     # If any of the objects doesn't have states that require on_contact callbacks, skip
-                    if len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0 or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0:
+                    if (
+                        len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0
+                        or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0
+                    ):
                         continue
                     headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.uuid))].append(contact_header)
 
-                for (actor0_obj, actor1_obj) in headers:
+                for actor0_obj, actor1_obj in headers:
                     for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                         for state_type in self.object_state_types_on_contact:
                             if state_type in obj0.states:
-                                obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
+                                obj0.states[state_type].on_contact(
+                                    obj1, headers[(actor0_obj, actor1_obj)], contact_data
+                                )
 
         def _on_simulation_event(self, event):
             """
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
             if gm.ENABLE_OBJECT_STATES:
-                if event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
-                    joint_path = str(lazy.pxr.PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                if (
+                    event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK)
+                    and self._objects_require_joint_break_callback
+                ):
+                    joint_path = str(
+                        lazy.pxr.PhysicsSchemaTools.decodeSdfPath(
+                            event.payload["jointPath"][0], event.payload["jointPath"][1]
+                        )
+                    )
                     obj = None
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
@@ -859,8 +923,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_playing or sim_is_paused:
                 self.stop()
             yield
-            if sim_is_playing: self.play()
-            elif sim_is_paused: self.pause()
+            if sim_is_playing:
+                self.play()
+            elif sim_is_paused:
+                self.pause()
 
         @contextlib.contextmanager
         def playing(self):
@@ -873,8 +939,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_stopped or sim_is_paused:
                 self.play()
             yield
-            if sim_is_stopped: self.stop()
-            elif sim_is_paused: self.pause()
+            if sim_is_stopped:
+                self.stop()
+            elif sim_is_paused:
+                self.pause()
 
         @contextlib.contextmanager
         def paused(self):
@@ -887,8 +955,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_stopped or sim_is_playing:
                 self.pause()
             yield
-            if sim_is_stopped: self.stop()
-            elif sim_is_playing: self.play()
+            if sim_is_stopped:
+                self.stop()
+            elif sim_is_playing:
+                self.play()
 
         @contextlib.contextmanager
         def slowed(self, dt):
@@ -961,7 +1031,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_play.pop(name)
+            self._callbacks_on_play.pop(name, None)
 
         def remove_callback_on_stop(self, name):
             """
@@ -970,7 +1040,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_stop.pop(name)
+            self._callbacks_on_stop.pop(name, None)
 
         def remove_callback_on_import_obj(self, name):
             """
@@ -979,7 +1049,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_import_obj.pop(name)
+            self._callbacks_on_import_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
@@ -988,7 +1058,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_remove_obj.pop(name)
+            self._callbacks_on_remove_obj.pop(name, None)
 
         @classmethod
         def clear_instance(cls):
@@ -1224,7 +1294,7 @@ def launch_simulator(*args, **kwargs):
                 physics_dt = self.get_physics_dt()
             except:
                 print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
-                physics_dt = 1 / 120.
+                physics_dt = 1 / 120.0
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1233,8 +1303,7 @@ def launch_simulator(*args, **kwargs):
 
             # Clear physics context
             self._physics_context = None
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physx_fabric_interface = None
+            self._physx_fabric_interface = None
 
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
@@ -1260,7 +1329,7 @@ def launch_simulator(*args, **kwargs):
                 physics_dt = self.get_physics_dt()
             except:
                 print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
-                physics_dt = 1/120.
+                physics_dt = 1 / 120.0
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1304,10 +1373,18 @@ def launch_simulator(*args, **kwargs):
             # Update internal callbacks
             self._setup_default_callback_fns()
             self._stage_open_callback = (
-                lazy.omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
+                lazy.omni.usd.get_context()
+                .get_stage_event_stream()
+                .create_subscription_to_pop(self._stage_open_callback_fn)
             )
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
-            self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
+            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
+                self._on_contact
+            )
+            self._simulation_event_callback = (
+                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                    self._on_simulation_event
+                )
+            )
 
             # Set the lighting mode to be stage by default
             self.set_lighting_mode(mode=LightingMode.STAGE)
@@ -1378,12 +1455,14 @@ def launch_simulator(*args, **kwargs):
             # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
             # step is needed to propagate specific states in physics backend
             # TODO: This should be resolved in a future omniverse release!
-            disclaimer("Attempting to load simulator state.\n"
-                    "Currently, omniverse does not support exclusively stepping kinematics, so we cannot update some "
-                    "of our object states relying on updated kinematics until a simulator step is taken!\n"
-                    "Object states such as OnTop, Inside, etc. relying on relative spatial information will inaccurate"
-                    "until a single sim step is taken.\n"
-                    "This should be resolved by the next NVIDIA Isaac Sim release.")
+            disclaimer(
+                "Attempting to load simulator state.\n"
+                "Currently, omniverse does not support exclusively stepping kinematics, so we cannot update some "
+                "of our object states relying on updated kinematics until a simulator step is taken!\n"
+                "Object states such as OnTop, Inside, etc. relying on relative spatial information will inaccurate"
+                "until a single sim step is taken.\n"
+                "This should be resolved by the next NVIDIA Isaac Sim release."
+            )
 
         def _serialize(self, state):
             # Default state is from the scene

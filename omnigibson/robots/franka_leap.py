@@ -25,25 +25,20 @@ class FrankaLeap(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -159,19 +154,23 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
-            GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
-            GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
+                GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
+                GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
-            GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
-            GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
+                GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
+                GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+            ]
+        }
 
     @property
     def finger_lengths(self):
@@ -211,7 +210,7 @@ class FrankaLeap(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}

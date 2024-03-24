@@ -23,25 +23,20 @@ class FrankaPanda(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -142,7 +137,7 @@ class FrankaPanda(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
+
     @property
     def _default_joint_pos(self):
         return np.array([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
@@ -182,31 +177,35 @@ class FrankaPanda(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_description.yaml")}
-    
+
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
-    
+
     @property
     def eef_usd_path(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
-    
+
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-np.pi, 0, 0])}
-    
+
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
+            ]
+        }

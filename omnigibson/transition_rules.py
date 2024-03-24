@@ -11,7 +11,13 @@ import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
+from omnigibson.systems import (
+    get_system,
+    is_system_active,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    REGISTERED_SYSTEMS,
+)
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.object_states.factory import get_system_states
@@ -43,12 +49,10 @@ m.DEFAULT_GARBAGE_SYSTEM = "sludge"
 _attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn", "states", "callback"]
 # States: dict: mapping state nameargs to pass to the state setter for @obj in order to set the object state
 # callback: function: signature callback(obj) -> None to execute after states are set, if any
-ObjectAttrs = namedtuple(
-    "ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
+ObjectAttrs = namedtuple("ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
 
 # Tuple of lists of objects to be added or removed returned from transitions, if not None
-TransitionResults = namedtuple(
-    "TransitionResults", ["add", "remove"], defaults=(None, None))
+TransitionResults = namedtuple("TransitionResults", ["add", "remove"], defaults=(None, None))
 
 # Mapping from transition rule json files to rule classe names
 _JSON_FILES_TO_RULES = {
@@ -62,10 +66,12 @@ _JSON_FILES_TO_RULES = {
 # Global dicts that will contain mappings
 REGISTERED_RULES = dict()
 
+
 class TransitionRuleAPI:
     """
     Monolithic class containing methods to check and execute arbitrary discrete state transitions within the simulator
     """
+
     # Set of active rules
     ACTIVE_RULES = set()
 
@@ -190,12 +196,16 @@ class TransitionRuleAPI:
                 # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
                 if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
                     new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
-                elif isinstance(new_obj, DatasetObject) and \
-                        (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
-                    new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos,
-                                                                 orientation=added_obj_attr.bb_orn)
+                elif isinstance(new_obj, DatasetObject) and (
+                    added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None
+                ):
+                    new_obj.set_bbox_center_position_orientation(
+                        position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn
+                    )
                 else:
-                    raise ValueError("Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!")
+                    raise ValueError(
+                        "Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!"
+                    )
                 # Additionally record any requested states if specified to be updated during the next transition step
                 if added_obj_attr.states is not None or added_obj_attr.callback is not None:
                     cls._INIT_INFO[new_obj] = {
@@ -223,6 +233,7 @@ class ObjectCandidateFilter(metaclass=ABCMeta):
     NOTE: These filters should describe STATIC properties about an object -- i.e.: properties that should NOT change
     at runtime, once imported
     """
+
     @abstractmethod
     def __call__(self, obj):
         """Returns true if the given object passes the filter."""
@@ -261,6 +272,7 @@ class NameFilter(ObjectCandidateFilter):
 
 class NotFilter(ObjectCandidateFilter):
     """Logical-not of a filter"""
+
     def __init__(self, f):
         self.f = f
 
@@ -295,6 +307,7 @@ class RuleCondition:
     NOTE: These filters should describe DYNAMIC properties about object candidates -- i.e.: properties that MAY change
     at runtime, once imported
     """
+
     def refresh(self, object_candidates):
         """
         Refreshes any internal state for this rule condition, given set of input object candidates @object_candidates
@@ -334,6 +347,7 @@ class TouchingAnyCondition(RuleCondition):
     Rule condition that prunes object candidates from @filter_1_name, only keeping any that are touching any object
     from @filter_2_name
     """
+
     def __init__(self, filter_1_name, filter_2_name):
         """
         Args:
@@ -361,17 +375,24 @@ class TouchingAnyCondition(RuleCondition):
     def refresh(self, object_candidates):
         # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
         # in our collision set are kinematic only
-        self._optimized = not np.any([obj.kinematic_only or obj.prim_type == PrimType.CLOTH
-                                  for f in (self._filter_1_name, self._filter_2_name) for obj in object_candidates[f]])
+        self._optimized = not np.any(
+            [
+                obj.kinematic_only or obj.prim_type == PrimType.CLOTH
+                for f in (self._filter_1_name, self._filter_2_name)
+                for obj in object_candidates[f]
+            ]
+        )
 
         if self._optimized:
             # Register idx mappings
-            self._filter_1_scene_idxs = {obj: RigidContactAPI.get_scene_idx(obj.links.values()[0].prim_path)
-                                for obj in object_candidates[self._filter_1_name]}
-            self._filter_1_idxs = {obj: [list(RigidContactAPI.get_body_row_idx(link.prim_path))[1] for link in obj.links.values()]
-                                for obj in object_candidates[self._filter_1_name]}
-            self._filter_2_idxs = {obj: [list(RigidContactAPI.get_body_col_idx(link.prim_path))[1] for link in obj.links.values()]
-                                for obj in object_candidates[self._filter_2_name]}
+            self._filter_1_idxs = {
+                obj: [RigidContactAPI.get_body_row_idx(link.prim_path) for link in obj.links.values()]
+                for obj in object_candidates[self._filter_1_name]
+            }
+            self._filter_2_idxs = {
+                obj: [RigidContactAPI.get_body_col_idx(link.prim_path) for link in obj.links.values()]
+                for obj in object_candidates[self._filter_2_name]
+            }
         else:
             # Register body mappings
             self._filter_2_bodies = {obj: set(obj.links.values()) for obj in object_candidates[self._filter_2_name]}
@@ -410,12 +431,13 @@ class StateCondition(RuleCondition):
     """
     Rule condition that checks all objects from @filter_name whether a state condition is equal to @val for
     """
+
     def __init__(
-            self,
-            filter_name,
-            state,
-            val,
-            op=operator.eq,
+        self,
+        filter_name,
+        state,
+        val,
+        op=operator.eq,
     ):
         """
         Args:
@@ -435,8 +457,11 @@ class StateCondition(RuleCondition):
 
     def __call__(self, object_candidates):
         # Keep any object whose states are satisfied
-        object_candidates[self._filter_name] = \
-            [obj for obj in object_candidates[self._filter_name] if self._op(obj.states[self._state].get_value(), self._val)]
+        object_candidates[self._filter_name] = [
+            obj
+            for obj in object_candidates[self._filter_name]
+            if self._op(obj.states[self._state].get_value(), self._val)
+        ]
 
         # Condition met if any object meets the condition
         return len(object_candidates[self._filter_name]) > 0
@@ -450,9 +475,10 @@ class ChangeConditionWrapper(RuleCondition):
     """
     Rule condition wrapper that checks whether the output from @condition
     """
+
     def __init__(
-            self,
-            condition,
+        self,
+        condition,
     ):
         """
         Args:
@@ -473,7 +499,9 @@ class ChangeConditionWrapper(RuleCondition):
         # then we store it, otherwise, we don't
         for filter_name in self.modifies_filter_names:
             # Compute current valid candidates
-            objs = [obj for obj in object_candidates[filter_name] if obj not in self._last_valid_candidates[filter_name]]
+            objs = [
+                obj for obj in object_candidates[filter_name] if obj not in self._last_valid_candidates[filter_name]
+            ]
             # Store last valid objects -- these are all candidates that were validated by self._condition at the
             # current timestep
             self._last_valid_candidates[filter_name] = set(object_candidates[filter_name])
@@ -494,6 +522,7 @@ class OrConditionWrapper(RuleCondition):
     """
     Logical OR between multiple RuleConditions
     """
+
     def __init__(self, conditions):
         """
         Args:
@@ -518,8 +547,9 @@ class OrConditionWrapper(RuleCondition):
         # For each filter, take the union over object candidates across each condition.
         # If the result is empty, we immediately return False.
         for filter_name in object_candidates:
-            object_candidates[filter_name] = \
-                list(set.union(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()]))
+            object_candidates[filter_name] = list(
+                set.union(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()])
+            )
             if len(object_candidates[filter_name]) == 0:
                 return False
 
@@ -535,6 +565,7 @@ class AndConditionWrapper(RuleCondition):
     """
     Logical AND between multiple RuleConditions
     """
+
     def __init__(self, conditions):
         """
         Args:
@@ -559,8 +590,9 @@ class AndConditionWrapper(RuleCondition):
         # For each filter, take the intersection over object candidates across each condition.
         # If the result is empty, we immediately return False.
         for filter_name in object_candidates:
-            object_candidates[filter_name] = \
-                list(set.intersection(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()]))
+            object_candidates[filter_name] = list(
+                set.intersection(*[set(candidates[filter_name]) for candidates in pruned_candidates.values()])
+            )
             if len(object_candidates[filter_name]) == 0:
                 return False
 
@@ -576,6 +608,7 @@ class BaseTransitionRule(Registerable):
     """
     Defines a set of categories of objects and how to transition their states.
     """
+
     conditions = None
     candidates = None
 
@@ -589,8 +622,9 @@ class BaseTransitionRule(Registerable):
         if cls.__name__ not in cls._do_not_register_classes:
             global RULES_REGISTRY
             RULES_REGISTRY.add(obj=cls)
-            assert len(cls.candidate_filters) > 0, \
-                "At least one of individual_filters or group_filters must be specified!"
+            assert (
+                len(cls.candidate_filters) > 0
+            ), "At least one of individual_filters or group_filters must be specified!"
 
             # Store conditions
             cls.conditions = cls._generate_conditions()
@@ -667,7 +701,6 @@ class BaseTransitionRule(Registerable):
         for condition in cls.conditions:
             condition.refresh(object_candidates=object_candidates)
 
-
     @classmethod
     def transition(cls, object_candidates):
         """
@@ -727,16 +760,21 @@ class WasherDryerRule(BaseTransitionRule):
     """
     Transition rule to apply to cloth washers and dryers.
     """
+
     @classmethod
     def _generate_conditions(cls):
         assert len(cls.candidate_filters.keys()) == 1
         machine_type = list(cls.candidate_filters.keys())[0]
-        return [ChangeConditionWrapper(
-            condition=AndConditionWrapper(conditions=[
-                StateCondition(filter_name=machine_type, state=ToggledOn, val=True, op=operator.eq),
-                StateCondition(filter_name=machine_type, state=Open, val=False, op=operator.eq),
-            ])
-        )]
+        return [
+            ChangeConditionWrapper(
+                condition=AndConditionWrapper(
+                    conditions=[
+                        StateCondition(filter_name=machine_type, state=ToggledOn, val=True, op=operator.eq),
+                        StateCondition(filter_name=machine_type, state=Open, val=False, op=operator.eq),
+                    ]
+                )
+            )
+        ]
 
     @classmethod
     def _compute_global_rule_info(cls):
@@ -794,6 +832,7 @@ class WasherRule(WasherDryerRule):
     1. remove "dirty" particles from the washer if the necessary solvent is present.
     2. wet the objects inside by making them either Saturated with or Covered by water.
     """
+
     cleaning_conditions = None
 
     @classmethod
@@ -847,7 +886,9 @@ class WasherRule(WasherDryerRule):
                 washer.states[Contains].set_value(system, False)
 
             # Make the objects wet
-            container_info = cls._compute_container_info(object_candidates=object_candidates, container=washer, global_info=global_info)
+            container_info = cls._compute_container_info(
+                object_candidates=object_candidates, container=washer, global_info=global_info
+            )
             in_volume_objs = container_info["in_volume_objs"]
             for obj in in_volume_objs:
                 if Saturated in obj.states:
@@ -864,6 +905,7 @@ class DryerRule(WasherDryerRule):
     1. dry the objects inside by making them not Saturated with water.
     2. remove all water from the dryer.
     """
+
     @classproperty
     def candidate_filters(cls):
         return {
@@ -875,7 +917,9 @@ class DryerRule(WasherDryerRule):
         water = get_system("water")
         global_info = cls._compute_global_rule_info()
         for dryer in object_candidates["dryer"]:
-            container_info = cls._compute_container_info(object_candidates=object_candidates, container=dryer, global_info=global_info)
+            container_info = cls._compute_container_info(
+                object_candidates=object_candidates, container=dryer, global_info=global_info
+            )
             in_volume_objs = container_info["in_volume_objs"]
             for obj in in_volume_objs:
                 if Saturated in obj.states:
@@ -889,6 +933,7 @@ class SlicingRule(BaseTransitionRule):
     """
     Transition rule to apply to sliced / slicer object pairs.
     """
+
     @classproperty
     def candidate_filters(cls):
         return {
@@ -899,8 +944,10 @@ class SlicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer"),
-                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
+        return [
+            TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer"),
+            StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq),
+        ]
 
     @classmethod
     def transition(cls, object_candidates):
@@ -909,10 +956,6 @@ class SlicingRule(BaseTransitionRule):
         for sliceable_obj in object_candidates["sliceable"]:
             # Object parts offset annotation are w.r.t the base link of the whole object.
             pos, orn = sliceable_obj.get_position_orientation()
-
-            # If it has no parts, silently fail
-            if not sliceable_obj.metadata["object_parts"]:
-                continue
 
             # Load object parts
             for i, part in enumerate(sliceable_obj.metadata["object_parts"].values()):
@@ -925,7 +968,9 @@ class SlicingRule(BaseTransitionRule):
                 # Determine the relative scale to apply to the object part from the original object
                 # Note that proper (rotated) scaling can only be applied when the relative orientation of
                 # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                assert T.check_quat_right_angle(part_bb_orn), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                assert T.check_quat_right_angle(
+                    part_bb_orn
+                ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
                 scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
@@ -938,7 +983,8 @@ class SlicingRule(BaseTransitionRule):
                     name=part_obj_name,
                     category=part["category"],
                     model=part["model"],
-                    bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
+                    bounding_box=part["bb_size"]
+                    * scale,  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
                 sliceable_obj_state = sliceable_obj.dump_state()
@@ -962,6 +1008,7 @@ class DicingRule(BaseTransitionRule):
     """
     Transition rule to apply to diceable / slicer object pairs.
     """
+
     @classproperty
     def candidate_filters(cls):
         return {
@@ -972,8 +1019,10 @@ class DicingRule(BaseTransitionRule):
     @classmethod
     def _generate_conditions(cls):
         # sliceables should be touching any slicer
-        return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer"),
-                StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq)]
+        return [
+            TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer"),
+            StateCondition(filter_name="slicer", state=SlicerActive, val=True, op=operator.eq),
+        ]
 
     @classmethod
     def transition(cls, object_candidates):
@@ -986,7 +1035,9 @@ class DicingRule(BaseTransitionRule):
             if Cooked in diceable_obj.states and diceable_obj.states[Cooked].get_value():
                 system_name = "cooked__" + system_name
             system = get_system(system_name)
-            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False)
+            system.generate_particles_from_link(
+                diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False
+            )
 
             # Delete original object from stage.
             objs_to_remove.append(diceable_obj)
@@ -999,6 +1050,7 @@ class MeltingRule(BaseTransitionRule):
     Transition rule to apply to meltable objects to simulate melting
     Once the object reaches the melting temperature, remove the object and spawn the melted substance in its place.
     """
+
     @classproperty
     def candidate_filters(cls):
         # We want to find all meltable objects
@@ -1018,7 +1070,9 @@ class MeltingRule(BaseTransitionRule):
             root_category = meltable_obj.category.removeprefix("half_").removeprefix("diced__")
             system_name = f"melted__{root_category}"
             system = get_system(system_name)
-            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False)
+            system.generate_particles_from_link(
+                meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False
+            )
 
             # Delete original object from stage.
             objs_to_remove.append(meltable_obj)
@@ -1030,6 +1084,7 @@ class RecipeRule(BaseTransitionRule):
     """
     Transition rule to approximate recipe-based transitions
     """
+
     # Maps recipe name to recipe information
     _RECIPES = None
 
@@ -1103,7 +1158,9 @@ class RecipeRule(BaseTransitionRule):
                 assert nx.is_tree(input_object_tree), f"Input object tree must be a tree! Now: {input_object_tree}."
                 root_nodes = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0]
                 assert len(root_nodes) == 1, f"Input object tree must have exactly one root node! Now: {root_nodes}."
-                assert input_objects[root_nodes[0]] == 1, f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
+                assert (
+                    input_objects[root_nodes[0]] == 1
+                ), f"Input object tree root node must have exactly one instance! Now: {cls._RECIPES[name]['input_objects'][root_nodes[0]]}."
 
         # Store information for this recipe
         cls._RECIPES[name] = {
@@ -1196,11 +1253,15 @@ class RecipeRule(BaseTransitionRule):
 
         if not cls.is_multi_instance:
             return cls._validate_recipe_objects_non_multi_instance(
-                recipe=recipe, category_to_valid_indices=category_to_valid_indices, in_volume=in_volume,
+                recipe=recipe,
+                category_to_valid_indices=category_to_valid_indices,
+                in_volume=in_volume,
             )
         else:
             return cls._validate_recipe_objects_multi_instance(
-                recipe=recipe, category_to_valid_indices=category_to_valid_indices, container_info=container_info,
+                recipe=recipe,
+                category_to_valid_indices=category_to_valid_indices,
+                container_info=container_info,
             )
 
     @classmethod
@@ -1288,8 +1349,9 @@ class RecipeRule(BaseTransitionRule):
 
             all_subtree_objs = set()
             for child_cat in children_categories:
-                assert len(input_states[child_cat]["binary_object"]) == 1, \
-                    "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
+                assert (
+                    len(input_states[child_cat]["binary_object"]) == 1
+                ), "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
                 state_class, _, state_value = input_states[child_cat]["binary_object"][0]
                 num_valid_children = 0
                 children_objs = cls._OBJECTS[category_to_valid_indices[child_cat]]
@@ -1334,8 +1396,9 @@ class RecipeRule(BaseTransitionRule):
 
         # If multi-instance is True and requires kinematic states between objects
         else:
-            root_node_category = [node for node in input_object_tree.nodes()
-                                  if input_object_tree.in_degree(node) == 0][0]
+            root_node_category = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0][
+                0
+            ]
             # A list of objects belonging to the root node category
             root_nodes = cls._OBJECTS[category_to_valid_indices[root_node_category]]
             input_states = recipe["input_states"]
@@ -1363,7 +1426,9 @@ class RecipeRule(BaseTransitionRule):
                     continue
                 for obj in objs:
                     if state_class in [Filled, Contains]:
-                        contained_particle_idx = obj.states[ContainedParticles].get_value(get_system(system_name)).in_volume.nonzero()[0]
+                        contained_particle_idx = (
+                            obj.states[ContainedParticles].get_value(get_system(system_name)).in_volume.nonzero()[0]
+                        )
                         relevant_systems[system_name] |= contained_particle_idx
                     elif state_class in [Covered]:
                         covered_particle_idx = obj.states[ContactParticles].get_value(get_system(system_name))
@@ -1393,9 +1458,14 @@ class RecipeRule(BaseTransitionRule):
         in_volume = container_info["in_volume"]
         # These are object indices whose objects satisfy the input states
         category_to_valid_indices = container_info["execution_info"]["category_to_valid_indices"]
-        nonrecipe_objects_in_volume = in_volume if len(recipe["input_objects"]) == 0 else \
-            np.delete(in_volume, np.concatenate([category_to_valid_indices[obj_category]
-                                                 for obj_category in category_to_valid_indices]))
+        nonrecipe_objects_in_volume = (
+            in_volume
+            if len(recipe["input_objects"]) == 0
+            else np.delete(
+                in_volume,
+                np.concatenate([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
+            )
+        )
         return not np.any(nonrecipe_objects_in_volume)
 
     @classmethod
@@ -1503,19 +1573,27 @@ class RecipeRule(BaseTransitionRule):
             return False
 
         # Verify all required systems are contained in the container
-        if not cls.relax_recipe_systems and not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+        if not cls.relax_recipe_systems and not cls._validate_recipe_systems_are_contained(
+            recipe=recipe, container=container
+        ):
             return False
 
         # Verify all required object quantities are contained in the container and their states are satisfied
-        if not cls._validate_recipe_objects_are_contained_and_states_satisfied(recipe=recipe, container_info=container_info):
+        if not cls._validate_recipe_objects_are_contained_and_states_satisfied(
+            recipe=recipe, container_info=container_info
+        ):
             return False
 
         # Verify no non-relevant system is contained
-        if not cls.ignore_nonrecipe_systems and not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
+        if not cls.ignore_nonrecipe_systems and not cls._validate_nonrecipe_systems_not_contained(
+            recipe=recipe, container=container
+        ):
             return False
 
         # Verify no non-relevant object is contained if we're not ignoring them
-        if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, container_info=container_info):
+        if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(
+            recipe=recipe, container_info=container_info
+        ):
             return False
 
         return True
@@ -1554,8 +1632,9 @@ class RecipeRule(BaseTransitionRule):
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | \
-                    np.array([obj.states[OnTop].get_value(container) for obj in cls._OBJECTS])
+        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | np.array(
+            [obj.states[OnTop].get_value(container) for obj in cls._OBJECTS]
+        )
 
         # Container itself is never within its own volume
         in_volume[cls._OBJECTS_TO_IDX[container]] = False
@@ -1618,7 +1697,9 @@ class RecipeRule(BaseTransitionRule):
 
             # Check every recipe to find if any is valid
             for name, recipe in cls._ACTIVE_RECIPES.items():
-                if cls._is_recipe_executable(recipe=recipe, container=container, global_info=global_info, container_info=container_info):
+                if cls._is_recipe_executable(
+                    recipe=recipe, container=container, global_info=global_info, container_info=container_info
+                ):
                     # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
                     og.log.info(f"Executing recipe: {name} in container {container.name}!")
 
@@ -1634,7 +1715,9 @@ class RecipeRule(BaseTransitionRule):
 
             # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead if requested
             if recipe_results is None and cls.use_garbage_fallback_recipe:
-                og.log.info(f"Did not find a valid recipe for rule {cls.__name__}; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
+                og.log.info(
+                    f"Did not find a valid recipe for rule {cls.__name__}; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!"
+                )
 
                 # Generate garbage fluid
                 garbage_results = cls._execute_recipe(
@@ -1686,7 +1769,13 @@ class RecipeRule(BaseTransitionRule):
             for system in PhysicalParticleSystem.get_active_systems().values():
                 if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
                     if container.states[Contains].get_value(system):
-                        volume += contained_particles_state.get_value(system).n_in_volume * np.pi * (system.particle_radius ** 3) * 4 / 3
+                        volume += (
+                            contained_particles_state.get_value(system).n_in_volume
+                            * np.pi
+                            * (system.particle_radius**3)
+                            * 4
+                            / 3
+                        )
                         container.states[Contains].set_value(system, False)
             for system in VisualParticleSystem.get_active_systems().values():
                 if not cls.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
@@ -1696,7 +1785,7 @@ class RecipeRule(BaseTransitionRule):
             # Remove the particles that are involved in this execution
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
                 system = get_system(system_name)
-                volume += len(particle_idxs) * np.pi * (system.particle_radius ** 3) * 4 / 3
+                volume += len(particle_idxs) * np.pi * (system.particle_radius**3) * 4 / 3
                 system.remove_particles(idxs=np.array(list(particle_idxs)))
 
         if not cls.is_multi_instance:
@@ -1722,8 +1811,12 @@ class RecipeRule(BaseTransitionRule):
             state = OnTop
             # TODO: What to do if setter fails?
             if not obj.states[state].set_value(container, True):
-                log.warning(f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead.")
-                pos = np.array(container.aabb_center) + np.array([0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0])
+                log.warning(
+                    f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead."
+                )
+                pos = np.array(container.aabb_center) + np.array(
+                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0]
+                )
                 obj.set_bbox_center_position_orientation(position=pos)
 
         # Spawn in new objects
@@ -1766,7 +1859,7 @@ class RecipeRule(BaseTransitionRule):
                 # When ignore_nonrecipe_objects is True, we don't necessarily remove all objects in the container.
                 # Therefore, we need to check for contact when generating output systems.
                 check_contact=cls.ignore_nonrecipe_objects,
-                max_samples=int(volume / (np.pi * (out_system.particle_radius ** 3) * 4 / 3)),
+                max_samples=int(volume / (np.pi * (out_system.particle_radius**3) * 4 / 3)),
             )
 
         # Return transition results
@@ -1830,6 +1923,7 @@ class CookingPhysicalParticleRule(RecipeRule):
     During execution, we replace the input particles (xyz) with the output particles (cooked__xyz), and remove the
     cooked__water if it was used as an input.
     """
+
     @classmethod
     def add_recipe(
         cls,
@@ -1854,13 +1948,16 @@ class CookingPhysicalParticleRule(RecipeRule):
         assert len(input_objects) == 0, f"No input objects can be specified for {cls.__name__}, recipe: {name}!"
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
 
-        assert len(input_systems) == 1 or len(input_systems) == 2, \
-            f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
+        assert (
+            len(input_systems) == 1 or len(input_systems) == 2
+        ), f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
         if len(input_systems) == 2:
-            assert input_systems[1] == "cooked__water", \
-                f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
-        assert len(output_systems) == 1, \
-            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+            assert (
+                input_systems[1] == "cooked__water"
+            ), f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
+        assert (
+            len(output_systems) == 1
+        ), f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
 
         super().add_recipe(
             name=name,
@@ -1875,7 +1972,9 @@ class CookingPhysicalParticleRule(RecipeRule):
     def candidate_filters(cls):
         # Modify the container filter to include the heatable ability as well
         candidate_filters = super().candidate_filters
-        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="heatable")])
+        candidate_filters["container"] = AndFilter(
+            filters=[candidate_filters["container"], AbilityFilter(ability="heatable")]
+        )
         return candidate_filters
 
     @classmethod
@@ -1962,8 +2061,12 @@ class ToggleableMachineRule(RecipeRule):
                 for this recipe. If None, any fillable is allowed
         """
         if len(output_objects) > 0:
-            assert len(output_objects) == 1, f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
-            assert output_objects[list(output_objects.keys())[0]] == 1, f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
+            assert (
+                len(output_objects) == 1
+            ), f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
+            assert (
+                output_objects[list(output_objects.keys())[0]] == 1
+            ), f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
 
         super().add_recipe(
             name=name,
@@ -1981,21 +2084,26 @@ class ToggleableMachineRule(RecipeRule):
     def candidate_filters(cls):
         # Modify the container filter to include toggleable ability as well
         candidate_filters = super().candidate_filters
-        candidate_filters["container"] = AndFilter(filters=[
-            candidate_filters["container"],
-            AbilityFilter(ability="toggleable"),
-            # Exclude washer and clothes dryer because they are handled by WasherRule and DryerRule
-            NotFilter(CategoryFilter("washer")),
-            NotFilter(CategoryFilter("clothes_dryer")),
-        ])
+        candidate_filters["container"] = AndFilter(
+            filters=[
+                candidate_filters["container"],
+                AbilityFilter(ability="toggleable"),
+                # Exclude washer and clothes dryer because they are handled by WasherRule and DryerRule
+                NotFilter(CategoryFilter("washer")),
+                NotFilter(CategoryFilter("clothes_dryer")),
+                NotFilter(CategoryFilter("hot_tub")),
+            ]
+        )
         return candidate_filters
 
     @classmethod
     def _generate_conditions(cls):
         # Container must be toggledOn, and should only be triggered once
-        return [ChangeConditionWrapper(
-            condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
-        )]
+        return [
+            ChangeConditionWrapper(
+                condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
+            )
+        ]
 
     @classproperty
     def relax_recipe_systems(cls):
@@ -2020,6 +2128,7 @@ class MixingToolRule(RecipeRule):
     and a container in order to trigger the recipe event.
     Example: water + lemon_juice + sugar -> lemonade, mixing tool is spoon
     """
+
     @classmethod
     def add_recipe(
         cls,
@@ -2049,8 +2158,9 @@ class MixingToolRule(RecipeRule):
         """
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
         assert len(input_systems) > 0, f"Some input systems need to be specified for {cls.__name__}, recipe: {name}!"
-        assert len(output_systems) == 1, \
-            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+        assert (
+            len(output_systems) == 1
+        ), f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
 
         super().add_recipe(
             name=name,
@@ -2073,9 +2183,11 @@ class MixingToolRule(RecipeRule):
     @classmethod
     def _generate_conditions(cls):
         # Mixing tool must be touching the container, and should only be triggered once
-        return [ChangeConditionWrapper(
-            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
-        )]
+        return [
+            ChangeConditionWrapper(
+                condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
+            )
+        ]
 
     @classproperty
     def relax_recipe_systems(cls):
@@ -2099,6 +2211,7 @@ class CookingRule(RecipeRule):
     Transition mixing rule that approximates cooking recipes via a container and heatsource.
     It is subclassed by CookingObjectRule and CookingSystemRule.
     """
+
     # Counter that increments monotonically
     COUNTER = 0
 
@@ -2185,17 +2298,23 @@ class CookingRule(RecipeRule):
         required_heatsource_categories = recipe["heatsource_categories"]
         # Either no specific required and there is at least 1 heatsource or there is at least 1 matching heatsource
         # between the required and available
-        return (required_heatsource_categories is None and len(heatsource_categories) > 0) or \
-               len(required_heatsource_categories.intersection(heatsource_categories)) > 0
+        return (required_heatsource_categories is None and len(heatsource_categories) > 0) or len(
+            required_heatsource_categories.intersection(heatsource_categories)
+        ) > 0
 
     @classmethod
     def _compute_container_info(cls, object_candidates, container, global_info):
         # Run super first
-        info = super()._compute_container_info(object_candidates=object_candidates, container=container, global_info=global_info)
+        info = super()._compute_container_info(
+            object_candidates=object_candidates, container=container, global_info=global_info
+        )
 
         # Compute whether each heatsource is affecting the container
-        info["heatsource_categories"] = set(obj.category for obj in object_candidates["heatSource"] if
-                                            obj.states[HeatSourceOrSink].affects_obj(container))
+        info["heatsource_categories"] = set(
+            obj.category
+            for obj in object_candidates["heatSource"]
+            if obj.states[HeatSourceOrSink].affects_obj(container)
+        )
 
         return info
 
@@ -2211,7 +2330,9 @@ class CookingRule(RecipeRule):
     @classmethod
     def _is_recipe_executable(cls, recipe, container, global_info, container_info):
         # Check for heatsource compatibility first
-        if not cls._validate_recipe_heatsource_is_valid(recipe=recipe, heatsource_categories=container_info["heatsource_categories"]):
+        if not cls._validate_recipe_heatsource_is_valid(
+            recipe=recipe, heatsource_categories=container_info["heatsource_categories"]
+        ):
             return False
 
         # Run super
@@ -2225,8 +2346,7 @@ class CookingRule(RecipeRule):
         # If executable, increment heat counter by 1, if we were also active last timestep, else, reset to 1
         if executable:
             name = recipe["name"]
-            cls._HEAT_STEPS[name] = cls._HEAT_STEPS[name] + 1 if \
-                cls._LAST_HEAT_TIMESTEP[name] == cls.COUNTER - 1 else 1
+            cls._HEAT_STEPS[name] = cls._HEAT_STEPS[name] + 1 if cls._LAST_HEAT_TIMESTEP[name] == cls.COUNTER - 1 else 1
             cls._LAST_HEAT_TIMESTEP[name] = cls.COUNTER
 
             # If valid number of timesteps met, recipe is indeed executable
@@ -2328,6 +2448,7 @@ class CookingObjectRule(CookingRule):
     Example: bagel_dough + egg + sesame_seed -> bagel, heat source is oven, fillable is baking_sheet.
     This is the only rule where is_multi_instance is True, where multiple copies of the recipe can be executed.
     """
+
     @classmethod
     def add_recipe(
         cls,
@@ -2400,6 +2521,7 @@ class CookingSystemRule(CookingRule):
     Cooking rule when output is a system.
     Example: beef + tomato + chicken_stock -> stew, heat source is stove, fillable is stockpot.
     """
+
     @classmethod
     def add_recipe(
         cls,
@@ -2464,7 +2586,9 @@ class CookingSystemRule(CookingRule):
 
 def import_recipes():
     for json_file, rule_names in _JSON_FILES_TO_RULES.items():
-        recipe_fpath = os.path.join(os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file)
+        recipe_fpath = os.path.join(
+            os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file
+        )
         if not os.path.exists(recipe_fpath):
             log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
 
@@ -2491,10 +2615,13 @@ def import_recipes():
                     satisfied = True
                     og_recipe = translate_bddl_recipe_to_og_recipe(**recipe)
                     has_output_system = len(og_recipe["output_systems"]) > 0
-                    if (rule == CookingObjectRule and has_output_system) or (rule == CookingSystemRule and not has_output_system):
+                    if (rule == CookingObjectRule and has_output_system) or (
+                        rule == CookingSystemRule and not has_output_system
+                    ):
                         satisfied = False
                     if satisfied:
                         rule.add_recipe(**og_recipe)
                 log.info(f"All recipes of rule {rule_name} imported successfully.")
+
 
 import_recipes()

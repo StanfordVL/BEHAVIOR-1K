@@ -1,31 +1,38 @@
 import networkx as nx
+from collections import namedtuple
 
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
 
-_ABILITY_TO_STATE_MAPPING = {
-    "robot": [IsGrasping, ObjectsInFOVOfRobot],
-    "attachable": [AttachedTo],
-    "particleApplier": [ParticleApplier],
-    "particleRemover": [ParticleRemover],
-    "particleSource": [ParticleSource],
-    "particleSink": [ParticleSink],
-    "coldSource": [HeatSourceOrSink],
-    "cookable": [Cooked, Burnt],
-    "coverable": [Covered],
-    "freezable": [Frozen],
-    "heatable": [Heated],
-    "heatSource": [HeatSourceOrSink],
-    "meltable": [MaxTemperature],
-    "mixingTool": [],
-    "openable": [Open],
-    "flammable": [OnFire],
-    "saturable": [Saturated],
-    "sliceable": [],
-    "slicer": [SlicerActive],
-    "toggleable": [ToggledOn],
-    "cloth": [Folded, Unfolded, Overlaid, Draped],
-    "fillable": [Filled, Contains],
+# states: list of ObjectBaseState
+# requirements: list of ObjectBaseRequirement
+AbilityDependencies = namedtuple("AbilityDependencies", ("states", "requirements"))
+
+# Maps ability name to list of Object States and / or Ability Requirements that determine
+# whether the given ability can be instantiated for a requested object
+_ABILITY_DEPENDENCIES = {
+    "robot": AbilityDependencies(states=[IsGrasping, ObjectsInFOVOfRobot], requirements=[]),
+    "attachable": AbilityDependencies(states=[AttachedTo], requirements=[]),
+    "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[ParticleRequirement]),
+    "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[ParticleRequirement]),
+    "particleSource": AbilityDependencies(states=[ParticleSource], requirements=[ParticleRequirement]),
+    "particleSink": AbilityDependencies(states=[ParticleSink], requirements=[ParticleRequirement]),
+    "coldSource": AbilityDependencies(states=[HeatSourceOrSink], requirements=[]),
+    "cookable": AbilityDependencies(states=[Cooked, Burnt], requirements=[]),
+    "coverable": AbilityDependencies(states=[Covered], requirements=[]),
+    "freezable": AbilityDependencies(states=[Frozen], requirements=[]),
+    "heatable": AbilityDependencies(states=[Heated], requirements=[]),
+    "heatSource": AbilityDependencies(states=[HeatSourceOrSink], requirements=[]),
+    "meltable": AbilityDependencies(states=[MaxTemperature], requirements=[]),
+    "mixingTool": AbilityDependencies(states=[], requirements=[]),
+    "openable": AbilityDependencies(states=[Open], requirements=[]),
+    "flammable": AbilityDependencies(states=[OnFire], requirements=[]),
+    "saturable": AbilityDependencies(states=[Saturated], requirements=[]),
+    "sliceable": AbilityDependencies(states=[], requirements=[SliceableRequirement]),
+    "slicer": AbilityDependencies(states=[SlicerActive], requirements=[]),
+    "toggleable": AbilityDependencies(states=[ToggledOn], requirements=[]),
+    "cloth": AbilityDependencies(states=[Folded, Unfolded, Overlaid, Draped], requirements=[]),
+    "fillable": AbilityDependencies(states=[Filled, Contains], requirements=[]),
 }
 
 _DEFAULT_STATE_SET = frozenset(
@@ -85,8 +92,10 @@ _TEXTURE_CHANGE_PRIORITY = {
     ToggledOn: 0,
 }
 
+
 def get_system_states():
     return _SYSTEM_STATE_SET
+
 
 def get_fire_states():
     return _FIRE_STATE_SET
@@ -118,9 +127,15 @@ def get_state_name(state):
 
 
 def get_states_for_ability(ability):
-    if ability not in _ABILITY_TO_STATE_MAPPING:
+    if ability not in _ABILITY_DEPENDENCIES:
         return []
-    return _ABILITY_TO_STATE_MAPPING[ability]
+    return _ABILITY_DEPENDENCIES[ability].states
+
+
+def get_requirements_for_ability(ability):
+    if ability not in _ABILITY_DEPENDENCIES:
+        return []
+    return _ABILITY_DEPENDENCIES[ability].requirements
 
 
 def get_state_dependency_graph(states=None):

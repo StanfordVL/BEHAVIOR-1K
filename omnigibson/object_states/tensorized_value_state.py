@@ -10,6 +10,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     of this type, i.e.: all values across all object state instances are updated at once, rather than per
     individual instance update() call.
     """
+
     # Numpy array of raw internally tracked values
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
@@ -73,8 +74,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         Args:
             obj (StatefulObject): Object to add
         """
-        assert obj.name not in cls.OBJ_IDXS, \
-            f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
+        assert (
+            obj.name not in cls.OBJ_IDXS
+        ), f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
 
         # Add this object to the tracked global state
         cls.OBJ_IDXS[obj.name] = len(cls.VALUES)
@@ -90,8 +92,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             obj (StatefulObject): Object to remove
         """
         # Removes this tracked object from the global value array
-        assert obj.name in cls.OBJ_IDXS, \
-            f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
+        assert (
+            obj.name in cls.OBJ_IDXS
+        ), f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
         deleted_idx = cls.OBJ_IDXS.pop(obj.name)
 
         # Re-standardize the indices
@@ -183,7 +186,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _serialize(self, state):
         # If the state value is not an iterable, wrap it in a numpy array
-        val = state[self.value_name] if isinstance(state[self.value_name], np.ndarray) else np.array([state[self.value_name]])
+        val = (
+            state[self.value_name]
+            if isinstance(state[self.value_name], np.ndarray)
+            else np.array([state[self.value_name]])
+        )
         return val.flatten().astype(float)
 
     def _deserialize(self, state):

@@ -18,7 +18,7 @@ from omnigibson.sensors import ALL_SENSOR_MODALITIES
 from omnigibson.simulator import launch_simulator as launch
 
 # Create logger
-logging.basicConfig(format='[%(levelname)s] [%(name)s] %(message)s')
+logging.basicConfig(format="[%(levelname)s] [%(name)s] %(message)s")
 log = logging.getLogger(__name__)
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
@@ -27,9 +27,10 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
 
 # Always enable nest_asyncio because MaterialPrim calls asyncio.run()
 import nest_asyncio
+
 nest_asyncio.apply()
 
-__version__ = "0.2.1"
+__version__ = "1.0.0"
 
 log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
@@ -47,6 +48,7 @@ sim = None  # (this is a singleton so it's okay that it's global)
 # shutdown by the shutdown function.
 tempdir = tempfile.mkdtemp()
 
+
 def cleanup(*args, **kwargs):
     # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
     try:
@@ -54,7 +56,9 @@ def cleanup(*args, **kwargs):
     except PermissionError:
         log.info("Permission error when removing temp files. Ignoring")
     from omnigibson.simulator import logo_small
+
     log.info(f"{'-' * 10} Shutting Down {logo_small()} {'-' * 10}")
+
 
 def shutdown(due_to_signal=False):
     if app is not None:
@@ -66,14 +70,16 @@ def shutdown(due_to_signal=False):
     else:
         # Otherwise, we do the cleanup here.
         cleanup()
-        
+
         # If we're not shutting down due to a signal, we need to manually exit
         if not due_to_signal:
             exit(0)
-        
+
+
 def shutdown_handler(*args, **kwargs):
     shutdown(due_to_signal=True)
     return signal.default_int_handler(*args, **kwargs)
-    
+
+
 # Something somewhere disables the default SIGINT handler, so we need to re-enable it
 signal.signal(signal.SIGINT, shutdown_handler)

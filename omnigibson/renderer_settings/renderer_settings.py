@@ -7,10 +7,12 @@ from omnigibson.renderer_settings.real_time_settings import RealTimeSettings
 
 def singleton(cls):
     instances = {}
+
     def getinstance():
         if cls not in instances:
             instances[cls] = cls()
         return instances[cls]
+
     return getinstance
 
 
@@ -77,7 +79,7 @@ class RendererSettings:
     def set_current_renderer(self, renderer):
         """
         Set the current renderer to @renderer.
-        
+
         Args:
             renderer (str): The renderer to set as current (e.g. Real-Time, Path-Traced).
         """
@@ -91,10 +93,10 @@ class RendererSettings:
     def settings(self):
         """
         Get all available settings.
-        
+
         Returns:
             dict: A dictionary of all available settings.
-                Keys are setting paths and values are setting item objects. 
+                Keys are setting paths and values are setting item objects.
         """
         settings = {}
         settings.update(self.common_settings.settings)

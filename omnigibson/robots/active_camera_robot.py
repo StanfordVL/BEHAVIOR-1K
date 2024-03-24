@@ -105,7 +105,9 @@ class ActiveCameraRobot(BaseRobot):
         # We additionally add in camera default
         cfg["camera"] = {
             self._default_camera_joint_controller_config["name"]: self._default_camera_joint_controller_config,
-            self._default_camera_null_joint_controller_config["name"]: self._default_camera_null_joint_controller_config,
+            self._default_camera_null_joint_controller_config[
+                "name"
+            ]: self._default_camera_null_joint_controller_config,
         }
 
         return cfg

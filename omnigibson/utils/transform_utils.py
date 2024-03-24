@@ -403,10 +403,10 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     # See https://stackoverflow.com/questions/15873996/converting-a-direction-vector-to-a-quaternion-rotation
     # Take cross product of @up and @vec to get @s_n, and then cross @vec and @s_n to get @u_n
     # Then compose 3x3 rotation matrix and convert into quaternion
-    vec_n = vec / np.linalg.norm(vec)       # x
+    vec_n = vec / np.linalg.norm(vec)  # x
     up_n = up / np.linalg.norm(up)
-    s_n = np.cross(up_n, vec_n)             # y
-    u_n = np.cross(vec_n, s_n)              # z
+    s_n = np.cross(up_n, vec_n)  # y
+    u_n = np.cross(vec_n, s_n)  # z
     return mat2quat(np.array([vec_n, s_n, u_n]).T)
 
 
@@ -533,6 +533,7 @@ def quat2euler(quat):
     """
     return R.from_quat(quat).as_euler("xyz")
 
+
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     """
     Converts a homogenous matrix corresponding to a point C in frame A
@@ -606,6 +607,7 @@ def pose_transform(pos1, quat1, pos0, quat0):
 
     # Multiply and convert back to pos, quat
     return mat2pose(mat1 @ mat0)
+
 
 def invert_pose_transform(pos, quat):
     """
@@ -1043,7 +1045,9 @@ def vecs2quat(vec0, vec1, normalized=False):
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = np.sum(vec0 * vec1, axis=-1, keepdims=True)
-    quat_unnormalized = np.where(cos_theta == -1, np.array([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1))
+    quat_unnormalized = np.where(
+        cos_theta == -1, np.array([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1)
+    )
     return quat_unnormalized / np.linalg.norm(quat_unnormalized, axis=-1, keepdims=True)
 
 
@@ -1110,17 +1114,17 @@ def normalize(v, axis=None, eps=1e-10):
 
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
-    rho = np.sqrt(x ** 2 + y ** 2)
+    rho = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
     return rho, phi
 
 
 def deg2rad(deg):
-    return deg * np.pi / 180.
+    return deg * np.pi / 180.0
 
 
 def rad2deg(rad):
-    return rad * 180. / np.pi
+    return rad * 180.0 / np.pi
 
 
 def check_quat_right_angle(quat, atol=5e-2):

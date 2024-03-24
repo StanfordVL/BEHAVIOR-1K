@@ -58,6 +58,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create a keyboard event handler for generating waypoints
     waypoints = []
+
     def add_waypoint():
         nonlocal waypoints
         pos = cam_mover.cam.get_position()
@@ -85,7 +86,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             per_step_distance=0.02,
             fps=30,
             steps_per_frame=1,
-            fpath=None,             # This corresponds to the default path inferred from cam_mover.save_dir
+            fpath=None,  # This corresponds to the default path inferred from cam_mover.save_dir
         ),
     )
     KeyboardEventHandler.add_keyboard_callback(
@@ -102,6 +103,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Loop indefinitely
     while True:
         env.step([])
+
 
 if __name__ == "__main__":
     main()

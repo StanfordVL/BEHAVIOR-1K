@@ -79,24 +79,46 @@ class AntiAliasingSettings(SubSettingsBase):
         if self._carb_settings.get("/ngx/enabled") is True:
             antialiasing_ops.append("DLSS")
             antialiasing_ops.append("RTXAA")
-        self.algorithm = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.STRING, "Algorithm", "/rtx/post/aa/op", antialiasing_ops)
+        self.algorithm = SettingItem(
+            self, lazy.omni.kit.widget.settings.SettingType.STRING, "Algorithm", "/rtx/post/aa/op", antialiasing_ops
+        )
 
         # antialiasing_op_idx == 1
         # TAA
         self.static_ratio = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Static scaling", "/rtx/post/scaling/staticRatio", range_from=0.33, range_to=1
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Static scaling",
+            "/rtx/post/scaling/staticRatio",
+            range_from=0.33,
+            range_to=1,
         )
         self.samples = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "TAA Samples", "/rtx/post/taa/samples", range_from=1, range_to=16
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "TAA Samples",
+            "/rtx/post/taa/samples",
+            range_from=1,
+            range_to=16,
         )
         self.alpha = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "TAA history scale", "/rtx/post/taa/alpha", range_from=0, range_to=1
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "TAA history scale",
+            "/rtx/post/taa/alpha",
+            range_from=0,
+            range_to=1,
         )
 
         # antialiasing_op_idx == 2
         # FXAA
         self.quality_sub_pix = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Subpixel Quality", "/rtx/post/fxaa/qualitySubPix", range_from=0.0, range_to=1.0
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Subpixel Quality",
+            "/rtx/post/fxaa/qualitySubPix",
+            range_from=0.0,
+            range_to=1.0,
         )
         self.quality_edge_threshold = SettingItem(
             self,
@@ -119,15 +141,30 @@ class AntiAliasingSettings(SubSettingsBase):
         # DLSS and RTXAA
         # if antialiasing_op_idx == 3
         dlss_opts = ["Performance", "Balanced", "Quality"]
-        self.exec_mode = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.STRING, "Execution mode", "/rtx/post/dlss/execMode", dlss_opts)
+        self.exec_mode = SettingItem(
+            self,
+            lazy.omni.kit.widget.settings.SettingType.STRING,
+            "Execution mode",
+            "/rtx/post/dlss/execMode",
+            dlss_opts,
+        )
 
         self.sharpness = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Sharpness", "/rtx/post/aa/sharpness", range_from=0.0, range_to=1.0
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Sharpness",
+            "/rtx/post/aa/sharpness",
+            range_from=0.0,
+            range_to=1.0,
         )
 
         exposure_ops = ["Force self evaluated", "PostProcess Autoexposure", "Fixed"]
         self.auto_exposure_mode = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.STRING, "Exposure mode", "/rtx/post/aa/autoExposureMode", exposure_ops
+            self,
+            lazy.omni.kit.widget.settings.SettingType.STRING,
+            "Exposure mode",
+            "/rtx/post/aa/autoExposureMode",
+            exposure_ops,
         )
 
         # auto_exposure_idx = self._carb_settings.get("/rtx/post/aa/autoExposureMode")
@@ -142,7 +179,12 @@ class AntiAliasingSettings(SubSettingsBase):
         )
         # if auto_exposure_idx == 2
         self.exposure = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Fixed Exposure Value", "/rtx/post/aa/exposure", range_from=0.00001, range_to=1.0
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Fixed Exposure Value",
+            "/rtx/post/aa/exposure",
+            range_from=0.00001,
+            range_to=1.0,
         )
 
     @property
@@ -174,20 +216,29 @@ class AntiAliasingSettings(SubSettingsBase):
             # DLSS and RTXAA
             if antialiasing_op_idx == 3:
                 settings.update(
-                    {"/rtx/post/dlss/execMode": self.exec_mode,}
+                    {
+                        "/rtx/post/dlss/execMode": self.exec_mode,
+                    }
                 )
             settings.update(
-                {"/rtx/post/aa/sharpness": self.sharpness, "/rtx/post/aa/autoExposureMode": self.auto_exposure_mode,}
+                {
+                    "/rtx/post/aa/sharpness": self.sharpness,
+                    "/rtx/post/aa/autoExposureMode": self.auto_exposure_mode,
+                }
             )
 
         auto_exposure_idx = self._carb_settings.get("/rtx/post/aa/autoExposureMode")
         if auto_exposure_idx == 1:
             settings.update(
-                {"/rtx/post/aa/exposureMultiplier": self.exposure_multiplier,}
+                {
+                    "/rtx/post/aa/exposureMultiplier": self.exposure_multiplier,
+                }
             )
         elif auto_exposure_idx == 2:
             settings.update(
-                {"/rtx/post/aa/exposure": self.exposure,}
+                {
+                    "/rtx/post/aa/exposure": self.exposure,
+                }
             )
         return settings
 
@@ -196,10 +247,15 @@ class DirectLightingSettings(SubSettingsBase):
     def __init__(self):
         self._carb_settings = lazy.carb.settings.get_settings()
 
-        self.shadows_enabled = SettingItem(self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Shadows", "/rtx/shadows/enabled")
+        self.shadows_enabled = SettingItem(
+            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Shadows", "/rtx/shadows/enabled"
+        )
 
         self.sampled_lighting_enabled = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Sampled Direct Lighting", "/rtx/directLighting/sampledLighting/enabled"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Enable Sampled Direct Lighting",
+            "/rtx/directLighting/sampledLighting/enabled",
         )
         self.sampled_lighting_auto_enable = SettingItem(
             self,
@@ -216,13 +272,24 @@ class DirectLightingSettings(SubSettingsBase):
 
         # if not self._settings.get("/rtx/directLighting/sampledLighting/enabled"
         self.shadows_sample_count = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "Shadow Samples per Pixel", "/rtx/shadows/sampleCount", range_from=1, range_to=16
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "Shadow Samples per Pixel",
+            "/rtx/shadows/sampleCount",
+            range_from=1,
+            range_to=16,
         )
         self.shadows_denoiser_quarter_res = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Lower Resolution Shadows Denoiser", "/rtx/shadows/denoiser/quarterRes"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Lower Resolution Shadows Denoiser",
+            "/rtx/shadows/denoiser/quarterRes",
         )
         self.dome_light_enabled = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Dome Lighting", "/rtx/directLighting/domeLight/enabled"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Dome Lighting",
+            "/rtx/directLighting/domeLight/enabled",
         )
         self.dome_light_sample_count = SettingItem(
             self,
@@ -233,7 +300,10 @@ class DirectLightingSettings(SubSettingsBase):
             range_to=32,
         )
         self.dome_light_enabled_in_reflections = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Dome Lighting in Reflections",
+            "/rtx/directLighting/domeLight/enabledInReflections",
         )
 
         # if self._settings.get("/rtx/directLighting/sampledLighting/enabled")
@@ -281,7 +351,10 @@ class DirectLightingSettings(SubSettingsBase):
             range_to=1000000,
         )
         self.enabled_in_reflections = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Dome Lighting in Reflections", "/rtx/directLighting/domeLight/enabledInReflections"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Dome Lighting in Reflections",
+            "/rtx/directLighting/domeLight/enabledInReflections",
         )
         firefly_filter_types = {"None": "None", "Median": "Cross-Bilateral Median", "RCRS": "Cross-Bilateral RCRS"}
         self.firefly_suppression_type = SettingItem(
@@ -292,7 +365,10 @@ class DirectLightingSettings(SubSettingsBase):
             range_dict=firefly_filter_types,
         )
         self.history_clamping_enabled = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "History Clamping", "/rtx/lightspeed/ReLAX/historyClampingEnabled"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "History Clamping",
+            "/rtx/lightspeed/ReLAX/historyClampingEnabled",
         )
         self.denoiser_iterations = SettingItem(
             self,
@@ -373,7 +449,12 @@ class ReflectionsSettings(SettingsBase):
         self._carb_settings = lazy.carb.settings.get_settings()
 
         self.max_roughness = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Max Roughness", "/rtx/reflections/maxRoughness", range_from=0.0, range_to=1.0
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Max Roughness",
+            "/rtx/reflections/maxRoughness",
+            range_from=0.0,
+            range_to=1.0,
         )
         self.max_reflection_bounces = SettingItem(
             self,
@@ -417,10 +498,16 @@ class TranslucencySettings(SettingsBase):
             range_to=1.0,
         )
         self.fractional_cutou_opacity = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Fractional Cutout Opacity", "/rtx/raytracing/fractionalCutoutOpacity"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Enable Fractional Cutout Opacity",
+            "/rtx/raytracing/fractionalCutoutOpacity",
         )
         self.virtual_depth = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Depth Correction for DoF", "/rtx/translucency/virtualDepth"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Enable Depth Correction for DoF",
+            "/rtx/translucency/virtualDepth",
         )
 
     @property
@@ -458,7 +545,12 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
             range_to=1024,
         )
         self.pixel_ratio = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "Pixel Density", "/rtx/raytracing/inscattering/pixelRatio", range_from=4, range_to=64
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "Pixel Density",
+            "/rtx/raytracing/inscattering/pixelRatio",
+            range_from=4,
+            range_to=64,
         )
         self.max_distance = SettingItem(
             self,
@@ -477,7 +569,10 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
             range_to=100000,
         )
         self.transmittance_color = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.COLOR3, "Transmittance Color", "/rtx/raytracing/inscattering/transmittanceColor"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.COLOR3,
+            "Transmittance Color",
+            "/rtx/raytracing/inscattering/transmittanceColor",
         )
         self.transmittance_measurement_distance = SettingItem(
             self,
@@ -488,7 +583,10 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
             range_to=1000000,
         )
         self.single_scattering_albedo = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.COLOR3, "Single Scattering Albedo", "/rtx/raytracing/inscattering/singleScatteringAlbedo",
+            self,
+            lazy.omni.kit.widget.settings.SettingType.COLOR3,
+            "Single Scattering Albedo",
+            "/rtx/raytracing/inscattering/singleScatteringAlbedo",
         )
         self.anisotropy_factor = SettingItem(
             self,
@@ -539,7 +637,10 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
             range_to=1,
         )
         self.use_detail_noise = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Apply Density Noise", "/rtx/raytracing/inscattering/useDetailNoise"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Apply Density Noise",
+            "/rtx/raytracing/inscattering/useDetailNoise",
         )
         self.detail_noise_scale = SettingItem(
             self,
@@ -598,7 +699,10 @@ class GlobalVolumetricEffectsSettings(SubSettingsBase):
             range_to=8,
         )
         self.use_32bit_precision = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Use 32-bit Precision", "/rtx/raytracing/inscattering/use32bitPrecision"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Use 32-bit Precision",
+            "/rtx/raytracing/inscattering/use32bitPrecision",
         )
 
     @property
@@ -655,10 +759,20 @@ class CausticsSettings(SettingsBase):
             range_to=20,
         )
         self.positio_phi = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Position Phi", "/rtx/raytracing/caustics/positionPhi", range_from=0.1, range_to=50
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Position Phi",
+            "/rtx/raytracing/caustics/positionPhi",
+            range_from=0.1,
+            range_to=50,
         )
         self.normal_phi = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Normal Phi", "/rtx/raytracing/caustics/normalPhi", range_from=0.3, range_to=1
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Normal Phi",
+            "/rtx/raytracing/caustics/normalPhi",
+            range_from=0.3,
+            range_to=1,
         )
         self.filtering_iterations = SettingItem(
             self,
@@ -689,7 +803,10 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         self._carb_settings = lazy.carb.settings.get_settings()
 
         self.ambient_light_color = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.COLOR3, "Ambient Light Color", "/rtx/sceneDb/ambientLightColor"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.COLOR3,
+            "Ambient Light Color",
+            "/rtx/sceneDb/ambientLightColor",
         )
         self.ambient_light_intensity = SettingItem(
             self,
@@ -700,7 +817,10 @@ class IndirectDiffuseLightingSettings(SettingsBase):
             range_to=10.0,
         )
         self.ambient_occlusion_enabled = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Ambient Occlusion (AO)", "/rtx/ambientOcclusion/enabled"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Enable Ambient Occlusion (AO)",
+            "/rtx/ambientOcclusion/enabled",
         )
 
         # if self._carb_settings.get("/rtx/ambientOcclusion/enabled")
@@ -729,11 +849,17 @@ class IndirectDiffuseLightingSettings(SettingsBase):
             range_to=16,
         )
         self.aggressive_denoising = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "AO: Aggressive denoising", "/rtx/ambientOcclusion/aggressiveDenoising"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "AO: Aggressive denoising",
+            "/rtx/ambientOcclusion/aggressiveDenoising",
         )
 
         self.indirect_diffuse_enabled = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "Enable Indirect Diffuse GI", "/rtx/indirectDiffuse/enabled"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "Enable Indirect Diffuse GI",
+            "/rtx/indirectDiffuse/enabled",
         )
 
         # if self._carb_settings.get("/rtx/indirectDiffuse/enabled")
@@ -747,10 +873,20 @@ class IndirectDiffuseLightingSettings(SettingsBase):
             range_to=4,
         )
         self.max_bounces = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "Max Bounces", "/rtx/indirectDiffuse/maxBounces", range_from=0, range_to=16
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "Max Bounces",
+            "/rtx/indirectDiffuse/maxBounces",
+            range_from=0,
+            range_to=16,
         )
         self.scaling_factor = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.FLOAT, "Intensity", "/rtx/indirectDiffuse/scalingFactor", range_from=0.0, range_to=20.0
+            self,
+            lazy.omni.kit.widget.settings.SettingType.FLOAT,
+            "Intensity",
+            "/rtx/indirectDiffuse/scalingFactor",
+            range_from=0.0,
+            range_to=20.0,
         )
         self.denoiser_method = SettingItem(
             self,
@@ -870,13 +1006,26 @@ class RTMultiGPUSettings(SubSettingsBase):
 
         currentGpuCount = self._carb_settings.get("/renderer/multiGpu/currentGpuCount")
         self.tile_count = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "Tile Count", "/rtx/realtime/mgpu/tileCount", range_from=2, range_to=currentGpuCount
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "Tile Count",
+            "/rtx/realtime/mgpu/tileCount",
+            range_from=2,
+            range_to=currentGpuCount,
         )
         self.master_post_processOnly = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.BOOL, "GPU 0 Post Process Only", "/rtx/realtime/mgpu/masterPostProcessOnly"
+            self,
+            lazy.omni.kit.widget.settings.SettingType.BOOL,
+            "GPU 0 Post Process Only",
+            "/rtx/realtime/mgpu/masterPostProcessOnly",
         )
         self.tile_overlap = SettingItem(
-            self, lazy.omni.kit.widget.settings.SettingType.INT, "Tile Overlap (Pixels)", "/rtx/realtime/mgpu/tileOverlap", range_from=0, range_to=256
+            self,
+            lazy.omni.kit.widget.settings.SettingType.INT,
+            "Tile Overlap (Pixels)",
+            "/rtx/realtime/mgpu/tileOverlap",
+            range_from=0,
+            range_to=256,
         )
         self.tile_overlap_blend_fraction = SettingItem(
             self,

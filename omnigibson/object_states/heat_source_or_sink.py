@@ -206,6 +206,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         # Only update if we're valid
         if self.get_value():
+
             def overlap_callback(hit):
                 nonlocal affected_objects
                 # global affected_objects
@@ -235,7 +236,12 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     cloth_positions = np.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
-                    for idx in np.where(np.all((aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)), axis=-1))[0]:
+                    for idx in np.where(
+                        np.all(
+                            (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
+                            axis=-1,
+                        )
+                    )[0]:
                         affected_objects.add(cloth_objs[idx])
 
                 # Additionally prune objects based on Inside requirement -- cast to avoid in-place operations
@@ -261,13 +267,18 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     cloth_positions = np.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
-                    for idx in np.where(np.linalg.norm(heat_source_pos.reshape(1, 3) - cloth_positions, axis=-1) <= self.distance_threshold)[0]:
+                    for idx in np.where(
+                        np.linalg.norm(heat_source_pos.reshape(1, 3) - cloth_positions, axis=-1)
+                        <= self.distance_threshold
+                    )[0]:
                         affected_objects.add(cloth_objs[idx])
 
         # Remove self (we cannot affect ourselves) and update the internal set of objects, and remove self
         if self.obj in affected_objects:
             affected_objects.remove(self.obj)
-        self._affected_objects = {obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states}
+        self._affected_objects = {
+            obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states
+        }
 
         # Propagate the affected objects' temperatures
         if len(self._affected_objects) > 0:

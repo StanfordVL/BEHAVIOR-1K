@@ -6,8 +6,16 @@ import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, get_uuid, camel_case_to_snake_case, \
-    snake_case_to_camel_case, subclass_factory, SerializableNonInstance, UniquelyNamedNonInstance
+from omnigibson.utils.python_utils import (
+    classproperty,
+    assert_valid_key,
+    get_uuid,
+    camel_case_to_snake_case,
+    snake_case_to_camel_case,
+    subclass_factory,
+    SerializableNonInstance,
+    UniquelyNamedNonInstance,
+)
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
@@ -44,9 +52,10 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     (e.g. StrawberrySmoothie), we adopt the snake case for the system registry to unify with the category of BaseObject.
     For example, get_system("strawberry_smoothie") will return the StrawberrySmoothie class.
     """
+
     # Scaling factor to sample from when generating a new particle
-    min_scale = None              # (x,y,z) scaling
-    max_scale = None              # (x,y,z) scaling
+    min_scale = None  # (x,y,z) scaling
+    max_scale = None  # (x,y,z) scaling
 
     # Whether this system has been initialized or not
     initialized = False
@@ -144,6 +153,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # Avoid circular import
         if og.sim.is_playing():
             from omnigibson.transition_rules import TransitionRuleAPI
+
             TransitionRuleAPI.refresh_all_rules()
 
         # Run any callbacks
@@ -167,9 +177,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     @classmethod
     def remove_particles(
-            cls,
-            idxs,
-            **kwargs,
+        cls,
+        idxs,
+        **kwargs,
     ):
         """
         Removes pre-existing particles
@@ -182,11 +192,11 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     @classmethod
     def generate_particles(
-            cls,
-            positions,
-            orientations=None,
-            scales=None,
-            **kwargs,
+        cls,
+        positions,
+        orientations=None,
+        scales=None,
+        **kwargs,
     ):
         """
         Generates new particles
@@ -227,6 +237,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # Avoid circular import
         if og.sim.is_playing():
             from omnigibson.transition_rules import TransitionRuleAPI
+
             TransitionRuleAPI.refresh_all_rules()
 
     @classmethod
@@ -254,6 +265,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Returns:
             BaseSystem: Generated system class given input arguments
         """
+
         @classmethod
         def cm_initialize(cls):
             # Potentially override the min / max scales
@@ -412,8 +424,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     @classmethod
     def _dump_state(cls):
-        positions, orientations = cls.get_particles_local_pose() if \
-            cls._store_local_poses else cls.get_particles_position_orientation()
+        positions, orientations = (
+            cls.get_particles_local_pose() if cls._store_local_poses else cls.get_particles_position_orientation()
+        )
         return dict(
             n_particles=cls.n_particles,
             min_scale=cls.min_scale,
@@ -425,9 +438,11 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     @classmethod
     def _load_state(cls, state):
         # Sanity check loading particles
-        assert cls.n_particles == state["n_particles"], f"Inconsistent number of particles found when loading " \
-                                                        f"particles state! Current number: {cls.n_particles}, " \
-                                                        f"loaded number: {state['n_particles']}"
+        assert cls.n_particles == state["n_particles"], (
+            f"Inconsistent number of particles found when loading "
+            f"particles state! Current number: {cls.n_particles}, "
+            f"loaded number: {state['n_particles']}"
+        )
         # Load scale
         cls.min_scale = state["min_scale"]
         cls.max_scale = state["max_scale"]
@@ -439,13 +454,16 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     @classmethod
     def _serialize(cls, state):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
-        return np.concatenate([
-            [state["n_particles"]],
-            state["min_scale"],
-            state["max_scale"],
-            state["positions"].flatten(),
-            state["orientations"].flatten(),
-        ], dtype=float)
+        return np.concatenate(
+            [
+                [state["n_particles"]],
+                state["min_scale"],
+                state["max_scale"],
+                state["positions"].flatten(),
+                state["orientations"].flatten(),
+            ],
+            dtype=float,
+        )
 
     @classmethod
     def _deserialize(cls, state):
@@ -457,8 +475,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         state_dict["n_particles"] = n_particles
         state_dict["min_scale"] = state[1:4]
         state_dict["max_scale"] = state[4:7]
-        state_dict["positions"] = state[7:7+len_positions].reshape(-1, 3)
-        state_dict["orientations"] = state[7+len_positions:7+len_positions+len_orientations].reshape(-1, 4)
+        state_dict["positions"] = state[7 : 7 + len_positions].reshape(-1, 3)
+        state_dict["orientations"] = state[7 + len_positions : 7 + len_positions + len_orientations].reshape(-1, 4)
 
         return state_dict, 7 + len_positions + len_orientations
 
@@ -480,6 +498,7 @@ class VisualParticleSystem(BaseSystem):
     """
     Particle system class for generating particles not subject to physics, and are attached to individual objects
     """
+
     # Maps group name to the particles associated with it
     # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
     _group_particles = None
@@ -537,8 +556,12 @@ class VisualParticleSystem(BaseSystem):
 
         # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
         # particle ids, particle indices, and corresponding link info for each particle (m * 3)
-        return state_size + 1 + 2 * len(cls._group_particles) + \
-               sum(3 * cls.num_group_particles(group) for group in cls.groups)
+        return (
+            state_size
+            + 1
+            + 2 * len(cls._group_particles)
+            + sum(3 * cls.num_group_particles(group) for group in cls.groups)
+        )
 
     @classmethod
     def _clear(cls):
@@ -609,8 +632,9 @@ class VisualParticleSystem(BaseSystem):
         group = cls.get_group_name(obj=obj)
         # This should only happen once for a single attachment group, so we explicitly check to make sure the object
         # doesn't already exist
-        assert group not in cls.groups, \
-            f"Cannot create new attachment group because group with name {group} already exists!"
+        assert (
+            group not in cls.groups
+        ), f"Cannot create new attachment group because group with name {group} already exists!"
 
         # Create the group
         cls._group_particles[group] = dict()
@@ -704,7 +728,11 @@ class VisualParticleSystem(BaseSystem):
         cls._validate_group(group=group)
 
         # Sample based on whether we're scaling relative to parent or not
-        scales = np.random.uniform(*cls._group_scales[group], (n, 3)) if cls.scale_relative_to_parent else cls.sample_scales(n=n)
+        scales = (
+            np.random.uniform(*cls._group_scales[group], (n, 3))
+            if cls.scale_relative_to_parent
+            else cls.sample_scales(n=n)
+        )
 
         # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
         # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
@@ -716,24 +744,25 @@ class VisualParticleSystem(BaseSystem):
 
     @classmethod
     def generate_particles(
-            cls,
-            positions,
-            orientations=None,
-            scales=None,
-            **kwargs,
+        cls,
+        positions,
+        orientations=None,
+        scales=None,
+        **kwargs,
     ):
         # Should not be called, since particles must be tied to a group!
-        raise ValueError("Cannot call generate_particles for a VisualParticleSystem! "
-                         "Call generate_group_particles() instead.")
+        raise ValueError(
+            "Cannot call generate_particles for a VisualParticleSystem! " "Call generate_group_particles() instead."
+        )
 
     @classmethod
     def generate_group_particles(
-            cls,
-            group,
-            positions,
-            orientations=None,
-            scales=None,
-            link_prim_paths=None,
+        cls,
+        group,
+        positions,
+        orientations=None,
+        scales=None,
+        link_prim_paths=None,
     ):
         """
         Generates new particle objects within group @group at the specified pose (@positions, @orientations) with
@@ -755,14 +784,14 @@ class VisualParticleSystem(BaseSystem):
         raise NotImplementedError
 
     @classmethod
-    def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
+    def generate_group_particles_on_object(cls, group, max_samples=None, min_samples_for_success=1):
         """
         Generates @max_samples new particle objects and samples their locations on the surface of object @obj. Note
         that if any particles are in the group already, they will be removed
 
         Args:
             group (str): Object on which to sample particle locations
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
 
@@ -847,14 +876,16 @@ class PhysicalParticleSystem(BaseSystem):
     """
     System whose generated particles are subject to physics
     """
+
     @classmethod
     def initialize(cls):
         # Run super first
         super().initialize()
 
         # Make sure min and max scale are identical
-        assert np.all(cls.min_scale == cls.max_scale), \
-            "Min and max scale should be identical for PhysicalParticleSystem!"
+        assert np.all(
+            cls.min_scale == cls.max_scale
+        ), "Min and max scale should be identical for PhysicalParticleSystem!"
 
     @classproperty
     def particle_density(cls):
@@ -879,6 +910,14 @@ class PhysicalParticleSystem(BaseSystem):
             float: Contact radius for the particles to be generated, for the purpose of estimating contacts
         """
         raise NotImplementedError()
+
+    @classproperty
+    def particle_particle_rest_distance(cls):
+        """
+        Returns:
+            The minimum distance between individual particles at rest
+        """
+        return cls.particle_radius * 2.0
 
     @classmethod
     def check_in_contact(cls, positions):
@@ -906,15 +945,15 @@ class PhysicalParticleSystem(BaseSystem):
 
     @classmethod
     def generate_particles_from_link(
-            cls,
-            obj,
-            link,
-            use_visual_meshes=True,
-            mesh_name_prefixes=None,
-            check_contact=True,
-            sampling_distance=None,
-            max_samples=5e5,
-            **kwargs,
+        cls,
+        obj,
+        link,
+        use_visual_meshes=True,
+        mesh_name_prefixes=None,
+        check_contact=True,
+        sampling_distance=None,
+        max_samples=None,
+        **kwargs,
     ):
         """
         Generates a new particle instancer with unique identification number @idn, with particles sampled from the mesh
@@ -931,7 +970,7 @@ class PhysicalParticleSystem(BaseSystem):
             check_contact (bool): If True, will only spawn in particles that do not collide with other rigid bodies
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             **kwargs (dict): Any additional keyword-mapped arguments required by subclass implementation
         """
         # Run sanity checks
@@ -956,11 +995,15 @@ class PhysicalParticleSystem(BaseSystem):
         # We sample the range of each extent minus
         sampling_distance = 2 * cls.particle_radius if sampling_distance is None else sampling_distance
         n_particles_per_axis = (extent / sampling_distance).astype(int)
-        assert np.all(n_particles_per_axis), f"link {link.name} is too small to sample any particle of radius {cls.particle_radius}."
+        assert np.all(
+            n_particles_per_axis
+        ), f"link {link.name} is too small to sample any particle of radius {cls.particle_radius}."
 
         # 1e-10 is added because the extent might be an exact multiple of particle radius
-        arrs = [np.arange(l + cls.particle_radius, h - cls.particle_radius + 1e-10, cls.particle_radius * 2)
-                for l, h, n in zip(low, high, n_particles_per_axis)]
+        arrs = [
+            np.arange(l + cls.particle_radius, h - cls.particle_radius + 1e-10, cls.particle_particle_rest_distance)
+            for l, h, n in zip(low, high, n_particles_per_axis)
+        ]
         # Generate 3D-rectangular grid of points
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
@@ -971,9 +1014,10 @@ class PhysicalParticleSystem(BaseSystem):
             particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions) == 0)[0]]
 
         # Also potentially sub-sample if we're past our limit
-        if len(particle_positions) > max_samples:
+        if max_samples is not None and len(particle_positions) > max_samples:
             particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)]
+                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)
+            ]
 
         return cls.generate_particles(
             positions=particle_positions,
@@ -982,12 +1026,12 @@ class PhysicalParticleSystem(BaseSystem):
 
     @classmethod
     def generate_particles_on_object(
-            cls,
-            obj,
-            sampling_distance=None,
-            max_samples=5e5,
-            min_samples_for_success=1,
-            **kwargs,
+        cls,
+        obj,
+        sampling_distance=None,
+        max_samples=None,
+        min_samples_for_success=1,
+        **kwargs,
     ):
         """
         Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
@@ -997,7 +1041,7 @@ class PhysicalParticleSystem(BaseSystem):
                 top surface
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
-            max_samples (int): Maximum number of particles to sample
+            max_samples (None or int): If specified, maximum number of particles to sample
             min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
             **kwargs (dict): Any additional keyword-mapped arguments required by subclass implementation
@@ -1025,9 +1069,10 @@ class PhysicalParticleSystem(BaseSystem):
         )
         particle_positions = np.array([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
-        if len(particle_positions) > max_samples:
+        if max_samples is not None and len(particle_positions) > max_samples:
             particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)
+            ]
 
         n_particles = len(particle_positions)
         success = n_particles >= min_samples_for_success
@@ -1069,52 +1114,50 @@ def _create_system_from_metadata(system_name):
             material_mtl_name="DeepWater",
         )
     else:
-        """
-        This is not defined yet, but one proposal:
-        
-        Metadata = .json dict, with format:
-        {
-            "type": one of {"visual", "fluid", "granular"},
-        }
-        if visual, include:
-            "relative_particle_scaling" : ...,
-        
-        if visual or granular, also includes:
-            
-            --> note: create_particle_template should be deterministic, configured via:
-                lambda prim_path, name: og.objects.DatasetObject(
-                    prim_path=prim_path,
-                    name=name,
-                    usd_path=os.path.join(gm.DATASET_PATH, "systems", system_name, f"{system_name}.usd"),
-                    category=system_name,
-                    visible=False,
-                    fixed_base=False,
-                    visual_only=True,
-                    include_default_states=False,
-                    abilities={},
-                )
-        
-        if fluid / granular, also include:
-            "particle_contact_offset": ...,
-            "particle_density": ...,
-        
-        if fluid, also include:
-            "is_viscous": bool
-            "material_mtl_name": ...,       # Base material config to use
-            "customize_particle_kwargs": {  # Maps property/ies from @MaterialPrim to value to set
-                "opacity_constant": ...,
-                "albedo_add": ...,
-                "diffuse_color_constant": ...,
-                ...,
-            }
-            
-            --> This will be programmatically constructed into a function:
-                def _customize_particle_material(mat: MaterialPrim): --> None
-                    for attr, val in metadata["customize_particle_kwargs"].items():
-                        mat.__setattr__(attr, val)
-                        
-        Then, compile the necessary kwargs and generate the requested system
-        """
+        # This is not defined yet, but one proposal:
+
+        # Metadata = .json dict, with format:
+        # {
+        #     "type": one of {"visual", "fluid", "granular"},
+        # }
+        # if visual, include:
+        #     "relative_particle_scaling" : ...,
+
+        # if visual or granular, also includes:
+
+        #     --> note: create_particle_template should be deterministic, configured via:
+        #         lambda prim_path, name: og.objects.DatasetObject(
+        #             prim_path=prim_path,
+        #             name=name,
+        #             usd_path=os.path.join(gm.DATASET_PATH, "systems", system_name, f"{system_name}.usd"),
+        #             category=system_name,
+        #             visible=False,
+        #             fixed_base=False,
+        #             visual_only=True,
+        #             include_default_states=False,
+        #             abilities={},
+        #         )
+
+        # if fluid / granular, also include:
+        #     "particle_contact_offset": ...,
+        #     "particle_density": ...,
+
+        # if fluid, also include:
+        #     "is_viscous": bool
+        #     "material_mtl_name": ...,       # Base material config to use
+        #     "customize_particle_kwargs": {  # Maps property/ies from @MaterialPrim to value to set
+        #         "opacity_constant": ...,
+        #         "albedo_add": ...,
+        #         "diffuse_color_constant": ...,
+        #         ...,
+        #     }
+
+        #     --> This will be programmatically constructed into a function:
+        #         def _customize_particle_material(mat: MaterialPrim): --> None
+        #             for attr, val in metadata["customize_particle_kwargs"].items():
+        #                 mat.__setattr__(attr, val)
+
+        # Then, compile the necessary kwargs and generate the requested system
         # Parse information
         system_dir = os.path.join(gm.DATASET_PATH, "systems", system_name)
         with open(os.path.join(system_dir, "metadata.json"), "r") as f:
@@ -1137,42 +1180,44 @@ def _create_system_from_metadata(system_name):
                 asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "ahkjul.usd")
                 has_asset = True
         if has_asset:
+
             def generate_particle_template_fcn():
-                return lambda prim_path, name: \
-                    og.objects.USDObject(
-                        prim_path=prim_path,
-                        name=name,
-                        usd_path=asset_path,
-                        encrypted=True,
-                        category=system_name,
-                        visible=False,
-                        fixed_base=True,
-                        visual_only=True,
-                        kinematic_only=True,
-                        include_default_states=False,
-                        abilities={},
-                    )
+                return lambda prim_path, name: og.objects.USDObject(
+                    prim_path=prim_path,
+                    name=name,
+                    usd_path=asset_path,
+                    encrypted=True,
+                    category=system_name,
+                    visible=False,
+                    fixed_base=True,
+                    visual_only=True,
+                    kinematic_only=True,
+                    include_default_states=False,
+                    abilities={},
+                )
+
         else:
+
             def generate_particle_template_fcn():
-                return lambda prim_path, name: \
-                    og.objects.PrimitiveObject(
-                        prim_path=prim_path,
-                        name=name,
-                        primitive_type="Sphere",
-                        category=system_name,
-                        radius=0.015,
-                        visible=False,
-                        fixed_base=True,
-                        visual_only=True,
-                        kinematic_only=True,
-                        include_default_states=False,
-                        abilities={},
-                    )
+                return lambda prim_path, name: og.objects.PrimitiveObject(
+                    prim_path=prim_path,
+                    name=name,
+                    primitive_type="Sphere",
+                    category=system_name,
+                    radius=0.015,
+                    visible=False,
+                    fixed_base=True,
+                    visual_only=True,
+                    kinematic_only=True,
+                    include_default_states=False,
+                    abilities={},
+                )
 
         def generate_customize_particle_material_fcn(mat_kwargs):
             def customize_mat(mat):
                 for attr, val in mat_kwargs.items():
                     setattr(mat, attr, np.array(val) if isinstance(val, list) else val)
+
             return customize_mat
 
         if system_type == "macro_visual_particle":
@@ -1186,11 +1231,14 @@ def _create_system_from_metadata(system_name):
             system_kwargs["particle_density"] = metadata["particle_density"]
             system_kwargs["is_viscous"] = metadata["is_viscous"]
             system_kwargs["material_mtl_name"] = metadata["material_mtl_name"]
-            system_kwargs["customize_particle_material"] = \
-                generate_customize_particle_material_fcn(mat_kwargs=metadata["customize_material_kwargs"])
+            system_kwargs["customize_particle_material"] = generate_customize_particle_material_fcn(
+                mat_kwargs=metadata["customize_material_kwargs"]
+            )
         else:
-            raise ValueError(f"{system_name} system's type {system_type} is invalid! Must be one of "
-                             f"{{ 'macro_visual_particle', 'macro_physical_particle', 'granular', or 'fluid' }}")
+            raise ValueError(
+                f"{system_name} system's type {system_type} is invalid! Must be one of "
+                f"{{ 'macro_visual_particle', 'macro_physical_particle', 'granular', or 'fluid' }}"
+            )
 
         # Generate the requested system
         system_cls = "".join([st.capitalize() for st in system_type.split("_")])
@@ -1231,6 +1279,7 @@ def is_fluid_system(system_name):
     system = REGISTERED_SYSTEMS[system_name]
     # Avoid circular imports
     from omnigibson.systems.micro_particle_system import FluidSystem
+
     return issubclass(system, FluidSystem)
 
 
@@ -1240,8 +1289,11 @@ def get_system(system_name, force_active=True):
     for scene in og.sim.scenes:
         assert scene is not None, "Cannot get systems until scene is imported!"
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
-    system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
+    system = (
+        REGISTERED_SYSTEMS[system_name]
+        if system_name in REGISTERED_SYSTEMS
         else _create_system_from_metadata(system_name=system_name)
+    )
     if not system.initialized and force_active:
         system.initialize()
     return system

@@ -1,6 +1,7 @@
 """
 Helper utility functions for computing relevant object information
 """
+
 import omnigibson as og
 import numpy as np
 import omnigibson.utils.transform_utils as T

@@ -1,7 +1,12 @@
 import numpy as np
 
-from omnigibson.controllers import IsGraspingState, ControlType, LocomotionController, ManipulationController, \
-    GripperController
+from omnigibson.controllers import (
+    IsGraspingState,
+    ControlType,
+    LocomotionController,
+    ManipulationController,
+    GripperController,
+)
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
 
@@ -10,7 +15,7 @@ from omnigibson.macros import create_module_macros
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 m.DEFAULT_JOINT_POS_KP = 50.0
-m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0     # critically damped
+m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0  # critically damped
 m.DEFAULT_JOINT_VEL_KP = 2.0
 
 
@@ -87,7 +92,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         elif self._motor_type == "velocity":
             kp = m.DEFAULT_JOINT_VEL_KP if kp is None else kp
             assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=velocity!"
-        else:   # effort
+        else:  # effort
             assert kp is None, "Cannot set kp for JointController with motor_type=effort!"
             assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=effort!"
         self.kp = kp
@@ -96,8 +101,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
-        assert not (self._use_delta_commands and command_output_limits == "default"), \
-            "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
+        assert not (
+            self._use_delta_commands and command_output_limits == "default"
+        ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
         super().__init__(
@@ -127,8 +133,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 delta_rots = command[[rx_ind, ry_ind, rz_ind]]
 
                 # Compute the final rotations in the quaternion space.
-                _, end_quat = T.pose_transform(np.zeros(3), T.euler2quat(delta_rots),
-                                               np.zeros(3), T.euler2quat(start_rots))
+                _, end_quat = T.pose_transform(
+                    np.zeros(3), T.euler2quat(delta_rots), np.zeros(3), T.euler2quat(start_rots)
+                )
                 end_rots = T.quat2euler(end_quat)
 
                 # Update the command
@@ -177,7 +184,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 # Compute command torques via PI velocity controller plus gravity compensation torques
                 velocity_error = target - base_value
                 u = velocity_error * self.kp
-            else:   # effort
+            else:  # effort
                 u = target
 
             dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))

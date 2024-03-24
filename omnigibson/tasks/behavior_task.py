@@ -16,8 +16,12 @@ from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import get_system, add_callback_on_system_init, add_callback_on_system_clear, \
-    REGISTERED_SYSTEMS
+from omnigibson.systems.system_base import (
+    get_system,
+    add_callback_on_system_init,
+    add_callback_on_system_clear,
+    REGISTERED_SYSTEMS,
+)
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
@@ -57,25 +61,27 @@ class BehaviorTask(BaseTask):
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
     """
+
     def __init__(
-            self,
-            activity_name=None,
-            activity_definition_id=0,
-            activity_instance_id=0,
-            predefined_problem=None,
-            online_object_sampling=False,
-            debug_object_sampling=False,
-            highlight_task_relevant_objects=False,
-            termination_config=None,
-            reward_config=None,
+        self,
+        activity_name=None,
+        activity_definition_id=0,
+        activity_instance_id=0,
+        predefined_problem=None,
+        online_object_sampling=False,
+        debug_object_sampling=False,
+        highlight_task_relevant_objects=False,
+        termination_config=None,
+        reward_config=None,
     ):
         # Make sure object states are enabled
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
 
         # Make sure task name is valid if not specifying a predefined problem
         if predefined_problem is None:
-            assert activity_name is not None, \
-                "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
+            assert (
+                activity_name is not None
+            ), "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
             assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
         else:
             # Infer activity name
@@ -94,31 +100,37 @@ class BehaviorTask(BaseTask):
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
         self.ground_goal_state_options = None
-        self.feedback = None                                                    # None or str
-        self.sampler = None                                                     # BDDLSampler
+        self.feedback = None  # None or str
+        self.sampler = None  # BDDLSampler
 
         # Object info
-        self.debug_object_sampling = debug_object_sampling                      # bool
-        self.online_object_sampling = online_object_sampling                    # bool
-        self.highlight_task_relevant_objs = highlight_task_relevant_objects     # bool
-        self.object_scope = None                                                # Maps str to BDDLEntity
-        self.object_instance_to_category = None                                 # Maps str to str
-        self.future_obj_instances = None                                        # set of str
+        self.debug_object_sampling = debug_object_sampling  # bool
+        self.online_object_sampling = online_object_sampling  # bool
+        self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
+        self.object_scope = None  # Maps str to BDDLEntity
+        self.object_instance_to_category = None  # Maps str to str
+        self.future_obj_instances = None  # set of str
 
         # Info for demonstration collection
-        self.instruction_order = None                                           # np.array of int
-        self.currently_viewed_index = None                                      # int
-        self.currently_viewed_instruction = None                                # tuple of str
-        self.activity_natural_language_goal_conditions = None                   # str
+        self.instruction_order = None  # np.array of int
+        self.currently_viewed_index = None  # int
+        self.currently_viewed_instruction = None  # tuple of str
+        self.activity_natural_language_goal_conditions = None  # str
 
         # Load the initial behavior configuration
-        self.update_activity(activity_name=activity_name, activity_definition_id=activity_definition_id, predefined_problem=predefined_problem)
+        self.update_activity(
+            activity_name=activity_name,
+            activity_definition_id=activity_definition_id,
+            predefined_problem=predefined_problem,
+        )
 
         # Run super init
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
     @classmethod
-    def get_cached_activity_scene_filename(cls, scene_model, activity_name, activity_definition_id, activity_instance_id):
+    def get_cached_activity_scene_filename(
+        cls, scene_model, activity_name, activity_definition_id, activity_instance_id
+    ):
         """
         Helper method to programmatically construct the scene filename for a given pre-cached task configuration
 
@@ -140,8 +152,11 @@ class BehaviorTask(BaseTask):
 
         # Possibly modify the scene to load if we're using online_object_sampling
         scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
-        activity_name = task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0] if \
-            task_cfg.get("predefined_problem", None) is not None else task_cfg["activity_name"]
+        activity_name = (
+            task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0]
+            if task_cfg.get("predefined_problem", None) is not None
+            else task_cfg["activity_name"]
+        )
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
                 scene_model=scene_cfg.get("scene_model", "Scene"),
@@ -245,7 +260,9 @@ class BehaviorTask(BaseTask):
         }
 
         # Generate initial and goal conditions
-        self.activity_initial_conditions = get_initial_conditions(self.activity_conditions, self.backend, self.object_scope)
+        self.activity_initial_conditions = get_initial_conditions(
+            self.activity_conditions, self.backend, self.object_scope
+        )
         self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
         self.ground_goal_state_options = get_ground_goal_state_options(
             self.activity_conditions, self.backend, self.object_scope, self.activity_goal_conditions
@@ -301,8 +318,9 @@ class BehaviorTask(BaseTask):
         )
 
         # Compose future objects
-        self.future_obj_instances = \
-            {init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"}
+        self.future_obj_instances = {
+            init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"
+        }
 
         if self.online_object_sampling:
             # Sample online
@@ -348,8 +366,10 @@ class BehaviorTask(BaseTask):
             if obj_inst in self.future_obj_instances:
                 entity = None
             else:
-                assert obj_inst in inst_to_name, f"BDDL object instance {obj_inst} should exist in cached metadata " \
-                                                 f"from loaded scene, but could not be found!"
+                assert obj_inst in inst_to_name, (
+                    f"BDDL object instance {obj_inst} should exist in cached metadata "
+                    f"from loaded scene, but could not be found!"
+                )
                 name = inst_to_name[obj_inst]
                 is_system = name in REGISTERED_SYSTEMS
                 #@TODO: Which scene
@@ -364,15 +384,23 @@ class BehaviorTask(BaseTask):
 
         # Batch rpy calculations for much better efficiency
         objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
-        objs_rpy = T.quat2euler(np.array([obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
-                                          for obj, obj_exist in objs_exist.items()]))
+        objs_rpy = T.quat2euler(
+            np.array(
+                [
+                    obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
+                    for obj, obj_exist in objs_exist.items()
+                ]
+            )
+        )
         objs_rpy_cos = np.cos(objs_rpy)
         objs_rpy_sin = np.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)
 
-        for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin):
+        for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
+            objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
+        ):
 
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
@@ -472,7 +500,9 @@ class BehaviorTask(BaseTask):
                 - 3-tuple: (R,G,B) color to assign to text
                 - list of BaseObject: Relevant objects for the current instruction
         """
-        satisfied = self.currently_viewed_instruction in self._termination_conditions["predicate"].goal_status["satisfied"]
+        satisfied = (
+            self.currently_viewed_instruction in self._termination_conditions["predicate"].goal_status["satisfied"]
+        )
         natural_language_condition = self.activity_natural_language_goal_conditions[self.currently_viewed_instruction]
         objects = self.activity_goal_conditions[self.currently_viewed_instruction].get_relevant_objects()
         text_color = (
@@ -485,7 +515,9 @@ class BehaviorTask(BaseTask):
         """
         Increment the instruction
         """
-        self.currently_viewed_index = (self.currently_viewed_index + 1) % len(self.activity_conditions.parsed_goal_conditions)
+        self.currently_viewed_index = (self.currently_viewed_index + 1) % len(
+            self.activity_conditions.parsed_goal_conditions
+        )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
     def save_task(self, path=None, override=False):

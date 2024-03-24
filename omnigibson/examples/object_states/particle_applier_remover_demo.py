@@ -100,16 +100,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    # Define objects to load: a light, table, and cloth
-    light_cfg = dict(
-        type="LightObject",
-        name="light",
-        light_type="Sphere",
-        radius=0.01,
-        intensity=1e8,
-        position=[-2.0, -2.0, 2.0],
-    )
-
     table_cfg = dict(
         type="DatasetObject",
         name="table",
@@ -124,7 +114,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         "scene": {
             "type": "Scene",
         },
-        "objects": [light_cfg, table_cfg],
+        "objects": [table_cfg],
     }
 
     # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
@@ -139,8 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.61340969, -1.79803028,  2.53167412]),
-        orientation=np.array([ 0.46291845, -0.12381886, -0.22679218,  0.84790371]),
+        position=np.array([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=np.array([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
@@ -148,8 +138,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="modifier",
         category="dishtowel",
         model="dtfspn",
-        bounding_box=[0.341, 0.466, 0.07],
-        visual_only=method_type == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
+        bounding_box=[0.34245, 0.46798, 0.07],
+        visual_only=method_type
+        == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
@@ -203,9 +194,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Move object in square around table
     deltas = [
-        [150, np.array([-0.01, 0, 0])],
+        [130, np.array([-0.01, 0, 0])],
         [60, np.array([0, -0.01, 0])],
-        [150, np.array([0.01, 0, 0])],
+        [130, np.array([0.01, 0, 0])],
         [60, np.array([0, 0.01, 0])],
     ]
     for t, delta in deltas:
@@ -219,4 +210,3 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 if __name__ == "__main__":
     main()
-
