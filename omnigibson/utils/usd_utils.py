@@ -603,7 +603,7 @@ class ControllableObjectViewAPI:
 
         # Create the actual articulation view
         cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/*")
-        view_prim_paths = cls._VIEW.metadata.prim_paths
+        view_prim_paths = cls._VIEW.prim_paths
         assert (
             set(view_prim_paths) == expected_prim_paths
         ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
