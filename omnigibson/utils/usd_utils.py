@@ -9,6 +9,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
@@ -570,12 +571,40 @@ class PoseAPI:
         return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
+class ControllableObjectViewAPI:
+    _VIEW = None
+
+    @classmethod
+    def clear(cls):
+        cls._VIEW = None
+        cls._CACHE = {}
+
+    @classmethod
+    def flush_control(cls):
+        pass
+
+    @classmethod
+    def initialize_view(cls):
+        # First, get all of the controllable objects in the scene
+        controllable_objects = [obj for obj in og.sim.scene.objects if isinstance(obj, ControllableObject)]
+
+        # Get their corresponding prim paths
+        prim_paths = {obj.prim_path for obj in controllable_objects}
+
+        # Create the actual articulation view
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/*")
+        assert (
+            set(cls._VIEW.metadata.prim_paths) == prim_paths
+        ), f"ControllableObjectViewAPI expected prim paths {prim_paths} but got {cls._VIEW.metadata.prim_paths}"
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
     PoseAPI.invalidate()
     CollisionAPI.clear()
+    ControllableObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):

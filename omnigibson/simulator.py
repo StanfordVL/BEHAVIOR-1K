@@ -16,6 +16,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import (
@@ -24,7 +25,13 @@ from omnigibson.utils.python_utils import (
     Serializable,
     meets_minimum_version,
 )
-from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
+from omnigibson.utils.usd_utils import (
+    ControllableObjectViewAPI,
+    clear as clear_uu,
+    FlatcacheAPI,
+    RigidContactAPI,
+    PoseAPI,
+)
 from omnigibson.utils.ui_utils import (
     CameraMover,
     disclaimer,
@@ -650,6 +657,7 @@ def launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
+            ControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -721,6 +729,7 @@ def launch_simulator(*args, **kwargs):
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
             RigidContactAPI.clear()
+            ControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -829,7 +838,21 @@ def launch_simulator(*args, **kwargs):
             """
             Step the physics a single step.
             """
+            # Make the controllable object view API refresh
+            ControllableObjectViewAPI.clear()
+
+            # Run the controller step on every controllable object
+            for obj in self.scene.objects:
+                if isinstance(obj, ControllableObject):
+                    obj.step()
+
+            # Flush the controls from the ControllableObjectViewAPI
+            ControllableObjectViewAPI.flush_control()
+
+            # Actually take the physics step
             self._physics_context._step(current_time=self.current_time)
+
+            # Update all APIs
             self._omni_update_step()
             PoseAPI.invalidate()
 

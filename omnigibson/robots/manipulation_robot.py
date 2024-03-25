@@ -325,7 +325,7 @@ class ManipulationRobot(BaseRobot):
                 new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                 self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
+    def deploy_control(self, control, control_type):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
         for arm in self.arm_names:
             if self._ag_freeze_gripper[arm]:
@@ -335,7 +335,7 @@ class ManipulationRobot(BaseRobot):
                     else 0.0
                 )
 
-        super().deploy_control(control=control, control_type=control_type, indices=indices, normalized=normalized)
+        super().deploy_control(control=control, control_type=control_type)
 
         # Then run assisted grasping
         if self.grasping_mode != "physical" and not self._disable_grasp_handling:
@@ -382,8 +382,9 @@ class ManipulationRobot(BaseRobot):
         # In addition to super method, add in EEF states
         fcns = super().get_control_dict()
 
-        for arm in self.arm_names:
-            self._add_arm_control_dict(fcns=fcns, arm=arm)
+        # TODO: Implement these also with the view.
+        # for arm in self.arm_names:
+        #     self._add_arm_control_dict(fcns=fcns, arm=arm)
 
         return fcns
 
