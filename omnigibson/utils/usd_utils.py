@@ -573,6 +573,8 @@ class PoseAPI:
 
 class ControllableObjectViewAPI:
     _VIEW = None
+    _CACHE = {}
+    _IDX = {}
 
     @classmethod
     def clear(cls):
@@ -581,7 +583,14 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def flush_control(cls):
-        pass
+        if "dof_position_targets" in cls._CACHE:
+            cls._VIEW.set_dof_position_targets(cls._CACHE["dof_position_targets"])
+
+        if "dof_velocity_targets" in cls._CACHE:
+            cls._VIEW.set_dof_velocity_targets(cls._CACHE["dof_velocity_targets"])
+
+        if "dof_actuation_forces" in cls._CACHE:
+            cls._VIEW.set_dof_actuation_forces(cls._CACHE["dof_actuation_forces"])
 
     @classmethod
     def initialize_view(cls):
@@ -589,13 +598,133 @@ class ControllableObjectViewAPI:
         controllable_objects = [obj for obj in og.sim.scene.objects if isinstance(obj, ControllableObject)]
 
         # Get their corresponding prim paths
-        prim_paths = {obj.prim_path for obj in controllable_objects}
+        expected_prim_paths = {obj.prim_path for obj in controllable_objects}
 
         # Create the actual articulation view
         cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/*")
+        view_prim_paths = cls._VIEW.metadata.prim_paths
         assert (
-            set(cls._VIEW.metadata.prim_paths) == prim_paths
-        ), f"ControllableObjectViewAPI expected prim paths {prim_paths} but got {cls._VIEW.metadata.prim_paths}"
+            set(view_prim_paths) == expected_prim_paths
+        ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+
+        # Create the mapping from prim path to index
+        cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
+
+    @classmethod
+    def set_joint_position_targets(cls, prim_path, indices, values):
+        assert len(indices) == len(values), "Indices and values must have the same length"
+
+        if "dof_position_targets" not in cls._CACHE:
+            cls._CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
+
+        idx = cls._IDX[prim_path]
+        cls._CACHE["dof_position_targets"][idx][indices] = values
+
+    @classmethod
+    def set_joint_velocity_targets(cls, prim_path, indices, values):
+        assert len(indices) == len(values), "Indices and values must have the same length"
+
+        if "dof_velocity_targets" not in cls._CACHE:
+            cls._CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
+
+        idx = cls._IDX[prim_path]
+        cls._CACHE["dof_velocity_targets"][idx][indices] = values
+
+    @classmethod
+    def set_joint_efforts(cls, prim_path, indices, values):
+        assert len(indices) == len(values), "Indices and values must have the same length"
+
+        if "dof_actuation_forces" not in cls._CACHE:
+            cls._CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
+
+        idx = cls._IDX[prim_path]
+        cls._CACHE["dof_actuation_forces"][idx][indices] = values
+
+    @classmethod
+    def get_position_orientation(cls, prim_path):
+        if "root_transforms" not in cls._CACHE:
+            cls._CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
+
+        idx = cls._IDX[prim_path]
+        pose = cls._CACHE["root_transforms"][idx]
+        return pose[:3], pose[3:]
+
+    @classmethod
+    def get_linear_velocity(cls, prim_path):
+        if "root_velocities" not in cls._CACHE:
+            cls._CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["root_velocities"][idx][:3]
+
+    @classmethod
+    def get_angular_velocity(cls, prim_path):
+        if "root_velocities" not in cls._CACHE:
+            cls._CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["root_velocities"][idx][3:]
+
+    @classmethod
+    def get_relative_linear_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        linvel = cls.get_linear_velocity(prim_path)
+        return T.quat2mat(orn).T @ linvel
+
+    @classmethod
+    def get_relative_angular_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        angvel = cls.get_angular_velocity(prim_path)
+        return T.quat2mat(orn).T @ angvel
+
+    @classmethod
+    def get_joint_positions(cls, prim_path):
+        if "dof_positions" not in cls._CACHE:
+            cls._CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["dof_positions"][idx]
+
+    @classmethod
+    def get_joint_velocities(cls, prim_path):
+        if "dof_velocities" not in cls._CACHE:
+            cls._CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["dof_velocities"][idx]
+
+    @classmethod
+    def get_joint_efforts(cls, prim_path):
+        if "dof_projected_joint_forces" not in cls._CACHE:
+            cls._CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["dof_projected_joint_forces"][idx]
+
+    @classmethod
+    def get_mass_matrix(cls, prim_path):
+        if "mass_matrix" not in cls._CACHE:
+            cls._CACHE["mass_matrix"] = cls._VIEW.get_mass_matrix()
+
+        idx = cls._IDX[prim_path]
+        # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
+        return cls._CACHE["mass_matrix"][idx]
+
+    @classmethod
+    def get_generalized_gravity_forces(cls, prim_path):
+        if "generalized_gravity_forces" not in cls._CACHE:
+            cls._CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["generalized_gravity_forces"][idx]
+
+    @classmethod
+    def get_coriolis_and_centrifugal_forces(cls, prim_path):
+        if "coriolis_and_centrifugal_forces" not in cls._CACHE:
+            cls._CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._CACHE["coriolis_and_centrifugal_forces"][idx]
 
 
 def clear():
