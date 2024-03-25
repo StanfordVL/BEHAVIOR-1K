@@ -9,7 +9,6 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
@@ -594,7 +593,9 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def initialize_view(cls):
-        # First, get all of the controllable objects in the scene
+        # First, get all of the controllable objects in the scene (avoiding circular import)
+        from omnigibson.objects.controllable_object import ControllableObject
+
         controllable_objects = [obj for obj in og.sim.scene.objects if isinstance(obj, ControllableObject)]
 
         # Get their corresponding prim paths

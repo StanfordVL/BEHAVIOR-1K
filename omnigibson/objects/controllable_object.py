@@ -146,14 +146,6 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-        # If we haven't already created a physics callback, do so now so control gets updated every sim step
-        callback_name = f"{self.name}_controller_callback"
-        if not og.sim.physics_callback_exists(callback_name=callback_name):
-            og.sim.add_physics_callback(
-                callback_name=callback_name,
-                callback_fn=lambda x: self.step(),
-            )
-
     def load(self):
         # Run super first
         prim = super().load()
