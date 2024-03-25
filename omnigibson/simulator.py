@@ -406,6 +406,15 @@ def launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
             # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
             # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
+            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/outputVelocitiesLocalSpace", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateTransformations", True)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateVelocities", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateForceSensors", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
 
         @property
         def viewer_visibility(self):
@@ -470,7 +479,8 @@ def launch_simulator(*args, **kwargs):
             Args:
                 mode (LightingMode): Lighting mode to set
             """
-            lazy.omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
+            # lazy.omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
+            pass
 
         def enable_viewer_camera_teleoperation(self):
             """

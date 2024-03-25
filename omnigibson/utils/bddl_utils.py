@@ -1234,8 +1234,8 @@ class BDDLSampler:
                             category=category,
                             abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
                         ))
-                        if len(model_choices) > 0:
-                            break
+                    if len(model_choices) > 0:
+                        break
 
                     if len(model_choices) == 0:
                         # We failed to find ANY valid model across ALL valid categories
