@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, create_joint, RigidContactAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, create_joint
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -256,55 +256,105 @@ class ManipulationRobot(BaseRobot):
 
         return is_grasping
 
+    # def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
+    #     """
+    #     For arm @arm, calculate any body IDs and corresponding link IDs that are not part of the robot
+    #     itself that are in contact with any of this arm's gripper's fingers
+
+    #     Args:
+    #         arm (str): specific arm whose gripper will be checked for contact. Default is "default" which
+    #             corresponds to the first entry in self.arm_names
+    #         return_contact_positions (bool): if True, will additionally return the contact (x,y,z) position
+
+    #     Returns:
+    #         2-tuple:
+    #             - set: set of unique contact prim_paths that are not the robot self-collisions.
+    #                 If @return_contact_positions is True, then returns (prim_path, pos), where pos is the contact
+    #                 (x,y,z) position
+    #                 Note: if no objects that are not the robot itself are intersecting, the set will be empty.
+    #             - dict: dictionary mapping unique contact objects defined by the contact prim_path to
+    #                 set of unique robot link prim_paths that it is in contact with
+    #     """
+    #     arm = self.default_arm if arm == "default" else arm
+    #     robot_contact_links = dict()
+    #     contact_data = set()
+    #     # Find all objects in contact with all finger joints for this arm
+    #     con_results = []
+    #     for link in self.finger_links[arm]:
+    #         scene_idx, row_id = RigidContactAPI.get_body_row_idx(link.prim_path)
+    #         impulses = RigidContactAPI.get_all_impulses(scene_idx)[row_id]
+    #         non_zero_impulses = [any(impulse) for impulse in impulses]
+    #         idx_non_zero_impulses = np.where(non_zero_impulses)[0]
+    #         for idx in idx_non_zero_impulses:
+    #             con_results.append((link.prim_path, RigidContactAPI.get_col_idx_prim_path(scene_idx, idx)))
+    #     if len(con_results) > 0:
+    #         from IPython import embed; embed()
+
+    #     # Get robot contact links
+    #     link_paths = set(self.link_prim_paths)
+    #     for con_res in con_results:
+    #         # Only add this contact if it's not a robot self-collision
+    #         other_contact_set = {con_res[0], con_res[1]} - link_paths
+    #         if len(other_contact_set) == 1:
+    #             link_contact, other_contact = con_res[0], con_res[1]
+    #             # Add to contact data
+    #             contact_data.add(
+    #                 (other_contact, tuple(con_res.position)) if return_contact_positions else other_contact
+    #             )
+    #             # Also add robot contact link info
+    #             if other_contact not in robot_contact_links:
+    #                 robot_contact_links[other_contact] = set()
+    #             robot_contact_links[other_contact].add(link_contact)
+
+    #     return contact_data, robot_contact_links
+    
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
-        """
-        For arm @arm, calculate any body IDs and corresponding link IDs that are not part of the robot
-        itself that are in contact with any of this arm's gripper's fingers
-
-        Args:
-            arm (str): specific arm whose gripper will be checked for contact. Default is "default" which
-                corresponds to the first entry in self.arm_names
-            return_contact_positions (bool): if True, will additionally return the contact (x,y,z) position
-
-        Returns:
-            2-tuple:
-                - set: set of unique contact prim_paths that are not the robot self-collisions.
-                    If @return_contact_positions is True, then returns (prim_path, pos), where pos is the contact
-                    (x,y,z) position
-                    Note: if no objects that are not the robot itself are intersecting, the set will be empty.
-                - dict: dictionary mapping unique contact objects defined by the contact prim_path to
-                    set of unique robot link prim_paths that it is in contact with
-        """
         arm = self.default_arm if arm == "default" else arm
-        robot_contact_links = dict()
-        contact_data = set()
-        # Find all objects in contact with all finger joints for this arm
-        con_results = []
-        for link in self.finger_links[arm]:
-            scene_idx, row_id = RigidContactAPI.get_body_row_idx(link.prim_path)
-            impulses = RigidContactAPI.get_all_impulses(scene_idx)[row_id]
-            non_zero_impulses = [any(impulse) for impulse in impulses]
-            idx_non_zero_impulses = np.where(non_zero_impulses)[0]
-            for idx in idx_non_zero_impulses:
-                con_results.append((link.prim_path, RigidContactAPI.get_col_idx_prim_path(scene_idx, idx)))
-        if len(con_results) > 0:
-            from IPython import embed; embed()
-
         # Get robot contact links
         link_paths = set(self.link_prim_paths)
-        for con_res in con_results:
-            # Only add this contact if it's not a robot self-collision
-            other_contact_set = {con_res[0], con_res[1]} - link_paths
-            if len(other_contact_set) == 1:
-                link_contact, other_contact = con_res[0], con_res[1]
-                # Add to contact data
-                contact_data.add(
-                    (other_contact, tuple(con_res.position)) if return_contact_positions else other_contact
-                )
-                # Also add robot contact link info
+        scene_idx, _ = GripperRigidContactAPI.get_body_row_idx(link_paths[0])
+
+        if not return_contact_positions:
+            # If return contact positions is False, we only need to return the contact prim_paths.
+            # For this we can simply use the impulse matrix.
+            impulses = GripperRigidContactAPI.get_all_impulses(scene_idx)
+            interesting_col_paths = [link.prim_path for link in self.finger_links[arm]]
+            interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+
+            # Get the interesting-columns from the impulse matrix
+            interesting_impulse_columns = impulses[:, interesting_columns]
+            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0), axis=1)[0]
+            interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
+
+            # Get the full interesting section of the impulse matrix
+            interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
+
+            # Get all of the (row, col) pairs where the impulse is greater than 0
+            raw_contact_data = {
+                (interesting_row_paths[row], interesting_col_paths[col])
+                for row, col in np.argwhere(interesting_impulses > 0)
+                if interesting_row_paths[row] not in link_paths
+            }
+
+            # Translate that to robot contact data
+            robot_contact_links = {}
+            for con_data in contact_data:
+                other_contact, link_contact = con_data
                 if other_contact not in robot_contact_links:
                     robot_contact_links[other_contact] = set()
                 robot_contact_links[other_contact].add(link_contact)
+
+            return {other for other, _ in raw_contact_data}, robot_contact_links
+
+        # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
+        contacts = GripperRigidContactAPI.get_contact_data_from_columns(scene_idx, link_paths)
+        contact_data = {(contact[0], contact[3]) for contact in contacts}
+        robot_contact_links = {}
+        for con_data in contacts:
+            other_contact, link_contact = con_data[:2]
+            if other_contact not in robot_contact_links:
+                robot_contact_links[other_contact] = set()
+            robot_contact_links[other_contact].add(link_contact)
 
         return contact_data, robot_contact_links
 

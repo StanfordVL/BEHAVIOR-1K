@@ -9,11 +9,8 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, CachedFunctions
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
-<<<<<<< HEAD
 from functools import cached_property
-=======
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
->>>>>>> origin/central-control
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -150,7 +147,6 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-<<<<<<< HEAD
         # If we haven't already created a physics callback, do so now so control gets updated every sim step
         callback_name = f"{self.name}_controller_callback"
         if not og.sim.physics_callback_exists(callback_name=callback_name):
@@ -160,9 +156,6 @@ class ControllableObject(BaseObject):
             )
 
     def load(self, scene):
-=======
-    def load(self):
->>>>>>> origin/central-control
         # Run super first
         prim = super().load(scene)
 

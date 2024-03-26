@@ -30,6 +30,7 @@ from omnigibson.utils.usd_utils import (
     clear as clear_uu,
     FlatcacheAPI,
     RigidContactAPI,
+    GripperRigidContactAPI,
     PoseAPI,
 )
 from omnigibson.utils.ui_utils import (
@@ -675,6 +676,7 @@ def launch_simulator(*args, **kwargs):
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
+            GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
