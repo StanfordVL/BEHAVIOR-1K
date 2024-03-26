@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, create_joint
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -312,7 +312,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         # Get robot contact links
         link_paths = set(self.link_prim_paths)
-        scene_idx, _ = GripperRigidContactAPI.get_body_row_idx(link_paths[0])
+        scene_idx, _ = RigidContactAPI.get_body_row_idx(list(link_paths)[0])
 
         if not return_contact_positions:
             # If return contact positions is False, we only need to return the contact prim_paths.
