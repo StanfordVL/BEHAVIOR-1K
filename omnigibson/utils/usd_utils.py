@@ -11,9 +11,12 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.ui_utils import suppress_omni_log, create_module_logger
 
 import omnigibson.utils.transform_utils as T
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 def array_to_vtarray(arr, element_type):
@@ -191,6 +194,9 @@ class RigidContactAPI:
     # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
     _CONTACT_MATRIX = None
 
+    # Current contact data cache containing forces, points, normals, separations, contact_counts, start_indices
+    _CONTACT_DATA = None
+
     # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
     _CONTACT_CACHE = None
 
@@ -312,6 +318,58 @@ class RigidContactAPI:
         return cls.get_all_impulses()[idxs_a][:, idxs_b]
 
     @classmethod
+    def get_contact_data(cls, prim_path):
+        # First check if the object has any contacts
+        impulses = cls.get_all_impulses()
+        row_idx = cls.get_body_row_idx(prim_path)
+        if not np.any(impulses[row_idx] > 0):
+            return []
+
+        # Get the contact targets' prim paths
+        col_idxs = np.nonzero(impulses[row_idx] > 0)[0]
+        col_paths = [cls.get_col_idx_prim_path(idx) for idx in col_idxs]
+
+        # Get the contact data
+        if cls._CONTACT_DATA is None:
+            cls._CONTACT_DATA = cls._CONTACT_VIEW.get_contact_data()
+
+        # Get the contact data for this prim
+        forces, points, normals, separations, contact_counts, start_indices = cls._CONTACT_DATA
+        start_idx = start_indices[row_idx]
+        contact_count = contact_counts[row_idx]
+        end_idx = start_idx + contact_count
+
+        # Assert that one of two things is true: either the prim count and contact count are equal,
+        # in which case we can zip them together, or the prim count is 1, in which case we can just
+        # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
+        # happening between which two objects, so we return no contacts while printing an error.
+        if len(col_paths) == contact_count:
+            return list(
+                zip(
+                    col_paths,
+                    forces[start_idx:end_idx],
+                    points[start_idx:end_idx],
+                    normals[start_idx:end_idx],
+                    separations[start_idx:end_idx],
+                )
+            )
+        elif len(col_paths) == 1:
+            return [
+                (col_paths[0], force, point, normal, separation)
+                for force, point, normal, separation in zip(
+                    forces[start_idx:end_idx],
+                    points[start_idx:end_idx],
+                    normals[start_idx:end_idx],
+                    separations[start_idx:end_idx],
+                )
+            ]
+
+        log.warning(
+            f"Could not disambiguate which contacts are happening with which object for prim {prim_path}! Returning no contacts."
+        )
+        return []
+
+    @classmethod
     def in_contact(cls, prim_paths_a, prim_paths_b):
         """
         Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
@@ -338,6 +396,7 @@ class RigidContactAPI:
         Clears the internal contact matrix and cache
         """
         cls._CONTACT_MATRIX = None
+        cls._CONTACT_DATA = None
         cls._CONTACT_CACHE = dict()
 
 
