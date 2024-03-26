@@ -1,3 +1,4 @@
+import collections
 import math
 from collections.abc import Iterable
 import os
@@ -630,25 +631,47 @@ class PoseAPI:
 
 
 class ControllableObjectViewAPI:
+    """
+    A centralized view that allows for reading and writing to an ArticulationView that covers all
+    controllable objects in the scene. This is used to avoid the overhead of reading from many views
+    for each robot in each physics step, a source of significant overhead.
+    """
+
+    # The unified ArticulationView used to access all of the controllable objects in the scene.
     _VIEW = None
-    _CACHE = {}
+
+    # Cache for all of the view functions' return values within the same simulation step.
+    # Keyed by function name without get_, the value is the return value of the function.
+    _READ_CACHE = {}
+
+    # Cache for all of the view functions' write values within the same simulation step.
+    # Keyed by the function name without set_, the value is a dict that maps to-be-set index to value.
+    _WRITE_CACHE = collections.defaultdict(dict)
+
+    # Mapping from prim path to index in the view.
     _IDX = {}
+
+    # Mapping from prim idx to a dict that maps link name to link index in the view.
     _LINK_IDX = {}
 
     @classmethod
     def clear(cls):
-        cls._CACHE = {}
+        cls._READ_CACHE = {}
+        cls._WRITE_CACHE = collections.defaultdict(dict)
 
     @classmethod
     def flush_control(cls):
-        if "dof_position_targets" in cls._CACHE:
-            cls._VIEW.set_dof_position_targets(cls._CACHE["dof_position_targets"])
+        if "dof_position_targets" in cls._WRITE_CACHE:
+            pos_indices, pos_targets = zip(*sorted(cls._WRITE_CACHE["dof_position_targets"].items()))
+            cls._VIEW.set_dof_position_targets(np.array(pos_targets), np.array(pos_indices))
 
-        if "dof_velocity_targets" in cls._CACHE:
-            cls._VIEW.set_dof_velocity_targets(cls._CACHE["dof_velocity_targets"])
+        if "dof_velocity_targets" in cls._WRITE_CACHE:
+            vel_indices, vel_targets = zip(*sorted(cls._WRITE_CACHE["dof_velocity_targets"].items()))
+            cls._VIEW.set_dof_velocity_targets(np.array(vel_targets), np.array(vel_indices))
 
-        if "dof_actuation_forces" in cls._CACHE:
-            cls._VIEW.set_dof_actuation_forces(cls._CACHE["dof_actuation_forces"])
+        if "dof_actuation_forces" in cls._WRITE_CACHE:
+            eff_indices, eff_targets = zip(*sorted(cls._WRITE_CACHE["dof_actuation_forces"].items()))
+            cls._VIEW.set_dof_actuation_forces(np.array(eff_targets), np.array(eff_indices))
 
     @classmethod
     def initialize_view(cls):
@@ -694,57 +717,81 @@ class ControllableObjectViewAPI:
     @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
-
-        if "dof_position_targets" not in cls._CACHE:
-            cls._CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
-
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_position_targets"][idx][indices] = positions
+
+        # Load the current targets.
+        if "dof_position_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
+        current_targets = cls._READ_CACHE["dof_position_targets"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_position_targets"]:
+            current_targets = cls._WRITE_CACHE["dof_position_targets"][idx]
+        current_targets[indices] = positions
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_position_targets"][idx] = current_targets
 
     @classmethod
     def set_joint_velocity_targets(cls, prim_path, velocities, indices):
         assert len(indices) == len(velocities), "Indices and values must have the same length"
-
-        if "dof_velocity_targets" not in cls._CACHE:
-            cls._CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
-
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_velocity_targets"][idx][indices] = velocities
+
+        # Load the current targets.
+        if "dof_velocity_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
+        current_targets = cls._READ_CACHE["dof_velocity_targets"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_velocity_targets"]:
+            current_targets = cls._WRITE_CACHE["dof_velocity_targets"][idx]
+        current_targets[indices] = velocities
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_velocity_targets"][idx] = current_targets
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
         assert len(indices) == len(efforts), "Indices and values must have the same length"
-
-        if "dof_actuation_forces" not in cls._CACHE:
-            cls._CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
-
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_actuation_forces"][idx][indices] = efforts
+
+        # Load the current targets.
+        if "dof_actuation_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
+        current_targets = cls._READ_CACHE["dof_actuation_forces"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_actuation_forces"]:
+            current_targets = cls._WRITE_CACHE["dof_actuation_forces"][idx]
+        current_targets[indices] = efforts
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_actuation_forces"][idx] = current_targets
 
     @classmethod
     def get_position_orientation(cls, prim_path):
-        if "root_transforms" not in cls._CACHE:
-            cls._CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
+        if "root_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
 
         idx = cls._IDX[prim_path]
-        pose = cls._CACHE["root_transforms"][idx]
+        pose = cls._READ_CACHE["root_transforms"][idx]
         return pose[:3], pose[3:]
 
     @classmethod
     def get_linear_velocity(cls, prim_path):
-        if "root_velocities" not in cls._CACHE:
-            cls._CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["root_velocities"][idx][:3]
+        return cls._READ_CACHE["root_velocities"][idx][:3]
 
     @classmethod
     def get_angular_velocity(cls, prim_path):
-        if "root_velocities" not in cls._CACHE:
-            cls._CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["root_velocities"][idx][3:]
+        return cls._READ_CACHE["root_velocities"][idx][3:]
 
     @classmethod
     def get_relative_linear_velocity(cls, prim_path):
@@ -760,61 +807,61 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_joint_positions(cls, prim_path):
-        if "dof_positions" not in cls._CACHE:
-            cls._CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
+        if "dof_positions" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["dof_positions"][idx]
+        return cls._READ_CACHE["dof_positions"][idx]
 
     @classmethod
     def get_joint_velocities(cls, prim_path):
-        if "dof_velocities" not in cls._CACHE:
-            cls._CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
+        if "dof_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["dof_velocities"][idx]
+        return cls._READ_CACHE["dof_velocities"][idx]
 
     @classmethod
     def get_joint_efforts(cls, prim_path):
-        if "dof_projected_joint_forces" not in cls._CACHE:
-            cls._CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
+        if "dof_projected_joint_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["dof_projected_joint_forces"][idx]
+        return cls._READ_CACHE["dof_projected_joint_forces"][idx]
 
     @classmethod
     def get_mass_matrix(cls, prim_path):
-        if "mass_matrix" not in cls._CACHE:
-            cls._CACHE["mass_matrix"] = cls._VIEW.get_mass_matrix()
+        if "mass_matrices" not in cls._READ_CACHE:
+            cls._READ_CACHE["mass_matrices"] = cls._VIEW.get_mass_matrices()
 
         idx = cls._IDX[prim_path]
         # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
-        return cls._CACHE["mass_matrix"][idx]
+        return cls._READ_CACHE["mass_matrices"][idx]
 
     @classmethod
     def get_generalized_gravity_forces(cls, prim_path):
-        if "generalized_gravity_forces" not in cls._CACHE:
-            cls._CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
+        if "generalized_gravity_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["generalized_gravity_forces"][idx]
+        return cls._READ_CACHE["generalized_gravity_forces"][idx]
 
     @classmethod
     def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        if "coriolis_and_centrifugal_forces" not in cls._CACHE:
-            cls._CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
+        if "coriolis_and_centrifugal_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
 
         idx = cls._IDX[prim_path]
-        return cls._CACHE["coriolis_and_centrifugal_forces"][idx]
+        return cls._READ_CACHE["coriolis_and_centrifugal_forces"][idx]
 
     @classmethod
     def get_link_relative_position_orientation(cls, prim_path, link_name):
-        if "link_transforms" not in cls._CACHE:
-            cls._CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
+        if "link_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
 
         idx = cls._IDX[prim_path]
-        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
-        pose = cls._CACHE["link_transforms"][idx][link_idx]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        pose = cls._READ_CACHE["link_transforms"][idx][link_idx]
         pos, orn = pose[:3], pose[3:]
 
         # Get the root world transform too
@@ -825,12 +872,12 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_link_relative_linear_velocity(cls, prim_path, link_name):
-        if "link_velocities" not in cls._CACHE:
-            cls._CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
 
         idx = cls._IDX[prim_path]
-        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
-        vel = cls._CACHE["link_velocities"][idx][link_idx]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
         linvel = vel[:3]
 
         # Get the root world transform too
@@ -841,12 +888,12 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_link_relative_angular_velocity(cls, prim_path, link_name):
-        if "link_velocities" not in cls._CACHE:
-            cls._CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
 
         idx = cls._IDX[prim_path]
-        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
-        vel = cls._CACHE["link_velocities"][idx][link_idx]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
         angvel = vel[3:]
 
         # Get the root world transform too

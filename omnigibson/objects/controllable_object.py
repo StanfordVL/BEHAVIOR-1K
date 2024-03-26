@@ -424,18 +424,12 @@ class ControllableObject(BaseObject):
                 values. Expects a single bool for the entire @control. Default is False.
         """
         # Run sanity check
-        if indices is None:
-            assert len(control) == len(control_type) == self.n_dof, (
-                "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
-            )
-            # Set indices manually so that we're standardized
-            indices = np.arange(self.n_dof)
-        else:
-            assert len(control) == len(control_type) == len(indices), (
-                "Control signals, control types, and indices should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), len(indices))
-            )
+        assert len(control) == len(control_type) == self.n_dof, (
+            "Control signals, control types, and number of DOF should all be the same!"
+            "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
+        )
+        # Set indices manually so that we're standardized
+        indices = np.arange(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
