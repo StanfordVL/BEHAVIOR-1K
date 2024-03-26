@@ -579,6 +579,7 @@ class ControllableObjectViewAPI:
     def clear(cls):
         cls._VIEW = None
         cls._CACHE = {}
+        cls._IDX = {}
 
     @classmethod
     def flush_control(cls):
@@ -598,11 +599,28 @@ class ControllableObjectViewAPI:
 
         controllable_objects = [obj for obj in og.sim.scene.objects if isinstance(obj, ControllableObject)]
 
-        # Get their corresponding prim paths
-        expected_prim_paths = {obj.prim_path for obj in controllable_objects}
+        # This only works if the root link is called base_link for every controllable object, so assert that
+        assert all(
+            co.root_link.prim_path.endswith("/base_link") for co in controllable_objects
+        ), "Controllable objects must have a link named base_link as the root link."
 
-        # Create the actual articulation view
-        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/*")
+        # Get their corresponding prim paths
+        expected_regular_prim_paths = {obj.root_link.articulation_root_path for obj in controllable_objects}
+        expected_dummy_prim_paths = {
+            obj._dummy.articulation_root_path
+            for obj in controllable_objects
+            if hasattr(obj, "_dummy") and obj._dummy is not None
+        }
+        expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
+
+        # Make sure we have at least one controllable object
+        if len(expected_prim_paths) == 0:
+            return
+
+        # Create the actual articulation view. Note that even though we search for base_link here,
+        # the returned things will not necessarily be the base_link prim paths, but the appropriate
+        # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/base_link")
         view_prim_paths = cls._VIEW.prim_paths
         assert (
             set(view_prim_paths) == expected_prim_paths
@@ -612,34 +630,34 @@ class ControllableObjectViewAPI:
         cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
 
     @classmethod
-    def set_joint_position_targets(cls, prim_path, indices, values):
-        assert len(indices) == len(values), "Indices and values must have the same length"
+    def set_joint_position_targets(cls, prim_path, positions, indices):
+        assert len(indices) == len(positions), "Indices and values must have the same length"
 
         if "dof_position_targets" not in cls._CACHE:
             cls._CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
 
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_position_targets"][idx][indices] = values
+        cls._CACHE["dof_position_targets"][idx][indices] = positions
 
     @classmethod
-    def set_joint_velocity_targets(cls, prim_path, indices, values):
-        assert len(indices) == len(values), "Indices and values must have the same length"
+    def set_joint_velocity_targets(cls, prim_path, velocities, indices):
+        assert len(indices) == len(velocities), "Indices and values must have the same length"
 
         if "dof_velocity_targets" not in cls._CACHE:
             cls._CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
 
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_velocity_targets"][idx][indices] = values
+        cls._CACHE["dof_velocity_targets"][idx][indices] = velocities
 
     @classmethod
-    def set_joint_efforts(cls, prim_path, indices, values):
-        assert len(indices) == len(values), "Indices and values must have the same length"
+    def set_joint_efforts(cls, prim_path, efforts, indices):
+        assert len(indices) == len(efforts), "Indices and values must have the same length"
 
         if "dof_actuation_forces" not in cls._CACHE:
             cls._CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
 
         idx = cls._IDX[prim_path]
-        cls._CACHE["dof_actuation_forces"][idx][indices] = values
+        cls._CACHE["dof_actuation_forces"][idx][indices] = efforts
 
     @classmethod
     def get_position_orientation(cls, prim_path):

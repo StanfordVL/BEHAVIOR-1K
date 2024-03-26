@@ -503,15 +503,15 @@ class ControllableObject(BaseObject):
         # set the targets for joints
         if using_pos:
             ControllableObjectViewAPI.set_joint_position_targets(
-                positions=np.array(pos_vec), indices=np.array(pos_idxs)
+                self.articulation_root_path, positions=np.array(pos_vec), indices=np.array(pos_idxs)
             )
         if using_vel:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.prim_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
+                self.articulation_root_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
             )
         if using_eff:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.prim_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
+                self.articulation_root_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
             )
 
     def get_control_dict(self):
@@ -537,19 +537,28 @@ class ControllableObject(BaseObject):
         # removing the need for multiple reads and writes.
         # TODO: CachedFunctions can now be entirely removed since the API already implements caching.
         fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.prim_path)
+        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.prim_path)
-        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.prim_path)
-        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(self.prim_path)
-        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(self.prim_path)
-        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.prim_path)
-        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.prim_path)
-        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.prim_path)
-        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.prim_path)
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(self.prim_path)
-        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(self.prim_path)
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)
+        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
+            self.articulation_root_path
+        )
+        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
+            self.articulation_root_path
+        )
+        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
+        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
+        # TODO: Move gravity force computation dummy to this class instead of BaseRobot
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+            self.articulation_root_path if not self.fixed_base else self._dummy.articulation_root_path
+        )
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+            self.articulation_root_path
+        )
 
         return fcns
 

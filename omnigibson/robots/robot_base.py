@@ -162,8 +162,22 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Run super first
         prim = super()._load()
 
-        # Also import dummy object if this robot is not fixed base
-        if self._use_dummy:
+        # Also import dummy object if this robot is not fixed base AND it has a controller that
+        # requires generalized gravity forces. We incur a relatively heavy cost at every step if we
+        # have to move the dummy. So we only do this if we absolutely need to.
+        needs_dummy = False
+        if not self.fixed_base:
+            # TODO: Make this work after controllers get updated post-load.
+            # Check if we have any operational space controllers or joint controllers with use_impedances on.
+            for cfg in self._controller_config.values():
+                if cfg["controller_type"] == "OperationalSpaceController":
+                    needs_dummy = True
+                    break
+                if cfg["controller_type"] == "JointController" and cfg.get("use_impedances", False):
+                    needs_dummy = True
+                    break
+
+        if needs_dummy:
             dummy_path = f"{self._prim_path}_dummy"
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
@@ -287,7 +301,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # This is done prior to any state getter calls, since setting kinematic state results in physx backend
         # having to re-fetch tensorized state.
         # We do this so we have more optimal runtime performance
-        if self._use_dummy:
+        if self._dummy is not None:
             self._dummy.set_joint_positions(self.get_joint_positions())
             self._dummy.set_joint_velocities(self.get_joint_velocities())
             self._dummy.set_position_orientation(*self.get_position_orientation())
@@ -503,9 +517,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
     def get_generalized_gravity_forces(self, clone=True):
         # Override method based on whether we're using a dummy or not
+        assert (
+            self._dummy is not None or not self.fixed_base
+        ), "Cannot compute generalized gravity forces for fixed base robot without a dummy!"
         return (
             self._dummy.get_generalized_gravity_forces(clone=clone)
-            if self._use_dummy
+            if not self.fixed_base
             else super().get_generalized_gravity_forces(clone=clone)
         )
 
@@ -635,15 +652,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             str: file path to the robot urdf file.
         """
         raise NotImplementedError
-
-    @property
-    def _use_dummy(self):
-        """
-        Returns:
-            bool: Whether the robot dummy should be loaded and used for some computations, e.g., gravity compensation
-        """
-        # By default, only load if robot is not fixed base
-        return not self.fixed_base
 
     @classproperty
     def _do_not_register_classes(cls):
