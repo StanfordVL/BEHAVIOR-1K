@@ -605,7 +605,7 @@ class ControllableObjectViewAPI:
         ), "Controllable objects must have a link named base_link as the root link."
 
         # Get their corresponding prim paths
-        expected_regular_prim_paths = {obj.root_link.articulation_root_path for obj in controllable_objects}
+        expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
         expected_dummy_prim_paths = {
             obj._dummy.articulation_root_path
             for obj in controllable_objects

@@ -168,14 +168,17 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         needs_dummy = False
         if not self.fixed_base:
             # TODO: Make this work after controllers get updated post-load.
+            # TODO: Make this work - for now this feature is disabled because we can't check the config
+            # at this time.
             # Check if we have any operational space controllers or joint controllers with use_impedances on.
-            for cfg in self._controller_config.values():
-                if cfg["controller_type"] == "OperationalSpaceController":
-                    needs_dummy = True
-                    break
-                if cfg["controller_type"] == "JointController" and cfg.get("use_impedances", False):
-                    needs_dummy = True
-                    break
+            # for cfg in self._controller_config.values():
+            #     if cfg["controller_type"] == "OperationalSpaceController":
+            #         needs_dummy = True
+            #         break
+            #     if cfg["controller_type"] == "JointController" and cfg.get("use_impedances", False):
+            #         needs_dummy = True
+            #         break
+            pass
 
         if needs_dummy:
             dummy_path = f"{self._prim_path}_dummy"
