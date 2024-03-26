@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint, RigidContactAPI
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -279,20 +279,24 @@ class ManipulationRobot(BaseRobot):
         robot_contact_links = dict()
         contact_data = set()
         # Find all objects in contact with all finger joints for this arm
-        con_results = [con for link in self.finger_links[arm] for con in link.contact_list()]
+        con_results = []
+        for link in self.finger_links[arm]:
+            scene_idx, row_id = RigidContactAPI.get_body_row_idx(link.prim_path)
+            impulses = RigidContactAPI.get_all_impulses(scene_idx)[row_id]
+            non_zero_impulses = [any(impulse) for impulse in impulses]
+            idx_non_zero_impulses = np.where(non_zero_impulses)[0]
+            for idx in idx_non_zero_impulses:
+                con_results.append((link.prim_path, RigidContactAPI.get_col_idx_prim_path(scene_idx, idx)))
+        if len(con_results) > 0:
+            from IPython import embed; embed()
 
         # Get robot contact links
         link_paths = set(self.link_prim_paths)
-
         for con_res in con_results:
             # Only add this contact if it's not a robot self-collision
-            other_contact_set = {con_res.body0, con_res.body1} - link_paths
+            other_contact_set = {con_res[0], con_res[1]} - link_paths
             if len(other_contact_set) == 1:
-                link_contact, other_contact = (
-                    (con_res.body0, con_res.body1)
-                    if list(other_contact_set)[0] == con_res.body1
-                    else (con_res.body1, con_res.body0)
-                )
+                link_contact, other_contact = con_res[0], con_res[1]
                 # Add to contact data
                 contact_data.add(
                     (other_contact, tuple(con_res.position)) if return_contact_positions else other_contact
