@@ -9,7 +9,11 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, CachedFunctions
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
+<<<<<<< HEAD
 from functools import cached_property
+=======
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+>>>>>>> origin/central-control
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -91,6 +95,16 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
+        if prim_path:
+            # If prim path is specified, assert that the last element starts with controllable_ to ensure that
+            # the object will be included in the ControllableObjectViewAPI.
+            assert prim_path.split("/")[-1].startswith(
+                "controllable_"
+            ), "If prim_path is specified, the last element of the path must start with 'controllable_'."
+        else:
+            # If prim path is not specified, set it to the default path, but prepend controllable.
+            prim_path = f"/World/controllable_{name}"
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -136,6 +150,7 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
+<<<<<<< HEAD
         # If we haven't already created a physics callback, do so now so control gets updated every sim step
         callback_name = f"{self.name}_controller_callback"
         if not og.sim.physics_callback_exists(callback_name=callback_name):
@@ -145,6 +160,9 @@ class ControllableObject(BaseObject):
             )
 
     def load(self, scene):
+=======
+    def load(self):
+>>>>>>> origin/central-control
         # Run super first
         prim = super().load(scene)
 
@@ -373,7 +391,7 @@ class ControllableObject(BaseObject):
         u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
 
         # Deploy control signals
-        self.deploy_control(control=u_vec, control_type=u_type_vec, indices=None, normalized=False)
+        self.deploy_control(control=u_vec, control_type=u_type_vec)
 
     def _postprocess_control(self, control, control_type):
         """
@@ -395,7 +413,7 @@ class ControllableObject(BaseObject):
         """
         return control, control_type
 
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
+    def deploy_control(self, control, control_type):
         """
         Deploys control signals @control with corresponding @control_type on this entity.
 
@@ -422,18 +440,12 @@ class ControllableObject(BaseObject):
                 values. Expects a single bool for the entire @control. Default is False.
         """
         # Run sanity check
-        if indices is None:
-            assert len(control) == len(control_type) == self.n_dof, (
-                "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
-            )
-            # Set indices manually so that we're standardized
-            indices = np.arange(self.n_dof)
-        else:
-            assert len(control) == len(control_type) == len(indices), (
-                "Control signals, control types, and indices should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), len(indices))
-            )
+        assert len(control) == len(control_type) == self.n_dof, (
+            "Control signals, control types, and number of DOF should all be the same!"
+            "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
+        )
+        # Set indices manually so that we're standardized
+        indices = np.arange(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -460,8 +472,8 @@ class ControllableObject(BaseObject):
                 ), "Got mismatched control indices for a single joint!"
                 # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
                 for group_name, group in zip(
-                    ("joints", "control_types", "normalized"),
-                    (self._dof_to_joints, control_type, normalized),
+                    ("joints", "control_types"),
+                    (self._dof_to_joints, control_type),
                 ):
                     assert (
                         len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
@@ -500,15 +512,17 @@ class ControllableObject(BaseObject):
 
         # set the targets for joints
         if using_pos:
-            self.set_joint_positions(
-                positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized
+            ControllableObjectViewAPI.set_joint_position_targets(
+                self.articulation_root_path, positions=np.array(pos_vec), indices=np.array(pos_idxs)
             )
         if using_vel:
-            self.set_joint_velocities(
-                velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized
+            ControllableObjectViewAPI.set_joint_velocity_targets(
+                self.articulation_root_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
             )
         if using_eff:
-            self.set_joint_efforts(efforts=np.array(eff_vec), indices=np.array(eff_idxs), normalized=normalized)
+            ControllableObjectViewAPI.set_joint_efforts(
+                self.articulation_root_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
+            )
 
     def get_control_dict(self):
         """
@@ -528,20 +542,33 @@ class ControllableObject(BaseObject):
                 - gravity_force: (n_dof,) per-joint generalized gravity forces
                 - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
+        # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
+        # the functions that this class also implements. The API centralizes access for all of the robots in the scene
+        # removing the need for multiple reads and writes.
+        # TODO: CachedFunctions can now be entirely removed since the API already implements caching.
         fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = self.get_position_orientation
+        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = self.get_linear_velocity
-        fcns["root_ang_vel"] = self.get_angular_velocity
-        fcns["root_rel_lin_vel"] = self.get_relative_linear_velocity
-        fcns["root_rel_ang_vel"] = self.get_relative_angular_velocity
-        fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
-        fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
-        fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
-        fcns["mass_matrix"] = lambda: self.get_mass_matrix(clone=False)
-        fcns["gravity_force"] = lambda: self.get_generalized_gravity_forces(clone=False)
-        fcns["cc_force"] = lambda: self.get_coriolis_and_centrifugal_forces(clone=False)
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)
+        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
+            self.articulation_root_path
+        )
+        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
+            self.articulation_root_path
+        )
+        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
+        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
+        # TODO: Move gravity force computation dummy to this class instead of BaseRobot
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+            self.articulation_root_path if not self.fixed_base else self._dummy.articulation_root_path
+        )
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+            self.articulation_root_path
+        )
 
         return fcns
 

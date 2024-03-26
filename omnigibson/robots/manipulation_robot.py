@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import create_joint, RigidContactAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, create_joint, RigidContactAPI
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -329,7 +329,7 @@ class ManipulationRobot(BaseRobot):
                 new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                 self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
+    def deploy_control(self, control, control_type):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
         for arm in self.arm_names:
             if self._ag_freeze_gripper[arm]:
@@ -339,7 +339,7 @@ class ManipulationRobot(BaseRobot):
                     else 0.0
                 )
 
-        super().deploy_control(control=control, control_type=control_type, indices=indices, normalized=normalized)
+        super().deploy_control(control=control, control_type=control_type)
 
         # Then run assisted grasping
         if self.grasping_mode != "physical" and not self._disable_grasp_handling:
@@ -386,6 +386,7 @@ class ManipulationRobot(BaseRobot):
         # In addition to super method, add in EEF states
         fcns = super().get_control_dict()
 
+        # TODO: Implement these also with the view.
         for arm in self.arm_names:
             self._add_arm_control_dict(fcns=fcns, arm=arm)
 
@@ -400,15 +401,24 @@ class ManipulationRobot(BaseRobot):
             fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
             arm (str): specific arm to generate necessary control dict entries for
         """
-        fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
+        fcns[f"_eef_{arm}_pos_quat_relative"] = (
+            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, self.eef_link_names[arm]
+            )
+        )
         fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
         fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
-        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
-        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
+        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
+            self.articulation_root_path, self.eef_link_names[arm]
+        )
+        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
+            self.articulation_root_path, self.eef_link_names[arm]
+        )
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        # TODO: Replace this with a ControllableObjectViewAPI call too.
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
             eef_link_idx, :, -self.n_joints :
         ]

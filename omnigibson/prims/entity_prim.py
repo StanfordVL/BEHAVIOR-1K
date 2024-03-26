@@ -910,7 +910,7 @@ class EntityPrim(XFormPrim):
 
     def get_joint_efforts(self, normalized=False):
         """
-        Grabs this entity's joint efforts
+        Grabs this entity's "measured" joint efforts
 
         Args:
             normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
@@ -921,7 +921,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_efforts = self._articulation_view.get_applied_joint_efforts().reshape(self.n_dof)
+        joint_efforts = self._articulation_view.get_measured_joint_efforts().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts

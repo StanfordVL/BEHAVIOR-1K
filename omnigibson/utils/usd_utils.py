@@ -1,3 +1,4 @@
+import collections
 import math
 from collections.abc import Iterable
 import os
@@ -11,9 +12,12 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.ui_utils import suppress_omni_log, create_module_logger
 
 import omnigibson.utils.transform_utils as T
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 def array_to_vtarray(arr, element_type):
@@ -192,6 +196,9 @@ class RigidContactAPI:
     # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
     _CONTACT_MATRIX = None
 
+    # Current contact data cache containing forces, points, normals, separations, contact_counts, start_indices
+    _CONTACT_DATA = None
+
     # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
     _CONTACT_CACHE = None
 
@@ -337,6 +344,58 @@ class RigidContactAPI:
         return cls.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
 
     @classmethod
+    def get_contact_data(cls, prim_path):
+        # First check if the object has any contacts
+        impulses = cls.get_all_impulses()
+        row_idx = cls.get_body_row_idx(prim_path)
+        if not np.any(impulses[row_idx] > 0):
+            return []
+
+        # Get the contact targets' prim paths
+        col_idxs = np.nonzero(impulses[row_idx] > 0)[0]
+        col_paths = [cls.get_col_idx_prim_path(idx) for idx in col_idxs]
+
+        # Get the contact data
+        if cls._CONTACT_DATA is None:
+            cls._CONTACT_DATA = cls._CONTACT_VIEW.get_contact_data()
+
+        # Get the contact data for this prim
+        forces, points, normals, separations, contact_counts, start_indices = cls._CONTACT_DATA
+        start_idx = start_indices[row_idx]
+        contact_count = contact_counts[row_idx]
+        end_idx = start_idx + contact_count
+
+        # Assert that one of two things is true: either the prim count and contact count are equal,
+        # in which case we can zip them together, or the prim count is 1, in which case we can just
+        # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
+        # happening between which two objects, so we return no contacts while printing an error.
+        if len(col_paths) == contact_count:
+            return list(
+                zip(
+                    col_paths,
+                    forces[start_idx:end_idx],
+                    points[start_idx:end_idx],
+                    normals[start_idx:end_idx],
+                    separations[start_idx:end_idx],
+                )
+            )
+        elif len(col_paths) == 1:
+            return [
+                (col_paths[0], force, point, normal, separation)
+                for force, point, normal, separation in zip(
+                    forces[start_idx:end_idx],
+                    points[start_idx:end_idx],
+                    normals[start_idx:end_idx],
+                    separations[start_idx:end_idx],
+                )
+            ]
+
+        log.warning(
+            f"Could not disambiguate which contacts are happening with which object for prim {prim_path}! Returning no contacts."
+        )
+        return []
+
+    @classmethod
     def in_contact(cls, prim_paths_a, prim_paths_b):
         """
         Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
@@ -363,6 +422,7 @@ class RigidContactAPI:
         Clears the internal contact matrix and cache
         """
         cls._CONTACT_MATRIX = dict()
+        cls._CONTACT_DATA = None
         cls._CONTACT_CACHE = dict()
 
 
@@ -595,12 +655,286 @@ class PoseAPI:
         return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
+class ControllableObjectViewAPI:
+    """
+    A centralized view that allows for reading and writing to an ArticulationView that covers all
+    controllable objects in the scene. This is used to avoid the overhead of reading from many views
+    for each robot in each physics step, a source of significant overhead.
+    """
+
+    # The unified ArticulationView used to access all of the controllable objects in the scene.
+    _VIEW = None
+
+    # Cache for all of the view functions' return values within the same simulation step.
+    # Keyed by function name without get_, the value is the return value of the function.
+    _READ_CACHE = {}
+
+    # Cache for all of the view functions' write values within the same simulation step.
+    # Keyed by the function name without set_, the value is a dict that maps to-be-set index to value.
+    _WRITE_CACHE = collections.defaultdict(dict)
+
+    # Mapping from prim path to index in the view.
+    _IDX = {}
+
+    # Mapping from prim idx to a dict that maps link name to link index in the view.
+    _LINK_IDX = {}
+
+    @classmethod
+    def clear(cls):
+        cls._READ_CACHE = {}
+        cls._WRITE_CACHE = collections.defaultdict(dict)
+
+    @classmethod
+    def flush_control(cls):
+        if "dof_position_targets" in cls._WRITE_CACHE:
+            pos_indices, pos_targets = zip(*sorted(cls._WRITE_CACHE["dof_position_targets"].items()))
+            cls._VIEW.set_dof_position_targets(np.array(pos_targets), np.array(pos_indices))
+
+        if "dof_velocity_targets" in cls._WRITE_CACHE:
+            vel_indices, vel_targets = zip(*sorted(cls._WRITE_CACHE["dof_velocity_targets"].items()))
+            cls._VIEW.set_dof_velocity_targets(np.array(vel_targets), np.array(vel_indices))
+
+        if "dof_actuation_forces" in cls._WRITE_CACHE:
+            eff_indices, eff_targets = zip(*sorted(cls._WRITE_CACHE["dof_actuation_forces"].items()))
+            cls._VIEW.set_dof_actuation_forces(np.array(eff_targets), np.array(eff_indices))
+
+    @classmethod
+    def initialize_view(cls):
+        # First, get all of the controllable objects in the scene (avoiding circular import)
+        from omnigibson.objects.controllable_object import ControllableObject
+
+        controllable_objects = [obj for obj in og.sim.scene.objects if isinstance(obj, ControllableObject)]
+
+        # This only works if the root link is called base_link for every controllable object, so assert that
+        assert all(
+            co.root_link.prim_path.endswith("/base_link") for co in controllable_objects
+        ), "Controllable objects must have a link named base_link as the root link."
+
+        # Get their corresponding prim paths
+        expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
+        expected_dummy_prim_paths = {
+            obj._dummy.articulation_root_path
+            for obj in controllable_objects
+            if hasattr(obj, "_dummy") and obj._dummy is not None
+        }
+        expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
+
+        # Make sure we have at least one controllable object
+        if len(expected_prim_paths) == 0:
+            return
+
+        # Create the actual articulation view. Note that even though we search for base_link here,
+        # the returned things will not necessarily be the base_link prim paths, but the appropriate
+        # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/base_link")
+        view_prim_paths = cls._VIEW.prim_paths
+        assert (
+            set(view_prim_paths) == expected_prim_paths
+        ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+
+        # Create the mapping from prim path to index
+        cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
+        cls._LINK_IDX = [
+            {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
+            for articulation_link_paths in cls._VIEW.link_paths
+        ]
+
+    @classmethod
+    def set_joint_position_targets(cls, prim_path, positions, indices):
+        assert len(indices) == len(positions), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_position_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
+        current_targets = cls._READ_CACHE["dof_position_targets"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_position_targets"]:
+            current_targets = cls._WRITE_CACHE["dof_position_targets"][idx]
+        current_targets[indices] = positions
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_position_targets"][idx] = current_targets
+
+    @classmethod
+    def set_joint_velocity_targets(cls, prim_path, velocities, indices):
+        assert len(indices) == len(velocities), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_velocity_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
+        current_targets = cls._READ_CACHE["dof_velocity_targets"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_velocity_targets"]:
+            current_targets = cls._WRITE_CACHE["dof_velocity_targets"][idx]
+        current_targets[indices] = velocities
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_velocity_targets"][idx] = current_targets
+
+    @classmethod
+    def set_joint_efforts(cls, prim_path, efforts, indices):
+        assert len(indices) == len(efforts), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_actuation_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
+        current_targets = cls._READ_CACHE["dof_actuation_forces"][idx].copy()
+
+        # If there's already a target for this joint, update it.
+        if idx in cls._WRITE_CACHE["dof_actuation_forces"]:
+            current_targets = cls._WRITE_CACHE["dof_actuation_forces"][idx]
+        current_targets[indices] = efforts
+
+        # Write the new target
+        cls._WRITE_CACHE["dof_actuation_forces"][idx] = current_targets
+
+    @classmethod
+    def get_position_orientation(cls, prim_path):
+        if "root_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
+
+        idx = cls._IDX[prim_path]
+        pose = cls._READ_CACHE["root_transforms"][idx]
+        return pose[:3], pose[3:]
+
+    @classmethod
+    def get_linear_velocity(cls, prim_path):
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["root_velocities"][idx][:3]
+
+    @classmethod
+    def get_angular_velocity(cls, prim_path):
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["root_velocities"][idx][3:]
+
+    @classmethod
+    def get_relative_linear_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        linvel = cls.get_linear_velocity(prim_path)
+        return T.quat2mat(orn).T @ linvel
+
+    @classmethod
+    def get_relative_angular_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        angvel = cls.get_angular_velocity(prim_path)
+        return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
+
+    @classmethod
+    def get_joint_positions(cls, prim_path):
+        if "dof_positions" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_positions"][idx]
+
+    @classmethod
+    def get_joint_velocities(cls, prim_path):
+        if "dof_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_velocities"][idx]
+
+    @classmethod
+    def get_joint_efforts(cls, prim_path):
+        if "dof_projected_joint_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_projected_joint_forces"][idx]
+
+    @classmethod
+    def get_mass_matrix(cls, prim_path):
+        if "mass_matrices" not in cls._READ_CACHE:
+            cls._READ_CACHE["mass_matrices"] = cls._VIEW.get_mass_matrices()
+
+        idx = cls._IDX[prim_path]
+        # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
+        return cls._READ_CACHE["mass_matrices"][idx]
+
+    @classmethod
+    def get_generalized_gravity_forces(cls, prim_path):
+        if "generalized_gravity_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["generalized_gravity_forces"][idx]
+
+    @classmethod
+    def get_coriolis_and_centrifugal_forces(cls, prim_path):
+        if "coriolis_and_centrifugal_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["coriolis_and_centrifugal_forces"][idx]
+
+    @classmethod
+    def get_link_relative_position_orientation(cls, prim_path, link_name):
+        if "link_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        pose = cls._READ_CACHE["link_transforms"][idx][link_idx]
+        pos, orn = pose[:3], pose[3:]
+
+        # Get the root world transform too
+        world_pos, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.relative_pose_transform(pos, orn, world_pos, world_orn)
+
+    @classmethod
+    def get_link_relative_linear_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        linvel = vel[:3]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.quat2mat(world_orn).T @ linvel
+
+    @classmethod
+    def get_link_relative_angular_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        angvel = vel[3:]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
     PoseAPI.invalidate()
     CollisionAPI.clear()
+    ControllableObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
