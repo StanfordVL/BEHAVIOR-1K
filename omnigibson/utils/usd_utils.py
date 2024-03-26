@@ -10,6 +10,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log, create_module_logger
@@ -175,34 +176,53 @@ def create_joint(
     return joint_prim
 
 
-class RigidContactAPI:
+class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
 
-    # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
-    _PATH_TO_ROW_IDX = None
-    _PATH_TO_COL_IDX = None
+    def __init__(self):
+        # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
+        self._PATH_TO_ROW_IDX = None
+        self._PATH_TO_COL_IDX = None
 
-    # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
-    # index in the contact view matrix
-    _ROW_IDX_TO_PATH = None
-    _COL_IDX_TO_PATH = None
+        # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
+        # index in the contact view matrix
+        self._ROW_IDX_TO_PATH = None
+        self._COL_IDX_TO_PATH = None
 
-    # Contact view for generating contact matrices at each timestep
-    _CONTACT_VIEW = None
+        # Contact view for generating contact matrices at each timestep
+        self._CONTACT_VIEW = None
 
-    # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
-    _CONTACT_MATRIX = None
+        # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+        self._CONTACT_MATRIX = None
 
-    # Current contact data cache containing forces, points, normals, separations, contact_counts, start_indices
-    _CONTACT_DATA = None
+        # Current contact data cache containing forces, points, normals, separations, contact_counts, start_indices
+        self._CONTACT_DATA = None
 
-    # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
-    _CONTACT_CACHE = None
+        # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
+        self._CONTACT_CACHE = None
 
     @classmethod
-    def initialize_view(cls):
+    def get_row_filter(cls):
+        return "/World/*/*"
+
+    @classmethod
+    def get_column_filters(cls):
+        filters = []
+        for obj in og.sim.scene.objects:
+            if obj.prim_type == PrimType.RIGID:
+                for link in obj.links.values():
+                    if not link.kinematic_only:
+                        filters.append([link.prim_path])
+
+        return filters
+
+    @classmethod
+    def get_max_contact_data_count(cls):
+        return 0
+
+    def initialize_view(self):
         """
         Initializes the rigid contact view. Note: Can only be done when sim is playing!
         """
@@ -212,18 +232,12 @@ class RigidContactAPI:
         # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
         # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
         # mapping aligns with omni's ordering!
-        i = 0
-        cls._PATH_TO_COL_IDX = dict()
-        for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
-                for link in obj.links.values():
-                    if not link.kinematic_only:
-                        cls._PATH_TO_COL_IDX[link.prim_path] = i
-                        i += 1
+        column_filters = self.get_column_filters()
+        self._PATH_TO_COL_IDX = {path: i for i, path in enumerate(column_filters)}
 
         # If there are no valid objects, clear the view and terminate early
-        if i == 0:
-            cls._CONTACT_VIEW = None
+        if len(column_filters) == 0:
+            self._CONTACT_VIEW = None
             return
 
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
@@ -231,59 +245,55 @@ class RigidContactAPI:
         # We also suppress the omni tensor plugin from giving warnings we expect
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
-                pattern="/World/*/*",
-                filter_patterns=list(cls._PATH_TO_COL_IDX.keys()),
+            self._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern=self.get_row_filter(),
+                filter_patterns=column_filters,
+                max_contact_data_count=self.get_max_contact_data_count(),
             )
 
         # Create deterministic mapping from path to row index
-        cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
+        self._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(self._CONTACT_VIEW.sensor_paths)}
 
         # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
-        cls._ROW_IDX_TO_PATH = np.array(list(cls._PATH_TO_ROW_IDX.keys()))
-        cls._COL_IDX_TO_PATH = np.array(list(cls._PATH_TO_COL_IDX.keys()))
+        self._ROW_IDX_TO_PATH = np.array(list(self._PATH_TO_ROW_IDX.keys()))
+        self._COL_IDX_TO_PATH = np.array(list(self._PATH_TO_COL_IDX.keys()))
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
-        n_bodies = len(cls._PATH_TO_COL_IDX)
-        assert cls._CONTACT_VIEW.filter_count == n_bodies, (
+        n_bodies = len(self._PATH_TO_COL_IDX)
+        assert self._CONTACT_VIEW.filter_count == n_bodies, (
             f"Got unexpected contact view shape. Expected: (N, {n_bodies}); "
-            f"got: (N, {cls._CONTACT_VIEW.filter_count})"
+            f"got: (N, {self._CONTACT_VIEW.filter_count})"
         )
 
-    @classmethod
-    def get_body_row_idx(cls, prim_path):
+    def get_body_row_idx(self, prim_path):
         """
         Returns:
             int: row idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_ROW_IDX[prim_path]
+        return self._PATH_TO_ROW_IDX[prim_path]
 
-    @classmethod
-    def get_body_col_idx(cls, prim_path):
+    def get_body_col_idx(self, prim_path):
         """
         Returns:
             int: col idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_COL_IDX[prim_path]
+        return self._PATH_TO_COL_IDX[prim_path]
 
-    @classmethod
-    def get_row_idx_prim_path(cls, idx):
+    def get_row_idx_prim_path(self, idx):
         """
         Returns:
             str: @prim_path corresponding to the row idx @idx in the contact matrix
         """
-        return cls._ROW_IDX_TO_PATH[idx]
+        return self._ROW_IDX_TO_PATH[idx]
 
-    @classmethod
-    def get_col_idx_prim_path(cls, idx):
+    def get_col_idx_prim_path(self, idx):
         """
         Returns:
             str: @prim_path corresponding to the column idx @idx in the contact matrix
         """
-        return cls._COL_IDX_TO_PATH[idx]
+        return self._COL_IDX_TO_PATH[idx]
 
-    @classmethod
-    def get_all_impulses(cls):
+    def get_all_impulses(self):
         """
         Grab all impulses at the current timestep
 
@@ -292,13 +302,12 @@ class RigidContactAPI:
                 in the simulator and M tracked rigid bodies
         """
         # Generate the contact matrix if it doesn't already exist
-        if cls._CONTACT_MATRIX is None:
-            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+        if self._CONTACT_MATRIX is None:
+            self._CONTACT_MATRIX = self._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
 
-        return cls._CONTACT_MATRIX
+        return self._CONTACT_MATRIX
 
-    @classmethod
-    def get_impulses(cls, prim_paths_a, prim_paths_b):
+    def get_impulses(self, prim_paths_a, prim_paths_b):
         """
         Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
         rigid prims from @prim_paths_b
@@ -314,28 +323,27 @@ class RigidContactAPI:
                 from @prim_paths_b
         """
         # Compute subset of matrix and return
-        idxs_a = [cls._PATH_TO_ROW_IDX[path] for path in prim_paths_a]
-        idxs_b = [cls._PATH_TO_COL_IDX[path] for path in prim_paths_b]
-        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+        idxs_a = [self._PATH_TO_ROW_IDX[path] for path in prim_paths_a]
+        idxs_b = [self._PATH_TO_COL_IDX[path] for path in prim_paths_b]
+        return self.get_all_impulses()[idxs_a][:, idxs_b]
 
-    @classmethod
-    def get_contact_data(cls, prim_path):
+    def get_contact_data(self, prim_path):
         # First check if the object has any contacts
-        impulses = cls.get_all_impulses()
-        row_idx = cls.get_body_row_idx(prim_path)
+        impulses = self.get_all_impulses()
+        row_idx = self.get_body_row_idx(prim_path)
         if not np.any(impulses[row_idx] > 0):
             return []
 
         # Get the contact targets' prim paths
         col_idxs = np.nonzero(impulses[row_idx] > 0)[0]
-        col_paths = [cls.get_col_idx_prim_path(idx) for idx in col_idxs]
+        col_paths = [self.get_col_idx_prim_path(idx) for idx in col_idxs]
 
         # Get the contact data
-        if cls._CONTACT_DATA is None:
-            cls._CONTACT_DATA = cls._CONTACT_VIEW.get_contact_data()
+        if self._CONTACT_DATA is None:
+            self._CONTACT_DATA = self._CONTACT_VIEW.get_contact_data()
 
         # Get the contact data for this prim
-        forces, points, normals, separations, contact_counts, start_indices = cls._CONTACT_DATA
+        forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_DATA
         start_idx = start_indices[row_idx]
         contact_count = contact_counts[row_idx]
         end_idx = start_idx + contact_count
@@ -370,8 +378,27 @@ class RigidContactAPI:
         )
         return []
 
-    @classmethod
-    def in_contact(cls, prim_paths_a, prim_paths_b):
+    def get_contact_data_from_columns(self, col_paths):
+        # First, find all of the rows that the prim is in contact with
+        impulses = self.get_all_impulses()
+        col_idx = [self.get_body_col_idx(prim_path) for prim_path in col_paths]
+        if not np.any(impulses[:, col_idx] > 0):
+            return []
+
+        # Get the contact targets' prim paths
+        row_idxs = np.nonzero(np.any(impulses[:, col_idx] > 0, axis=1))[0]
+        row_paths = [self.get_row_idx_prim_path(idx) for idx in row_idxs]
+
+        # Accumulate contacts for each row
+        return [
+            # TODO: Is it true that only the normal needs to be negated?
+            (row_path, col_path, force, point, -normal, separation)
+            for row_path in row_paths
+            for col_path, force, point, normal, separation in self.get_contact_data(row_path)
+            if col_path in col_paths
+        ]
+
+    def in_contact(self, prim_paths_a, prim_paths_b):
         """
         Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
 
@@ -386,19 +413,41 @@ class RigidContactAPI:
         """
         # Check if the contact tuple already exists in the cache; if so, return the value
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
-        if key not in cls._CONTACT_CACHE:
+        if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-        return cls._CONTACT_CACHE[key]
+            self._CONTACT_CACHE[key] = np.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return self._CONTACT_CACHE[key]
 
-    @classmethod
-    def clear(cls):
+    def clear(self):
         """
         Clears the internal contact matrix and cache
         """
-        cls._CONTACT_MATRIX = None
-        cls._CONTACT_DATA = None
-        cls._CONTACT_CACHE = dict()
+        self._CONTACT_MATRIX = None
+        self._CONTACT_DATA = None
+        self._CONTACT_CACHE = dict()
+
+
+# Instantiate the RigidContactAPI
+RigidContactAPI = RigidContactAPIImpl()
+
+
+class GripperRigidContactAPIImpl(RigidContactAPIImpl):
+    @classmethod
+    def get_column_filters(cls):
+        filters = []
+        for robot in og.sim.scene.robots:
+            if isinstance(robot, ManipulationRobot):
+                filters.extend(link.prim_path for links in robot.finger_links.values() for link in links)
+        return filters
+
+    @classmethod
+    def get_max_contact_data_count(cls):
+        # 2x per finger link, to be safe.
+        return cls.get_column_filters() * 2
+
+
+# Instantiate the GripperRigidContactAPI
+GripperRigidContactAPI = GripperRigidContactAPIImpl()
 
 
 class CollisionAPI:

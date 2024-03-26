@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, create_joint
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, create_joint
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -276,31 +276,51 @@ class ManipulationRobot(BaseRobot):
                     set of unique robot link prim_paths that it is in contact with
         """
         arm = self.default_arm if arm == "default" else arm
-        robot_contact_links = dict()
-        contact_data = set()
-        # Find all objects in contact with all finger joints for this arm
-        con_results = [con for link in self.finger_links[arm] for con in link.contact_list()]
 
         # Get robot contact links
         link_paths = set(self.link_prim_paths)
 
-        for con_res in con_results:
-            # Only add this contact if it's not a robot self-collision
-            other_contact_set = {con_res.body0, con_res.body1} - link_paths
-            if len(other_contact_set) == 1:
-                link_contact, other_contact = (
-                    (con_res.body0, con_res.body1)
-                    if list(other_contact_set)[0] == con_res.body1
-                    else (con_res.body1, con_res.body0)
-                )
-                # Add to contact data
-                contact_data.add(
-                    (other_contact, tuple(con_res.position)) if return_contact_positions else other_contact
-                )
-                # Also add robot contact link info
+        if not return_contact_positions:
+            # If return contact positions is False, we only need to return the contact prim_paths.
+            # For this we can simply use the impulse matrix.
+            impulses = GripperRigidContactAPI.get_all_impulses()
+            interesting_col_paths = [link.prim_path for link in self.finger_links[arm]]
+            interesting_columns = [GripperRigidContactAPI.get_body_col_idx(pp) for pp in interesting_col_paths]
+
+            # Get the interesting-columns from the impulse matrix
+            interesting_impulse_columns = impulses[:, interesting_columns]
+            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0), axis=1)[0]
+            interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(i) for i in interesting_row_idxes]
+
+            # Get the full interesting section of the impulse matrix
+            interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
+
+            # Get all of the (row, col) pairs where the impulse is greater than 0
+            raw_contact_data = {
+                (interesting_row_paths[row], interesting_col_paths[col])
+                for row, col in np.argwhere(interesting_impulses > 0)
+                if interesting_row_paths[row] not in link_paths
+            }
+
+            # Translate that to robot contact data
+            robot_contact_links = {}
+            for con_data in contact_data:
+                other_contact, link_contact = con_data
                 if other_contact not in robot_contact_links:
                     robot_contact_links[other_contact] = set()
                 robot_contact_links[other_contact].add(link_contact)
+
+            return {other for other, _ in raw_contact_data}, robot_contact_links
+
+        # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
+        contacts = GripperRigidContactAPI.get_contact_data_from_columns(link_paths)
+        contact_data = {(contact[0], contact[3]) for contact in contacts}
+        robot_contact_links = {}
+        for con_data in contacts:
+            other_contact, link_contact = con_data[:2]
+            if other_contact not in robot_contact_links:
+                robot_contact_links[other_contact] = set()
+            robot_contact_links[other_contact].add(link_contact)
 
         return contact_data, robot_contact_links
 
