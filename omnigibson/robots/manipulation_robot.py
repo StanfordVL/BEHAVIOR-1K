@@ -19,7 +19,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, create_joint
 from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
@@ -383,8 +383,8 @@ class ManipulationRobot(BaseRobot):
         fcns = super().get_control_dict()
 
         # TODO: Implement these also with the view.
-        # for arm in self.arm_names:
-        #     self._add_arm_control_dict(fcns=fcns, arm=arm)
+        for arm in self.arm_names:
+            self._add_arm_control_dict(fcns=fcns, arm=arm)
 
         return fcns
 
@@ -397,15 +397,24 @@ class ManipulationRobot(BaseRobot):
             fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
             arm (str): specific arm to generate necessary control dict entries for
         """
-        fcns[f"_eef_{arm}_pos_quat_relative"] = lambda: self.get_relative_eef_pose(arm)
+        fcns[f"_eef_{arm}_pos_quat_relative"] = (
+            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, self.eef_link_names[arm]
+            )
+        )
         fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
         fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
-        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: self.get_relative_eef_lin_vel(arm)
-        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: self.get_relative_eef_ang_vel(arm)
+        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
+            self.articulation_root_path, self.eef_link_names[arm]
+        )
+        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
+            self.articulation_root_path, self.eef_link_names[arm]
+        )
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        # TODO: Replace this with a ControllableObjectViewAPI call too.
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
             eef_link_idx, :, -self.n_joints :
         ]

@@ -633,12 +633,11 @@ class ControllableObjectViewAPI:
     _VIEW = None
     _CACHE = {}
     _IDX = {}
+    _LINK_IDX = {}
 
     @classmethod
     def clear(cls):
-        cls._VIEW = None
         cls._CACHE = {}
-        cls._IDX = {}
 
     @classmethod
     def flush_control(cls):
@@ -687,6 +686,10 @@ class ControllableObjectViewAPI:
 
         # Create the mapping from prim path to index
         cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
+        cls._LINK_IDX = [
+            {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
+            for articulation_link_paths in cls._VIEW.link_paths
+        ]
 
     @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):
@@ -753,7 +756,7 @@ class ControllableObjectViewAPI:
     def get_relative_angular_velocity(cls, prim_path):
         orn = cls.get_position_orientation(prim_path)[1]
         angvel = cls.get_angular_velocity(prim_path)
-        return T.quat2mat(orn).T @ angvel
+        return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
 
     @classmethod
     def get_joint_positions(cls, prim_path):
@@ -803,6 +806,54 @@ class ControllableObjectViewAPI:
 
         idx = cls._IDX[prim_path]
         return cls._CACHE["coriolis_and_centrifugal_forces"][idx]
+
+    @classmethod
+    def get_link_relative_position_orientation(cls, prim_path, link_name):
+        if "link_transforms" not in cls._CACHE:
+            cls._CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
+        pose = cls._CACHE["link_transforms"][idx][link_idx]
+        pos, orn = pose[:3], pose[3:]
+
+        # Get the root world transform too
+        world_pos, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.relative_pose_transform(pos, orn, world_pos, world_orn)
+
+    @classmethod
+    def get_link_relative_linear_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._CACHE:
+            cls._CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
+        vel = cls._CACHE["link_velocities"][idx][link_idx]
+        linvel = vel[:3]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.quat2mat(world_orn).T @ linvel
+
+    @classmethod
+    def get_link_relative_angular_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._CACHE:
+            cls._CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._VIEW._LINK_IDX[idx][link_name]
+        vel = cls._CACHE["link_velocities"][idx][link_idx]
+        angvel = vel[3:]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
 
 
 def clear():
