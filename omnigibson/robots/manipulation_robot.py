@@ -289,7 +289,7 @@ class ManipulationRobot(BaseRobot):
 
             # Get the interesting-columns from the impulse matrix
             interesting_impulse_columns = impulses[:, interesting_columns]
-            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0), axis=1)[0]
+            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
             interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(i) for i in interesting_row_idxes]
 
             # Get the full interesting section of the impulse matrix
