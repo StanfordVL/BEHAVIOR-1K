@@ -2,6 +2,7 @@ from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 
 from omnigibson.macros import create_module_macros
 from omnigibson.sensors import (
@@ -15,10 +16,12 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.gym_utils import GymObservable
-from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, add_asset_to_stage
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 from omnigibson.utils.constants import PrimType
+
+import omnigibson.utils.transform_utils as T
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()
@@ -351,11 +354,21 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: keyword-mapped proprioception observations available for this robot.
                 Can be extended by subclasses
         """
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
-        joint_efforts = self.get_joint_efforts(normalized=False)
-        pos, ori = self.get_position(), self.get_rpy()
-        ori_2d = self.get_2d_orientation()
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_efforts = ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
+        pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
+        ori = T.quat2euler(quat)
+
+        # Compute ori2d
+        ori_2d = 0.0
+        fwd = R.from_quat(quat).apply([1, 0, 0])
+        fwd[2] = 0.0
+        if np.linalg.norm(fwd) > 1e-4:
+            fwd /= np.linalg.norm(fwd)
+            ori_2d = np.arctan2(fwd[1], fwd[0])
+
+        # Pack everything together
         return dict(
             joint_qpos=joint_positions,
             joint_qpos_sin=np.sin(joint_positions),
@@ -368,8 +381,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_2d_ori=ori_2d,
             robot_2d_ori_cos=np.cos(ori_2d),
             robot_2d_ori_sin=np.sin(ori_2d),
-            robot_lin_vel=self.get_linear_velocity(),
-            robot_ang_vel=self.get_angular_velocity(),
+            robot_lin_vel=ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path),
+            robot_ang_vel=ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path),
         )
 
     def _load_observation_space(self):

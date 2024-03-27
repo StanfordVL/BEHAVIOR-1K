@@ -444,8 +444,8 @@ class ManipulationRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Loop over all arms to grab proprio info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         for arm in self.arm_names:
             # Add arm info
             dic["arm_{}_qpos".format(arm)] = joint_positions[self.arm_control_idx[arm]]
@@ -454,10 +454,11 @@ class ManipulationRobot(BaseRobot):
             dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
             # Add eef and grasping info
-            dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
-            dic["eef_{}_quat_global".format(arm)] = self.get_eef_orientation(arm)
-            dic["eef_{}_pos".format(arm)] = self.get_relative_eef_position(arm)
-            dic["eef_{}_quat".format(arm)] = self.get_relative_eef_orientation(arm)
+            # TODO: Should we include this? Seems hacky.
+            # dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
+            # dic["eef_{}_quat_global".format(arm)] = self.get_eef_orientation(arm)
+            dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
+                ControllableObjectViewAPI.get_link_relative_position_orientation(self.eef_link_names[arm]))
             dic["grasp_{}".format(arm)] = np.array([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
