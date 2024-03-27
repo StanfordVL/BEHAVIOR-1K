@@ -1,0 +1,85 @@
+env:
+  initial_pos_z_offset: 0.1
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: Rs_int
+  trav_map_resolution: 0.1
+  trav_map_erosion: 2
+  trav_map_with_objects: true
+  build_graph: true
+  num_waypoints: 1
+  waypoint_resolution: 0.2
+  load_object_categories: null
+  not_load_object_categories: null
+  load_room_types: null
+  load_room_instances: null
+  seg_map_resolution: 0.1
+  scene_source: OG
+  include_robots: true
+
+robots:
+  - type: Tiago
+    obs_modalities: [scan, rgb, depth]
+    scale: 1.0
+    self_collisions: true
+    action_normalize: false
+    action_type: continuous
+    grasping_mode: sticky
+    rigid_trunk: false
+    default_arm_pose: diagonal30
+    default_trunk_offset: 0.365
+    controller_config:
+      base:
+        name: JointController
+        motor_type: velocity
+      # arm_left:
+      #   name: JointController
+      #   motor_type: position
+      #   command_input_limits: null
+      #   command_output_limits: null
+      #   use_delta_commands: false
+      arm_left:
+        name: InverseKinematicsController
+        motor_type: velocity
+        command_input_limits: null
+        command_output_limits: null
+        mode: pose_absolute_ori
+        kv: 3.0
+      arm_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_left:
+        name: MultiFingerGripperController
+        motor_type: position
+        mode: ternary
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        # use_single_command: true
+      gripper_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: true
+        # use_single_command: true
+      camera:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+
+# objects:
+#   - type: DatasetObject
+#     name: "cologne"
+#     category: "bottle_of_cologne"
+#     model: "lyipur"
+#     position: [-0.3, -0.8, 0.5]

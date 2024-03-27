@@ -749,6 +749,7 @@ def launch_simulator(*args, **kwargs):
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
             RigidContactAPI.clear()
+            GripperRigidContactAPI.clear()
             ControllableObjectViewAPI.clear()
 
         def play(self):

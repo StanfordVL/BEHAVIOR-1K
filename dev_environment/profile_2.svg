@@ -1,0 +1,415 @@
+<?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg version="1.1" width="1200" height="442" onload="init(evt)" viewBox="0 0 1200 442" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fg="http://github.com/jonhoo/inferno"><!--Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples.--><!--NOTES: --><defs><linearGradient id="background" y1="0" y2="1" x1="0" x2="0"><stop stop-color="#eeeeee" offset="5%"/><stop stop-color="#eeeeb0" offset="95%"/></linearGradient></defs><style type="text/css">
+text { font-family:"Verdana"; font-size:12px; fill:rgb(0,0,0); }
+#title { text-anchor:middle; font-size:17px; }
+#matched { text-anchor:end; }
+#search { text-anchor:end; opacity:0.1; cursor:pointer; }
+#search:hover, #search.show { opacity:1; }
+#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+#unzoom { cursor:pointer; }
+#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+.hide { display:none; }
+.parent { opacity:0.5; }
+</style><script type="text/ecmascript"><![CDATA[
+        var nametype = 'Function:';
+        var fontsize = 12;
+        var fontwidth = 0.59;
+        var xpad = 10;
+        var inverted = true;
+        var searchcolor = 'rgb(230,0,230)';
+        var fluiddrawing = true;
+        var truncate_text_right = false;
+    ]]><![CDATA["use strict";
+var details, searchbtn, unzoombtn, matchedtxt, svg, searching, frames;
+function init(evt) {
+    details = document.getElementById("details").firstChild;
+    searchbtn = document.getElementById("search");
+    unzoombtn = document.getElementById("unzoom");
+    matchedtxt = document.getElementById("matched");
+    svg = document.getElementsByTagName("svg")[0];
+    frames = document.getElementById("frames");
+    total_samples = parseInt(frames.attributes.total_samples.value);
+    searching = 0;
+
+    // Use GET parameters to restore a flamegraph's state.
+    var restore_state = function() {
+        var params = get_params();
+        if (params.x && params.y)
+            zoom(find_group(document.querySelector('[*|x="' + params.x + '"][y="' + params.y + '"]')));
+        if (params.s)
+            search(params.s);
+    };
+
+    if (fluiddrawing) {
+        // Make width dynamic so the SVG fits its parent's width.
+        svg.removeAttribute("width");
+        // Edge requires us to have a viewBox that gets updated with size changes.
+        var isEdge = /Edge\/\d./i.test(navigator.userAgent);
+        var update_for_width_change = function() {
+            if (isEdge) {
+                svg.attributes.viewBox.value = "0 0 " + svg.width.baseVal.value + " " + svg.height.baseVal.value;
+            }
+
+            // Keep consistent padding on left and right of frames container.
+            frames.attributes.width.value = svg.width.baseVal.value - xpad * 2;
+
+            // Text truncation needs to be adjusted for the current width.
+            var el = frames.children;
+            for(var i = 0; i < el.length; i++) {
+                update_text(el[i]);
+            }
+
+            // Keep search elements at a fixed distance from right edge.
+            var svgWidth = svg.width.baseVal.value;
+            searchbtn.attributes.x.value = svgWidth - xpad;
+            matchedtxt.attributes.x.value = svgWidth - xpad;
+        };
+        window.addEventListener('resize', function() {
+            update_for_width_change();
+        });
+        // This needs to be done asynchronously for Safari to work.
+        setTimeout(function() {
+            unzoom();
+            update_for_width_change();
+            restore_state();
+            if (!isEdge) {
+                svg.removeAttribute("viewBox");
+            }
+        }, 0);
+    } else {
+        restore_state();
+    }
+}
+// event listeners
+window.addEventListener("click", function(e) {
+    var target = find_group(e.target);
+    if (target) {
+        if (target.nodeName == "a") {
+            if (e.ctrlKey === false) return;
+            e.preventDefault();
+        }
+        if (target.classList.contains("parent")) unzoom();
+        zoom(target);
+
+        // set parameters for zoom state
+        var el = target.querySelector("rect");
+        if (el && el.attributes && el.attributes.y && el.attributes["fg:x"]) {
+            var params = get_params()
+            params.x = el.attributes["fg:x"].value;
+            params.y = el.attributes.y.value;
+            history.replaceState(null, null, parse_params(params));
+        }
+    }
+    else if (e.target.id == "unzoom") {
+        unzoom();
+
+        // remove zoom state
+        var params = get_params();
+        if (params.x) delete params.x;
+        if (params.y) delete params.y;
+        history.replaceState(null, null, parse_params(params));
+    }
+    else if (e.target.id == "search") search_prompt();
+}, false)
+// mouse-over for info
+// show
+window.addEventListener("mouseover", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = nametype + " " + g_to_text(target);
+}, false)
+// clear
+window.addEventListener("mouseout", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = ' ';
+}, false)
+// ctrl-F for search
+window.addEventListener("keydown",function (e) {
+    if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+        e.preventDefault();
+        search_prompt();
+    }
+}, false)
+// functions
+function get_params() {
+    var params = {};
+    var paramsarr = window.location.search.substr(1).split('&');
+    for (var i = 0; i < paramsarr.length; ++i) {
+        var tmp = paramsarr[i].split("=");
+        if (!tmp[0] || !tmp[1]) continue;
+        params[tmp[0]]  = decodeURIComponent(tmp[1]);
+    }
+    return params;
+}
+function parse_params(params) {
+    var uri = "?";
+    for (var key in params) {
+        uri += key + '=' + encodeURIComponent(params[key]) + '&';
+    }
+    if (uri.slice(-1) == "&")
+        uri = uri.substring(0, uri.length - 1);
+    if (uri == '?')
+        uri = window.location.href.split('?')[0];
+    return uri;
+}
+function find_child(node, selector) {
+    var children = node.querySelectorAll(selector);
+    if (children.length) return children[0];
+    return;
+}
+function find_group(node) {
+    var parent = node.parentElement;
+    if (!parent) return;
+    if (parent.id == "frames") return node;
+    return find_group(parent);
+}
+function orig_save(e, attr, val) {
+    if (e.attributes["fg:orig_" + attr] != undefined) return;
+    if (e.attributes[attr] == undefined) return;
+    if (val == undefined) val = e.attributes[attr].value;
+    e.setAttribute("fg:orig_" + attr, val);
+}
+function orig_load(e, attr) {
+    if (e.attributes["fg:orig_"+attr] == undefined) return;
+    e.attributes[attr].value = e.attributes["fg:orig_" + attr].value;
+    e.removeAttribute("fg:orig_" + attr);
+}
+function g_to_text(e) {
+    var text = find_child(e, "title").firstChild.nodeValue;
+    return (text)
+}
+function g_to_func(e) {
+    var func = g_to_text(e);
+    // if there's any manipulation we want to do to the function
+    // name before it's searched, do it here before returning.
+    return (func);
+}
+function update_text(e) {
+    var r = find_child(e, "rect");
+    var t = find_child(e, "text");
+    var w = parseFloat(r.attributes.width.value) * frames.attributes.width.value / 100 - 3;
+    var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+    t.attributes.x.value = format_percent((parseFloat(r.attributes.x.value) + (100 * 3 / frames.attributes.width.value)));
+    // Smaller than this size won't fit anything
+    if (w < 2 * fontsize * fontwidth) {
+        t.textContent = "";
+        return;
+    }
+    t.textContent = txt;
+    // Fit in full text width
+    if (/^ *\$/.test(txt) || t.getComputedTextLength() < w)
+        return;
+    if (truncate_text_right) {
+        // Truncate the right side of the text.
+        for (var x = txt.length - 2; x > 0; x--) {
+            if (t.getSubStringLength(0, x + 2) <= w) {
+                t.textContent = txt.substring(0, x) + "..";
+                return;
+            }
+        }
+    } else {
+        // Truncate the left side of the text.
+        for (var x = 2; x < txt.length; x++) {
+            if (t.getSubStringLength(x - 2, txt.length) <= w) {
+                t.textContent = ".." + txt.substring(x, txt.length);
+                return;
+            }
+        }
+    }
+    t.textContent = "";
+}
+// zoom
+function zoom_reset(e) {
+    if (e.tagName == "rect") {
+        e.attributes.x.value = format_percent(100 * parseInt(e.attributes["fg:x"].value) / total_samples);
+        e.attributes.width.value = format_percent(100 * parseInt(e.attributes["fg:w"].value) / total_samples);
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_reset(c[i]);
+    }
+}
+function zoom_child(e, x, zoomed_width_samples) {
+    if (e.tagName == "text") {
+        var parent_x = parseFloat(find_child(e.parentNode, "rect[x]").attributes.x.value);
+        e.attributes.x.value = format_percent(parent_x + (100 * 3 / frames.attributes.width.value));
+    } else if (e.tagName == "rect") {
+        e.attributes.x.value = format_percent(100 * (parseInt(e.attributes["fg:x"].value) - x) / zoomed_width_samples);
+        e.attributes.width.value = format_percent(100 * parseInt(e.attributes["fg:w"].value) / zoomed_width_samples);
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_child(c[i], x, zoomed_width_samples);
+    }
+}
+function zoom_parent(e) {
+    if (e.attributes) {
+        if (e.attributes.x != undefined) {
+            e.attributes.x.value = "0.0%";
+        }
+        if (e.attributes.width != undefined) {
+            e.attributes.width.value = "100.0%";
+        }
+    }
+    if (e.childNodes == undefined) return;
+    for(var i = 0, c = e.childNodes; i < c.length; i++) {
+        zoom_parent(c[i]);
+    }
+}
+function zoom(node) {
+    var attr = find_child(node, "rect").attributes;
+    var width = parseInt(attr["fg:w"].value);
+    var xmin = parseInt(attr["fg:x"].value);
+    var xmax = xmin + width;
+    var ymin = parseFloat(attr.y.value);
+    unzoombtn.classList.remove("hide");
+    var el = frames.children;
+    for (var i = 0; i < el.length; i++) {
+        var e = el[i];
+        var a = find_child(e, "rect").attributes;
+        var ex = parseInt(a["fg:x"].value);
+        var ew = parseInt(a["fg:w"].value);
+        // Is it an ancestor
+        if (!inverted) {
+            var upstack = parseFloat(a.y.value) > ymin;
+        } else {
+            var upstack = parseFloat(a.y.value) < ymin;
+        }
+        if (upstack) {
+            // Direct ancestor
+            if (ex <= xmin && (ex+ew) >= xmax) {
+                e.classList.add("parent");
+                zoom_parent(e);
+                update_text(e);
+            }
+            // not in current path
+            else
+                e.classList.add("hide");
+        }
+        // Children maybe
+        else {
+            // no common path
+            if (ex < xmin || ex >= xmax) {
+                e.classList.add("hide");
+            }
+            else {
+                zoom_child(e, xmin, width);
+                update_text(e);
+            }
+        }
+    }
+}
+function unzoom() {
+    unzoombtn.classList.add("hide");
+    var el = frames.children;
+    for(var i = 0; i < el.length; i++) {
+        el[i].classList.remove("parent");
+        el[i].classList.remove("hide");
+        zoom_reset(el[i]);
+        update_text(el[i]);
+    }
+}
+// search
+function reset_search() {
+    var el = document.querySelectorAll("#frames rect");
+    for (var i = 0; i < el.length; i++) {
+        orig_load(el[i], "fill")
+    }
+    var params = get_params();
+    delete params.s;
+    history.replaceState(null, null, parse_params(params));
+}
+function search_prompt() {
+    if (!searching) {
+        var term = prompt("Enter a search term (regexp " +
+            "allowed, eg: ^ext4_)", "");
+        if (term != null) {
+            search(term)
+        }
+    } else {
+        reset_search();
+        searching = 0;
+        searchbtn.classList.remove("show");
+        searchbtn.firstChild.nodeValue = "Search"
+        matchedtxt.classList.add("hide");
+        matchedtxt.firstChild.nodeValue = ""
+    }
+}
+function search(term) {
+    var re = new RegExp(term);
+    var el = frames.children;
+    var matches = new Object();
+    var maxwidth = 0;
+    for (var i = 0; i < el.length; i++) {
+        var e = el[i];
+        // Skip over frames which are either not visible, or below the zoomed-to frame
+        if (e.classList.contains("hide") || e.classList.contains("parent")) {
+            continue;
+        }
+        var func = g_to_func(e);
+        var rect = find_child(e, "rect");
+        if (func == null || rect == null)
+            continue;
+        // Save max width. Only works as we have a root frame
+        var w = parseInt(rect.attributes["fg:w"].value);
+        if (w > maxwidth)
+            maxwidth = w;
+        if (func.match(re)) {
+            // highlight
+            var x = parseInt(rect.attributes["fg:x"].value);
+            orig_save(rect, "fill");
+            rect.attributes.fill.value = searchcolor;
+            // remember matches
+            if (matches[x] == undefined) {
+                matches[x] = w;
+            } else {
+                if (w > matches[x]) {
+                    // overwrite with parent
+                    matches[x] = w;
+                }
+            }
+            searching = 1;
+        }
+    }
+    if (!searching)
+        return;
+    var params = get_params();
+    params.s = term;
+    history.replaceState(null, null, parse_params(params));
+
+    searchbtn.classList.add("show");
+    searchbtn.firstChild.nodeValue = "Reset Search";
+    // calculate percent matched, excluding vertical overlap
+    var count = 0;
+    var lastx = -1;
+    var lastw = 0;
+    var keys = Array();
+    for (k in matches) {
+        if (matches.hasOwnProperty(k))
+            keys.push(k);
+    }
+    // sort the matched frames by their x location
+    // ascending, then width descending
+    keys.sort(function(a, b){
+        return a - b;
+    });
+    // Step through frames saving only the biggest bottom-up frames
+    // thanks to the sort order. This relies on the tree property
+    // where children are always smaller than their parents.
+    for (var k in keys) {
+        var x = parseInt(keys[k]);
+        var w = matches[keys[k]];
+        if (x >= lastx + lastw) {
+            count += w;
+            lastx = x;
+            lastw = w;
+        }
+    }
+    // display matched percent
+    matchedtxt.classList.remove("hide");
+    var pct = 100 * count / maxwidth;
+    if (pct != 100) pct = pct.toFixed(1);
+    matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+}
+function format_percent(n) {
+    return n.toFixed(4) + "%";
+}
+]]></script><rect x="0" y="0" width="100%" height="442" fill="url(#background)"/><text id="title" x="50.0000%" y="24.00">py-spy record -o profile_2.svg --pid 46369</text><text id="details" x="10" y="40.00"> </text><text id="unzoom" class="hide" x="10" y="24.00">Reset Zoom</text><text id="search" x="1190" y="24.00">Search</text><text id="matched" x="1190" y="431.00"> </text><svg id="frames" x="10" width="1180" total_samples="1418"><g><title>main (test_multiple_envs.py:55) (2 samples, 0.14%)</title><rect x="0.0000%" y="84" width="0.1410%" height="15" fill="rgb(227,0,7)" fg:x="0" fg:w="2"/><text x="0.2500%" y="94.50"></text></g><g><title>sample (gymnasium/spaces/box.py:218) (2 samples, 0.14%)</title><rect x="0.0000%" y="100" width="0.1410%" height="15" fill="rgb(217,0,24)" fg:x="0" fg:w="2"/><text x="0.2500%" y="110.50"></text></g><g><title>get_control_dict (omnigibson/robots/manipulation_robot.py:378) (2 samples, 0.14%)</title><rect x="0.2116%" y="148" width="0.1410%" height="15" fill="rgb(221,193,54)" fg:x="3" fg:w="2"/><text x="0.4616%" y="158.50"></text></g><g><title>_update_goal (omnigibson/controllers/joint_controller.py:113) (2 samples, 0.14%)</title><rect x="0.4937%" y="164" width="0.1410%" height="15" fill="rgb(248,212,6)" fg:x="7" fg:w="2"/><text x="0.7437%" y="174.50"></text></g><g><title>__getitem__ (omnigibson/utils/python_utils.py:728) (2 samples, 0.14%)</title><rect x="0.4937%" y="180" width="0.1410%" height="15" fill="rgb(208,68,35)" fg:x="7" fg:w="2"/><text x="0.7437%" y="190.50"></text></g><g><title>get (omnigibson/utils/python_utils.py:747) (2 samples, 0.14%)</title><rect x="0.4937%" y="196" width="0.1410%" height="15" fill="rgb(232,128,0)" fg:x="7" fg:w="2"/><text x="0.7437%" y="206.50"></text></g><g><title>step (omnigibson/envs/vec_env_base.py:14) (8 samples, 0.56%)</title><rect x="0.1410%" y="100" width="0.5642%" height="15" fill="rgb(207,160,47)" fg:x="2" fg:w="8"/><text x="0.3910%" y="110.50"></text></g><g><title>_pre_step (omnigibson/envs/env_base.py:538) (7 samples, 0.49%)</title><rect x="0.2116%" y="116" width="0.4937%" height="15" fill="rgb(228,23,34)" fg:x="3" fg:w="7"/><text x="0.4616%" y="126.50"></text></g><g><title>apply_action (omnigibson/objects/controllable_object.py:315) (7 samples, 0.49%)</title><rect x="0.2116%" y="132" width="0.4937%" height="15" fill="rgb(218,30,26)" fg:x="3" fg:w="7"/><text x="0.4616%" y="142.50"></text></g><g><title>update_goal (omnigibson/controllers/controller_base.py:204) (4 samples, 0.28%)</title><rect x="0.4231%" y="148" width="0.2821%" height="15" fill="rgb(220,122,19)" fg:x="6" fg:w="4"/><text x="0.6731%" y="158.50"></text></g><g><title>step (omnigibson/simulator.py:772) (2 samples, 0.14%)</title><rect x="0.7052%" y="116" width="0.1410%" height="15" fill="rgb(250,228,42)" fg:x="10" fg:w="2"/><text x="0.9552%" y="126.50"></text></g><g><title>n_physics_timesteps_per_render (omnigibson/simulator.py:753) (2 samples, 0.14%)</title><rect x="0.7052%" y="132" width="0.1410%" height="15" fill="rgb(240,193,28)" fg:x="10" fg:w="2"/><text x="0.9552%" y="142.50"></text></g><g><title>step (core/simulation_context/simulation_context.py:689) (3 samples, 0.21%)</title><rect x="0.8463%" y="132" width="0.2116%" height="15" fill="rgb(216,20,37)" fg:x="12" fg:w="3"/><text x="1.0963%" y="142.50"></text></g><g><title>stage (core/simulation_context/simulation_context.py:291) (3 samples, 0.21%)</title><rect x="0.8463%" y="148" width="0.2116%" height="15" fill="rgb(206,188,39)" fg:x="12" fg:w="3"/><text x="1.0963%" y="158.50"></text></g><g><title>get_current_stage (core/utils/stage.py:52) (3 samples, 0.21%)</title><rect x="0.8463%" y="164" width="0.2116%" height="15" fill="rgb(217,207,13)" fg:x="12" fg:w="3"/><text x="1.0963%" y="174.50"></text></g><g><title>_step (core/physics_context/physics_context.py:573) (9 samples, 0.63%)</title><rect x="1.0578%" y="148" width="0.6347%" height="15" fill="rgb(231,73,38)" fg:x="15" fg:w="9"/><text x="1.3078%" y="158.50"></text></g><g><title>get_joint_positions (core/articulations/articulation_view.py:1444) (2 samples, 0.14%)</title><rect x="62.7645%" y="212" width="0.1410%" height="15" fill="rgb(225,20,46)" fg:x="890" fg:w="2"/><text x="63.0145%" y="222.50"></text></g><g><title>get_joint_positions (core/articulations/articulation_view.py:1445) (5 samples, 0.35%)</title><rect x="62.9055%" y="212" width="0.3526%" height="15" fill="rgb(210,31,41)" fg:x="892" fg:w="5"/><text x="63.1555%" y="222.50"></text></g><g><title>resolve_indices (core/utils/numpy/tensor.py:51) (4 samples, 0.28%)</title><rect x="62.9760%" y="228" width="0.2821%" height="15" fill="rgb(221,200,47)" fg:x="893" fg:w="4"/><text x="63.2260%" y="238.50"></text></g><g><title>get_joint_positions (omnigibson/prims/entity_prim.py:832) (16 samples, 1.13%)</title><rect x="62.6234%" y="196" width="1.1283%" height="15" fill="rgb(226,26,5)" fg:x="888" fg:w="16"/><text x="62.8734%" y="206.50"></text></g><g><title>get_joint_positions (core/articulations/articulation_view.py:1451) (4 samples, 0.28%)</title><rect x="63.4697%" y="212" width="0.2821%" height="15" fill="rgb(249,33,26)" fg:x="900" fg:w="4"/><text x="63.7197%" y="222.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (4 samples, 0.28%)</title><rect x="63.4697%" y="228" width="0.2821%" height="15" fill="rgb(235,183,28)" fg:x="900" fg:w="4"/><text x="63.7197%" y="238.50"></text></g><g><title>expand_dims (&lt;__array_function__ internals&gt;:180) (4 samples, 0.28%)</title><rect x="63.4697%" y="244" width="0.2821%" height="15" fill="rgb(221,5,38)" fg:x="900" fg:w="4"/><text x="63.7197%" y="254.50"></text></g><g><title>set_dof_positions (tensors/impl/api.py:445) (2 samples, 0.14%)</title><rect x="64.1749%" y="228" width="0.1410%" height="15" fill="rgb(247,18,42)" fg:x="910" fg:w="2"/><text x="64.4249%" y="238.50"></text></g><g><title>get_tensor_desc (tensors/impl/frontend_np.py:62) (2 samples, 0.14%)</title><rect x="64.1749%" y="244" width="0.1410%" height="15" fill="rgb(241,131,45)" fg:x="910" fg:w="2"/><text x="64.4249%" y="254.50"></text></g><g><title>set_dof_positions (tensors/impl/api.py:446) (2 samples, 0.14%)</title><rect x="64.3159%" y="228" width="0.1410%" height="15" fill="rgb(249,31,29)" fg:x="912" fg:w="2"/><text x="64.5659%" y="238.50"></text></g><g><title>get_tensor_desc (tensors/impl/frontend_np.py:62) (2 samples, 0.14%)</title><rect x="64.3159%" y="244" width="0.1410%" height="15" fill="rgb(225,111,53)" fg:x="912" fg:w="2"/><text x="64.5659%" y="254.50"></text></g><g><title>set_joint_positions (omnigibson/utils/deprecated_utils.py:481) (7 samples, 0.49%)</title><rect x="64.0339%" y="212" width="0.4937%" height="15" fill="rgb(238,160,17)" fg:x="908" fg:w="7"/><text x="64.2839%" y="222.50"></text></g><g><title>step (omnigibson/robots/robot_base.py:280) (31 samples, 2.19%)</title><rect x="62.5529%" y="180" width="2.1862%" height="15" fill="rgb(214,148,48)" fg:x="887" fg:w="31"/><text x="62.8029%" y="190.50">s..</text></g><g><title>set_joint_positions (omnigibson/prims/entity_prim.py:636) (13 samples, 0.92%)</title><rect x="63.8223%" y="196" width="0.9168%" height="15" fill="rgb(232,36,49)" fg:x="905" fg:w="13"/><text x="64.0723%" y="206.50"></text></g><g><title>set_joint_positions (omnigibson/utils/deprecated_utils.py:485) (3 samples, 0.21%)</title><rect x="64.5275%" y="212" width="0.2116%" height="15" fill="rgb(209,103,24)" fg:x="915" fg:w="3"/><text x="64.7775%" y="222.50"></text></g><g><title>set_joint_position_targets (core/articulations/articulation_view.py:908) (2 samples, 0.14%)</title><rect x="64.5980%" y="228" width="0.1410%" height="15" fill="rgb(229,88,8)" fg:x="916" fg:w="2"/><text x="64.8480%" y="238.50"></text></g><g><title>get_joint_velocities (omnigibson/prims/entity_prim.py:850) (2 samples, 0.14%)</title><rect x="64.8096%" y="196" width="0.1410%" height="15" fill="rgb(213,181,19)" fg:x="919" fg:w="2"/><text x="65.0596%" y="206.50"></text></g><g><title>set_joint_velocities (omnigibson/utils/deprecated_utils.py:545) (3 samples, 0.21%)</title><rect x="64.9506%" y="212" width="0.2116%" height="15" fill="rgb(254,191,54)" fg:x="921" fg:w="3"/><text x="65.2006%" y="222.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (3 samples, 0.21%)</title><rect x="64.9506%" y="228" width="0.2116%" height="15" fill="rgb(241,83,37)" fg:x="921" fg:w="3"/><text x="65.2006%" y="238.50"></text></g><g><title>expand_dims (&lt;__array_function__ internals&gt;:180) (3 samples, 0.21%)</title><rect x="64.9506%" y="244" width="0.2116%" height="15" fill="rgb(233,36,39)" fg:x="921" fg:w="3"/><text x="65.2006%" y="254.50"></text></g><g><title>set_dof_velocities (tensors/impl/api.py:454) (2 samples, 0.14%)</title><rect x="65.1622%" y="228" width="0.1410%" height="15" fill="rgb(226,3,54)" fg:x="924" fg:w="2"/><text x="65.4122%" y="238.50"></text></g><g><title>set_joint_velocities (omnigibson/utils/deprecated_utils.py:547) (3 samples, 0.21%)</title><rect x="65.1622%" y="212" width="0.2116%" height="15" fill="rgb(245,192,40)" fg:x="924" fg:w="3"/><text x="65.4122%" y="222.50"></text></g><g><title>step (omnigibson/robots/robot_base.py:281) (12 samples, 0.85%)</title><rect x="64.7391%" y="180" width="0.8463%" height="15" fill="rgb(238,167,29)" fg:x="918" fg:w="12"/><text x="64.9891%" y="190.50"></text></g><g><title>set_joint_velocities (omnigibson/prims/entity_prim.py:667) (9 samples, 0.63%)</title><rect x="64.9506%" y="196" width="0.6347%" height="15" fill="rgb(232,182,51)" fg:x="921" fg:w="9"/><text x="65.2006%" y="206.50"></text></g><g><title>set_joint_velocities (omnigibson/utils/deprecated_utils.py:551) (3 samples, 0.21%)</title><rect x="65.3738%" y="212" width="0.2116%" height="15" fill="rgb(231,60,39)" fg:x="927" fg:w="3"/><text x="65.6238%" y="222.50"></text></g><g><title>get_world_poses (core/articulations/articulation_view.py:1798) (2 samples, 0.14%)</title><rect x="65.6559%" y="212" width="0.1410%" height="15" fill="rgb(208,69,12)" fg:x="931" fg:w="2"/><text x="65.9059%" y="222.50"></text></g><g><title>get_world_poses (core/articulations/articulation_view.py:1802) (2 samples, 0.14%)</title><rect x="65.7969%" y="212" width="0.1410%" height="15" fill="rgb(235,93,37)" fg:x="933" fg:w="2"/><text x="66.0469%" y="222.50"></text></g><g><title>get_position_orientation (omnigibson/prims/entity_prim.py:950) (12 samples, 0.85%)</title><rect x="65.6559%" y="196" width="0.8463%" height="15" fill="rgb(213,116,39)" fg:x="931" fg:w="12"/><text x="65.9059%" y="206.50"></text></g><g><title>get_world_poses (core/articulations/articulation_view.py:1803) (8 samples, 0.56%)</title><rect x="65.9379%" y="212" width="0.5642%" height="15" fill="rgb(222,207,29)" fg:x="935" fg:w="8"/><text x="66.1879%" y="222.50"></text></g><g><title>xyzw2wxyz (core/utils/numpy/rotations.py:191) (8 samples, 0.56%)</title><rect x="65.9379%" y="228" width="0.5642%" height="15" fill="rgb(206,96,30)" fg:x="935" fg:w="8"/><text x="66.1879%" y="238.50"></text></g><g><title>roll (&lt;__array_function__ internals&gt;:180) (8 samples, 0.56%)</title><rect x="65.9379%" y="244" width="0.5642%" height="15" fill="rgb(218,138,4)" fg:x="935" fg:w="8"/><text x="66.1879%" y="254.50"></text></g><g><title>roll (numpy/core/numeric.py:1248) (2 samples, 0.14%)</title><rect x="66.3611%" y="260" width="0.1410%" height="15" fill="rgb(250,191,14)" fg:x="941" fg:w="2"/><text x="66.6111%" y="270.50"></text></g><g><title>set_position_orientation (omnigibson/prims/entity_prim.py:924) (2 samples, 0.14%)</title><rect x="66.5021%" y="196" width="0.1410%" height="15" fill="rgb(239,60,40)" fg:x="943" fg:w="2"/><text x="66.7521%" y="206.50"></text></g><g><title>kinematic_only (omnigibson/prims/entity_prim.py:1249) (2 samples, 0.14%)</title><rect x="66.5021%" y="212" width="0.1410%" height="15" fill="rgb(206,27,48)" fg:x="943" fg:w="2"/><text x="66.7521%" y="222.50"></text></g><g><title>kinematic_only (omnigibson/prims/rigid_prim.py:498) (2 samples, 0.14%)</title><rect x="66.5021%" y="228" width="0.1410%" height="15" fill="rgb(225,35,8)" fg:x="943" fg:w="2"/><text x="66.7521%" y="238.50"></text></g><g><title>get_attribute (omnigibson/prims/prim_base.py:222) (2 samples, 0.14%)</title><rect x="66.5021%" y="244" width="0.1410%" height="15" fill="rgb(250,213,24)" fg:x="943" fg:w="2"/><text x="66.7521%" y="254.50"></text></g><g><title>get_world_poses (core/articulations/articulation_view.py:1799) (2 samples, 0.14%)</title><rect x="66.7137%" y="228" width="0.1410%" height="15" fill="rgb(247,123,22)" fg:x="946" fg:w="2"/><text x="66.9637%" y="238.50"></text></g><g><title>set_world_poses (core/articulations/articulation_view.py:1728) (3 samples, 0.21%)</title><rect x="66.7137%" y="212" width="0.2116%" height="15" fill="rgb(231,138,38)" fg:x="946" fg:w="3"/><text x="66.9637%" y="222.50"></text></g><g><title>step (omnigibson/robots/robot_base.py:282) (23 samples, 1.62%)</title><rect x="65.5853%" y="180" width="1.6220%" height="15" fill="rgb(231,145,46)" fg:x="930" fg:w="23"/><text x="65.8353%" y="190.50"></text></g><g><title>set_position_orientation (omnigibson/prims/entity_prim.py:938) (7 samples, 0.49%)</title><rect x="66.7137%" y="196" width="0.4937%" height="15" fill="rgb(251,118,11)" fg:x="946" fg:w="7"/><text x="66.9637%" y="206.50"></text></g><g><title>set_world_poses (core/articulations/articulation_view.py:1740) (3 samples, 0.21%)</title><rect x="66.9958%" y="212" width="0.2116%" height="15" fill="rgb(217,147,25)" fg:x="950" fg:w="3"/><text x="67.2458%" y="222.50"></text></g><g><title>get_control_dict (omnigibson/robots/manipulation_robot.py:380) (2 samples, 0.14%)</title><rect x="67.2779%" y="212" width="0.1410%" height="15" fill="rgb(247,81,37)" fg:x="954" fg:w="2"/><text x="67.5279%" y="222.50"></text></g><g><title>step (omnigibson/objects/controllable_object.py:332) (9 samples, 0.63%)</title><rect x="67.2073%" y="196" width="0.6347%" height="15" fill="rgb(209,12,38)" fg:x="953" fg:w="9"/><text x="67.4573%" y="206.50"></text></g><g><title>get_control_dict (omnigibson/robots/manipulation_robot.py:381) (6 samples, 0.42%)</title><rect x="67.4189%" y="212" width="0.4231%" height="15" fill="rgb(227,1,9)" fg:x="956" fg:w="6"/><text x="67.6689%" y="222.50"></text></g><g><title>_add_arm_control_dict (omnigibson/robots/manipulation_robot.py:402) (5 samples, 0.35%)</title><rect x="67.4894%" y="228" width="0.3526%" height="15" fill="rgb(248,47,43)" fg:x="957" fg:w="5"/><text x="67.7394%" y="238.50"></text></g><g><title>eef_links (omnigibson/robots/manipulation_robot.py:604) (2 samples, 0.14%)</title><rect x="67.7010%" y="244" width="0.1410%" height="15" fill="rgb(221,10,30)" fg:x="960" fg:w="2"/><text x="67.9510%" y="254.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:509) (3 samples, 0.21%)</title><rect x="68.2652%" y="276" width="0.2116%" height="15" fill="rgb(210,229,1)" fg:x="968" fg:w="3"/><text x="68.5152%" y="286.50"></text></g><g><title>get_joint_positions (omnigibson/prims/entity_prim.py:832) (3 samples, 0.21%)</title><rect x="68.2652%" y="292" width="0.2116%" height="15" fill="rgb(222,148,37)" fg:x="968" fg:w="3"/><text x="68.5152%" y="302.50"></text></g><g><title>get_joint_positions (core/articulations/articulation_view.py:1451) (2 samples, 0.14%)</title><rect x="68.3357%" y="308" width="0.1410%" height="15" fill="rgb(234,67,33)" fg:x="969" fg:w="2"/><text x="68.5857%" y="318.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (2 samples, 0.14%)</title><rect x="68.3357%" y="324" width="0.1410%" height="15" fill="rgb(247,98,35)" fg:x="969" fg:w="2"/><text x="68.5857%" y="334.50"></text></g><g><title>expand_dims (&lt;__array_function__ internals&gt;:180) (2 samples, 0.14%)</title><rect x="68.3357%" y="340" width="0.1410%" height="15" fill="rgb(247,138,52)" fg:x="969" fg:w="2"/><text x="68.5857%" y="350.50"></text></g><g><title>expand_dims (numpy/lib/shape_base.py:597) (2 samples, 0.14%)</title><rect x="68.3357%" y="356" width="0.1410%" height="15" fill="rgb(213,79,30)" fg:x="969" fg:w="2"/><text x="68.5857%" y="366.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:166) (9 samples, 0.63%)</title><rect x="68.1241%" y="228" width="0.6347%" height="15" fill="rgb(246,177,23)" fg:x="966" fg:w="9"/><text x="68.3741%" y="238.50"></text></g><g><title>__getitem__ (omnigibson/utils/python_utils.py:728) (8 samples, 0.56%)</title><rect x="68.1946%" y="244" width="0.5642%" height="15" fill="rgb(230,62,27)" fg:x="967" fg:w="8"/><text x="68.4446%" y="254.50"></text></g><g><title>get (omnigibson/utils/python_utils.py:747) (8 samples, 0.56%)</title><rect x="68.1946%" y="260" width="0.5642%" height="15" fill="rgb(216,154,8)" fg:x="967" fg:w="8"/><text x="68.4446%" y="270.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:510) (4 samples, 0.28%)</title><rect x="68.4767%" y="276" width="0.2821%" height="15" fill="rgb(244,35,45)" fg:x="971" fg:w="4"/><text x="68.7267%" y="286.50"></text></g><g><title>get_joint_velocities (omnigibson/prims/entity_prim.py:850) (4 samples, 0.28%)</title><rect x="68.4767%" y="292" width="0.2821%" height="15" fill="rgb(251,115,12)" fg:x="971" fg:w="4"/><text x="68.7267%" y="302.50"></text></g><g><title>get_joint_velocities (core/articulations/articulation_view.py:1517) (2 samples, 0.14%)</title><rect x="68.6178%" y="308" width="0.1410%" height="15" fill="rgb(240,54,50)" fg:x="973" fg:w="2"/><text x="68.8678%" y="318.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (2 samples, 0.14%)</title><rect x="68.6178%" y="324" width="0.1410%" height="15" fill="rgb(233,84,52)" fg:x="973" fg:w="2"/><text x="68.8678%" y="334.50"></text></g><g><title>expand_dims (&lt;__array_function__ internals&gt;:180) (2 samples, 0.14%)</title><rect x="68.6178%" y="340" width="0.1410%" height="15" fill="rgb(207,117,47)" fg:x="973" fg:w="2"/><text x="68.8678%" y="350.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:175) (3 samples, 0.21%)</title><rect x="68.8293%" y="228" width="0.2116%" height="15" fill="rgb(249,43,39)" fg:x="976" fg:w="3"/><text x="69.0793%" y="238.50"></text></g><g><title>_broadcast_to (numpy/lib/stride_tricks.py:349) (3 samples, 0.21%)</title><rect x="69.3230%" y="324" width="0.2116%" height="15" fill="rgb(209,38,44)" fg:x="983" fg:w="3"/><text x="69.5730%" y="334.50"></text></g><g><title>meshgrid (numpy/lib/function_base.py:4987) (6 samples, 0.42%)</title><rect x="69.1819%" y="260" width="0.4231%" height="15" fill="rgb(236,212,23)" fg:x="981" fg:w="6"/><text x="69.4319%" y="270.50"></text></g><g><title>broadcast_arrays (&lt;__array_function__ internals&gt;:180) (6 samples, 0.42%)</title><rect x="69.1819%" y="276" width="0.4231%" height="15" fill="rgb(242,79,21)" fg:x="981" fg:w="6"/><text x="69.4319%" y="286.50"></text></g><g><title>broadcast_arrays (numpy/lib/stride_tricks.py:546) (4 samples, 0.28%)</title><rect x="69.3230%" y="292" width="0.2821%" height="15" fill="rgb(211,96,35)" fg:x="983" fg:w="4"/><text x="69.5730%" y="302.50"></text></g><g><title>&lt;listcomp&gt; (numpy/lib/stride_tricks.py:546) (4 samples, 0.28%)</title><rect x="69.3230%" y="308" width="0.2821%" height="15" fill="rgb(253,215,40)" fg:x="983" fg:w="4"/><text x="69.5730%" y="318.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:183) (10 samples, 0.71%)</title><rect x="69.0409%" y="228" width="0.7052%" height="15" fill="rgb(211,81,21)" fg:x="979" fg:w="10"/><text x="69.2909%" y="238.50"></text></g><g><title>meshgrid (&lt;__array_function__ internals&gt;:180) (9 samples, 0.63%)</title><rect x="69.1114%" y="244" width="0.6347%" height="15" fill="rgb(208,190,38)" fg:x="980" fg:w="9"/><text x="69.3614%" y="254.50"></text></g><g><title>meshgrid (numpy/lib/function_base.py:4990) (2 samples, 0.14%)</title><rect x="69.6051%" y="260" width="0.1410%" height="15" fill="rgb(235,213,38)" fg:x="987" fg:w="2"/><text x="69.8551%" y="270.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:184) (4 samples, 0.28%)</title><rect x="69.7461%" y="228" width="0.2821%" height="15" fill="rgb(237,122,38)" fg:x="989" fg:w="4"/><text x="69.9961%" y="238.50"></text></g><g><title>__getitem__ (omnigibson/utils/python_utils.py:728) (4 samples, 0.28%)</title><rect x="69.7461%" y="244" width="0.2821%" height="15" fill="rgb(244,218,35)" fg:x="989" fg:w="4"/><text x="69.9961%" y="254.50"></text></g><g><title>get (omnigibson/utils/python_utils.py:747) (4 samples, 0.28%)</title><rect x="69.7461%" y="260" width="0.2821%" height="15" fill="rgb(240,68,47)" fg:x="989" fg:w="4"/><text x="69.9961%" y="270.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:512) (4 samples, 0.28%)</title><rect x="69.7461%" y="276" width="0.2821%" height="15" fill="rgb(210,16,53)" fg:x="989" fg:w="4"/><text x="69.9961%" y="286.50"></text></g><g><title>get_mass_matrix (omnigibson/prims/entity_prim.py:1320) (4 samples, 0.28%)</title><rect x="69.7461%" y="292" width="0.2821%" height="15" fill="rgb(235,124,12)" fg:x="989" fg:w="4"/><text x="69.9961%" y="302.50"></text></g><g><title>get_mass_matrices (core/articulations/articulation_view.py:3659) (2 samples, 0.14%)</title><rect x="69.8872%" y="308" width="0.1410%" height="15" fill="rgb(224,169,11)" fg:x="991" fg:w="2"/><text x="70.1372%" y="318.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:185) (4 samples, 0.28%)</title><rect x="70.0282%" y="228" width="0.2821%" height="15" fill="rgb(250,166,2)" fg:x="993" fg:w="4"/><text x="70.2782%" y="238.50"></text></g><g><title>dot (&lt;__array_function__ internals&gt;:180) (3 samples, 0.21%)</title><rect x="70.0987%" y="244" width="0.2116%" height="15" fill="rgb(242,216,29)" fg:x="994" fg:w="3"/><text x="70.3487%" y="254.50"></text></g><g><title>_articulation_view (omnigibson/prims/entity_prim.py:358) (3 samples, 0.21%)</title><rect x="70.3808%" y="324" width="0.2116%" height="15" fill="rgb(230,116,27)" fg:x="998" fg:w="3"/><text x="70.6308%" y="334.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:513) (8 samples, 0.56%)</title><rect x="70.3808%" y="276" width="0.5642%" height="15" fill="rgb(228,99,48)" fg:x="998" fg:w="8"/><text x="70.6308%" y="286.50"></text></g><g><title>get_generalized_gravity_forces (omnigibson/robots/robot_base.py:493) (8 samples, 0.56%)</title><rect x="70.3808%" y="292" width="0.5642%" height="15" fill="rgb(253,11,6)" fg:x="998" fg:w="8"/><text x="70.6308%" y="302.50"></text></g><g><title>get_generalized_gravity_forces (omnigibson/prims/entity_prim.py:1309) (8 samples, 0.56%)</title><rect x="70.3808%" y="308" width="0.5642%" height="15" fill="rgb(247,143,39)" fg:x="998" fg:w="8"/><text x="70.6308%" y="318.50"></text></g><g><title>get_generalized_gravity_forces (core/articulations/articulation_view.py:3796) (4 samples, 0.28%)</title><rect x="70.6629%" y="324" width="0.2821%" height="15" fill="rgb(236,97,10)" fg:x="1002" fg:w="4"/><text x="70.9129%" y="334.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (3 samples, 0.21%)</title><rect x="70.7334%" y="340" width="0.2116%" height="15" fill="rgb(233,208,19)" fg:x="1003" fg:w="3"/><text x="70.9834%" y="350.50"></text></g><g><title>expand_dims (&lt;__array_function__ internals&gt;:180) (3 samples, 0.21%)</title><rect x="70.7334%" y="356" width="0.2116%" height="15" fill="rgb(216,164,2)" fg:x="1003" fg:w="3"/><text x="70.9834%" y="366.50"></text></g><g><title>compute_control (omnigibson/controllers/joint_controller.py:188) (12 samples, 0.85%)</title><rect x="70.3103%" y="228" width="0.8463%" height="15" fill="rgb(220,129,5)" fg:x="997" fg:w="12"/><text x="70.5603%" y="238.50"></text></g><g><title>__getitem__ (omnigibson/utils/python_utils.py:728) (11 samples, 0.78%)</title><rect x="70.3808%" y="244" width="0.7757%" height="15" fill="rgb(242,17,10)" fg:x="998" fg:w="11"/><text x="70.6308%" y="254.50"></text></g><g><title>get (omnigibson/utils/python_utils.py:747) (11 samples, 0.78%)</title><rect x="70.3808%" y="260" width="0.7757%" height="15" fill="rgb(242,107,0)" fg:x="998" fg:w="11"/><text x="70.6308%" y="270.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:514) (3 samples, 0.21%)</title><rect x="70.9450%" y="276" width="0.2116%" height="15" fill="rgb(251,28,31)" fg:x="1006" fg:w="3"/><text x="71.1950%" y="286.50"></text></g><g><title>get_coriolis_and_centrifugal_forces (omnigibson/prims/entity_prim.py:1298) (3 samples, 0.21%)</title><rect x="70.9450%" y="292" width="0.2116%" height="15" fill="rgb(233,223,10)" fg:x="1006" fg:w="3"/><text x="71.1950%" y="302.50"></text></g><g><title>_update_grasping_state (omnigibson/controllers/multi_finger_gripper_controller.py:240) (3 samples, 0.21%)</title><rect x="71.1566%" y="244" width="0.2116%" height="15" fill="rgb(215,21,27)" fg:x="1009" fg:w="3"/><text x="71.4066%" y="254.50"></text></g><g><title>mean (&lt;__array_function__ internals&gt;:180) (3 samples, 0.21%)</title><rect x="71.1566%" y="260" width="0.2116%" height="15" fill="rgb(232,23,21)" fg:x="1009" fg:w="3"/><text x="71.4066%" y="270.50"></text></g><g><title>mean (numpy/core/fromnumeric.py:3432) (3 samples, 0.21%)</title><rect x="71.1566%" y="276" width="0.2116%" height="15" fill="rgb(244,5,23)" fg:x="1009" fg:w="3"/><text x="71.4066%" y="286.50"></text></g><g><title>step (omnigibson/controllers/controller_base.py:274) (54 samples, 3.81%)</title><rect x="67.9831%" y="212" width="3.8082%" height="15" fill="rgb(226,81,46)" fg:x="964" fg:w="54"/><text x="68.2331%" y="222.50">step..</text></g><g><title>compute_control (omnigibson/controllers/multi_finger_gripper_controller.py:203) (9 samples, 0.63%)</title><rect x="71.1566%" y="228" width="0.6347%" height="15" fill="rgb(247,70,30)" fg:x="1009" fg:w="9"/><text x="71.4066%" y="238.50"></text></g><g><title>_update_grasping_state (omnigibson/controllers/multi_finger_gripper_controller.py:274) (3 samples, 0.21%)</title><rect x="71.5797%" y="244" width="0.2116%" height="15" fill="rgb(212,68,19)" fg:x="1015" fg:w="3"/><text x="71.8297%" y="254.50"></text></g><g><title>_clip (numpy/core/_methods.py:133) (2 samples, 0.14%)</title><rect x="71.8618%" y="244" width="0.1410%" height="15" fill="rgb(240,187,13)" fg:x="1019" fg:w="2"/><text x="72.1118%" y="254.50"></text></g><g><title>_clip_dep_is_byte_swapped (numpy/core/_methods.py:104) (2 samples, 0.14%)</title><rect x="71.8618%" y="260" width="0.1410%" height="15" fill="rgb(223,113,26)" fg:x="1019" fg:w="2"/><text x="72.1118%" y="270.50"></text></g><g><title>_clip (numpy/core/_methods.py:135) (3 samples, 0.21%)</title><rect x="72.0028%" y="244" width="0.2116%" height="15" fill="rgb(206,192,2)" fg:x="1021" fg:w="3"/><text x="72.2528%" y="254.50"></text></g><g><title>_clip_dep_is_scalar_nan (numpy/core/_methods.py:94) (3 samples, 0.21%)</title><rect x="72.0028%" y="260" width="0.2116%" height="15" fill="rgb(241,108,4)" fg:x="1021" fg:w="3"/><text x="72.2528%" y="270.50"></text></g><g><title>clip_control (omnigibson/controllers/controller_base.py:246) (7 samples, 0.49%)</title><rect x="71.8618%" y="228" width="0.4937%" height="15" fill="rgb(247,173,49)" fg:x="1019" fg:w="7"/><text x="72.1118%" y="238.50"></text></g><g><title>_clip (numpy/core/_methods.py:160) (2 samples, 0.14%)</title><rect x="72.2144%" y="244" width="0.1410%" height="15" fill="rgb(224,114,35)" fg:x="1024" fg:w="2"/><text x="72.4644%" y="254.50"></text></g><g><title>clip_control (omnigibson/controllers/controller_base.py:247) (3 samples, 0.21%)</title><rect x="72.3554%" y="228" width="0.2116%" height="15" fill="rgb(245,159,27)" fg:x="1026" fg:w="3"/><text x="72.6054%" y="238.50"></text></g><g><title>dof_idx (omnigibson/controllers/controller_base.py:452) (2 samples, 0.14%)</title><rect x="72.4260%" y="244" width="0.1410%" height="15" fill="rgb(245,172,44)" fg:x="1027" fg:w="2"/><text x="72.6760%" y="254.50"></text></g><g><title>step (omnigibson/objects/controllable_object.py:336) (68 samples, 4.80%)</title><rect x="67.9126%" y="196" width="4.7955%" height="15" fill="rgb(236,23,11)" fg:x="963" fg:w="68"/><text x="68.1626%" y="206.50">step (..</text></g><g><title>step (omnigibson/controllers/controller_base.py:275) (13 samples, 0.92%)</title><rect x="71.7913%" y="212" width="0.9168%" height="15" fill="rgb(205,117,38)" fg:x="1018" fg:w="13"/><text x="72.0413%" y="222.50"></text></g><g><title>step (omnigibson/objects/controllable_object.py:340) (2 samples, 0.14%)</title><rect x="72.7080%" y="196" width="0.1410%" height="15" fill="rgb(237,72,25)" fg:x="1031" fg:w="2"/><text x="72.9580%" y="206.50"></text></g><g><title>command_dim (omnigibson/controllers/joint_controller.py:237) (2 samples, 0.14%)</title><rect x="72.7080%" y="212" width="0.1410%" height="15" fill="rgb(244,70,9)" fg:x="1031" fg:w="2"/><text x="72.9580%" y="222.50"></text></g><g><title>dof_idx (omnigibson/controllers/controller_base.py:452) (2 samples, 0.14%)</title><rect x="72.7080%" y="228" width="0.1410%" height="15" fill="rgb(217,125,39)" fg:x="1031" fg:w="2"/><text x="72.9580%" y="238.50"></text></g><g><title>step (omnigibson/objects/controllable_object.py:345) (2 samples, 0.14%)</title><rect x="72.8491%" y="196" width="0.1410%" height="15" fill="rgb(235,36,10)" fg:x="1033" fg:w="2"/><text x="73.0991%" y="206.50"></text></g><g><title>set_joint_position_targets (core/articulations/articulation_view.py:902) (2 samples, 0.14%)</title><rect x="73.2017%" y="276" width="0.1410%" height="15" fill="rgb(251,123,47)" fg:x="1038" fg:w="2"/><text x="73.4517%" y="286.50"></text></g><g><title>get_dof_position_targets (tensors/impl/api.py:493) (2 samples, 0.14%)</title><rect x="73.2017%" y="292" width="0.1410%" height="15" fill="rgb(221,13,13)" fg:x="1038" fg:w="2"/><text x="73.4517%" y="302.50"></text></g><g><title>set_joint_position_targets (core/articulations/articulation_view.py:906) (2 samples, 0.14%)</title><rect x="73.4133%" y="276" width="0.1410%" height="15" fill="rgb(238,131,9)" fg:x="1041" fg:w="2"/><text x="73.6633%" y="286.50"></text></g><g><title>expand_dims (core/utils/numpy/tensor.py:64) (2 samples, 0.14%)</title><rect x="73.4133%" y="292" width="0.1410%" height="15" fill="rgb(211,50,8)" fg:x="1041" fg:w="2"/><text x="73.6633%" y="302.50"></text></g><g><title>get_tensor_desc (tensors/impl/frontend_np.py:62) (2 samples, 0.14%)</title><rect x="73.8364%" y="308" width="0.1410%" height="15" fill="rgb(245,182,24)" fg:x="1047" fg:w="2"/><text x="74.0864%" y="318.50"></text></g><g><title>deploy_control (omnigibson/objects/controllable_object.py:477) (14 samples, 0.99%)</title><rect x="73.0606%" y="228" width="0.9873%" height="15" fill="rgb(242,14,37)" fg:x="1036" fg:w="14"/><text x="73.3106%" y="238.50"></text></g><g><title>set_joint_positions (omnigibson/objects/controllable_object.py:526) (13 samples, 0.92%)</title><rect x="73.1312%" y="244" width="0.9168%" height="15" fill="rgb(246,228,12)" fg:x="1037" fg:w="13"/><text x="73.3812%" y="254.50"></text></g><g><title>set_joint_positions (omnigibson/prims/entity_prim.py:634) (13 samples, 0.92%)</title><rect x="73.1312%" y="260" width="0.9168%" height="15" fill="rgb(213,55,15)" fg:x="1037" fg:w="13"/><text x="73.3812%" y="270.50"></text></g><g><title>set_joint_position_targets (core/articulations/articulation_view.py:908) (7 samples, 0.49%)</title><rect x="73.5543%" y="276" width="0.4937%" height="15" fill="rgb(209,9,3)" fg:x="1043" fg:w="7"/><text x="73.8043%" y="286.50"></text></g><g><title>set_dof_position_targets (tensors/impl/api.py:472) (4 samples, 0.28%)</title><rect x="73.7659%" y="292" width="0.2821%" height="15" fill="rgb(230,59,30)" fg:x="1046" fg:w="4"/><text x="74.0159%" y="302.50"></text></g><g><title>deploy_control (omnigibson/objects/controllable_object.py:479) (7 samples, 0.49%)</title><rect x="74.0480%" y="228" width="0.4937%" height="15" fill="rgb(209,121,21)" fg:x="1050" fg:w="7"/><text x="74.2980%" y="238.50"></text></g><g><title>set_joint_velocities (omnigibson/prims/entity_prim.py:665) (6 samples, 0.42%)</title><rect x="74.1185%" y="244" width="0.4231%" height="15" fill="rgb(220,109,13)" fg:x="1051" fg:w="6"/><text x="74.3685%" y="254.50"></text></g><g><title>set_joint_velocity_targets (core/articulations/articulation_view.py:1033) (3 samples, 0.21%)</title><rect x="74.3300%" y="260" width="0.2116%" height="15" fill="rgb(232,18,1)" fg:x="1054" fg:w="3"/><text x="74.5800%" y="270.50"></text></g><g><title>set_dof_actuation_forces (tensors/impl/api.py:463) (2 samples, 0.14%)</title><rect x="74.7532%" y="276" width="0.1410%" height="15" fill="rgb(215,41,42)" fg:x="1060" fg:w="2"/><text x="75.0032%" y="286.50"></text></g><g><title>get_tensor_desc (tensors/impl/frontend_np.py:62) (2 samples, 0.14%)</title><rect x="74.7532%" y="292" width="0.1410%" height="15" fill="rgb(224,123,36)" fg:x="1060" fg:w="2"/><text x="75.0032%" y="302.50"></text></g><g><title>deploy_control (omnigibson/robots/manipulation_robot.py:333) (29 samples, 2.05%)</title><rect x="72.9901%" y="212" width="2.0451%" height="15" fill="rgb(240,125,3)" fg:x="1035" fg:w="29"/><text x="73.2401%" y="222.50">d..</text></g><g><title>deploy_control (omnigibson/objects/controllable_object.py:481) (7 samples, 0.49%)</title><rect x="74.5416%" y="228" width="0.4937%" height="15" fill="rgb(205,98,50)" fg:x="1057" fg:w="7"/><text x="74.7916%" y="238.50"></text></g><g><title>set_joint_efforts (omnigibson/prims/entity_prim.py:691) (7 samples, 0.49%)</title><rect x="74.5416%" y="244" width="0.4937%" height="15" fill="rgb(205,185,37)" fg:x="1057" fg:w="7"/><text x="74.7916%" y="254.50"></text></g><g><title>set_joint_efforts (omnigibson/utils/deprecated_utils.py:620) (4 samples, 0.28%)</title><rect x="74.7532%" y="260" width="0.2821%" height="15" fill="rgb(238,207,15)" fg:x="1060" fg:w="4"/><text x="75.0032%" y="270.50"></text></g><g><title>set_dof_actuation_forces (tensors/impl/api.py:464) (2 samples, 0.14%)</title><rect x="74.8942%" y="276" width="0.1410%" height="15" fill="rgb(213,199,42)" fg:x="1062" fg:w="2"/><text x="75.1442%" y="286.50"></text></g><g><title>get_tensor_desc (tensors/impl/frontend_np.py:62) (2 samples, 0.14%)</title><rect x="74.8942%" y="292" width="0.1410%" height="15" fill="rgb(235,201,11)" fg:x="1062" fg:w="2"/><text x="75.1442%" y="302.50"></text></g><g><title>_handle_assisted_grasping (omnigibson/robots/manipulation_robot.py:1238) (4 samples, 0.28%)</title><rect x="75.1058%" y="228" width="0.2821%" height="15" fill="rgb(207,46,11)" fg:x="1065" fg:w="4"/><text x="75.3558%" y="238.50"></text></g><g><title>mean (&lt;__array_function__ internals&gt;:180) (4 samples, 0.28%)</title><rect x="75.1058%" y="244" width="0.2821%" height="15" fill="rgb(241,35,35)" fg:x="1065" fg:w="4"/><text x="75.3558%" y="254.50"></text></g><g><title>mean (numpy/core/fromnumeric.py:3432) (4 samples, 0.28%)</title><rect x="75.1058%" y="260" width="0.2821%" height="15" fill="rgb(243,32,47)" fg:x="1065" fg:w="4"/><text x="75.3558%" y="270.50"></text></g><g><title>_handle_assisted_grasping (omnigibson/robots/manipulation_robot.py:1242) (3 samples, 0.21%)</title><rect x="75.3879%" y="228" width="0.2116%" height="15" fill="rgb(247,202,23)" fg:x="1069" fg:w="3"/><text x="75.6379%" y="238.50"></text></g><g><title>any (&lt;__array_function__ internals&gt;:180) (2 samples, 0.14%)</title><rect x="75.4584%" y="244" width="0.1410%" height="15" fill="rgb(219,102,11)" fg:x="1070" fg:w="2"/><text x="75.7084%" y="254.50"></text></g><g><title>any (numpy/core/fromnumeric.py:2397) (2 samples, 0.14%)</title><rect x="75.4584%" y="260" width="0.1410%" height="15" fill="rgb(243,110,44)" fg:x="1070" fg:w="2"/><text x="75.7084%" y="270.50"></text></g><g><title>_wrapreduction (numpy/core/fromnumeric.py:86) (2 samples, 0.14%)</title><rect x="75.4584%" y="276" width="0.1410%" height="15" fill="rgb(222,74,54)" fg:x="1070" fg:w="2"/><text x="75.7084%" y="286.50"></text></g><g><title>contact_list (omnigibson/prims/rigid_prim.py:254) (4 samples, 0.28%)</title><rect x="75.5994%" y="308" width="0.2821%" height="15" fill="rgb(216,99,12)" fg:x="1072" fg:w="4"/><text x="75.8494%" y="318.50"></text></g><g><title>contact_reporting_enabled (omnigibson/prims/rigid_prim.py:604) (4 samples, 0.28%)</title><rect x="75.5994%" y="324" width="0.2821%" height="15" fill="rgb(226,22,26)" fg:x="1072" fg:w="4"/><text x="75.8494%" y="334.50"></text></g><g><title>__dtype_from_pep3118 (numpy/core/_internal.py:696) (4 samples, 0.28%)</title><rect x="77.0804%" y="356" width="0.2821%" height="15" fill="rgb(217,163,10)" fg:x="1093" fg:w="4"/><text x="77.3304%" y="366.50"></text></g><g><title>consume_until (numpy/core/_internal.py:633) (4 samples, 0.28%)</title><rect x="77.0804%" y="372" width="0.2821%" height="15" fill="rgb(213,25,53)" fg:x="1093" fg:w="4"/><text x="77.3304%" y="382.50"></text></g><g><title>__dtype_from_pep3118 (numpy/core/_internal.py:706) (3 samples, 0.21%)</title><rect x="77.3625%" y="356" width="0.2116%" height="15" fill="rgb(252,105,26)" fg:x="1097" fg:w="3"/><text x="77.6125%" y="366.50"></text></g><g><title>__dtype_from_pep3118 (numpy/core/_internal.py:765) (3 samples, 0.21%)</title><rect x="77.3625%" y="372" width="0.2116%" height="15" fill="rgb(220,39,43)" fg:x="1097" fg:w="3"/><text x="77.6125%" y="382.50"></text></g><g><title>consume (numpy/core/_internal.py:626) (2 samples, 0.14%)</title><rect x="77.4330%" y="388" width="0.1410%" height="15" fill="rgb(229,68,48)" fg:x="1098" fg:w="2"/><text x="77.6830%" y="398.50"></text></g><g><title>advance (numpy/core/_internal.py:621) (2 samples, 0.14%)</title><rect x="77.4330%" y="404" width="0.1410%" height="15" fill="rgb(252,8,32)" fg:x="1098" fg:w="2"/><text x="77.6830%" y="414.50"></text></g><g><title>contact_list (omnigibson/prims/rigid_prim.py:255) (28 samples, 1.97%)</title><rect x="75.8815%" y="308" width="1.9746%" height="15" fill="rgb(223,20,43)" fg:x="1076" fg:w="28"/><text x="76.1315%" y="318.50">c..</text></g><g><title>_dtype_from_pep3118 (numpy/core/_internal.py:652) (14 samples, 0.99%)</title><rect x="76.8688%" y="324" width="0.9873%" height="15" fill="rgb(229,81,49)" fg:x="1090" fg:w="14"/><text x="77.1188%" y="334.50"></text></g><g><title>__dtype_from_pep3118 (numpy/core/_internal.py:706) (12 samples, 0.85%)</title><rect x="77.0099%" y="340" width="0.8463%" height="15" fill="rgb(236,28,36)" fg:x="1092" fg:w="12"/><text x="77.2599%" y="350.50"></text></g><g><title>__dtype_from_pep3118 (numpy/core/_internal.py:794) (2 samples, 0.14%)</title><rect x="77.7151%" y="356" width="0.1410%" height="15" fill="rgb(249,185,26)" fg:x="1102" fg:w="2"/><text x="77.9651%" y="366.50"></text></g><g><title>&lt;listcomp&gt; (omnigibson/robots/manipulation_robot.py:285) (33 samples, 2.33%)</title><rect x="75.5994%" y="292" width="2.3272%" height="15" fill="rgb(249,174,33)" fg:x="1072" fg:w="33"/><text x="75.8494%" y="302.50">&lt;..</text></g><g><title>_calculate_in_hand_object_rigid (omnigibson/robots/manipulation_robot.py:788) (36 samples, 2.54%)</title><rect x="75.5994%" y="260" width="2.5388%" height="15" fill="rgb(233,201,37)" fg:x="1072" fg:w="36"/><text x="75.8494%" y="270.50">_c..</text></g><g><title>_find_gripper_contacts (omnigibson/robots/manipulation_robot.py:285) (36 samples, 2.54%)</title><rect x="75.5994%" y="276" width="2.5388%" height="15" fill="rgb(221,78,26)" fg:x="1072" fg:w="36"/><text x="75.8494%" y="286.50">_f..</text></g><g><title>finger_links (omnigibson/robots/manipulation_robot.py:613) (3 samples, 0.21%)</title><rect x="77.9267%" y="292" width="0.2116%" height="15" fill="rgb(250,127,30)" fg:x="1105" fg:w="3"/><text x="78.1767%" y="302.50"></text></g><g><title>arm_names (omnigibson/robots/manipulation_robot.py:490) (2 samples, 0.14%)</title><rect x="77.9972%" y="308" width="0.1410%" height="15" fill="rgb(230,49,44)" fg:x="1106" fg:w="2"/><text x="78.2472%" y="318.50"></text></g><g><title>&lt;lambda&gt; (omnigibson/objects/controllable_object.py:139) (223 samples, 15.73%)</title><rect x="62.4824%" y="164" width="15.7264%" height="15" fill="rgb(229,67,23)" fg:x="886" fg:w="223"/><text x="62.7324%" y="174.50">&lt;lambda&gt; (omnigibson/obj..</text></g><g><title>step (omnigibson/robots/robot_base.py:284) (156 samples, 11.00%)</title><rect x="67.2073%" y="180" width="11.0014%" height="15" fill="rgb(249,83,47)" fg:x="953" fg:w="156"/><text x="67.4573%" y="190.50">step (omnigibson..</text></g><g><title>step (omnigibson/objects/controllable_object.py:354) (74 samples, 5.22%)</title><rect x="72.9901%" y="196" width="5.2186%" height="15" fill="rgb(215,43,3)" fg:x="1035" fg:w="74"/><text x="73.2401%" y="206.50">step (..</text></g><g><title>deploy_control (omnigibson/robots/manipulation_robot.py:337) (45 samples, 3.17%)</title><rect x="75.0353%" y="212" width="3.1735%" height="15" fill="rgb(238,154,13)" fg:x="1064" fg:w="45"/><text x="75.2853%" y="222.50">dep..</text></g><g><title>_handle_assisted_grasping (omnigibson/robots/manipulation_robot.py:1256) (37 samples, 2.61%)</title><rect x="75.5994%" y="228" width="2.6093%" height="15" fill="rgb(219,56,2)" fg:x="1072" fg:w="37"/><text x="75.8494%" y="238.50">_h..</text></g><g><title>_calculate_in_hand_object (omnigibson/robots/manipulation_robot.py:1279) (37 samples, 2.61%)</title><rect x="75.5994%" y="244" width="2.6093%" height="15" fill="rgb(233,0,4)" fg:x="1072" fg:w="37"/><text x="75.8494%" y="254.50">_c..</text></g><g><title>stage_changed_notice (viewport/widget.py:250) (60 samples, 4.23%)</title><rect x="78.2793%" y="180" width="4.2313%" height="15" fill="rgb(235,30,7)" fg:x="1110" fg:w="60"/><text x="78.5293%" y="190.50">stage..</text></g><g><title>stage_changed_notice (viewport/widget.py:251) (25 samples, 1.76%)</title><rect x="82.5106%" y="180" width="1.7630%" height="15" fill="rgb(250,79,13)" fg:x="1170" fg:w="25"/><text x="82.7606%" y="190.50"></text></g><g><title>stage_changed_notice (viewport/widget.py:256) (18 samples, 1.27%)</title><rect x="84.2736%" y="180" width="1.2694%" height="15" fill="rgb(211,146,34)" fg:x="1195" fg:w="18"/><text x="84.5236%" y="190.50"></text></g><g><title>stage_changed_notice (viewport/widget.py:258) (8 samples, 0.56%)</title><rect x="85.5430%" y="180" width="0.5642%" height="15" fill="rgb(228,22,38)" fg:x="1213" fg:w="8"/><text x="85.7930%" y="190.50"></text></g><g><title>stage_changed_notice (viewport/widget.py:260) (46 samples, 3.24%)</title><rect x="86.1072%" y="180" width="3.2440%" height="15" fill="rgb(235,168,5)" fg:x="1221" fg:w="46"/><text x="86.3572%" y="190.50">sta..</text></g><g><title>__ensure_usd_stage (viewport/widget.py:214) (4 samples, 0.28%)</title><rect x="89.4217%" y="196" width="0.2821%" height="15" fill="rgb(221,155,16)" fg:x="1268" fg:w="4"/><text x="89.6717%" y="206.50"></text></g><g><title>stage_changed_notice (viewport/widget.py:263) (19 samples, 1.34%)</title><rect x="89.4217%" y="180" width="1.3399%" height="15" fill="rgb(215,215,53)" fg:x="1268" fg:w="19"/><text x="89.6717%" y="190.50"></text></g><g><title>__viewport_updated (window/layers.py:158) (14 samples, 0.99%)</title><rect x="89.7743%" y="196" width="0.9873%" height="15" fill="rgb(223,4,10)" fg:x="1273" fg:w="14"/><text x="90.0243%" y="206.50"></text></g><g><title>_viewport_changed (viewport/widget.py:201) (12 samples, 0.85%)</title><rect x="89.9154%" y="212" width="0.8463%" height="15" fill="rgb(234,103,6)" fg:x="1275" fg:w="12"/><text x="90.1654%" y="222.50"></text></g><g><title>size (viewport/display_delegate.py:74) (12 samples, 0.85%)</title><rect x="89.9154%" y="228" width="0.8463%" height="15" fill="rgb(227,97,0)" fg:x="1275" fg:w="12"/><text x="90.1654%" y="238.50"></text></g><g><title>&lt;lambda&gt; (viewport/widget.py:356) (179 samples, 12.62%)</title><rect x="78.2087%" y="164" width="12.6234%" height="15" fill="rgb(234,150,53)" fg:x="1109" fg:w="179"/><text x="78.4587%" y="174.50">&lt;lambda&gt; (viewport/..</text></g><g><title>__exit__ (contextlib.py:142) (3 samples, 0.21%)</title><rect x="90.9732%" y="180" width="0.2116%" height="15" fill="rgb(228,201,54)" fg:x="1290" fg:w="3"/><text x="91.2232%" y="190.50"></text></g><g><title>TraceScope (Trace/__init__.py:43) (2 samples, 0.14%)</title><rect x="91.0437%" y="196" width="0.1410%" height="15" fill="rgb(222,22,37)" fg:x="1291" fg:w="2"/><text x="91.2937%" y="206.50"></text></g><g><title>invoke (Trace/__init__.py:76) (6 samples, 0.42%)</title><rect x="90.8322%" y="164" width="0.4231%" height="15" fill="rgb(237,53,32)" fg:x="1288" fg:w="6"/><text x="91.0822%" y="174.50"></text></g><g><title>__on_objects_changed (stage/stage_model.py:473) (4 samples, 0.28%)</title><rect x="91.2553%" y="180" width="0.2821%" height="15" fill="rgb(233,25,53)" fg:x="1294" fg:w="4"/><text x="91.5053%" y="190.50"></text></g><g><title>__on_objects_changed (stage/stage_model.py:474) (3 samples, 0.21%)</title><rect x="91.5374%" y="180" width="0.2116%" height="15" fill="rgb(210,40,34)" fg:x="1298" fg:w="3"/><text x="91.7874%" y="190.50"></text></g><g><title>__on_objects_changed (stage/stage_model.py:475) (15 samples, 1.06%)</title><rect x="91.7489%" y="180" width="1.0578%" height="15" fill="rgb(241,220,44)" fg:x="1301" fg:w="15"/><text x="91.9989%" y="190.50"></text></g><g><title>_on_usd_changed (core/utils/usd_watch.py:147) (3 samples, 0.21%)</title><rect x="92.8068%" y="180" width="0.2116%" height="15" fill="rgb(235,28,35)" fg:x="1316" fg:w="3"/><text x="93.0568%" y="190.50"></text></g><g><title>_on_usd_changed (core/utils/usd_watch.py:148) (10 samples, 0.71%)</title><rect x="93.0183%" y="180" width="0.7052%" height="15" fill="rgb(210,56,17)" fg:x="1319" fg:w="10"/><text x="93.2683%" y="190.50"></text></g><g><title>_on_usd_changed (core/utils/usd_watch.py:149) (2 samples, 0.14%)</title><rect x="93.7236%" y="180" width="0.1410%" height="15" fill="rgb(224,130,29)" fg:x="1329" fg:w="2"/><text x="93.9736%" y="190.50"></text></g><g><title>_on_usd_changed (usd/_impl/utils.py:1068) (6 samples, 0.42%)</title><rect x="93.8646%" y="180" width="0.4231%" height="15" fill="rgb(235,212,8)" fg:x="1331" fg:w="6"/><text x="94.1146%" y="190.50"></text></g><g><title>step (omnigibson/simulator.py:773) (1,356 samples, 95.63%)</title><rect x="0.8463%" y="116" width="95.6276%" height="15" fill="rgb(223,33,50)" fg:x="12" fg:w="1356"/><text x="1.0963%" y="126.50">step (omnigibson/simulator.py:773)</text></g><g><title>step (core/simulation_context/simulation_context.py:704) (1,353 samples, 95.42%)</title><rect x="1.0578%" y="132" width="95.4161%" height="15" fill="rgb(219,149,13)" fg:x="15" fg:w="1353"/><text x="1.3078%" y="142.50">step (core/simulation_context/simulation_context.py:704)</text></g><g><title>_step (core/physics_context/physics_context.py:574) (1,344 samples, 94.78%)</title><rect x="1.6925%" y="148" width="94.7814%" height="15" fill="rgb(250,156,29)" fg:x="24" fg:w="1344"/><text x="1.9425%" y="158.50">_step (core/physics_context/physics_context.py:574)</text></g><g><title>invoke (Trace/__init__.py:77) (74 samples, 5.22%)</title><rect x="91.2553%" y="164" width="5.2186%" height="15" fill="rgb(216,193,19)" fg:x="1294" fg:w="74"/><text x="91.5053%" y="174.50">invoke..</text></g><g><title>_on_usd_changed (usd/_impl/utils.py:1069) (31 samples, 2.19%)</title><rect x="94.2877%" y="180" width="2.1862%" height="15" fill="rgb(216,135,14)" fg:x="1337" fg:w="31"/><text x="94.5377%" y="190.50">_..</text></g><g><title>global_update (omnigibson/object_states/tensorized_value_state.py:43) (2 samples, 0.14%)</title><rect x="96.5444%" y="148" width="0.1410%" height="15" fill="rgb(241,47,5)" fg:x="1369" fg:w="2"/><text x="96.7944%" y="158.50"></text></g><g><title>_update_values (omnigibson/object_states/temperature.py:58) (2 samples, 0.14%)</title><rect x="96.5444%" y="164" width="0.1410%" height="15" fill="rgb(233,42,35)" fg:x="1369" fg:w="2"/><text x="96.7944%" y="174.50"></text></g><g><title>_non_physics_step (omnigibson/simulator.py:656) (3 samples, 0.21%)</title><rect x="96.5444%" y="132" width="0.2116%" height="15" fill="rgb(231,13,6)" fg:x="1369" fg:w="3"/><text x="96.7944%" y="142.50"></text></g><g><title>update_visuals (omnigibson/objects/stateful_object.py:382) (3 samples, 0.21%)</title><rect x="96.7560%" y="148" width="0.2116%" height="15" fill="rgb(207,181,40)" fg:x="1372" fg:w="3"/><text x="97.0060%" y="158.50"></text></g><g><title>update_visuals (omnigibson/objects/stateful_object.py:390) (3 samples, 0.21%)</title><rect x="96.9676%" y="148" width="0.2116%" height="15" fill="rgb(254,173,49)" fg:x="1375" fg:w="3"/><text x="97.2176%" y="158.50"></text></g><g><title>update_visuals (omnigibson/objects/stateful_object.py:393) (2 samples, 0.14%)</title><rect x="97.1791%" y="148" width="0.1410%" height="15" fill="rgb(221,1,38)" fg:x="1378" fg:w="2"/><text x="97.4291%" y="158.50"></text></g><g><title>step (omnigibson/envs/vec_env_base.py:16) (1,374 samples, 96.90%)</title><rect x="0.7052%" y="100" width="96.8970%" height="15" fill="rgb(206,124,46)" fg:x="10" fg:w="1374"/><text x="0.9552%" y="110.50">step (omnigibson/envs/vec_env_base.py:16)</text></g><g><title>step (omnigibson/simulator.py:776) (16 samples, 1.13%)</title><rect x="96.4739%" y="116" width="1.1283%" height="15" fill="rgb(249,21,11)" fg:x="1368" fg:w="16"/><text x="96.7239%" y="126.50"></text></g><g><title>_non_physics_step (omnigibson/simulator.py:670) (12 samples, 0.85%)</title><rect x="96.7560%" y="132" width="0.8463%" height="15" fill="rgb(222,201,40)" fg:x="1372" fg:w="12"/><text x="97.0060%" y="142.50"></text></g><g><title>update_visuals (omnigibson/objects/stateful_object.py:398) (4 samples, 0.28%)</title><rect x="97.3202%" y="148" width="0.2821%" height="15" fill="rgb(235,61,29)" fg:x="1380" fg:w="4"/><text x="97.5702%" y="158.50"></text></g><g><title>set_emitter_enabled (omnigibson/objects/stateful_object.py:361) (2 samples, 0.14%)</title><rect x="97.4612%" y="164" width="0.1410%" height="15" fill="rgb(219,207,3)" fg:x="1382" fg:w="2"/><text x="97.7112%" y="174.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/robot_base.py:329) (3 samples, 0.21%)</title><rect x="97.8138%" y="260" width="0.2116%" height="15" fill="rgb(222,56,46)" fg:x="1387" fg:w="3"/><text x="98.0638%" y="270.50"></text></g><g><title>get_rpy (omnigibson/prims/xform_prim.py:234) (3 samples, 0.21%)</title><rect x="97.8138%" y="276" width="0.2116%" height="15" fill="rgb(239,76,54)" fg:x="1387" fg:w="3"/><text x="98.0638%" y="286.50"></text></g><g><title>quat2euler (omnigibson/utils/transform_utils.py:534) (2 samples, 0.14%)</title><rect x="97.8843%" y="292" width="0.1410%" height="15" fill="rgb(231,124,27)" fg:x="1388" fg:w="2"/><text x="98.1343%" y="302.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/active_camera_robot.py:35) (6 samples, 0.42%)</title><rect x="97.6728%" y="244" width="0.4231%" height="15" fill="rgb(249,195,6)" fg:x="1385" fg:w="6"/><text x="97.9228%" y="254.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/locomotion_robot.py:40) (7 samples, 0.49%)</title><rect x="97.6728%" y="228" width="0.4937%" height="15" fill="rgb(237,174,47)" fg:x="1385" fg:w="7"/><text x="97.9228%" y="238.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/two_wheel_robot.py:68) (10 samples, 0.71%)</title><rect x="97.6728%" y="212" width="0.7052%" height="15" fill="rgb(206,201,31)" fg:x="1385" fg:w="10"/><text x="97.9228%" y="222.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/manipulation_robot.py:406) (12 samples, 0.85%)</title><rect x="97.6728%" y="196" width="0.8463%" height="15" fill="rgb(231,57,52)" fg:x="1385" fg:w="12"/><text x="97.9228%" y="206.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/manipulation_robot.py:420) (2 samples, 0.14%)</title><rect x="98.5896%" y="196" width="0.1410%" height="15" fill="rgb(248,177,22)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="206.50"></text></g><g><title>get_eef_orientation (omnigibson/robots/manipulation_robot.py:699) (2 samples, 0.14%)</title><rect x="98.5896%" y="212" width="0.1410%" height="15" fill="rgb(215,211,37)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="222.50"></text></g><g><title>get_orientation (omnigibson/prims/xform_prim.py:225) (2 samples, 0.14%)</title><rect x="98.5896%" y="228" width="0.1410%" height="15" fill="rgb(241,128,51)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="238.50"></text></g><g><title>get_position_orientation (omnigibson/prims/rigid_prim.py:316) (2 samples, 0.14%)</title><rect x="98.5896%" y="244" width="0.1410%" height="15" fill="rgb(227,165,31)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="254.50"></text></g><g><title>isclose (&lt;__array_function__ internals&gt;:180) (2 samples, 0.14%)</title><rect x="98.5896%" y="260" width="0.1410%" height="15" fill="rgb(228,167,24)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="270.50"></text></g><g><title>isclose (numpy/core/numeric.py:2375) (2 samples, 0.14%)</title><rect x="98.5896%" y="276" width="0.1410%" height="15" fill="rgb(228,143,12)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="286.50"></text></g><g><title>within_tol (numpy/core/numeric.py:2356) (2 samples, 0.14%)</title><rect x="98.5896%" y="292" width="0.1410%" height="15" fill="rgb(249,149,8)" fg:x="1398" fg:w="2"/><text x="98.8396%" y="302.50"></text></g><g><title>get_relative_eef_pose (omnigibson/robots/manipulation_robot.py:714) (2 samples, 0.14%)</title><rect x="98.8011%" y="228" width="0.1410%" height="15" fill="rgb(243,35,44)" fg:x="1401" fg:w="2"/><text x="99.0511%" y="238.50"></text></g><g><title>get_position_orientation (omnigibson/prims/entity_prim.py:950) (2 samples, 0.14%)</title><rect x="98.8011%" y="244" width="0.1410%" height="15" fill="rgb(246,89,9)" fg:x="1401" fg:w="2"/><text x="99.0511%" y="254.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/manipulation_robot.py:421) (6 samples, 0.42%)</title><rect x="98.7306%" y="196" width="0.4231%" height="15" fill="rgb(233,213,13)" fg:x="1400" fg:w="6"/><text x="98.9806%" y="206.50"></text></g><g><title>get_relative_eef_position (omnigibson/robots/manipulation_robot.py:729) (6 samples, 0.42%)</title><rect x="98.7306%" y="212" width="0.4231%" height="15" fill="rgb(233,141,41)" fg:x="1400" fg:w="6"/><text x="98.9806%" y="222.50"></text></g><g><title>get_relative_eef_pose (omnigibson/robots/manipulation_robot.py:715) (3 samples, 0.21%)</title><rect x="98.9422%" y="228" width="0.2116%" height="15" fill="rgb(239,167,4)" fg:x="1403" fg:w="3"/><text x="99.1922%" y="238.50"></text></g><g><title>relative_pose_transform (omnigibson/utils/transform_utils.py:648) (2 samples, 0.14%)</title><rect x="99.0127%" y="244" width="0.1410%" height="15" fill="rgb(209,217,16)" fg:x="1404" fg:w="2"/><text x="99.2627%" y="254.50"></text></g><g><title>pose2mat (omnigibson/utils/transform_utils.py:459) (2 samples, 0.14%)</title><rect x="99.0127%" y="260" width="0.1410%" height="15" fill="rgb(219,88,35)" fg:x="1404" fg:w="2"/><text x="99.2627%" y="270.50"></text></g><g><title>quat2mat (omnigibson/utils/transform_utils.py:475) (2 samples, 0.14%)</title><rect x="99.0127%" y="276" width="0.1410%" height="15" fill="rgb(220,193,23)" fg:x="1404" fg:w="2"/><text x="99.2627%" y="286.50"></text></g><g><title>get_relative_eef_pose (omnigibson/robots/manipulation_robot.py:713) (4 samples, 0.28%)</title><rect x="99.1537%" y="228" width="0.2821%" height="15" fill="rgb(230,90,52)" fg:x="1406" fg:w="4"/><text x="99.4037%" y="238.50"></text></g><g><title>get_position_orientation (omnigibson/prims/rigid_prim.py:316) (2 samples, 0.14%)</title><rect x="99.2948%" y="244" width="0.1410%" height="15" fill="rgb(252,106,19)" fg:x="1408" fg:w="2"/><text x="99.5448%" y="254.50"></text></g><g><title>isclose (&lt;__array_function__ internals&gt;:180) (2 samples, 0.14%)</title><rect x="99.2948%" y="260" width="0.1410%" height="15" fill="rgb(206,74,20)" fg:x="1408" fg:w="2"/><text x="99.5448%" y="270.50"></text></g><g><title>isclose (numpy/core/numeric.py:2375) (2 samples, 0.14%)</title><rect x="99.2948%" y="276" width="0.1410%" height="15" fill="rgb(230,138,44)" fg:x="1408" fg:w="2"/><text x="99.5448%" y="286.50"></text></g><g><title>get_relative_eef_pose (omnigibson/robots/manipulation_robot.py:714) (2 samples, 0.14%)</title><rect x="99.4358%" y="228" width="0.1410%" height="15" fill="rgb(235,182,43)" fg:x="1410" fg:w="2"/><text x="99.6858%" y="238.50"></text></g><g><title>get_position_orientation (omnigibson/prims/entity_prim.py:950) (2 samples, 0.14%)</title><rect x="99.4358%" y="244" width="0.1410%" height="15" fill="rgb(242,16,51)" fg:x="1410" fg:w="2"/><text x="99.6858%" y="254.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/manipulation_robot.py:422) (7 samples, 0.49%)</title><rect x="99.1537%" y="196" width="0.4937%" height="15" fill="rgb(248,9,4)" fg:x="1406" fg:w="7"/><text x="99.4037%" y="206.50"></text></g><g><title>get_relative_eef_orientation (omnigibson/robots/manipulation_robot.py:741) (7 samples, 0.49%)</title><rect x="99.1537%" y="212" width="0.4937%" height="15" fill="rgb(210,31,22)" fg:x="1406" fg:w="7"/><text x="99.4037%" y="222.50"></text></g><g><title>_get_proprioception_dict (omnigibson/robots/fetch.py:289) (29 samples, 2.05%)</title><rect x="97.6728%" y="180" width="2.0451%" height="15" fill="rgb(239,54,39)" fg:x="1385" fg:w="29"/><text x="97.9228%" y="190.50">_..</text></g><g><title>get_obs (omnigibson/envs/env_base.py:473) (30 samples, 2.12%)</title><rect x="97.6728%" y="132" width="2.1157%" height="15" fill="rgb(230,99,41)" fg:x="1385" fg:w="30"/><text x="97.9228%" y="142.50">g..</text></g><g><title>get_obs (omnigibson/robots/robot_base.py:307) (30 samples, 2.12%)</title><rect x="97.6728%" y="148" width="2.1157%" height="15" fill="rgb(253,106,12)" fg:x="1385" fg:w="30"/><text x="97.9228%" y="158.50">g..</text></g><g><title>get_proprioception (omnigibson/robots/robot_base.py:317) (30 samples, 2.12%)</title><rect x="97.6728%" y="164" width="2.1157%" height="15" fill="rgb(213,46,41)" fg:x="1385" fg:w="30"/><text x="97.9228%" y="174.50">g..</text></g><g><title>main (test_multiple_envs.py:56) (1,414 samples, 99.72%)</title><rect x="0.1410%" y="84" width="99.7179%" height="15" fill="rgb(215,133,35)" fg:x="2" fg:w="1414"/><text x="0.3910%" y="94.50">main (test_multiple_envs.py:56)</text></g><g><title>step (omnigibson/envs/vec_env_base.py:18) (32 samples, 2.26%)</title><rect x="97.6023%" y="100" width="2.2567%" height="15" fill="rgb(213,28,5)" fg:x="1384" fg:w="32"/><text x="97.8523%" y="110.50">s..</text></g><g><title>_post_step (omnigibson/envs/env_base.py:542) (32 samples, 2.26%)</title><rect x="97.6023%" y="116" width="2.2567%" height="15" fill="rgb(215,77,49)" fg:x="1384" fg:w="32"/><text x="97.8523%" y="126.50">_..</text></g><g><title>all (1,418 samples, 100%)</title><rect x="0.0000%" y="52" width="100.0000%" height="15" fill="rgb(248,100,22)" fg:x="0" fg:w="1418"/><text x="0.2500%" y="62.50"></text></g><g><title>&lt;module&gt; (test_multiple_envs.py:77) (1,418 samples, 100.00%)</title><rect x="0.0000%" y="68" width="100.0000%" height="15" fill="rgb(208,67,9)" fg:x="0" fg:w="1418"/><text x="0.2500%" y="78.50">&lt;module&gt; (test_multiple_envs.py:77)</text></g><g><title>main (test_multiple_envs.py:57) (2 samples, 0.14%)</title><rect x="99.8590%" y="84" width="0.1410%" height="15" fill="rgb(219,133,21)" fg:x="1416" fg:w="2"/><text x="100.1090%" y="94.50"></text></g></svg></svg>

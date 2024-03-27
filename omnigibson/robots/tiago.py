@@ -9,7 +9,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -332,8 +332,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
