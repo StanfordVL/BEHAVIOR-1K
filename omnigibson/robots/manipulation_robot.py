@@ -304,7 +304,7 @@ class ManipulationRobot(BaseRobot):
 
             # Translate that to robot contact data
             robot_contact_links = {}
-            for con_data in contact_data:
+            for con_data in raw_contact_data:
                 other_contact, link_contact = con_data
                 if other_contact not in robot_contact_links:
                     robot_contact_links[other_contact] = set()
