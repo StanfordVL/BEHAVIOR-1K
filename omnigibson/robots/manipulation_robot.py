@@ -458,7 +458,8 @@ class ManipulationRobot(BaseRobot):
             # dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
             # dic["eef_{}_quat_global".format(arm)] = self.get_eef_orientation(arm)
             dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
-                ControllableObjectViewAPI.get_link_relative_position_orientation(self.eef_link_names[arm]))
+                ControllableObjectViewAPI.get_link_relative_position_orientation(self.eef_link_names[arm])
+            )
             dic["grasp_{}".format(arm)] = np.array([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]

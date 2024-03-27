@@ -68,7 +68,9 @@ class TwoWheelRobot(LocomotionRobot):
         dic = super()._get_proprioception_dict()
 
         # Grab wheel joint velocity info
-        l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[self.base_control_idx]
+        l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
+            self.base_control_idx
+        ]
 
         # Compute linear and angular velocities
         lin_vel = (l_vel + r_vel) / 2.0 * self.wheel_radius
