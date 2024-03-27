@@ -323,7 +323,7 @@ class ManipulationRobot(BaseRobot):
 
             # Get the interesting-columns from the impulse matrix
             interesting_impulse_columns = impulses[:, interesting_columns]
-            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0), axis=1)[0]
+            interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
             interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
             # Get the full interesting section of the impulse matrix
@@ -338,7 +338,7 @@ class ManipulationRobot(BaseRobot):
 
             # Translate that to robot contact data
             robot_contact_links = {}
-            for con_data in contact_data:
+            for con_data in raw_contact_data:
                 other_contact, link_contact = con_data
                 if other_contact not in robot_contact_links:
                     robot_contact_links[other_contact] = set()
@@ -467,11 +467,11 @@ class ManipulationRobot(BaseRobot):
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
-        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
         # TODO: Replace this with a ControllableObjectViewAPI call too.
-        fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
-            eef_link_idx, :, -self.n_joints :
-        ]
+        # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
+        #     eef_link_idx, :, -self.n_joints :
+        # ]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()

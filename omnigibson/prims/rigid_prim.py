@@ -501,7 +501,7 @@ class RigidPrim(XFormPrim):
         """
         self._rigid_prim_view.set_densities([density])
 
-    @property
+    @cached_property
     def kinematic_only(self):
         """
         Returns:
