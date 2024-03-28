@@ -10,7 +10,8 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+# Circular import
+# from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log, create_module_logger
