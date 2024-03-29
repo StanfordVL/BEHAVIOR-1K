@@ -678,16 +678,12 @@ class VisionSensor(BaseSensor):
             n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
-        projection_matrix = self.camera_parameters["cameraProjection"]
-        projection_matrix = np.array(projection_matrix).reshape(4, 4)
+        fx = fy = self.camera_parameters["cameraFocalLength"]
+        resolution = self.camera_parameters["renderProductResolution"]
+        cx = resolution[0] / 2
+        cy = resolution[1] / 2
 
-        fx = projection_matrix[0, 0]
-        fy = projection_matrix[1, 1]
-        cx = projection_matrix[0, 2]
-        cy = projection_matrix[1, 2]
-        s = projection_matrix[0, 1]  # Skew factor
-
-        intrinsic_matrix = np.array([[fx, s, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
         return intrinsic_matrix
 
     @property
