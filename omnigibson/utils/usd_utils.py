@@ -453,11 +453,13 @@ RigidContactAPI = RigidContactAPIImpl()
 class GripperRigidContactAPIImpl(RigidContactAPIImpl):
     @classmethod
     def get_column_filters(cls):
+        from omnigibson.robots.manipulation_robot import ManipulationRobot
+
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
             for robot in scene.robots:
-                if robot.__class__.__name__ == "Fetch":
+                if isinstance(robot, ManipulationRobot):
                     filters[scene_idx].extend(link.prim_path for links in robot.finger_links.values() for link in links)
 
         return filters
@@ -715,8 +717,8 @@ class ControllableObjectViewAPI:
     _READ_CACHE = {}
 
     # Cache for all of the view functions' write values within the same simulation step.
-    # Keyed by the function name without set_, the value is a dict that maps to-be-set index to value.
-    _WRITE_CACHE = collections.defaultdict(dict)
+    # Keyed by the function name without set_, the value is the set of indices that need to be updated.
+    _WRITE_IDX_CACHE = collections.defaultdict(set)
 
     # Mapping from prim path to index in the view.
     _IDX = {}
@@ -727,21 +729,24 @@ class ControllableObjectViewAPI:
     @classmethod
     def clear(cls):
         cls._READ_CACHE = {}
-        cls._WRITE_CACHE = collections.defaultdict(dict)
+        cls._WRITE_IDX_CACHE = collections.defaultdict(set)
 
     @classmethod
     def flush_control(cls):
-        if "dof_position_targets" in cls._WRITE_CACHE:
-            pos_indices, pos_targets = zip(*sorted(cls._WRITE_CACHE["dof_position_targets"].items()))
-            cls._VIEW.set_dof_position_targets(np.array(pos_targets), np.array(pos_indices))
+        if "dof_position_targets" in cls._WRITE_IDX_CACHE:
+            pos_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_position_targets"]))
+            pos_targets = cls._READ_CACHE["dof_position_targets"]
+            cls._VIEW.set_dof_position_targets(pos_targets, np.array(pos_indices))
 
-        if "dof_velocity_targets" in cls._WRITE_CACHE:
-            vel_indices, vel_targets = zip(*sorted(cls._WRITE_CACHE["dof_velocity_targets"].items()))
-            cls._VIEW.set_dof_velocity_targets(np.array(vel_targets), np.array(vel_indices))
+        if "dof_velocity_targets" in cls._WRITE_IDX_CACHE:
+            vel_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_velocity_targets"]))
+            vel_targets = cls._READ_CACHE["dof_velocity_targets"]
+            cls._VIEW.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
 
-        if "dof_actuation_forces" in cls._WRITE_CACHE:
-            eff_indices, eff_targets = zip(*sorted(cls._WRITE_CACHE["dof_actuation_forces"].items()))
-            cls._VIEW.set_dof_actuation_forces(np.array(eff_targets), np.array(eff_indices))
+        if "dof_actuation_forces" in cls._WRITE_IDX_CACHE:
+            eff_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_actuation_forces"]))
+            eff_targets = cls._READ_CACHE["dof_actuation_forces"]
+            cls._VIEW.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
 
     @classmethod
     def initialize_view(cls):
@@ -792,15 +797,12 @@ class ControllableObjectViewAPI:
         # Load the current targets.
         if "dof_position_targets" not in cls._READ_CACHE:
             cls._READ_CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
-        current_targets = cls._READ_CACHE["dof_position_targets"][idx].copy()
 
-        # If there's already a target for this joint, update it.
-        if idx in cls._WRITE_CACHE["dof_position_targets"]:
-            current_targets = cls._WRITE_CACHE["dof_position_targets"][idx]
-        current_targets[indices] = positions
+        # Update the target
+        cls._READ_CACHE["dof_position_targets"][idx][indices] = positions
 
-        # Write the new target
-        cls._WRITE_CACHE["dof_position_targets"][idx] = current_targets
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_position_targets"].add(idx)
 
     @classmethod
     def set_joint_velocity_targets(cls, prim_path, velocities, indices):
@@ -810,15 +812,12 @@ class ControllableObjectViewAPI:
         # Load the current targets.
         if "dof_velocity_targets" not in cls._READ_CACHE:
             cls._READ_CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
-        current_targets = cls._READ_CACHE["dof_velocity_targets"][idx].copy()
 
-        # If there's already a target for this joint, update it.
-        if idx in cls._WRITE_CACHE["dof_velocity_targets"]:
-            current_targets = cls._WRITE_CACHE["dof_velocity_targets"][idx]
-        current_targets[indices] = velocities
+        # Update the target
+        cls._READ_CACHE["dof_velocity_targets"][idx][indices] = velocities
 
-        # Write the new target
-        cls._WRITE_CACHE["dof_velocity_targets"][idx] = current_targets
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_velocity_targets"].add(idx)
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
@@ -828,15 +827,12 @@ class ControllableObjectViewAPI:
         # Load the current targets.
         if "dof_actuation_forces" not in cls._READ_CACHE:
             cls._READ_CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
-        current_targets = cls._READ_CACHE["dof_actuation_forces"][idx].copy()
 
-        # If there's already a target for this joint, update it.
-        if idx in cls._WRITE_CACHE["dof_actuation_forces"]:
-            current_targets = cls._WRITE_CACHE["dof_actuation_forces"][idx]
-        current_targets[indices] = efforts
+        # Update the target
+        cls._READ_CACHE["dof_actuation_forces"][idx][indices] = efforts
 
-        # Write the new target
-        cls._WRITE_CACHE["dof_actuation_forces"][idx] = current_targets
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_actuation_forces"].add(idx)
 
     @classmethod
     def get_position_orientation(cls, prim_path):

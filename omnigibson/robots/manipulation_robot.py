@@ -311,23 +311,31 @@ class ManipulationRobot(BaseRobot):
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
         arm = self.default_arm if arm == "default" else arm
         # Get robot contact links
+        # TODO: Find out how to know this from self
         link_paths = set(self.link_prim_paths)
         scene_idx, _ = RigidContactAPI.get_body_row_idx(list(link_paths)[0])
 
         if not return_contact_positions:
             # If return contact positions is False, we only need to return the contact prim_paths.
             # For this we can simply use the impulse matrix.
-            impulses = GripperRigidContactAPI.get_all_impulses(scene_idx)
+            impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+            assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
             interesting_col_paths = [link.prim_path for link in self.finger_links[arm]]
             interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
 
             # Get the interesting-columns from the impulse matrix
             interesting_impulse_columns = impulses[:, interesting_columns]
+            assert interesting_impulse_columns.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
             interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
             interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
             # Get the full interesting section of the impulse matrix
             interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
+            assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
+
+            # Early return if not in contact.
+            if not np.any(interesting_impulses > 0):
+                return set(), {}
 
             # Get all of the (row, col) pairs where the impulse is greater than 0
             raw_contact_data = {
