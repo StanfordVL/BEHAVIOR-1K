@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import time
 import gym
@@ -679,14 +680,13 @@ class VisionSensor(BaseSensor):
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
         focal_length = self.camera_parameters["cameraFocalLength"]
-        aperture = self.camera_parameters["cameraAperture"]
-        horizontal_aperture = aperture[0]
-        vertical_aperture = aperture[1]
-        resolution = self.camera_parameters["renderProductResolution"]
-        width = resolution[0]
-        height = resolution[1]
-        fx = width * focal_length / horizontal_aperture
-        fy = height * focal_length / vertical_aperture
+        width, height = self.camera_parameters["renderProductResolution"]
+        horizontal_aperture = self.camera_parameters["cameraAperture"][0]
+        horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
+        vertical_fov = horizontal_fov * height / width
+
+        fx = (width / 2.0) / np.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / np.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 
