@@ -89,14 +89,14 @@ nav:
     - Running on SLURM: getting_started/slurm.md
   - Modules:
     - Overview: modules/overview.md
-    - Prim: modules/prim.md
-    - Object: modules/object.md
+    - Prims: modules/prims.md
+    - Objects: modules/objects.md
     - Object States: modules/object_states.md
     - Robots: modules/robots.md
     - Controllers: modules/controllers.md
-    - Sensor: modules/sensor.md
-    - Scene: modules/scene.md
-    - Environment: modules/environment.md
+    - Sensors: modules/sensors.md
+    - Scenes: modules/scenes.md
+    - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
