@@ -95,7 +95,10 @@ nav:
     - Robots: modules/robots.md
     - Controllers: modules/controllers.md
     - Sensors: modules/sensors.md
+    - Systems: modules/systems.md
     - Scenes: modules/scenes.md
+    - Transition Rules: modules/transition_rules.md
+    - Simulator: modules/simulator.md
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md

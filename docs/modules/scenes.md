@@ -6,7 +6,7 @@ icon: material/home-outline
 
 ## Description
 
-In **`OmniGibson`**, `Scene`s represent a collection of [`Object`](./objects.md)s, potentially defined with a pre-configured state. A scene can be constructed iteratively and interactively, or generated from a pre-cached file.
+In **`OmniGibson`**, `Scene`s represent a collection of [`Object`](./objects.md)s and global [`System`](./systems.md)s, potentially defined with a pre-configured state. A scene can be constructed iteratively and interactively, or generated from a pre-cached file.
 
 ## Usage
 
@@ -44,6 +44,8 @@ The scene keeps track of and organizes all imported objects via its owned `scene
 - `env.scene.object_registry("prim_path", PRIM_PATH)`: get the object by its prim path
 
 - `env.scene.object_registry("category", CATEGORY)`: get all objects with category `CATEGORY`
+
+Similarly, systems can be queried via `scene.system_registry`.
 
 In addition, a scene can always be reset by calling `reset()`. The scene's initial state is cached when the scene is first imported, but can manually be updated by calling `scene.update_initial_state(state)`, where `state` can either be a desired state (output of `og.sim.dump_state()`) or `None`, corresponding to the current sim state.
 
