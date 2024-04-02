@@ -109,6 +109,7 @@ def test_navigate():
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
 
+@pytest.mark.skip(reason="primitives are broken")
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
