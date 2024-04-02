@@ -23,7 +23,6 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.skip(reason="dryer is not fillable yet.")
 @og_test
 def test_dryer_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -36,8 +35,8 @@ def test_dryer_rule():
     og.sim.step()
 
     # Place the two objects inside the dryer
-    remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
-    bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
+    remover_dishtowel.set_position_orientation([0.06, 0, 0.2], [0.0311883, -0.23199339, -0.06849886, 0.96980107])
+    bowl.set_position_orientation([0.0, 0.0, 0.2], [0, 0, 0, 1])
     og.sim.step()
 
     assert remover_dishtowel.states[Saturated].set_value(water, True)
@@ -49,15 +48,23 @@ def test_dryer_rule():
 
     # The rule will not execute if Open is True
     clothes_dryer.states[Open].set_value(True)
+    clothes_dryer.states[ToggledOn].set_value(True)
     og.sim.step()
 
     assert remover_dishtowel.states[Saturated].get_value(water)
     assert clothes_dryer.states[Contains].get_value(water)
 
+    # The rule will not execute if ToggledOn is False
+    clothes_dryer.states[Open].set_value(False)
+    clothes_dryer.states[ToggledOn].set_value(False)
+    og.sim.step()
+
+    assert remover_dishtowel.states[Saturated].get_value(water)
+    assert clothes_dryer.states[Contains].get_value(water)
+
+    # The rule will execute if Open is False and ToggledOn is True
     clothes_dryer.states[Open].set_value(False)
     clothes_dryer.states[ToggledOn].set_value(True)
-
-    # The rule will execute when Open is False and ToggledOn is True
     og.sim.step()
 
     # Need to take one more step for the state setters to take effect
