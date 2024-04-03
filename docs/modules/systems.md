@@ -68,7 +68,7 @@ A given system can be accessed globally at any time via `get_system(...)`. Syste
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`MacroPhysicalParticleSystem`**](../reference/systems/macro_particle_system.html#systems.macro_particle_system.MacroPhysicalParticleSystem)<br><br>  
+            [**`MacroVisualParticleSystem`**](../reference/systems/macro_particle_system.html#systems.macro_particle_system.MacroVisualParticleSystem)<br><br>  
             Represents particles that are usually flat and varied, such as stains, lint, and moss. These are particles not subject to physics, and are attached rigidly to specific objects in the scene.<br><br>**Collides with...**
             <ul>
                 <li>_Rigid bodies_: No</li>
