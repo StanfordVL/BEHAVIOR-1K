@@ -1,6 +1,7 @@
 import copy
 import omnigibson as og
 
+
 # TODO(rl): Figure out if there is a good interface to implement
 class VectorEnvironment:
 

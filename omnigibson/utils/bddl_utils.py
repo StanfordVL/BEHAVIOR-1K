@@ -949,7 +949,9 @@ class BDDLSampler:
                     for cat, models in valid_models.items()
                 }
                 room_insts = (
-                    [None] if self._scene_model is None else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None]
+                    if self._scene_model is None
+                    else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
