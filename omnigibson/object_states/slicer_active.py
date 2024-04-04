@@ -108,6 +108,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
+        # TODO(rl): Check this
         for scene_idx, scene in enumerate(og.sim.scenes):
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 

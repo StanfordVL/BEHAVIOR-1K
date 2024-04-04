@@ -80,7 +80,7 @@ class GraspTask(BaseTask):
         #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
         #     control_idx_in_joint_pos = np.arange(dim)
 
-        # with PlanningContext(self._primitive_controller.robot, self._primitive_controller.robot_copy, "original") as context:
+        # with PlanningContext(env, self._primitive_controller.robot, self._primitive_controller.robot_copy, "original") as context:
         #     for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
         #         joint_pos, joint_control_idx = self._get_random_joint_position(robot)
         #         initial_joint_pos[control_idx_in_joint_pos] = joint_pos

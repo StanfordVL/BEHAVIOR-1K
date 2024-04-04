@@ -21,7 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = og.Environment(configs=cfg)
 
     # Grab all window objects
-    windows = og.sim.scenes[0].object_registry("category", "window")
+    windows = env.scene.object_registry("category", "window")
 
     # Step environment while toggling window highlighting
     i = 0

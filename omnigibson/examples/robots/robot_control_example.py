@@ -5,7 +5,6 @@ Options for random actions, as well as selection of robot action space
 """
 
 import numpy as np
-import yaml
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -98,7 +97,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # Create the environment
     env = og.Environment(configs=cfg)
 
-    # # Choose robot controller to use
+    # Choose robot controller to use
     robot = env.robots[0]
     controller_choices = {
         "base": "DifferentialDriveController",
@@ -117,19 +116,19 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     else:
         control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
 
-    # # Update the control mode of the robot
-    # controller_config = {component: {"name": name} for component, name in controller_choices.items()}
-    # robot.reload_controllers(controller_config=controller_config)
+    # Update the control mode of the robot
+    controller_config = {component: {"name": name} for component, name in controller_choices.items()}
+    robot.reload_controllers(controller_config=controller_config)
 
-    # # Because the controllers have been updated, we need to update the initial state so the correct controller state
-    # # is preserved
-    # env.scene.update_initial_state()
+    # Because the controllers have been updated, we need to update the initial state so the correct controller state
+    # is preserved
+    env.scene.update_initial_state()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    # og.sim.viewer_camera.set_position_orientation(
-    #     position=np.array([1.46949, -3.97358, 2.21529]),
-    #     orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
-    # )
+    og.sim.viewer_camera.set_position_orientation(
+        position=np.array([1.46949, -3.97358, 2.21529]),
+        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+    )
 
     # Reset environment and robot
     env.reset()
@@ -157,16 +156,10 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
-<<<<<<< HEAD
-        action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        _, reward, _, _, _ = env.step(action=action)
-        print(reward)
-=======
         action = (
             action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         )
         env.step(action=action)
->>>>>>> og-develop
         step += 1
 
     # Always shut down the environment cleanly at the end

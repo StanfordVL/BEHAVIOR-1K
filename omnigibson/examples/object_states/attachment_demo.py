@@ -118,7 +118,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for _ in range(10):
         env.step([])
 
-    shelf_baseboard = og.sim.scenes[0].object_registry("name", "shelf_baseboard")
+    shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
     shelf_baseboard.set_position_orientation([0, -0.979, 0.26], [0, 0, 0, 1])
     shelf_baseboard.keep_still()
     shelf_baseboard.set_linear_velocity(np.array([-0.2, 0, 0]))

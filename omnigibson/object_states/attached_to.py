@@ -405,7 +405,7 @@ class AttachedTo(
         if uuid == -1:
             attached_obj = None
         else:
-            attached_obj = self.scene.object_registry("uuid", uuid)
+            attached_obj = self.obj.scene.object_registry("uuid", uuid)
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.parent != attached_obj:

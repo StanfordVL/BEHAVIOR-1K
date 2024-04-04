@@ -158,10 +158,6 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _set_value(self, new_value):
         # Directly set value in global register
-        # if self.obj.name == "coffee_table_fqluyq_0_0" and self.obj.name not in self.OBJ_IDXS:
-        #     import traceback
-        #     print(traceback.print_exc())
-        #     breakpoint()
         self.VALUES[self.OBJ_IDXS[self.obj.name]] = new_value
         return True
 

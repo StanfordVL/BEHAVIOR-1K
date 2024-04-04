@@ -118,8 +118,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             prim = self._prim
         else:
             self.scene = scene
-            # self._name = self.name + f"_{self.scene.id}"
-            # self._prim_path = self.prim_path + f"_{self.scene.id}"
             prim = super().load(scene)
             log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim

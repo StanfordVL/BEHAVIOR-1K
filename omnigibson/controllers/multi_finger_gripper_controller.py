@@ -174,7 +174,6 @@ class MultiFingerGripperController(GripperController):
         """
         target = goal_dict["target"]
         joint_pos = control_dict["joint_position"][self.dof_idx]
-        
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal

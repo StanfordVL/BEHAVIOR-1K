@@ -59,6 +59,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         if len(cls._robot_finger_paths) == 0:
             return
 
+        # TODO(rl): Fix this - it uses scene 0 always
         finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in cls._robot_finger_paths]
         finger_impulses = RigidContactAPI.get_all_impulses(0)[:, finger_idxs, :]
         n_bodies = len(finger_impulses)
