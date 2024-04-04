@@ -1500,7 +1500,10 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input objects exist in the scene
         """
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            if all(len(s.object_registry("category", obj_category, default_val=set())) < obj_quantity for s in og.sim.scenes):
+            if all(
+                len(s.object_registry("category", obj_category, default_val=set())) < obj_quantity
+                for s in og.sim.scenes
+            ):
                 return False
         return True
 
