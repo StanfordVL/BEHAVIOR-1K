@@ -22,6 +22,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.object_states.factory import get_system_states
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
+from omnigibson.systems.system_base import SYSTEM_REGISTRY
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -1226,8 +1227,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        # @TODO: Which scene
-        for system in og.sim.scene.system_registry.objects:
+        for system in SYSTEM_REGISTRY.objects:
             # Skip cloth system
             if system.name == "cloth":
                 continue
@@ -1500,8 +1500,7 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input objects exist in the scene
         """
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            # @TODO: Which scene
-            if len(og.sim.scene.object_registry("category", obj_category, default_val=set())) < obj_quantity:
+            if all(len(s.object_registry("category", obj_category, default_val=set())) < obj_quantity for s in og.sim.scenes):
                 return False
         return True
 
@@ -1522,8 +1521,7 @@ class RecipeRule(BaseTransitionRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            # @TODO: Which scene
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            if any(len(s.object_registry("category", category, default_val=set())) > 0 for s in og.sim.scenes):
                 return True
 
         # None found, return False
@@ -1656,7 +1654,6 @@ class RecipeRule(BaseTransitionRule):
         cls._OBJECTS = []
         cls._OBJECTS_TO_IDX = dict()
 
-        # @TODO: Which scene
         # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
         objects_by_category = og.sim.scene.object_registry.get_dict("category")
 
@@ -1834,7 +1831,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-            # @TODO: Which scene
+            # @TODO(rl): Which scene
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
@@ -2256,7 +2253,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            # @TODO: Which scene
+            # @TODO(rl): Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -2280,7 +2277,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
-            # @TODO: Which scene
+            # @TODO(rl): Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 

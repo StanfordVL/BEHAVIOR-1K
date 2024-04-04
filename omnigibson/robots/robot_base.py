@@ -364,7 +364,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         ori = T.quat2euler(quat)
 
         # Compute ori2d
-        # TODO: Dedupe this code that is also used in get_2d_orientation
+        # TODO(rl): Dedupe this code that is also used in get_2d_orientation
         ori_2d = 0.0
         fwd = R.from_quat(quat).apply([1, 0, 0])
         fwd[2] = 0.0

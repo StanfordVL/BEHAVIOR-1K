@@ -353,7 +353,7 @@ def launch_simulator(*args, **kwargs):
                 viewport_name=viewport_name,
             )
             if not self._viewer_camera.loaded:
-                # @TODO: How to access scene here
+                # @TODO(rl): How to access scene here
                 self._viewer_camera.load(None)
 
             # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip

@@ -29,16 +29,13 @@ from omnigibson.macros import gm
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
-DIST_BETWEEN_ENVS = 10
-NUM_ENVS_PER_ROW = 5
-
 
 class Environment(gym.Env, GymObservable, Recreatable):
     """
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
 
-    def __init__(self, configs, num_env=1):
+    def __init__(self, configs):
         """
         Args:
             configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
@@ -91,12 +88,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._scene_graph_builder = None
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
-
-        self.id = num_env
-        self.num_env = num_env
-        origin_offset_x = (self.num_env % NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
-        origin_offset_y = int(self.num_env / NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
-        self.origin_offset = [origin_offset_x, origin_offset_y, 0.0]
 
         # Load this environment
         self.load()
@@ -220,21 +211,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.set_simulation_dt(physics_dt=(1.0 / self.physics_frequency), rendering_dt=(1.0 / self.action_frequency))
 
         # Create the scene from our scene config
-        scene = create_class_from_registry_and_config(
+        self._scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
             cls_registry=REGISTERED_SCENES,
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
-
-        scene.id = self.num_env
-        scene.origin_offset = self.origin_offset
-        self._scene = scene
-        og.sim.import_scene(scene)
+        og.sim.import_scene(self._scene)
 
         # Set the rendering settings
-        # og.sim.viewer_width = self.render_config["viewer_width"]
-        # og.sim.viewer_height = self.render_config["viewer_height"]
+        if gm.RENDER_VIEWER_CAMERA:
+            og.sim.viewer_width = self.render_config["viewer_width"]
+            og.sim.viewer_height = self.render_config["viewer_height"]
         og.sim.device = self.device
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
@@ -251,13 +239,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}_{str(self.scene.id)}"
-                else:
-                    robot_config["name"] = f"{robot_config['name']}_{str(self.scene.id)}"
-                # Update robot config so name is unique amongst robots in all scenes
-                position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop(
-                    "orientation", None
-                )
+                    robot_config["name"] = f"robot{i}"
+
+                position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -265,10 +249,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     cfg=robot_config,
                     cls_type_descriptor="robot",
                 )
-                self.scene.add_object(robot)
-                init_position = [sum(x) for x in zip(position, self.origin_offset)]
                 # Import the robot into the simulator
-                robot.set_position_orientation(position=init_position, orientation=orientation)
+                self.scene.add_object(robot)
+                robot.set_local_pose(position=position, orientation=orientation)
 
             if len(self.robots_config) > 0:
                 # Auto-initialize all robots
@@ -287,11 +270,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for i, obj_config in enumerate(self.objects_config):
             # Add a name for the object if necessary
             if "name" not in obj_config:
-                obj_config["name"] = f"obj{i}_{str(self.scene.id)}"
-            else:
-                obj_config["name"] = f"{obj_config['name']}_{str(self.scene.id)}"
+                obj_config["name"] = f"obj{i}"
             # Pop the desired position and orientation
-            position, orientation = obj_config.pop("position", [0.0, 0.0, 0.0]), obj_config.pop("orientation", None)
+            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
             obj = create_class_from_registry_and_config(
                 cls_name=obj_config["type"],
@@ -299,11 +280,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 cfg=obj_config,
                 cls_type_descriptor="object",
             )
-
             # Import the robot into the simulator and set the pose
             self.scene.add_object(obj)
-            init_position = [sum(x) for x in zip(position, self.origin_offset)]
-            obj.set_position_orientation(position=init_position, orientation=orientation)
+            obj.set_local_pose(position=position, orientation=orientation)
 
         if len(self.objects_config) > 0:
             # Auto-initialize all objects
@@ -424,6 +403,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_objects()
         self._load_task()
+        # TODO(rl): Do not merge this
         # self._load_external_sensors()
 
         og.sim.play()
@@ -467,12 +447,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._loaded = True
 
     def close(self):
-        """
-        Clean up the environment and shut down the simulation.
-        """
-        return
-
-        # og.shutdown()
+        """No-op to satisfy certain RL frameworks."""
+        pass
 
     def get_obs(self):
         """

@@ -538,7 +538,7 @@ class ControllableObject(BaseObject):
         # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
         # the functions that this class also implements. The API centralizes access for all of the robots in the scene
         # removing the need for multiple reads and writes.
-        # TODO: CachedFunctions can now be entirely removed since the API already implements caching.
+        # TODO(rl): CachedFunctions can now be entirely removed since the API already implements caching.
         fcns = CachedFunctions()
         fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]

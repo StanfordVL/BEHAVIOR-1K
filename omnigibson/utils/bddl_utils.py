@@ -726,8 +726,7 @@ class BDDLSampler:
                         f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
                         f"Only non-sampleable (scene) objects can have room assignment."
                     )
-                # @TODO: Which scene
-                if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in self._env.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
@@ -933,16 +932,28 @@ class BDDLSampler:
 
                 # Grab all models that fully support all abilities for the corresponding category
                 valid_models = {
-                    cat: set(get_all_object_category_models_with_abilities(cat, abilities)) for cat in categories
+                    cat: set(
+                        get_all_object_category_models_with_abilities(
+                            cat, OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(cat))
+                        )
+                    )
+                    for cat in categories
                 }
-                # @TODO: Which scene
+                valid_models = {
+                    cat: (models if cat not in GOOD_MODELS else models.intersection(GOOD_MODELS[cat]))
+                    - BAD_CLOTH_MODELS.get(cat, set())
+                    for cat, models in valid_models.items()
+                }
+                valid_models = {
+                    cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst)
+                    for cat, models in valid_models.items()
+                }
                 room_insts = (
-                    [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None] if self._scene_model is None else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
-                    # @TODO: Which scene
-                    room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    room_objs = self._env.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [
                         obj
                         for obj in room_objs
@@ -1240,26 +1251,6 @@ class BDDLSampler:
                             abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
                         )
                     )
-                    if len(model_choices) > 0:
-                        break
-
-                    if len(model_choices) == 0:
-                        # We failed to find ANY valid model across ALL valid categories
-                        return f"Missing valid object models for all categories: {categories}"
-
-                    # Randomly select an object model
-                    model = np.random.choice(list(model_choices))
-
-                    # create the object
-                    # @TODO: Which scene
-                    simulator_obj = DatasetObject(
-                        name=f"{category}_{len(og.sim.scene.objects)}",
-                        category=category,
-                        model=model,
-                        prim_type=(
-                            PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID
-                        ),
-                    )
                     model_choices = (
                         model_choices
                         if category not in GOOD_MODELS
@@ -1270,10 +1261,9 @@ class BDDLSampler:
                     if len(model_choices) > 0:
                         break
 
-                    # Load the object into the simulator
-                    # @TODO: Which scene
-                    assert og.sim.scene.loaded, "Scene is not loaded"
-                    og.sim.import_object(simulator_obj)
+                if len(model_choices) == 0:
+                    # We failed to find ANY valid model across ALL valid categories
+                    return f"Missing valid object models for all categories: {categories}"
 
                 # Randomly select an object model
                 model = np.random.choice(list(model_choices))
@@ -1285,7 +1275,7 @@ class BDDLSampler:
 
                 # create the object
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(og.sim.scene.objects)}",
+                    name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
                     prim_type=(
@@ -1444,13 +1434,11 @@ class BDDLSampler:
                             og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
-                            # @TODO: Which scene
-                            og.sim.scene.object_registry.update(keys=["in_rooms"])
+                            self._env.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
-        # @TODO: Which scene
-        og.sim.scene.object_registry.update(keys=["in_rooms"])
+        self._env.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step

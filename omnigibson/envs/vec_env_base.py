@@ -1,7 +1,7 @@
 import copy
 import omnigibson as og
 
-
+# TODO(rl): Figure out if there is a good interface to implement
 class VectorEnvironment:
 
     def __init__(self, num_envs, config):
@@ -30,8 +30,7 @@ class VectorEnvironment:
             env.reset()
 
     def close(self):
-        for env in self.envs:
-            env.close()
+        pass
 
     def __len__(self):
         return self.num_envs
