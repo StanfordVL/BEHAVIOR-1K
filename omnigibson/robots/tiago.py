@@ -8,7 +8,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import JointType
 
 # Create settings for this module
@@ -185,11 +185,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def model_name(self):
         return "Tiago"
 
-    @property
+    @classproperty
     def n_arms(self):
         return 2
 
-    @property
+    @classproperty
     def arm_names(self):
         return ["left", "right"]
 

@@ -478,7 +478,7 @@ class ManipulationRobot(BaseRobot):
 
         return controllers
 
-    @property
+    @classproperty
     def n_arms(self):
         """
         Returns:
@@ -486,7 +486,7 @@ class ManipulationRobot(BaseRobot):
         """
         return 1
 
-    @property
+    @classproperty
     def arm_names(self):
         """
         Returns:
