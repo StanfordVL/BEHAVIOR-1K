@@ -307,7 +307,7 @@ class ManipulationRobot(BaseRobot):
     #             robot_contact_links[other_contact].add(link_contact)
 
     #     return contact_data, robot_contact_links
-    
+
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
         arm = self.default_arm if arm == "default" else arm
         # Get robot contact links
@@ -325,13 +325,19 @@ class ManipulationRobot(BaseRobot):
 
             # Get the interesting-columns from the impulse matrix
             interesting_impulse_columns = impulses[:, interesting_columns]
-            assert interesting_impulse_columns.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
+            assert (
+                interesting_impulse_columns.ndim == 2
+            ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
             interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
-            interesting_row_paths = [GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
+            interesting_row_paths = [
+                GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
+            ]
 
             # Get the full interesting section of the impulse matrix
             interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
-            assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
+            assert (
+                interesting_impulses.ndim == 2
+            ), f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
 
             # Early return if not in contact.
             if not np.any(interesting_impulses > 0):
@@ -500,7 +506,9 @@ class ManipulationRobot(BaseRobot):
             # dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
             # dic["eef_{}_quat_global".format(arm)] = self.get_eef_orientation(arm)
             dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
-                ControllableObjectViewAPI.get_link_relative_position_orientation(self.articulation_root_path, self.eef_link_names[arm])
+                ControllableObjectViewAPI.get_link_relative_position_orientation(
+                    self.articulation_root_path, self.eef_link_names[arm]
+                )
             )
             dic["grasp_{}".format(arm)] = np.array([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]

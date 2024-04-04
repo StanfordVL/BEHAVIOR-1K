@@ -300,8 +300,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # TODO(rl): Whats happening here
             # assert self.robot.controllers["base"].control_type == ControlType.VELOCITY, \
             #     "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
-            assert not self.robot.controllers["base"].use_delta_commands, \
+            assert not self.robot.controllers[
+                "base"
+            ].use_delta_commands, (
                 "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
+            )
             # assert self.robot.controllers["base"].command_dim == 3, \
             #     "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
 
@@ -889,13 +892,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return self.robot.arm_control_idx["left"]
             else:
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-            
+
         if isinstance(self.robot, Fetch):
             return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-        
+
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
-    
+
     @property
     def _manipulation_descriptor_path(self):
         """The appropriate manipulation descriptor for the current settings."""

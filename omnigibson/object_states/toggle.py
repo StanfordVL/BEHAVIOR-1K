@@ -49,10 +49,13 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         robots = [robot for robot in og.sim.scene.robots]
         # detect marker and hand interaction
-        robot_finger_links = set(link
-                                 for robot in robots if isinstance(robot, ManipulationRobot)
-                                 for finger_links in robot.finger_links.values()
-                                 for link in finger_links)
+        robot_finger_links = set(
+            link
+            for robot in robots
+            if isinstance(robot, ManipulationRobot)
+            for finger_links in robot.finger_links.values()
+            for link in finger_links
+        )
         cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
 
         # If there aren't any valid robot link paths, immediately return

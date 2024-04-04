@@ -15,6 +15,7 @@ from telegym.grpc_client_env import GRPCClientEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+
 class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrationService):
     def __init__(self, n_workers):
         self.envs = [None] * n_workers
@@ -24,7 +25,9 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
         for i, env in enumerate(self.envs):
             if env is None:
                 identity = context.peer().split(":")
-                assert len(identity) == 3 and identity[0] == "ipv4", f"Identity {context.peer()} isn't valid ipv4 identity"
+                assert (
+                    len(identity) == 3 and identity[0] == "ipv4"
+                ), f"Identity {context.peer()} isn't valid ipv4 identity"
                 ip = identity[1]
                 address = ip + ":" + str(request.port)
                 print(f"Start registration of {context.peer()}")
@@ -40,7 +43,7 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
 
                 return environment_pb2.RegisterEnvironmentResponse(success=True)
         return environment_pb2.RegisterEnvironmentResponse(success=False)
-    
+
     def RegisterEnvironmentAvailable(self, request, context):
         return environment_pb2.Empty()
 
@@ -49,17 +52,21 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
         await self.completed.wait()
         return list(self.envs)
 
+
 async def _register_workers(local_addr, n_envs):
     # Start the registration server
     registration_server = grpc.aio.server()
     registration_servicer = EnvironmentRegistrationServicer(n_envs)
-    environment_pb2_grpc.add_EnvironmentRegistrationServiceServicer_to_server(registration_servicer, registration_server)
+    environment_pb2_grpc.add_EnvironmentRegistrationServiceServicer_to_server(
+        registration_servicer, registration_server
+    )
     registration_server.add_insecure_port(local_addr)
     print(f"Launching registration server at {local_addr}.")
     await registration_server.start()
 
     # Await the workers
     return await registration_servicer.await_workers()
+
 
 class GRPCClientVecEnv(DummyVecEnv):
     def __init__(self, local_addr, n_envs):
@@ -76,14 +83,18 @@ class GRPCClientVecEnv(DummyVecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         step = lambda env_i, act_i: env_i.step(act_i)
         for env_idx, result in enumerate(self._executor.map(step, self.envs, self.actions)):
-            obs, self.buf_rews[env_idx], self.buf_dones[env_idx], self.buf_infos[env_idx], self.reset_infos[env_idx] = result
+            obs, self.buf_rews[env_idx], self.buf_dones[env_idx], self.buf_infos[env_idx], self.reset_infos[env_idx] = (
+                result
+            )
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones), deepcopy(self.buf_infos))
-    
+
     def reset(self):
         reset = lambda env_i, seed_i, opts_i: env_i.reset(seed=seed_i, **opts_i)
 
-        maybe_options = [{"options": self._options[env_idx]} if self._options[env_idx] else {} for env_idx in range(self.num_envs)]
+        maybe_options = [
+            {"options": self._options[env_idx]} if self._options[env_idx] else {} for env_idx in range(self.num_envs)
+        ]
         for env_idx, (obs, reset_info) in enumerate(self._executor.map(reset, self.envs, self._seeds, maybe_options)):
             self.reset_infos[env_idx] = reset_info
             self._save_obs(env_idx, obs)
@@ -91,7 +102,7 @@ class GRPCClientVecEnv(DummyVecEnv):
         self._reset_seeds()
         self._reset_options()
         return self._obs_from_buf()
-    
+
     def get_images(self):
         if self.render_mode != "rgb_array":
             warnings.warn(
@@ -124,7 +135,7 @@ class GRPCClientVecEnv(DummyVecEnv):
         target_envs = self._get_target_envs(indices)
         is_wrapped = lambda env_i: env_i.is_wrapped(wrapper_class)
         return list(self._executor.map(is_wrapped, target_envs))
-    
+
     def close(self):
         close = lambda env_i: env_i.close()
         return list(self._executor.map(close, self.envs))

@@ -21,6 +21,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
+
 class GraspTask(BaseTask):
     """
     Grasp task
@@ -38,7 +39,7 @@ class GraspTask(BaseTask):
         f = open(path + "/../../rl/reset_poses.json")
         self.reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
-        
+
     def _load(self, env):
         pass
 
@@ -54,12 +55,9 @@ class GraspTask(BaseTask):
 
     def _create_reward_functions(self):
         rewards = dict()
-        rewards["grasp"] = GraspReward(
-            self.obj_name,
-            **self._reward_config
-        )
+        rewards["grasp"] = GraspReward(self.obj_name, **self._reward_config)
         return rewards
-    
+
     def _reset_agent(self, env):
         # if self._primitive_controller is None:
         #     self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
@@ -97,7 +95,7 @@ class GraspTask(BaseTask):
         # # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
         # robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
         # robot.set_position_orientation(*robot_pose)
-            
+
         # Reset the robot with cached reset poses
         ###########################################
         robot = env.robots[0]
@@ -114,7 +112,7 @@ class GraspTask(BaseTask):
         for _ in range(100):
             og.sim.step()
             if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-                continue 
+                continue
             if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
                 continue
             # otherwise we've stopped
@@ -140,6 +138,7 @@ class GraspTask(BaseTask):
         """
         # Reset the scene, agent, and variables
         import traceback
+
         for _ in range(20):
             try:
                 self._reset_scene(env)
@@ -186,9 +185,7 @@ class GraspTask(BaseTask):
 
     @classproperty
     def default_termination_config(cls):
-        return {
-            "max_steps": 100000
-        }
+        return {"max_steps": 100000}
 
     @classproperty
     def default_reward_config(cls):
@@ -200,4 +197,3 @@ class GraspTask(BaseTask):
             "eef_orientation_penalty_coef": 0.001,
             "regularization_coef": 0.01,
         }
-

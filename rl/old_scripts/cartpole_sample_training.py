@@ -64,13 +64,13 @@ algo = config.build()
 for i in range(1000):
     result = algo.train()
     if i % 100 == 99:
-        wandb.log(result['info']['learner'])
-        print(pretty_print(result['info']['learner']))
-        print(pretty_print(result['evaluation']['sampler_results']))
+        wandb.log(result["info"]["learner"])
+        print(pretty_print(result["info"]["learner"]))
+        print(pretty_print(result["evaluation"]["sampler_results"]))
         print(i)
-        print('----------------------------------')
+        print("----------------------------------")
 
-algo.save('./cartpole_sample_training_algo')
+algo.save("./cartpole_sample_training_algo")
 algo_loaded = Algorithm.from_checkpoint("./cartpole_sample_training_algo")
 # algo.save('./cartpole_sample_training_algo_ddpg')
 # algo_loaded = Algorithm.from_checkpoint("./cartpole_sample_training_algo_ddpg")

@@ -14,13 +14,16 @@ import time
 import os
 import argparse
 
+
 def pause(time):
-    for _ in range(int(time*100)):
+    for _ in range(int(time * 100)):
         og.sim.render()
 
+
 def pause_step(time):
-    for _ in range(int(time*100)):
+    for _ in range(int(time * 100)):
         og.sim.step()
+
 
 def execute_controller(ctrl_gen, env, filename=None):
     actions = []
@@ -31,10 +34,12 @@ def execute_controller(ctrl_gen, env, filename=None):
         with open(filename, "w") as f:
             yaml.dump(actions, f)
 
+
 def replay_controller(env, filename):
     actions = yaml.load(open(filename, "r"), Loader=yaml.FullLoader)
     for action in actions:
         env.step(action)
+
 
 def main():
     # Load the config
@@ -49,13 +54,15 @@ def main():
     # Load the environment
     vec_env = og.VectorEnvironment(40, config)
     import time
+
     while True:
         actions = []
         start_time = time.time()
         for e in vec_env.envs:
             actions.append(e.action_space.sample())
         vec_env.step(actions)
-        print("fps", 1/(time.time() - start_time))
+        print("fps", 1 / (time.time() - start_time))
+
 
 if __name__ == "__main__":
     main()

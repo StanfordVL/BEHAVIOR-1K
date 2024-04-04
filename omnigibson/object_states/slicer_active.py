@@ -43,7 +43,6 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         cls.PREVIOUSLY_TOUCHING = np.array([], dtype=bool)
         cls.SLICER_LINK_PATHS = []
 
-
     @classmethod
     def _add_obj(cls, obj):
         # Call super first
@@ -117,8 +116,15 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
                 return currently_touching
 
             # Aggregate all link prim path indices
-            all_slicer_idxs = [[list(RigidContactAPI.get_body_row_idx(prim_path))[1] for prim_path in link_paths] for link_paths in cls.SLICER_LINK_PATHS]
-            sliceable_idxs = [list(RigidContactAPI.get_body_col_idx(link.prim_path))[1] for obj in sliceable_objs for link in obj.links.values()]
+            all_slicer_idxs = [
+                [list(RigidContactAPI.get_body_row_idx(prim_path))[1] for prim_path in link_paths]
+                for link_paths in cls.SLICER_LINK_PATHS
+            ]
+            sliceable_idxs = [
+                list(RigidContactAPI.get_body_col_idx(link.prim_path))[1]
+                for obj in sliceable_objs
+                for link in obj.links.values()
+            ]
             impulses = RigidContactAPI.get_all_impulses(scene_idx)
 
             # Batch check each slicer against all sliceables

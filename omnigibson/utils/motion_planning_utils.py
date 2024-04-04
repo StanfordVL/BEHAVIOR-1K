@@ -522,6 +522,7 @@ def detect_robot_collision(context):
 
     return valid_hit
 
+
 def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=True):
     """
     Detects robot collisions with the environment, but not with itself using the ContactBodies API

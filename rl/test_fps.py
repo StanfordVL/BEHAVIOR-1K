@@ -13,8 +13,8 @@ if __name__ == "__main__":
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     env = og.Environment(configs=config)
-    
+
     while True:
         start_time = time.time()
         env.step(env.action_space.sample())
-        print("fps: ", 1/(time.time() - start_time))
+        print("fps: ", 1 / (time.time() - start_time))

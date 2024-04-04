@@ -9,8 +9,7 @@ VALID_MODES = {
     "binary",
     "ternary",
     "smooth",
-    "smooth_delta"
-    "independent",
+    "smooth_delta" "independent",
 }
 
 
@@ -117,7 +116,6 @@ class MultiFingerGripperController(GripperController):
         assert not (
             mode == "smooth_delta" and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
-
 
         # Run super init
         super().__init__(

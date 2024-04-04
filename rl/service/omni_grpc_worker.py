@@ -10,6 +10,7 @@ from telegym import serve_env_over_grpc
 
 gm.USE_FLATCACHE = True
 
+
 def main(local_addr, learner_addr, render):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     config_path = os.path.join(script_dir, "omni_grpc.yaml")
@@ -17,7 +18,7 @@ def main(local_addr, learner_addr, render):
 
     if not render:
         gm.ENABLE_RENDERING = False
-        del config['env']['external_sensors']
+        del config["env"]["external_sensors"]
 
     env = og.Environment(configs=config)
 
@@ -32,6 +33,7 @@ def main(local_addr, learner_addr, render):
 
     # Now start servicing!
     serve_env_over_grpc(env, local_addr, learner_addr)
+
 
 if __name__ == "__main__":
     import sys, socket
