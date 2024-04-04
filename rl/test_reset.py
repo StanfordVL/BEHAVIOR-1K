@@ -8,7 +8,10 @@ import matplotlib.pyplot as plt
 import yaml
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 from omnigibson.sensors.scan_sensor import ScanSensor
 from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.transform_utils as T
@@ -20,12 +23,14 @@ from tqdm import tqdm
 
 
 def step_sim(time):
-    for _ in range(int(time*100)):
+    for _ in range(int(time * 100)):
         og.sim.step()
+
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action[0])
+
 
 def main(iterations):
     DIST_COEFF = 0.1
@@ -48,7 +53,7 @@ def main(iterations):
     #                 "local_position": [-0.5, -2.0, 1.0],
     #                 "local_orientation": [0.707, 0.0, 0.0, 0.707]
     #             }
-    #         ],   
+    #         ],
     #     },
     #     "scene": {
     #         "type": "InteractiveTraversableScene",
@@ -87,7 +92,7 @@ def main(iterations):
     #                 #     "command_input_limits": (np.array([-0.2, -0.2, -0.2, -np.pi, -np.pi, -np.pi]),
     #                 #     np.array([0.2, 0.2, 0.2, np.pi, np.pi, np.pi])),
     #                 #     "command_output_limits": None,
-    #                 #     "mode": "pose_absolute_ori", 
+    #                 #     "mode": "pose_absolute_ori",
     #                 #     "kv": 3.0
     #                 # },
     #                 "arm_0": {
@@ -140,10 +145,10 @@ def main(iterations):
     #     ]
     # }
 
-    cfg = yaml.load(open('./service/omni_grpc.yaml', "r"), Loader=yaml.FullLoader)
+    cfg = yaml.load(open("./service/omni_grpc.yaml", "r"), Loader=yaml.FullLoader)
     gm.USE_GPU_DYNAMICS = True
     env = og.Environment(configs=cfg)
-        
+
     # Testing primitives with env
     #############################
     # controller = env.task._primitive_controller
@@ -170,6 +175,7 @@ def main(iterations):
     # Testing random actions with env
     #############################
     import traceback
+
     for i in tqdm(range(int(iterations))):
         try:
             done = False
@@ -183,13 +189,13 @@ def main(iterations):
             print("Error in iteration: ", i)
             print(e)
             traceback.print_exc()
-            print('--------------------')
+            print("--------------------")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run worker")
     parser.add_argument("iterations")
-    
+
     args = parser.parse_args()
     main(args.iterations)
 

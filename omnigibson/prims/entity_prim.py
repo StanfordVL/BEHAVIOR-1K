@@ -870,7 +870,6 @@ class EntityPrim(XFormPrim):
             if not joint.initialized:
                 joint.initialize()
             joint.update_handles()
-            
 
     def get_joint_positions(self, normalized=False):
         """

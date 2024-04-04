@@ -6,9 +6,10 @@ import torch as th
 from stable_baselines3 import PPO
 from dask.distributed import Client
 
-class PolicyWrapper():
+
+class PolicyWrapper:
     def __init__(self):
-        self.PPO = PPO('MlpPolicy', 'CartPole-v1', verbose=1, device='cuda')
+        self.PPO = PPO("MlpPolicy", "CartPole-v1", verbose=1, device="cuda")
 
     def _read_and_concatanate_rollouts(self, rollout_paths):
         pass
@@ -56,7 +57,6 @@ class PolicyWrapper():
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
 
-
     def _learn(self):
 
         total_timesteps, callback = self.PPO._setup_learn(
@@ -68,7 +68,6 @@ class PolicyWrapper():
         )
 
         self._train()
-
 
     def _train(self, rollout_paths):
         # Switch to train mode (this affects batch norm / dropout)
@@ -168,7 +167,9 @@ class PolicyWrapper():
             if not continue_training:
                 break
 
-        explained_var = explained_variance(self.PPO.rollout_buffer.values.flatten(), self.PPO.rollout_buffer.returns.flatten())
+        explained_var = explained_variance(
+            self.PPO.rollout_buffer.values.flatten(), self.PPO.rollout_buffer.returns.flatten()
+        )
 
         # Logs
         self.PPO.logger.record("train/entropy_loss", np.mean(entropy_losses))
@@ -189,12 +190,15 @@ class PolicyWrapper():
 
 def run_rollouts(policy_path, max_rollouts_per_worker):
     rollouts_uuid = uuid.uuid4().hex
-    rollouts_path = './rollouts/rollouts_{}.hdf5'.format(rollouts_uuid)
+    rollouts_path = "./rollouts/rollouts_{}.hdf5".format(rollouts_uuid)
 
-    cmd = " ".join(['OMNIGIBSON_HEADLESS=1', 'python', '-m', "learner", policy_path, rollouts_path, max_rollouts_per_worker])
+    cmd = " ".join(
+        ["OMNIGIBSON_HEADLESS=1", "python", "-m", "learner", policy_path, rollouts_path, max_rollouts_per_worker]
+    )
     subprocess.call(cmd, shell=True)
 
     return rollouts_path
+
 
 def main(scheduler_route, num_workers, max_rollouts):
     c = Client(scheduler_route)
@@ -203,25 +207,26 @@ def main(scheduler_route, num_workers, max_rollouts):
     while True:
         # train policy from rollouts
         policy.train(rollout_files)
-        
+
         # save policy
         uuid = uuid.uuid4().hex
-        policy_path = './policies/policy_{}'.format(uuid)
+        policy_path = "./policies/policy_{}".format(uuid)
         policy.save(policy_path)
 
         max_rollouts_per_worker = round(max_rollouts / num_workers)
 
         # now call the runner with the new policy
         futures = [c.submit(run_rollouts, policy_path, max_rollouts_per_worker) for _ in range(num_workers)]
-        
+
         # wait for all the futures
         rollout_files = [f.result() for f in futures]
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run learner")
     parser.add_argument("scheduler_route")
     parser.add_argument("num_workers")
     parser.add_argument("max_rollouts")
-    
+
     args = parser.parse_args()
     main(args.scheduler_route, args.num_workers, args.max_rollouts)

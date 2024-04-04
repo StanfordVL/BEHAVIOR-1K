@@ -22,7 +22,14 @@ class StepResponse(_message.Message):
     terminated: bool
     truncated: bool
     info: bytes
-    def __init__(self, observation: _Optional[bytes] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., info: _Optional[bytes] = ...) -> None: ...
+    def __init__(
+        self,
+        observation: _Optional[bytes] = ...,
+        reward: _Optional[float] = ...,
+        terminated: bool = ...,
+        truncated: bool = ...,
+        info: _Optional[bytes] = ...,
+    ) -> None: ...
 
 class ResetRequest(_message.Message):
     __slots__ = ("seed", "options")

@@ -39,7 +39,6 @@ class MaxTemperature(TensorizedValueState):
             name="MaxTemperature_temperature_idx_update", callback=_update_temperature_idxs
         )
 
-
     @classmethod
     def _add_obj(cls, obj):
         # Call super first

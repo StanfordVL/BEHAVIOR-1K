@@ -32,12 +32,12 @@ class Falling(FailureCondition):
         robot_z = env.scene.robots[self._robot_idn].get_position()[2]
         if robot_z < (env.scene.get_floor_height() - self._fall_height):
             return True
-        
+
         # Terminate if the robot has toppled over
         if self._topple:
             rotation = R.from_quat(env.scene.robots[self._robot_idn].get_orientation())
             robot_up = rotation.apply(np.array([0, 0, 1]))
             if robot_up[2] < 0.75:
                 return True
-            
+
         return False

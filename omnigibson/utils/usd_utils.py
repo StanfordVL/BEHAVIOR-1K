@@ -10,6 +10,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
+
 # Circular import
 # from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
@@ -181,6 +182,7 @@ class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
+
     def __init__(self):
         self._PATH_TO_SCENE_IDX = dict()
 
@@ -221,7 +223,7 @@ class RigidContactAPIImpl:
                             filters[scene_idx].append(link.prim_path)
 
         return filters
-    
+
     @classmethod
     def get_max_contact_data_count(cls):
         return 0
@@ -262,13 +264,14 @@ class RigidContactAPIImpl:
 
         # Create deterministic mapping from path to row index
         for scene_idx, _ in enumerate(og.sim.scenes):
-            self._PATH_TO_ROW_IDX[scene_idx] = {path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)}
+            self._PATH_TO_ROW_IDX[scene_idx] = {
+                path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
+            }
 
         # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
         for scene_idx, _ in enumerate(og.sim.scenes):
             self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
             self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
-        
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         # n_bodies = len(cls._PATH_TO_COL_IDX)
@@ -282,7 +285,7 @@ class RigidContactAPIImpl:
             int: scene idx for the rigid body defined by @prim_path
         """
         return self._PATH_TO_SCENE_IDX[prim_path]
-    
+
     def get_body_row_idx(self, prim_path):
         """
         Returns:
@@ -398,7 +401,7 @@ class RigidContactAPIImpl:
             f"Could not disambiguate which contacts are happening with which object for prim {prim_path}! Returning no contacts."
         )
         return []
-    
+
     def get_contact_data_from_columns(self, scene_idx, col_paths):
         # First, find all of the rows that the prim is in contact with
         impulses = self.get_all_impulses(scene_idx)
@@ -447,8 +450,10 @@ class RigidContactAPIImpl:
         self._CONTACT_DATA = dict()
         self._CONTACT_CACHE = dict()
 
+
 # Instantiate the RigidContactAPI
 RigidContactAPI = RigidContactAPIImpl()
+
 
 class GripperRigidContactAPIImpl(RigidContactAPIImpl):
     @classmethod
@@ -472,6 +477,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
 # Instantiate the GripperRigidContactAPI
 GripperRigidContactAPI = GripperRigidContactAPIImpl()
+
 
 class CollisionAPI:
     """
@@ -753,7 +759,9 @@ class ControllableObjectViewAPI:
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.objects.controllable_object import ControllableObject
 
-        controllable_objects = [obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)]
+        controllable_objects = [
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+        ]
 
         # This only works if the root link is called base_link for every controllable object, so assert that
         assert all(

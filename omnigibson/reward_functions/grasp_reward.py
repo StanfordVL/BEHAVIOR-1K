@@ -12,7 +12,16 @@ class GraspReward(BaseRewardFunction):
     Grasp reward
     """
 
-    def __init__(self, obj_name, dist_coeff, grasp_reward, collision_penalty, eef_position_penalty_coef, eef_orientation_penalty_coef, regularization_coef):
+    def __init__(
+        self,
+        obj_name,
+        dist_coeff,
+        grasp_reward,
+        collision_penalty,
+        eef_position_penalty_coef,
+        eef_orientation_penalty_coef,
+        regularization_coef,
+    ):
         # Store internal vars
         self.prev_grasping = False
         self.prev_eef_pos = None
@@ -34,8 +43,8 @@ class GraspReward(BaseRewardFunction):
 
         robot = env.robots[0]
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
-        current_grasping = (obj_in_hand == self.obj)
-        
+        current_grasping = obj_in_hand == self.obj
+
         # Reward varying based on combination of whether the robot was previously grasping the desired and object
         # and is currently grasping the desired object
 
@@ -44,11 +53,11 @@ class GraspReward(BaseRewardFunction):
         # grapsing -> not grapsing = Distance between eef and obj reward
         # grasping -> grasping = Minimizing MOI + grasp reward
 
-        reward = 0.
+        reward = 0.0
 
         # Penalize large actions
         reward += -(np.sum(np.abs(action)) * self.regularization_coef)
-    
+
         # Penalize based on the magnitude of the action
         eef_pos = robot.get_eef_position(robot.default_arm)
         if self.prev_eef_pos is not None:
@@ -74,7 +83,7 @@ class GraspReward(BaseRewardFunction):
             reward += math.exp(-dist) * self.dist_coeff
 
         else:
-            # We are currently grasping - first apply a grasp reward 
+            # We are currently grasping - first apply a grasp reward
             reward += self.grasp_reward
 
             # Then apply a distance reward to take us to a tucked position
@@ -86,7 +95,7 @@ class GraspReward(BaseRewardFunction):
         self.prev_grasping = current_grasping
 
         return reward, {"grasp_success": current_grasping}
-    
+
     def reset(self, task, env):
         """
         Reward function-specific reset

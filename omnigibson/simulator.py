@@ -353,7 +353,7 @@ def launch_simulator(*args, **kwargs):
                 viewport_name=viewport_name,
             )
             if not self._viewer_camera.loaded:
-                #@TODO: How to access scene here
+                # @TODO: How to access scene here
                 self._viewer_camera.load(None)
 
             # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
@@ -616,7 +616,7 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-            
+
             self._scene.remove_object(obj)
 
         def remove_prim(self, prim):
@@ -709,7 +709,7 @@ def launch_simulator(*args, **kwargs):
                     TransitionRuleAPI.refresh_all_rules()
 
                 # Update any system-related state
-                for scene in self.scenes: 
+                for scene in self.scenes:
                     for system in scene.systems:
                         system.update()
 
@@ -732,7 +732,7 @@ def launch_simulator(*args, **kwargs):
                             obj.update_visuals()
 
                 # Possibly run transition rule step
-                if gm.ENABLE_TRANSITION_RULES: 
+                if gm.ENABLE_TRANSITION_RULES:
                     TransitionRuleAPI.step()
 
         def _omni_update_step(self):
@@ -908,11 +908,12 @@ def launch_simulator(*args, **kwargs):
                                 obj0.states[state_type].on_contact(
                                     obj1, headers[(actor0_obj, actor1_obj)], contact_data
                                 )
+
         def _find_object_in_envs(self, prim_path):
             for scene in self.scenes:
                 obj = scene.object_registry("prim_path", prim_path)
                 if obj is not None:
-                    return obj 
+                    return obj
             return None
 
         def _on_simulation_event(self, event):
@@ -1135,7 +1136,7 @@ def launch_simulator(*args, **kwargs):
                 PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
             """
             return self._physx_scene_query_interface
-        
+
         @property
         def scenes(self):
             """

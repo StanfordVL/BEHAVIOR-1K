@@ -21,16 +21,26 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, StopTrainingOnNoModelImprovement, BaseCallback, EvalCallback
-from wandb.integration.sb3 import WandbCallback 
+from stable_baselines3.common.callbacks import (
+    CallbackList,
+    CheckpointCallback,
+    StopTrainingOnNoModelImprovement,
+    BaseCallback,
+    EvalCallback,
+)
+from wandb.integration.sb3 import WandbCallback
 from wandb import AlertLevel
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
-parser.add_argument("--n_envs", type=int, default=0, help="Number of parallel environments to wait for. 0 to run a local environment.")
+parser.add_argument(
+    "--n_envs", type=int, default=0, help="Number of parallel environments to wait for. 0 to run a local environment."
+)
 parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
 parser.add_argument("--eval_port", type=int, default=None, help="Port to listen at for evaluation.")
-parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
+parser.add_argument(
+    "--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0."
+)
 parser.add_argument(
     "--checkpoint",
     type=str,
@@ -40,11 +50,13 @@ parser.add_argument(
 parser.add_argument("--sweep_id", type=str, default=None, help="Sweep ID to run.")
 args = parser.parse_args()
 
+
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "omni_grpc.yaml"))
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
+
 
 def get_open_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -53,9 +65,11 @@ def get_open_port():
     s.close()
     return port
 
+
 EVAL_EVERY_N_EPISODES = 10
 NUM_EVAL_EPISODES = 5
-STEPS_PER_EPISODE = _get_env_config()['task']['termination_config']['max_steps']
+STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
+
 
 def instantiate_envs():
     # Decide whether to use a local environment or remote
@@ -64,7 +78,7 @@ def instantiate_envs():
         if args.port is not None:
             local_port = int(args.port)
         else:
-            local_port = get_open_port() 
+            local_port = get_open_port()
 
         # Manually specify port for eval env
         eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
@@ -79,6 +93,7 @@ def instantiate_envs():
     else:
         import omnigibson as og
         from omnigibson.macros import gm
+
         gm.USE_FLATCACHE = True
 
         env = GRPCClientVecEnv(f"0.0.0.0:{get_open_port()}", 1)
@@ -87,6 +102,7 @@ def instantiate_envs():
         eval_env = env
         args.n_envs = 1
     return env, eval_env
+
 
 # class CustomCombinedExtractor(BaseFeaturesExtractor):
 #     def __init__(self, observation_space: gym.spaces.Dict):
@@ -107,7 +123,7 @@ def instantiate_envs():
 #                 assert time_dimension == subspace.shape[0], f"All observation subspaces must have the same time dimension. Expected {time_dimension}, found {subspace.shape[0]}"
 #             if key == "rgb":
 #                 assert len(subspace.shape) == 4, "Expected frame-stacked (f, c, h, w) RGB observations"
-#                 n_input_channels = subspace.shape[1]  # channel 
+#                 n_input_channels = subspace.shape[1]  # channel
 #                 cnn = nn.Sequential(
 #                     nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
 #                     nn.ReLU(),
@@ -161,23 +177,23 @@ def instantiate_envs():
 #         feature = self._across_time(feature)
 #         return feature
 
+
 def train(env, eval_env):
-    prefix = ''
+    prefix = ""
     seed = 0
     if args.sweep_id:
-        run = wandb.init(
-            sync_tensorboard=True,
-            monitor_gym=True
+        run = wandb.init(sync_tensorboard=True, monitor_gym=True)
+        task_config = _get_env_config()["task"]
+        task_config["reward_config"]["dist_coeff"] = wandb.config.dist_coeff
+        task_config["reward_config"]["grasp_reward"] = wandb.config.grasp_reward
+        task_config["reward_config"]["collision_penalty"] = wandb.config.collision_penalty
+        task_config["reward_config"]["eef_position_penalty_coef"] = wandb.config.eef_position_penalty_coef
+        task_config["reward_config"]["eef_orientation_penalty_coef"] = (
+            wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
         )
-        task_config = _get_env_config()['task']
-        task_config['reward_config']['dist_coeff'] = wandb.config.dist_coeff
-        task_config['reward_config']['grasp_reward'] = wandb.config.grasp_reward
-        task_config['reward_config']['collision_penalty'] = wandb.config.collision_penalty
-        task_config['reward_config']['eef_position_penalty_coef'] = wandb.config.eef_position_penalty_coef
-        task_config['reward_config']['eef_orientation_penalty_coef'] = wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
-        task_config['reward_config']['regularization_coef'] = wandb.config.regularization_coef
-        env.env_method('update_task', task_config)
-        eval_env.env_method('update_task', task_config)
+        task_config["reward_config"]["regularization_coef"] = wandb.config.regularization_coef
+        env.env_method("update_task", task_config)
+        eval_env.env_method("update_task", task_config)
     else:
         run = wandb.init(
             entity="behavior-rl",
@@ -199,10 +215,10 @@ def train(env, eval_env):
     #     features_extractor_class=CustomCombinedExtractor,
     # )
     if args.eval:
-        # Need to enable rendering in simulator.step and something else     
+        # Need to enable rendering in simulator.step and something else
         assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
         ceiling = env.scene.object_registry("name", "ceilings")
-        ceiling.visible = False   
+        ceiling.visible = False
         model = PPO.load(args.checkpoint)
         log.info("Starting evaluation...")
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
@@ -227,7 +243,7 @@ def train(env, eval_env):
                 "log_std_init": -2,
                 "ortho_init": False,
                 "activation_fn": nn.ReLU,
-                "net_arch": {"pi": [512, 512], "vf": [512, 512]}
+                "net_arch": {"pi": [512, 512], "vf": [512, 512]},
             },
         }
         tensorboard_log_dir = f"runs/{run.id}"
@@ -236,7 +252,7 @@ def train(env, eval_env):
                 env=env,
                 verbose=1,
                 tensorboard_log=tensorboard_log_dir,
-                device='cuda',
+                device="cuda",
                 **config,
             )
         else:
@@ -247,12 +263,23 @@ def train(env, eval_env):
             verbose=2,
         )
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
-        eval_callback = EvalCallback(eval_env, eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE, callback_after_eval=None, verbose=1, best_model_save_path='logs/best_model', n_eval_episodes=NUM_EVAL_EPISODES, deterministic=True, render=False)
-        callback = CallbackList([
-            wandb_callback,
-            checkpoint_callback,
-            eval_callback,
-        ])
+        eval_callback = EvalCallback(
+            eval_env,
+            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
+            callback_after_eval=None,
+            verbose=1,
+            best_model_save_path="logs/best_model",
+            n_eval_episodes=NUM_EVAL_EPISODES,
+            deterministic=True,
+            render=False,
+        )
+        callback = CallbackList(
+            [
+                wandb_callback,
+                checkpoint_callback,
+                eval_callback,
+            ]
+        )
         print(callback.callbacks)
 
         log.debug(model.policy)

@@ -406,7 +406,11 @@ class TouchingAnyCondition(RuleCondition):
             idxs_to_check = np.concatenate([self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]])
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
-                if np.any(RigidContactAPI.get_all_impulses(self._filter_1_scene_idxs[obj])[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                if np.any(
+                    RigidContactAPI.get_all_impulses(self._filter_1_scene_idxs[obj])[self._filter_1_idxs[obj]][
+                        :, idxs_to_check
+                    ]
+                ):
                     objs.append(obj)
         else:
             # Manually check contact
@@ -1222,7 +1226,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        #@TODO: Which scene
+        # @TODO: Which scene
         for system in og.sim.scene.system_registry.objects:
             # Skip cloth system
             if system.name == "cloth":
@@ -1496,7 +1500,7 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input objects exist in the scene
         """
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            #@TODO: Which scene
+            # @TODO: Which scene
             if len(og.sim.scene.object_registry("category", obj_category, default_val=set())) < obj_quantity:
                 return False
         return True
@@ -1518,7 +1522,7 @@ class RecipeRule(BaseTransitionRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            #@TODO: Which scene
+            # @TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -1652,7 +1656,7 @@ class RecipeRule(BaseTransitionRule):
         cls._OBJECTS = []
         cls._OBJECTS_TO_IDX = dict()
 
-        #@TODO: Which scene
+        # @TODO: Which scene
         # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
         objects_by_category = og.sim.scene.object_registry.get_dict("category")
 
@@ -1830,7 +1834,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-            #@TODO: Which scene
+            # @TODO: Which scene
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
@@ -2252,7 +2256,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            #@TODO: Which scene
+            # @TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -2276,7 +2280,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
-            #@TODO: Which scene
+            # @TODO: Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 

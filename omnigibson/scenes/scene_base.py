@@ -263,15 +263,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
             og.sim.write_metadata(key=key, data=data)
-    
+
     def _update_objects_info(self, scene_info):
         """
         Updates objects info base on scene ID
         """
         init_info = scene_info["objects_info"]["init_info"]
         for obj_name, obj_info in init_info.items():
-            obj_info['args']['name'] = obj_info['args']['name'] + '_' + str(self.id)
-            obj_info['args']['prim_path'] = obj_info['args']['prim_path'] + '_' + str(self.id)
+            obj_info["args"]["name"] = obj_info["args"]["name"] + "_" + str(self.id)
+            obj_info["args"]["prim_path"] = obj_info["args"]["prim_path"] + "_" + str(self.id)
         return scene_info
 
     def _should_load_object(self, obj_info, task_metadata):
@@ -378,13 +378,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(obj=SYSTEM_REGISTRY)
 
         # Add registry for objects
-        registry.add(obj=SerializableRegistry(
-            name="object_registry_{}".format(str(self.id)),
-            class_types=BaseObject,
-            default_key="name",
-            unique_keys=self.object_registry_unique_keys,
-            group_keys=self.object_registry_group_keys,
-        ))
+        registry.add(
+            obj=SerializableRegistry(
+                name="object_registry_{}".format(str(self.id)),
+                class_types=BaseObject,
+                default_key="name",
+                unique_keys=self.object_registry_unique_keys,
+                group_keys=self.object_registry_group_keys,
+            )
+        )
 
         return registry
 

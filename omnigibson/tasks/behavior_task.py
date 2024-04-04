@@ -372,7 +372,7 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in REGISTERED_SYSTEMS
-                #@TODO: Which scene
+                # @TODO: Which scene
                 entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
@@ -530,14 +530,14 @@ class BehaviorTask(BaseTask):
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:
-            #@TODO: Which scene
+            # @TODO: Which scene
             fname = self.get_cached_activity_scene_filename(
                 scene_model=og.sim.scene.scene_model,
                 activity_name=self.activity_name,
                 activity_definition_id=self.activity_definition_id,
                 activity_instance_id=self.activity_instance_id,
             )
-            #@TODO: Which scene
+            # @TODO: Which scene
             path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
 
         if os.path.exists(path) and not override:

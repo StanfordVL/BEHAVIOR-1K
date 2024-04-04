@@ -64,5 +64,5 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
-                obj_names.extend([name for name in info['seg_instance'].values() if name not in names_to_exclude])
+                obj_names.extend([name for name in info["seg_instance"].values() if name not in names_to_exclude])
         return [x for x in [self.obj.scene.object_registry("name", x) for x in obj_names] if x is not None]

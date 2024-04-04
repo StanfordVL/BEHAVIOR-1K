@@ -32,10 +32,12 @@ log = create_module_logger(module_name=__name__)
 DIST_BETWEEN_ENVS = 10
 NUM_ENVS_PER_ROW = 5
 
+
 class Environment(gym.Env, GymObservable, Recreatable):
     """
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
+
     def __init__(self, configs, num_env=1):
         """
         Args:
@@ -89,7 +91,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._scene_graph_builder = None
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
-        
+
         self.id = num_env
         self.num_env = num_env
         origin_offset_x = (self.num_env % NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
@@ -224,7 +226,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
-        
+
         scene.id = self.num_env
         scene.origin_offset = self.origin_offset
         self._scene = scene
@@ -253,7 +255,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 else:
                     robot_config["name"] = f"{robot_config['name']}_{str(self.scene.id)}"
                 # Update robot config so name is unique amongst robots in all scenes
-                position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop("orientation", None)
+                position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop(
+                    "orientation", None
+                )
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -327,7 +331,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "prim_path" not in sensor_config:
                     sensor_config["prim_path"] = f"/World/{sensor_config['name']}"
                 # Pop the desired position and orientation
-                local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop("local_orientation", None)
+                local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop(
+                    "local_orientation", None
+                )
                 # Pop whether or not to include this sensor in the observation
                 include_in_obs = sensor_config.pop("include_in_obs", True)
                 # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
@@ -465,7 +471,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Clean up the environment and shut down the simulation.
         """
         return
-    
+
         # og.shutdown()
 
     def get_obs(self):
@@ -484,7 +490,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for robot in self.robots:
             if gym.spaces.utils.flatdim(robot.observation_space) > 0:
                 obs[robot.name], info[robot.name] = robot.get_obs()
-            
 
         # Add task observations
         if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
@@ -540,7 +545,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             idx = 0
             for robot in self.robots:
                 action_dim = robot.action_dim
-                action_dict[robot.name] = action[idx: idx + action_dim]
+                action_dict[robot.name] = action[idx : idx + action_dim]
                 idx += action_dim
         else:
             # Our inputted action is the action dictionary
@@ -604,10 +609,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Only works if there is an external sensor
         if not self._external_sensors:
             return None
-        
+
         # Get the RGB sensors
         rgb_sensors = [
-            x for x in self._external_sensors.values()
+            x
+            for x in self._external_sensors.values()
             if isinstance(x, VisionSensor) and (x.modalities == "all" or "rgb" in x.modalities)
         ]
         if not rgb_sensors:
@@ -619,7 +625,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
         return np.concatenate(rgb_images, axis=1)[:, :, :3]
-
 
     def _reset_variables(self):
         """
