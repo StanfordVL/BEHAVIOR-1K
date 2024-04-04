@@ -143,10 +143,9 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
         for result in results:
             # Check if the inferred hit object is not None, we add it to our set
             obj_prim_path = "/".join(result["rigidBody"].split("/")[:-1])
-            #@TODO: Which scene
-            obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
-            if obj is not None:
-                unique_objs.add(obj)
+            hit_obj = obj.scene.object_registry("prim_path", obj_prim_path, None)
+            if hit_obj is not None:
+                unique_objs.add(hit_obj)
         objs_by_direction.append(unique_objs)
 
     # Reshape so that these have the following indices:

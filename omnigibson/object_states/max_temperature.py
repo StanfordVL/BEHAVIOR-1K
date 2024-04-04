@@ -19,9 +19,9 @@ class MaxTemperature(TensorizedValueState):
         return deps
 
     @classmethod
-    def global_initialize(cls):
+    def global_initialize(cls, sim):
         # Call super first
-        super().global_initialize()
+        super().global_initialize(sim)
 
         # Initialize other global variables
         cls.TEMPERATURE_IDXS = np.array([], dtype=int)
@@ -39,13 +39,6 @@ class MaxTemperature(TensorizedValueState):
             name="MaxTemperature_temperature_idx_update", callback=_update_temperature_idxs
         )
 
-    @classmethod
-    def global_clear(cls):
-        # Call super first
-        super().global_clear()
-
-        # Clear other internal state
-        cls.TEMPERATURE_IDXS = None
 
     @classmethod
     def _add_obj(cls, obj):

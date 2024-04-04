@@ -263,7 +263,6 @@ def launch_simulator(*args, **kwargs):
             Simulator._world_initialized = True
 
             # Store other references to variables that will be initialized later
-            self._scene = None
             self._scenes = []
             self._physx_interface = None
             self._physx_simulation_interface = None
@@ -513,12 +512,6 @@ def launch_simulator(*args, **kwargs):
             # Clear the existing scene if any
             # self.clear()
 
-            # Initialize all global updatable object states
-            for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
-                    state.global_initialize()
-
-            self._scene = scene
             self._scenes.append(scene)
             self._scenes[-1].load()
 
@@ -552,9 +545,6 @@ def launch_simulator(*args, **kwargs):
                 register (bool): whether to register this object internally in the scene registry
             """
             assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
-
-            # Make sure scene is loaded -- objects should not be loaded unless we have a reference to a scene
-            assert self.scene is not None, "import_object needs to be called after import_scene"
 
             # Load the object in omniverse by adding it to the scene
             # self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
@@ -626,6 +616,7 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
+            
             self._scene.remove_object(obj)
 
         def remove_prim(self, prim):
@@ -684,7 +675,7 @@ def launch_simulator(*args, **kwargs):
             Complete any non-physics steps such as state updates.
             """
             # If we don't have a valid scene, immediately return
-            if self._scene is None:
+            if len(self.scenes) == 0:
                 return
 
             # Update omni
@@ -718,8 +709,9 @@ def launch_simulator(*args, **kwargs):
                     TransitionRuleAPI.refresh_all_rules()
 
                 # Update any system-related state
-                for system in self.scene.systems:
-                    system.update()
+                for scene in self.scenes: 
+                    for system in scene.systems:
+                        system.update()
 
                 # Propagate states if the feature is enabled
                 if gm.ENABLE_OBJECT_STATES:
@@ -740,7 +732,7 @@ def launch_simulator(*args, **kwargs):
                             obj.update_visuals()
 
                 # Possibly run transition rule step
-                if gm.ENABLE_TRANSITION_RULES:
+                if gm.ENABLE_TRANSITION_RULES: 
                     TransitionRuleAPI.step()
 
         def _omni_update_step(self):
@@ -829,13 +821,14 @@ def launch_simulator(*args, **kwargs):
             assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
             return int(n_physics_timesteps_per_render)
 
-        def step(self, render=False):
+        def step(self, render=True):
             """
             Step the simulation at self.render_timestep
 
             Args:
                 render (bool): Whether rendering should occur or not
             """
+            render = gm.ENABLE_RENDERING
             if self.stage is None:
                 raise Exception("There is no stage currently opened, init_stage needed before calling this func")
 
@@ -872,9 +865,10 @@ def launch_simulator(*args, **kwargs):
             ControllableObjectViewAPI.clear()
 
             # Run the controller step on every controllable object
-            for obj in self.scene.objects:
-                if isinstance(obj, ControllableObject):
-                    obj.step()
+            for scene in self.scenes:
+                for obj in scene.objects:
+                    if isinstance(obj, ControllableObject):
+                        obj.step()
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
@@ -914,11 +908,18 @@ def launch_simulator(*args, **kwargs):
                                 obj0.states[state_type].on_contact(
                                     obj1, headers[(actor0_obj, actor1_obj)], contact_data
                                 )
+        def _find_object_in_envs(self, prim_path):
+            for scene in self.scenes:
+                obj = scene.object_registry("prim_path", prim_path)
+                if obj is not None:
+                    return obj 
+            return None
 
         def _on_simulation_event(self, event):
             """
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
+
             if gm.ENABLE_OBJECT_STATES:
                 if (
                     event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK)
@@ -933,7 +934,7 @@ def launch_simulator(*args, **kwargs):
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
                     for i in range(2, len(tokens) + 1):
-                        obj = self._scene.object_registry("prim_path", "/".join(tokens[:i]))
+                        obj = self._find_object_in_envs("/".join(tokens[:i]))
                         if obj is not None:
                             break
 
@@ -1134,14 +1135,6 @@ def launch_simulator(*args, **kwargs):
                 PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
             """
             return self._physx_scene_query_interface
-
-        @property
-        def scene(self):
-            """
-            Returns:
-                None or Scene: Scene currently loaded in this simulator. If no scene is loaded, returns None
-            """
-            return self._scene
         
         @property
         def scenes(self):
@@ -1182,10 +1175,10 @@ def launch_simulator(*args, **kwargs):
             # Stop the physics
             self.stop()
 
-            # Clear any pre-existing scene if it exists
-            if self._scene is not None:
-                self.scene.clear()
-            self._scene = None
+            # Clear all scenes
+            for scene in self.scenes:
+                scene.clear()
+            self._scenes = []
 
             # Clear all vision sensors and remove viewer camera reference and camera mover reference
             VisionSensor.clear()
@@ -1197,7 +1190,7 @@ def launch_simulator(*args, **kwargs):
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, GlobalUpdateStateMixin):
-                    state.global_clear()
+                    state.global_initialize(self)
 
             # Clear all materials
             MaterialPrim.clear()
@@ -1478,15 +1471,16 @@ def launch_simulator(*args, **kwargs):
         @property
         def state_size(self):
             # Total state size is the state size of our scene
-            return self._scene.state_size
+            return sum([scene.state_size for scene in self.scenes])
 
         def _dump_state(self):
             # Default state is from the scene
-            return self._scene.dump_state(serialized=False)
+            return {i: scene.dump_state(serialized=False) for i, scene in enumerate(self.scenes)}
 
         def _load_state(self, state):
             # Default state is from the scene
-            self._scene.load_state(state=state, serialized=False)
+            for i, scene in enumerate(self.scenes):
+                scene.load_state(state=state[i], serialized=False)
 
         def load_state(self, state, serialized=False):
             # We need to make sure the simulator is playing since joint states only get updated when playing
@@ -1509,11 +1503,17 @@ def launch_simulator(*args, **kwargs):
 
         def _serialize(self, state):
             # Default state is from the scene
-            return self._scene.serialize(state=state)
+            return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
 
         def _deserialize(self, state):
             # Default state is from the scene
-            return self._scene.deserialize(state=state), self._scene.state_size
+            dicts = {}
+            total_state_size = 0
+            for i, scene in enumerate(self.scenes):
+                scene_dict, scene_state_size = scene.deserialize(state=state[total_state_size:])
+                dicts[i] = scene_dict
+                total_state_size += scene_state_size
+            return dicts, total_state_size
 
     if not og.sim:
         og.sim = Simulator(*args, **kwargs)

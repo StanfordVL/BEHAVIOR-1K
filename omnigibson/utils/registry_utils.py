@@ -338,6 +338,7 @@ class SerializableRegistry(Registry, Serializable):
         # loading will be skipped.
         for obj in self.objects:
             if obj.name not in state:
+                # breakpoint()
                 log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
                 continue
             obj.load_state(state[obj.name], serialized=False)

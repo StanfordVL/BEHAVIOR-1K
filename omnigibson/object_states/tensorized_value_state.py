@@ -22,9 +22,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     CALLBACKS_ON_REMOVE = None
 
     @classmethod
-    def global_initialize(cls):
+    def global_initialize(cls, sim):
         # Call super first
-        super().global_initialize()
+        super().global_initialize(sim)
 
         # Initialize the global variables
         cls.VALUES = np.array([], dtype=cls.value_type).reshape(0, *cls.value_shape)
@@ -42,16 +42,6 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             return
 
         cls.VALUES = cls._update_values(values=cls.VALUES)
-
-    @classmethod
-    def global_clear(cls):
-        # Call super first
-        super().global_clear()
-
-        # Clear internal state
-        cls.VALUES = None
-        cls.OBJ_IDXS = None
-        cls.CALLBACKS_ON_REMOVE = None
 
     @classmethod
     def _update_values(cls, values):
@@ -168,6 +158,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _set_value(self, new_value):
         # Directly set value in global register
+        # if self.obj.name == "coffee_table_fqluyq_0_0" and self.obj.name not in self.OBJ_IDXS:
+        #     import traceback
+        #     print(traceback.print_exc())
+        #     breakpoint()
         self.VALUES[self.OBJ_IDXS[self.obj.name]] = new_value
         return True
 

@@ -89,7 +89,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._scene_graph_builder = None
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
-          
+        
+        self.id = num_env
         self.num_env = num_env
         origin_offset_x = (self.num_env % NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
         origin_offset_y = int(self.num_env / NUM_ENVS_PER_ROW) * DIST_BETWEEN_ENVS
@@ -224,7 +225,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="scene",
         )
         
-        scene.id = "scene_{}".format(str(self.num_env))
+        scene.id = self.num_env
         scene.origin_offset = self.origin_offset
         self._scene = scene
         og.sim.import_scene(scene)
@@ -248,9 +249,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}_{str(self.num_env)}"
+                    robot_config["name"] = f"robot{i}_{str(self.scene.id)}"
                 else:
-                    robot_config["name"] = f"{robot_config['name']}_{str(self.num_env)}"
+                    robot_config["name"] = f"{robot_config['name']}_{str(self.scene.id)}"
                 # Update robot config so name is unique amongst robots in all scenes
                 position, orientation = robot_config.pop("position", [0.0, 0.0, 0.0]), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
@@ -282,9 +283,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for i, obj_config in enumerate(self.objects_config):
             # Add a name for the object if necessary
             if "name" not in obj_config:
-                obj_config["name"] = f"obj{i}_{str(self.num_env)}"
+                obj_config["name"] = f"obj{i}_{str(self.scene.id)}"
             else:
-                obj_config["name"] = f"{obj_config['name']}_{str(self.num_env)}"
+                obj_config["name"] = f"{obj_config['name']}_{str(self.scene.id)}"
             # Pop the desired position and orientation
             position, orientation = obj_config.pop("position", [0.0, 0.0, 0.0]), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot

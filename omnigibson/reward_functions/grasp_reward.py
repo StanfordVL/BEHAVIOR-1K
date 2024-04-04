@@ -30,7 +30,7 @@ class GraspReward(BaseRewardFunction):
         super().__init__()
 
     def _step(self, task, env, action):
-        self.obj = env.scene.object_registry("name", self.obj_name) if self.obj is None else self.obj
+        self.obj = env.scene.object_registry("name", f"{self.obj_name}_{env.id}") if self.obj is None else self.obj
 
         robot = env.robots[0]
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]

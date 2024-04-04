@@ -61,8 +61,8 @@ class GraspTask(BaseTask):
         return rewards
     
     def _reset_agent(self, env):
-        if self._primitive_controller is None:
-            self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+        # if self._primitive_controller is None:
+        #     self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
         # Reset the robot with primitive controller
         ###########################################
@@ -103,8 +103,9 @@ class GraspTask(BaseTask):
         robot = env.robots[0]
         joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         robot_pose = random.choice(self.reset_poses)
-        robot.set_joint_positions(robot_pose['joint_pos'], joint_control_idx)
-        robot.set_position_orientation(robot_pose["base_pos"], robot_pose["base_ori"])
+        robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+        robot_pos = np.array(robot_pose["base_pos"]) + np.array(env.origin_offset)
+        robot.set_position_orientation(robot_pos, robot_pose["base_ori"])
 
         # Settle robot
         for _ in range(10):
@@ -138,12 +139,14 @@ class GraspTask(BaseTask):
             env (Environment): environment instance to reset
         """
         # Reset the scene, agent, and variables
+        import traceback
         for _ in range(20):
             try:
                 self._reset_scene(env)
                 self._reset_agent(env)
                 break
             except Exception as e:
+                print(traceback.print_exc())
                 print("Resetting error: ", e)
         else:
             raise ValueError("Could not reset task.")
@@ -166,7 +169,7 @@ class GraspTask(BaseTask):
         return joint_positions, joint_control_idx
 
     def _get_obs(self, env):
-        obj = env.scene.object_registry("name", self.obj_name)
+        obj = env.scene.object_registry("name", f"{self.obj_name}_{env.id}")
         robot = env.robots[0]
         relative_pos, _ = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
 

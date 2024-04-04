@@ -242,7 +242,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
-                    # from IPython import embed; embed()
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]

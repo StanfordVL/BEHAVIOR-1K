@@ -111,7 +111,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value="object_registry_{}".format(self.id))
+        return self._registry(key="name", value="object_registry_{}".format(str(self.id)))
 
     @property
     def system_registry(self):
@@ -182,7 +182,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
-        if self.id == 'scene_0':
+        if self.id == 0:
             # Create collision group for fixed base objects' non root links, root links, and building structures
             CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
             # Disable collision between root links of fixed base objects
@@ -270,8 +270,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         init_info = scene_info["objects_info"]["init_info"]
         for obj_name, obj_info in init_info.items():
-            obj_info['args']['name'] = obj_info['args']['name'] + '_' + self.id
-            obj_info['args']['prim_path'] = obj_info['args']['prim_path'] + '_' + self.id
+            obj_info['args']['name'] = obj_info['args']['name'] + '_' + str(self.id)
+            obj_info['args']['prim_path'] = obj_info['args']['prim_path'] + '_' + str(self.id)
         return scene_info
 
     def _should_load_object(self, obj_info, task_metadata):
@@ -370,7 +370,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name=self.id,
+            name=str(self.id),
             class_types=SerializableRegistry,
         )
 
@@ -379,7 +379,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Add registry for objects
         registry.add(obj=SerializableRegistry(
-            name="object_registry_{}".format(self.id),
+            name="object_registry_{}".format(str(self.id)),
             class_types=BaseObject,
             default_key="name",
             unique_keys=self.object_registry_unique_keys,

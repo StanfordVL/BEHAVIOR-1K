@@ -35,7 +35,7 @@ class GlobalUpdateStateMixin(BaseObjectState):
     """
 
     @classmethod
-    def global_initialize(cls):
+    def global_initialize(cls, sim):
         """
         Executes a global initialization sequence for this state. Default is no-op
         """
@@ -45,13 +45,6 @@ class GlobalUpdateStateMixin(BaseObjectState):
     def global_update(cls):
         """
         Executes a global update for this object state. Default is no-op
-        """
-        pass
-
-    @classmethod
-    def global_clear(cls):
-        """
-        Executes a global clear sequence for this object state. Default is no-op
         """
         pass
 

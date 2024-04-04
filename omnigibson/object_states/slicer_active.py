@@ -33,26 +33,16 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         return deps
 
     @classmethod
-    def global_initialize(cls):
+    def global_initialize(cls, sim):
         # Call super first
-        super().global_initialize()
+        super().global_initialize(sim)
 
         # Initialize other global variables
-        cls.STEPS_TO_WAIT = max(1, int(np.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
+        cls.STEPS_TO_WAIT = max(1, int(np.ceil(m.REACTIVATION_DELAY / sim.get_rendering_dt())))
         cls.DELAY_COUNTER = np.array([], dtype=int)
         cls.PREVIOUSLY_TOUCHING = np.array([], dtype=bool)
         cls.SLICER_LINK_PATHS = []
 
-    @classmethod
-    def global_clear(cls):
-        # Call super first
-        super().global_clear()
-
-        # Clear other internal state
-        cls.STEPS_TO_WAIT = None
-        cls.DELAY_COUNTER = None
-        cls.PREVIOUSLY_TOUCHING = None
-        cls.SLICER_LINK_PATHS = None
 
     @classmethod
     def _add_obj(cls, obj):
