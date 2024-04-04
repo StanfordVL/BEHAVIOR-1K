@@ -43,7 +43,6 @@ class XFormPrim(BasePrim):
         self._material = None
         self._collision_filter_api = None
         self.original_scale = None
-        self.scene = None
 
         # Run super method
         super().__init__(

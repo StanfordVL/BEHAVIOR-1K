@@ -47,12 +47,6 @@ class GraspReward(BaseRewardFunction):
 
         # Reward varying based on combination of whether the robot was previously grasping the desired and object
         # and is currently grasping the desired object
-
-        # not grasping -> not grasping = Distance between eef and obj reward
-        # not grasping -> grasping = Minimizing MOI + grasp reward
-        # grapsing -> not grapsing = Distance between eef and obj reward
-        # grasping -> grasping = Minimizing MOI + grasp reward
-
         reward = 0.0
 
         # Penalize large actions

@@ -171,7 +171,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         needs_dummy = False
         if not self.fixed_base:
             # TODO: Make this work after controllers get updated post-load.
-            # TODO: Make this work - for now this feature is disabled because we can't check the config
+            # TODO(rl): Make this work - for now this feature is disabled because we can't check the config
             # at this time.
             # Check if we have any operational space controllers or joint controllers with use_impedances on.
             # for cfg in self._controller_config.values():
@@ -251,16 +251,19 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                             if self._obs_modalities == "all"
                             else sensor_cls.all_modalities.intersection(self._obs_modalities)
                         )
+                    # If the modalities list is empty, don't import the sensor.
+                    if not sensor_kwargs["modalities"]:
+                        continue
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
-                    # sensor = create_sensor(
-                    #     sensor_type=prim_type,
-                    #     prim_path=str(prim.GetPrimPath()),
-                    #     name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
-                    #     **sensor_kwargs,
-                    # )
-                    # self._sensors[sensor.name] = sensor
-                    # sensor_counts[prim_type] += 1
+                    sensor = create_sensor(
+                        sensor_type=prim_type,
+                        prim_path=str(prim.GetPrimPath()),
+                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
+                        **sensor_kwargs,
+                    )
+                    self._sensors[sensor.name] = sensor
+                    sensor_counts[prim_type] += 1
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
         if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
@@ -361,6 +364,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         ori = T.quat2euler(quat)
 
         # Compute ori2d
+        # TODO: Dedupe this code that is also used in get_2d_orientation
         ori_2d = 0.0
         fwd = R.from_quat(quat).apply([1, 0, 0])
         fwd[2] = 0.0

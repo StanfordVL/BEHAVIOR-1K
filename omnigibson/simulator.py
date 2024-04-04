@@ -412,9 +412,9 @@ def launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
-            # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
-            # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
-            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", False)
+
+            # Below settings are for improving performance: we use the USD / Fabric only for poses.
+            lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
             lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
@@ -487,8 +487,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 mode (LightingMode): Lighting mode to set
             """
-            # lazy.omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
-            pass
+            lazy.omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
 
         def enable_viewer_camera_teleoperation(self):
             """
@@ -509,18 +508,20 @@ def launch_simulator(*args, **kwargs):
             assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
             assert isinstance(scene, Scene), "import_scene can only be called with Scene"
 
-            # Clear the existing scene if any
-            # self.clear()
+            # Check that the scene is not already imported
+            if scene in self._scenes:
+                raise ValueError("Scene is already imported!")
 
+            # Load the scene.
             self._scenes.append(scene)
-            self._scenes[-1].load()
+            scene.load()
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
             self.play()
 
             # Initialize the scene
-            self._scenes[-1].initialize()
+            scene.initialize()
 
             # Need to one more step for particle systems to work
             self.step()
@@ -536,7 +537,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._objects_to_initialize.append(obj)
 
-        def import_object(self, obj, register=True):
+        def post_import_object(self, obj, register=True):
             """
             Import an object into the simulator.
 
@@ -560,7 +561,7 @@ def launch_simulator(*args, **kwargs):
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self.initialize_object_on_next_sim_step(obj=obj)
 
-        def remove_object(self, obj):
+        def pre_remove_object(self, obj):
             """
             Remove one or a list of non-robot object from the simulator.
 
@@ -596,7 +597,7 @@ def launch_simulator(*args, **kwargs):
             # Refresh all current rules
             TransitionRuleAPI.prune_active_rules()
 
-        def _remove_object(self, obj):
+        def _pre_remove_object(self, obj):
             """
             Remove a non-robot object from the simulator. Should not be called directly by the user.
 
@@ -616,10 +617,9 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-
             self._scene.remove_object(obj)
 
-        def remove_prim(self, prim):
+        def pre_remove_prim(self, prim):
             """
             Remove a prim from the simulator.
 
@@ -821,7 +821,7 @@ def launch_simulator(*args, **kwargs):
             assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
             return int(n_physics_timesteps_per_render)
 
-        def step(self, render=True):
+        def step(self):
             """
             Step the simulation at self.render_timestep
 
@@ -909,7 +909,7 @@ def launch_simulator(*args, **kwargs):
                                     obj1, headers[(actor0_obj, actor1_obj)], contact_data
                                 )
 
-        def _find_object_in_envs(self, prim_path):
+        def find_object_in_scenes(self, prim_path):
             for scene in self.scenes:
                 obj = scene.object_registry("prim_path", prim_path)
                 if obj is not None:
@@ -920,7 +920,6 @@ def launch_simulator(*args, **kwargs):
             """
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
-
             if gm.ENABLE_OBJECT_STATES:
                 if (
                     event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK)
@@ -935,7 +934,7 @@ def launch_simulator(*args, **kwargs):
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
                     for i in range(2, len(tokens) + 1):
-                        obj = self._find_object_in_envs("/".join(tokens[:i]))
+                        obj = self.find_object_in_scenes("/".join(tokens[:i]))
                         if obj is not None:
                             break
 

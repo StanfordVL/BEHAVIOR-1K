@@ -256,69 +256,15 @@ class ManipulationRobot(BaseRobot):
 
         return is_grasping
 
-    # def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
-    #     """
-    #     For arm @arm, calculate any body IDs and corresponding link IDs that are not part of the robot
-    #     itself that are in contact with any of this arm's gripper's fingers
-
-    #     Args:
-    #         arm (str): specific arm whose gripper will be checked for contact. Default is "default" which
-    #             corresponds to the first entry in self.arm_names
-    #         return_contact_positions (bool): if True, will additionally return the contact (x,y,z) position
-
-    #     Returns:
-    #         2-tuple:
-    #             - set: set of unique contact prim_paths that are not the robot self-collisions.
-    #                 If @return_contact_positions is True, then returns (prim_path, pos), where pos is the contact
-    #                 (x,y,z) position
-    #                 Note: if no objects that are not the robot itself are intersecting, the set will be empty.
-    #             - dict: dictionary mapping unique contact objects defined by the contact prim_path to
-    #                 set of unique robot link prim_paths that it is in contact with
-    #     """
-    #     arm = self.default_arm if arm == "default" else arm
-    #     robot_contact_links = dict()
-    #     contact_data = set()
-    #     # Find all objects in contact with all finger joints for this arm
-    #     con_results = []
-    #     for link in self.finger_links[arm]:
-    #         scene_idx, row_id = RigidContactAPI.get_body_row_idx(link.prim_path)
-    #         impulses = RigidContactAPI.get_all_impulses(scene_idx)[row_id]
-    #         non_zero_impulses = [any(impulse) for impulse in impulses]
-    #         idx_non_zero_impulses = np.where(non_zero_impulses)[0]
-    #         for idx in idx_non_zero_impulses:
-    #             con_results.append((link.prim_path, RigidContactAPI.get_col_idx_prim_path(scene_idx, idx)))
-    #     if len(con_results) > 0:
-    #         from IPython import embed; embed()
-
-    #     # Get robot contact links
-    #     link_paths = set(self.link_prim_paths)
-    #     for con_res in con_results:
-    #         # Only add this contact if it's not a robot self-collision
-    #         other_contact_set = {con_res[0], con_res[1]} - link_paths
-    #         if len(other_contact_set) == 1:
-    #             link_contact, other_contact = con_res[0], con_res[1]
-    #             # Add to contact data
-    #             contact_data.add(
-    #                 (other_contact, tuple(con_res.position)) if return_contact_positions else other_contact
-    #             )
-    #             # Also add robot contact link info
-    #             if other_contact not in robot_contact_links:
-    #                 robot_contact_links[other_contact] = set()
-    #             robot_contact_links[other_contact].add(link_contact)
-
-    #     return contact_data, robot_contact_links
-
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
         arm = self.default_arm if arm == "default" else arm
         # Get robot contact links
-        # TODO: Find out how to know this from self
         link_paths = set(self.link_prim_paths)
-        scene_idx, _ = RigidContactAPI.get_body_row_idx(list(link_paths)[0])
 
         if not return_contact_positions:
             # If return contact positions is False, we only need to return the contact prim_paths.
             # For this we can simply use the impulse matrix.
-            impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+            impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(self.scene.idx), axis=-1)
             assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
             interesting_col_paths = [link.prim_path for link in self.finger_links[arm]]
             interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
@@ -330,7 +276,7 @@ class ManipulationRobot(BaseRobot):
             ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
             interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
             interesting_row_paths = [
-                GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
+                GripperRigidContactAPI.get_row_idx_prim_path(self.scene.idx, i) for i in interesting_row_idxes
             ]
 
             # Get the full interesting section of the impulse matrix
@@ -361,7 +307,7 @@ class ManipulationRobot(BaseRobot):
             return {other for other, _ in raw_contact_data}, robot_contact_links
 
         # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
-        contacts = GripperRigidContactAPI.get_contact_data_from_columns(scene_idx, link_paths)
+        contacts = GripperRigidContactAPI.get_contact_data_from_columns(self.scene.idx, link_paths)
         contact_data = {(contact[0], contact[3]) for contact in contacts}
         robot_contact_links = {}
         for con_data in contacts:
@@ -450,7 +396,6 @@ class ManipulationRobot(BaseRobot):
         # In addition to super method, add in EEF states
         fcns = super().get_control_dict()
 
-        # TODO: Implement these also with the view.
         for arm in self.arm_names:
             self._add_arm_control_dict(fcns=fcns, arm=arm)
 
@@ -478,12 +423,12 @@ class ManipulationRobot(BaseRobot):
         fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
             self.articulation_root_path, self.eef_link_names[arm]
         )
-        # TODO: This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
+        # TODO(rl): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        # TODO: Replace this with a ControllableObjectViewAPI call too.
+        # TODO(rl): Replace this with a ControllableObjectViewAPI call too.
         # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
         #     eef_link_idx, :, -self.n_joints :
         # ]
@@ -502,9 +447,6 @@ class ManipulationRobot(BaseRobot):
             dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
             # Add eef and grasping info
-            # TODO: Should we include this? Seems hacky.
-            # dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
-            # dic["eef_{}_quat_global".format(arm)] = self.get_eef_orientation(arm)
             dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
                 ControllableObjectViewAPI.get_link_relative_position_orientation(
                     self.articulation_root_path, self.eef_link_names[arm]

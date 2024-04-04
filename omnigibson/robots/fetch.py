@@ -229,6 +229,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
 
         # Temporarily enforce the base link to use a cube approximation (caster wheels are messed up otherwise)
+        # TODO(rl): Do not include this in the PR.
         base_link = self.root_link
         assert set(base_link.collision_meshes) == {"collisions"}, "Base link should only have 1 collision!"
         base_link.collision_meshes["collisions"].set_collision_approximation("boundingCube")

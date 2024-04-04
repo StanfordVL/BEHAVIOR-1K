@@ -59,6 +59,7 @@ robots:
 task:
   type: GraspTask
   obj_name: cologne
+  # TODO(rl): Add the reset poses path here.
   termination_config:
     max_steps: 200
   reward_config:

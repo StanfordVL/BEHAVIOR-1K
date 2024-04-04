@@ -75,8 +75,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane = None
         self._use_skybox = use_skybox
         self._skybox = None
-        self.id = None
-        self.origin_offset = None
 
         # Call super init
         super().__init__()
@@ -111,7 +109,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value="object_registry_{}".format(str(self.id)))
+        return self._registry(key="name", value=f"object_registry_{self.idx}")
 
     @property
     def system_registry(self):
@@ -174,6 +172,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._loaded
 
     @property
+    def idx(self):
+        """Index of this scene in the simulator. Should not change."""
+        return og.sim.scenes.index(self)
+
+    @property
     def initialized(self):
         return self._initialized
 
@@ -182,7 +185,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
-        if self.id == 0:
+        if self.idx == 0:
+            # TODO(rl): Move all this stuff to simulator.py
+
             # Create collision group for fixed base objects' non root links, root links, and building structures
             CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
             # Disable collision between root links of fixed base objects
@@ -219,7 +224,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Grab objects info from the scene file
         with open(self.scene_file, "r") as f:
-            scene_info = self._update_objects_info(json.load(f))
+            scene_info = json.load(f)
         init_info = scene_info["objects_info"]["init_info"]
         init_state = scene_info["state"]["object_registry"]
         init_systems = scene_info["state"]["system_registry"].keys()
@@ -247,9 +252,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Import into the simulator
             self.add_object(obj, register=True)
             # Set the init pose accordingly
-            init_pos = [sum(x) for x in zip(init_state[obj_name]["root_link"]["pos"], self.origin_offset)]
-            obj.set_position_orientation(
-                position=init_pos,
+            obj.set_local_pose(
+                position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
 
@@ -258,21 +262,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Loads metadata from self.scene_file and stores it within the world prim's CustomData
         """
         with open(self.scene_file, "r") as f:
-            scene_info = self._update_objects_info(json.load(f))
+            scene_info = json.load(f)
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
             og.sim.write_metadata(key=key, data=data)
-
-    def _update_objects_info(self, scene_info):
-        """
-        Updates objects info base on scene ID
-        """
-        init_info = scene_info["objects_info"]["init_info"]
-        for obj_name, obj_info in init_info.items():
-            obj_info["args"]["name"] = obj_info["args"]["name"] + "_" + str(self.id)
-            obj_info["args"]["prim_path"] = obj_info["args"]["prim_path"] + "_" + str(self.id)
-        return scene_info
 
     def _should_load_object(self, obj_info, task_metadata):
         """
@@ -370,7 +364,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name=str(self.id),
+            name=self.idx,
             class_types=SerializableRegistry,
         )
 
@@ -380,7 +374,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add registry for objects
         registry.add(
             obj=SerializableRegistry(
-                name="object_registry_{}".format(str(self.id)),
+                name="object_registry_{self.idx}",
                 class_types=BaseObject,
                 default_key="name",
                 unique_keys=self.object_registry_unique_keys,
@@ -484,7 +478,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Run any additional scene-specific logic with the created object
             self._add_object(obj)
 
-        og.sim.import_object(obj)
+        # Inform the simulator that there is a new object here.
+        og.sim.post_import_object(obj)
         return prim
 
     def remove_object(self, obj):

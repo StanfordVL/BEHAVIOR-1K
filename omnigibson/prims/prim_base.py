@@ -42,6 +42,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         self._applied_visual_material = None
         self._loaded = False  # Whether this prim exists in the stage or not
         self._initialized = False  # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
+        self._scene = None
         self._prim = None
         self._state_size = None
         self._n_duplicates = 0  # Simple counter for keeping track of duplicates for unique name indexing
@@ -86,12 +87,13 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         Returns:
             Usd.Prim: Prim object loaded into the simulator
         """
-        if self._loaded:
-            raise ValueError(f"Cannot load prim {self.name} multiple times.")
+        assert self.scene is None, f"Prim {self.name} is already loaded into a scene!"
+        self._scene = scene
 
-        # Load prim
-        self._prim = self._load()
-        self._loaded = True
+        # Load the prim if it doesn't exist yet.
+        if not self._loaded:
+            self._prim = self._load()
+            self._loaded = True
 
         # Run any post-loading logic
         self._post_load()
@@ -162,6 +164,14 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             Usd.Prim: USD Prim object that this object holds.
         """
         return self._prim
+
+    @property
+    def scene(self):
+        """
+        Returns:
+            Scene: Scene object that this prim is loaded into
+        """
+        return self._scene
 
     @property
     def property_names(self):

@@ -103,6 +103,9 @@ class BehaviorTask(BaseTask):
         self.feedback = None  # None or str
         self.sampler = None  # BDDLSampler
 
+        # Scene info
+        self.scene_name = None
+
         # Object info
         self.debug_object_sampling = debug_object_sampling  # bool
         self.online_object_sampling = online_object_sampling  # bool
@@ -204,6 +207,9 @@ class BehaviorTask(BaseTask):
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
+
+        # Store the scene name
+        self.scene_name = env.scene.scene_model
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -372,8 +378,7 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in REGISTERED_SYSTEMS
-                # @TODO: Which scene
-                entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
+                entity = get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,
@@ -530,15 +535,14 @@ class BehaviorTask(BaseTask):
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:
-            # @TODO: Which scene
+            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
             fname = self.get_cached_activity_scene_filename(
-                scene_model=og.sim.scene.scene_model,
+                scene_model=self.scene_name,
                 activity_name=self.activity_name,
                 activity_definition_id=self.activity_definition_id,
                 activity_instance_id=self.activity_instance_id,
             )
-            # @TODO: Which scene
-            path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
+            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
 
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
