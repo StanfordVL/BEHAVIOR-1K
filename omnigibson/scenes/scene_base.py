@@ -66,7 +66,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._loaded = False  # Whether this scene exists in the stage or not
         self._initialized = False  # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
-        self._world_prim = None
+        self._scene_prim = None
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
         self._use_floor_plane = use_floor_plane
@@ -299,7 +299,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._registry = self._create_registry()
 
         # Store world prim and load the scene into the simulator
-        self._world_prim = og.sim.world_prim
+        scene_prim_path = og.sim.world_prim.prim.GetPrimPath().pathString + f"/{self.idx}"
+        self._scene_prim = XFormPrim(prim_path=scene_prim_path, name=f"scene_{self.idx}")
         self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state

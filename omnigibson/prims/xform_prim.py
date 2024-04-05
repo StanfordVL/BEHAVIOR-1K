@@ -409,15 +409,15 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
 
     def _dump_state(self):
-        pos, ori = self.get_position_orientation()
-        return dict(pos=pos, ori=ori)
+        pos, ori = self.get_local_pose()
+        return dict(local_pos=pos, local_ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
+        self.set_position_orientation(np.array(state["local_pos"]), np.array(state["local_ori"]))
 
     def _serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"]]).astype(float)
+        return np.concatenate([state["local_pos"], state["local_ori"]]).astype(float)
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        return dict(pos=state[0:3], ori=state[3:7]), 7
+        return dict(local_pos=state[0:3], local_ori=state[3:7]), 7
