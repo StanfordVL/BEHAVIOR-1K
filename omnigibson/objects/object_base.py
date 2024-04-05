@@ -39,7 +39,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     def __init__(
         self,
         name,
-        prim_path=None,
+        prim_path_template=None,
         category="object",
         uuid=None,
         scale=None,
@@ -113,9 +113,22 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["uuid"] = self.uuid
 
     def load(self, scene):
+        assert self.scene is None, f"Prim {self.name} is already loaded into a scene!"
+        self._scene = scene
+
+        # Update the prim path to now include the scene path
+
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
+
+    @property
+    def scene(self):
+        """
+        Returns:
+            Scene: Scene object that this prim is loaded into
+        """
+        return self._scene
 
     def remove(self):
         # Run super first
