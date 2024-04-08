@@ -33,7 +33,7 @@ A given system can be accessed globally at any time via `get_system(...)`. Syste
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/systems/granular.png" alt="rgb">
         </td>
     </tr>
     <tr>
@@ -48,7 +48,7 @@ A given system can be accessed globally at any time via `get_system(...)`. Syste
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/systems/fluid.png" alt="rgb">
         </td>
     </tr>
     <tr>
@@ -63,7 +63,7 @@ A given system can be accessed globally at any time via `get_system(...)`. Syste
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/systems/macro_physical.png" alt="rgb">
         </td>
     </tr>
     <tr>
@@ -78,7 +78,7 @@ A given system can be accessed globally at any time via `get_system(...)`. Syste
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/systems/macro_visual.png" alt="rgb">
         </td>
     </tr>
 </table>
