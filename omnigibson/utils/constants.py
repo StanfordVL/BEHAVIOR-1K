@@ -1,6 +1,7 @@
 """
 Constant Definitions
 """
+
 from functools import cache
 import hashlib
 import os
@@ -51,11 +52,8 @@ class ParticleModifyCondition(str, Enum):
     GRAVITY = "gravity"
 
 
-# Valid omni characters for specifying strings, e.g. prim paths
-VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '_', '/'})
-
 # Structure categories that need to always be loaded for stability purposes
-STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence"})
+STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence", "roof", "background"})
 
 
 # Joint friction magic values to assign to objects based on their category
@@ -93,6 +91,7 @@ GEOM_TYPES = {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
 
 # Valid joint axis
 JointAxis = ["X", "Y", "Z"]
+
 
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types
@@ -176,6 +175,7 @@ UNDER_OBJECTS = [
     "bench",
 ]
 
+
 @cache
 def semantic_class_name_to_id():
     """
@@ -186,13 +186,15 @@ def semantic_class_name_to_id():
     """
     categories = get_all_object_categories()
     from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+
     systems = sorted(REGISTERED_SYSTEMS)
-    all_semantics = sorted(set(categories + systems + ['agent', 'background', 'object', 'light']))
-    
+    all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
+
     # Assign a unique class id to each class name with hashing
-    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32) for s in all_semantics}
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**32) for s in all_semantics}
 
     return class_name_to_class_id
+
 
 @cache
 def semantic_class_id_to_name():
@@ -203,4 +205,3 @@ def semantic_class_id_to_name():
         dict: class id to class name
     """
     return {v: k for k, v in semantic_class_name_to_id().items()}
-

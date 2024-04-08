@@ -120,7 +120,7 @@ class GeomPrim(XFormPrim):
             self.material.opacity_constant = opacity
         else:
             self.set_attribute("primvars:displayOpacity", np.array([opacity]))
-    
+
     @property
     def points(self):
         """
@@ -152,11 +152,11 @@ class GeomPrim(XFormPrim):
     @property
     def aabb(self):
         world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
-        
+
         # transform self.points into world frame
         points = self.points
         points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
-        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:,:3]
+        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
 
         aabb_lo = np.min(points_transformed, axis=0)
         aabb_hi = np.max(points_transformed, axis=0)
@@ -223,15 +223,24 @@ class CollisionGeomPrim(GeomPrim):
         self.purpose = "guide"
 
         # Create API references
-        self._collision_api = lazy.pxr.UsdPhysics.CollisionAPI(self._prim) if \
-            self._prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI) else lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._prim)
-        self._physx_collision_api = lazy.pxr.PhysxSchema.PhysxCollisionAPI(self._prim) if \
-            self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI) else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
+        self._collision_api = (
+            lazy.pxr.UsdPhysics.CollisionAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+            else lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._prim)
+        )
+        self._physx_collision_api = (
+            lazy.pxr.PhysxSchema.PhysxCollisionAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI)
+            else lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
+        )
 
         # Optionally add mesh collision API if this is a mesh
         if self._prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-            self._mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI(self._prim) if \
-                self._prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._prim)
+            self._mesh_collision_api = (
+                lazy.pxr.UsdPhysics.MeshCollisionAPI(self._prim)
+                if self._prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
+                else lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(self._prim)
+            )
             # Set the approximation to be convex hull by default
             self.set_collision_approximation(approximation_type="convexHull")
 
@@ -331,16 +340,30 @@ class CollisionGeomPrim(GeomPrim):
         assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
         assert_valid_key(
             key=approximation_type,
-            valid_keys={"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf", "boundingSphere", "boundingCube"},
+            valid_keys={
+                "none",
+                "convexHull",
+                "convexDecomposition",
+                "meshSimplification",
+                "sdf",
+                "boundingSphere",
+                "boundingCube",
+            },
             name="collision approximation type",
         )
 
         # Make sure to add the appropriate API if we're setting certain values
-        if approximation_type == "convexHull" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI):
+        if approximation_type == "convexHull" and not self._prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
+        ):
             lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
-        elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI):
+        elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
+        ):
             lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
-        elif approximation_type == "meshSimplification" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI):
+        elif approximation_type == "meshSimplification" and not self._prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
+        ):
             lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
         elif approximation_type == "sdf" and not self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
             lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)

@@ -1,6 +1,7 @@
 """
 A set of utility functions for general python usage
 """
+
 import inspect
 import re
 from abc import ABCMeta
@@ -59,7 +60,7 @@ def save_init_info(func):
     """
     sig = inspect.signature(func)
 
-    @wraps(func) # preserve func name, docstring, arguments list, etc.
+    @wraps(func)  # preserve func name, docstring, arguments list, etc.
     def wrapper(self, *args, **kwargs):
         values = sig.bind(self, *args, **kwargs)
 
@@ -76,7 +77,7 @@ def save_init_info(func):
 
         # Populate class's self._init_info.
         for k, p in sig.parameters.items():
-            if k == 'self':
+            if k == "self":
                 continue
             if k in values.arguments:
                 val = values.arguments[k]
@@ -245,7 +246,8 @@ def assert_valid_key(key, valid_keys, name=None):
     if name is None:
         name = "value"
     assert key in valid_keys, "Invalid {} received! Valid options are: {}, got: {}".format(
-        name, valid_keys.keys() if isinstance(valid_keys, dict) else valid_keys, key)
+        name, valid_keys.keys() if isinstance(valid_keys, dict) else valid_keys, key
+    )
 
 
 def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_descriptor):
@@ -286,7 +288,7 @@ def get_uuid(name, n_digits=8):
     Returns:
         int: uuid
     """
-    return abs(hash(name)) % (10 ** n_digits)
+    return abs(hash(name)) % (10**n_digits)
 
 
 def camel_case_to_snake_case(camel_case_text):
@@ -299,7 +301,7 @@ def camel_case_to_snake_case(camel_case_text):
     Returns:
         str: snake case text
     """
-    return re.sub(r'(?<!^)(?=[A-Z])', '_', camel_case_text).lower()
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", camel_case_text).lower()
 
 
 def snake_case_to_camel_case(snake_case_text):
@@ -312,7 +314,7 @@ def snake_case_to_camel_case(snake_case_text):
     Returns:
         str: camel case text
     """
-    return ''.join(item.title() for item in snake_case_text.split('_'))
+    return "".join(item.title() for item in snake_case_text.split("_"))
 
 
 def meets_minimum_version(test_version, minimum_version):
@@ -347,11 +349,11 @@ class UniquelyNamed:
     Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
     entity must be UNIQUE!
     """
+
     def __init__(self, *args, **kwargs):
         global NAMES
         # Register this object, making sure it's name is unique
-        assert self.name not in NAMES, \
-            f"UniquelyNamed object with name {self.name} already exists!"
+        assert self.name not in NAMES, f"UniquelyNamed object with name {self.name} already exists!"
         NAMES.add(self.name)
 
     def remove_names(self):
@@ -387,8 +389,7 @@ class UniquelyNamedNonInstance:
     def __init_subclass__(cls, **kwargs):
         global CLASS_NAMES
         # Register this object, making sure it's name is unique
-        assert cls.name not in CLASS_NAMES, \
-            f"UniquelyNamed class with name {cls.name} already exists!"
+        assert cls.name not in CLASS_NAMES, f"UniquelyNamed class with name {cls.name} already exists!"
         CLASS_NAMES.add(cls.name)
 
     @classproperty
@@ -451,6 +452,7 @@ class Serializable:
     Simple class that provides an abstract interface to dump / load states, optionally with serialized functionality
     as well.
     """
+
     @property
     def state_size(self):
         """
@@ -568,8 +570,10 @@ class Serializable:
         """
         # Sanity check the idx with the expected state size
         state_dict, idx = self._deserialize(state=state)
-        assert idx == self.state_size, f"Invalid state deserialization occurred! Expected {self.state_size} total " \
-                                           f"values to be deserialized, only {idx} were."
+        assert idx == self.state_size, (
+            f"Invalid state deserialization occurred! Expected {self.state_size} total "
+            f"values to be deserialized, only {idx} were."
+        )
 
         return state_dict
 
@@ -578,6 +582,7 @@ class SerializableNonInstance:
     """
     Identical to Serializable, but intended for non-instanceable classes
     """
+
     @classproperty
     def state_size(cls):
         """
@@ -703,8 +708,10 @@ class SerializableNonInstance:
         """
         # Sanity check the idx with the expected state size
         state_dict, idx = cls._deserialize(state=state)
-        assert idx == cls.state_size, f"Invalid state deserialization occurred! Expected {cls.state_size} total " \
-                                      f"values to be deserialized, only {idx} were."
+        assert idx == cls.state_size, (
+            f"Invalid state deserialization occurred! Expected {cls.state_size} total "
+            f"values to be deserialized, only {idx} were."
+        )
 
         return state_dict
 
@@ -718,6 +725,7 @@ class CachedFunctions:
     This allows the dictionary to be created with potentially expensive operations, but only queried up to exaclty once
     as needed.
     """
+
     def __init__(self, **kwargs):
         # Create internal dict to store functions
         self._fcns = dict()
@@ -833,12 +841,14 @@ class Wrapper:
         # (see https://stackoverflow.com/questions/3278077/difference-between-getattr-vs-getattribute)
         orig_attr = getattr(self.wrapped_obj, attr)
         if callable(orig_attr):
+
             def hooked(*args, **kwargs):
                 result = orig_attr(*args, **kwargs)
                 # prevent wrapped_class from becoming unwrapped
                 if id(result) == id(self.wrapped_obj):
                     return self
                 return result
+
             return hooked
         else:
             return orig_attr

@@ -18,10 +18,9 @@ def task_tester(task_type):
         # Task kwargs
         "task": {
             "type": task_type,
-
             # BehaviorTask-specific
             "activity_name": "assembling_gift_baskets",
-            "online_object_sampling": True
+            "online_object_sampling": True,
         },
     }
 

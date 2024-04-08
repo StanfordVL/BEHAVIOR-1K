@@ -31,9 +31,13 @@ class MaxTemperature(TensorizedValueState):
             # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
             # subtract 1 from all downstream indices
             deleted_idx = Temperature.OBJ_IDXS[obj.name]
-            cls.TEMPERATURE_IDXS = np.where(cls.TEMPERATURE_IDXS >= deleted_idx, cls.TEMPERATURE_IDXS - 1, cls.TEMPERATURE_IDXS)
+            cls.TEMPERATURE_IDXS = np.where(
+                cls.TEMPERATURE_IDXS >= deleted_idx, cls.TEMPERATURE_IDXS - 1, cls.TEMPERATURE_IDXS
+            )
 
-        Temperature.add_callback_on_remove(name="MaxTemperature_temperature_idx_update", callback=_update_temperature_idxs)
+        Temperature.add_callback_on_remove(
+            name="MaxTemperature_temperature_idx_update", callback=_update_temperature_idxs
+        )
 
     @classmethod
     def global_clear(cls):

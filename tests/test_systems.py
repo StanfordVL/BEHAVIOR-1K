@@ -6,6 +6,7 @@ from utils import og_test, SYSTEM_EXAMPLES
 
 import pytest
 
+
 @og_test
 def test_system_clear():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")

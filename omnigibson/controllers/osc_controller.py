@@ -13,11 +13,11 @@ log = create_module_logger(module_name=__name__)
 
 # Different modes
 OSC_MODE_COMMAND_DIMS = {
-    "absolute_pose": 6,             # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
-    "pose_absolute_ori": 6,         # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
-    "pose_delta_ori": 6,            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
-    "position_fixed_ori": 3,        # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
-    "position_compliant_ori": 3,    # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+    "absolute_pose": 6,  # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+    "pose_absolute_ori": 6,  # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+    "pose_delta_ori": 6,  # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+    "position_fixed_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
+    "position_compliant_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
 }
 OSC_MODES = set(OSC_MODE_COMMAND_DIMS.keys())
 
@@ -60,7 +60,7 @@ class OperationalSpaceController(ManipulationController):
         command_input_limits="default",
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
         kp=150.0,
-        kp_limits=(10.0, 300.),
+        kp_limits=(10.0, 300.0),
         damping_ratio=1.0,
         damping_ratio_limits=(0.0, 2.0),
         kp_null=10.0,
@@ -143,8 +143,11 @@ class OperationalSpaceController(ManipulationController):
         self.variable_kp_null = self.kp_null is None
 
         # TODO: Add support for variable gains -- for now, just raise an error
-        assert True not in {self.variable_kp, self.variable_damping_ratio, self.variable_kp_null}, \
-            "Variable gains with OSC is not supported yet!"
+        assert True not in {
+            self.variable_kp,
+            self.variable_damping_ratio,
+            self.variable_kp_null,
+        }, "Variable gains with OSC is not supported yet!"
 
         # If the mode is set as absolute orientation and using default config,
         # change input and output limits accordingly.
@@ -174,22 +177,36 @@ class OperationalSpaceController(ManipulationController):
 
         is_input_limits_numeric = not (command_input_limits is None or isinstance(command_input_limits, str))
         is_output_limits_numeric = not (command_output_limits is None or isinstance(command_output_limits, str))
-        command_input_limits = [nums2array(lim, dim=6, dtype=np.float32) for lim in command_input_limits] if is_input_limits_numeric else command_input_limits
-        command_output_limits = [nums2array(lim, dim=6, dtype=np.float32) for lim in command_output_limits] if is_output_limits_numeric else command_output_limits
+        command_input_limits = (
+            [nums2array(lim, dim=6, dtype=np.float32) for lim in command_input_limits]
+            if is_input_limits_numeric
+            else command_input_limits
+        )
+        command_output_limits = (
+            [nums2array(lim, dim=6, dtype=np.float32) for lim in command_output_limits]
+            if is_output_limits_numeric
+            else command_output_limits
+        )
 
         # Modify input / output scaling based on whether we expect gains to be part of the action space
         self._command_dim = OSC_MODE_COMMAND_DIMS[self.mode]
         for variable_gain, gain_limits, dim in zip(
-                (self.variable_kp, self.variable_damping_ratio, self.variable_kp_null),
-                (self.kp_limits, self.damping_ratio_limits, self.kp_null_limits),
-                (6, 6, control_dim),
+            (self.variable_kp, self.variable_damping_ratio, self.variable_kp_null),
+            (self.kp_limits, self.damping_ratio_limits, self.kp_null_limits),
+            (6, 6, control_dim),
         ):
             if variable_gain:
                 # Add this to input / output limits
                 if is_input_limits_numeric:
-                    command_input_limits = [np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)]) for lim, val in zip(command_input_limits, (-1, 1))]
+                    command_input_limits = [
+                        np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        for lim, val in zip(command_input_limits, (-1, 1))
+                    ]
                 if is_output_limits_numeric:
-                    command_output_limits = [np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)]) for lim, val in zip(command_output_limits, gain_limits)]
+                    command_output_limits = [
+                        np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        for lim, val in zip(command_output_limits, gain_limits)
+                    ]
                 # Update command dim
                 self._command_dim += dim
 
@@ -248,13 +265,13 @@ class OperationalSpaceController(ManipulationController):
         """
         idx = 0
         if self.variable_kp:
-            self.kp = gains[:, idx:idx + 6].astype(np.float32)
+            self.kp = gains[:, idx : idx + 6].astype(np.float32)
             idx += 6
         if self.variable_damping_ratio:
-            self.damping_ratio = gains[:, idx:idx + 6].astype(np.float32)
+            self.damping_ratio = gains[:, idx : idx + 6].astype(np.float32)
             idx += 6
         if self.variable_kp_null:
-            self.kp_null = gains[:, idx:idx + self.control_dim].astype(np.float32)
+            self.kp_null = gains[:, idx : idx + self.control_dim].astype(np.float32)
             self.kd_null = 2 * np.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
@@ -291,8 +308,9 @@ class OperationalSpaceController(ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative.astype(np.float32) \
-                    if (self._goal is None) else self._goal["target_quat"]
+                self._fixed_quat_target = (
+                    quat_relative.astype(np.float32) if (self._goal is None) else self._goal["target_quat"]
+                )
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
@@ -309,7 +327,7 @@ class OperationalSpaceController(ManipulationController):
         if self.workspace_pose_limiter is not None:
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
 
-        gains = None    # TODO! command[OSC_MODE_COMMAND_DIMS[self.mode]:]
+        gains = None  # TODO! command[OSC_MODE_COMMAND_DIMS[self.mode]:]
         if gains is not None:
             self._update_variable_gains(gains=gains)
 
@@ -362,7 +380,9 @@ class OperationalSpaceController(ManipulationController):
         j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
-        ee_vel = np.concatenate([control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]])
+        ee_vel = np.concatenate(
+            [control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]]
+        )
         base_lin_vel = control_dict["root_rel_lin_vel"]
         base_ang_vel = control_dict["root_rel_ang_vel"]
 

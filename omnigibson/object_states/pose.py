@@ -7,7 +7,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 m = create_module_macros(module_path=__file__)
 
 m.POSITIONAL_VALIDATION_EPSILON = 1e-10
-m.ORIENTATION_VALIDATION_EPSILON = 0.003        # ~5 degrees error tolerance
+m.ORIENTATION_VALIDATION_EPSILON = 0.003  # ~5 degrees error tolerance
 
 
 class Pose(AbsoluteObjectState):

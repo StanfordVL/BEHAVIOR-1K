@@ -1,6 +1,8 @@
 from abc import ABCMeta
 import numpy as np
 from collections.abc import Iterable
+import trimesh
+from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,6 +12,7 @@ from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+import omnigibson.utils.transform_utils as T
 
 
 # Global dicts that will contain mappings
@@ -22,29 +25,32 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 # Settings for highlighting objects
-m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color when highlighting objects
-m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
+m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]  # Default highlighting (R,G,B) color when highlighting objects
+m.HIGHLIGHT_INTENSITY = 10000.0  # Highlight intensity to apply, range [0, 10000)
+
+# Physics settings for objects -- see https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/docs/RigidBodyDynamics.html?highlight=velocity%20iteration#solver-iterations
+m.DEFAULT_SOLVER_POSITION_ITERATIONS = 32
+m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = 1
 
 
 class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     """This is the interface that all OmniGibson objects must implement."""
 
     def __init__(
-            self,
-            name,
-            prim_path=None,
-            category="object",
-            class_id=None,
-            uuid=None,
-            scale=None,
-            visible=True,
-            fixed_base=False,
-            visual_only=False,
-            kinematic_only=None,
-            self_collisions=False,
-            prim_type=PrimType.RIGID,
-            load_config=None,
-            **kwargs,
+        self,
+        name,
+        prim_path=None,
+        category="object",
+        uuid=None,
+        scale=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        kinematic_only=None,
+        self_collisions=False,
+        prim_type=PrimType.RIGID,
+        load_config=None,
+        **kwargs,
     ):
         """
         Args:
@@ -52,8 +58,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -82,11 +86,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
         self.category = category
         self.fixed_base = fixed_base
-
-        # Infer class ID if not specified
-        if class_id is None:
-            class_id = semantic_class_name_to_id()[category]
-        self.class_id = class_id
 
         # Values to be created at runtime
         self._highlight_cached_values = None
@@ -139,13 +138,19 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
             scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
-            if self.n_joints == 0 and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0) and (self._load_config["kinematic_only"] != False):
+            if (
+                self.n_joints == 0
+                and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0)
+                and (self._load_config["kinematic_only"] != False)
+                and not self.has_attachment_points
+            ):
                 kinematic_only = True
-        
+
         # Validate that we didn't make a kinematic-only decision that does not match
-        assert self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"], \
-            f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
-        
+        assert (
+            self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"]
+        ), f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
+
         # Actually apply the kinematic-only decision
         self._load_config["kinematic_only"] = kinematic_only
 
@@ -184,12 +189,22 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
         # Potentially add articulation root APIs and also set self collisions
-        root_prim = None if self.articulation_root_path is None else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+        root_prim = (
+            None
+            if self.articulation_root_path is None
+            else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+        )
         if root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
+        # Set position / velocity solver iterations if we're not cloth
+        if self._prim_type != PrimType.CLOTH:
+            self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
+            self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
+
+        # Add semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
@@ -306,11 +321,97 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     "emissive_intensity": material.emissive_intensity,
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
-            material.emissive_color = m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
-            material.emissive_intensity = m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
+            material.emissive_color = (
+                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
+            )
+            material.emissive_intensity = (
+                m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
+            )
 
         # Update internal value
         self._highlighted = enabled
+
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False):
+        """
+        Get a bounding box for this object that's axis-aligned in the object's base frame.
+
+        Args:
+            link_name (None or str): If specified, only get the bbox for the given link
+            visual (bool): Whether to aggregate the bounding boxes from the visual meshes. Otherwise, will use
+                collision meshes
+            xy_aligned (bool): Whether to align the bounding box to the global XY-plane
+
+        Returns:
+            4-tuple:
+                - 3-array: (x,y,z) bbox center position in world frame
+                - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
+                - 3-array: (x,y,z) bbox extent in desired frame
+                - 3-array: (x,y,z) bbox center in desired frame
+        """
+        # Get the base position transform.
+        pos, orn = self.get_position_orientation()
+        base_frame_to_world = T.pose2mat((pos, orn))
+
+        # Prepare the desired frame.
+        if xy_aligned:
+            # If the user requested an XY-plane aligned bbox, convert everything to that frame.
+            # The desired frame is same as the base_com frame with its X/Y rotations removed.
+            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
+
+            # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
+            # and then take the arctangent of its projection onto the XY plane.
+            rotated_X_axis = base_frame_to_world[:3, 0]
+            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
+                translate=translate, angles=[0, 0, rotation_around_Z_axis]
+            )
+
+            # Finally update our desired frame.
+            desired_frame_to_world = xy_aligned_base_com_to_world
+        else:
+            # Default desired frame is base CoM frame.
+            desired_frame_to_world = base_frame_to_world
+
+        # Compute the world-to-base frame transform.
+        world_to_desired_frame = np.linalg.inv(desired_frame_to_world)
+
+        # Grab all the world-frame points corresponding to the object's visual or collision hulls.
+        points_in_world = []
+        if self.prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            particles_in_world_frame = np.concatenate(
+                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], axis=0
+            )
+            points_in_world.extend(particles_in_world_frame)
+        else:
+            links = {link_name: self._links[link_name]} if link_name is not None else self._links
+            for link_name, link in links.items():
+                if visual:
+                    hull_points = link.visual_boundary_points_world
+                else:
+                    hull_points = link.collision_boundary_points_world
+
+                if hull_points is not None:
+                    points_in_world.extend(hull_points)
+
+        # Move the points to the desired frame
+        points = trimesh.transformations.transform_points(points_in_world, world_to_desired_frame)
+
+        # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
+        # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
+        aabb_min_in_desired_frame = np.amin(points, axis=0)
+        aabb_max_in_desired_frame = np.amax(points, axis=0)
+        bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
+        bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
+
+        # Transform the center to the world frame.
+        bbox_center_in_world = trimesh.transformations.transform_points(
+            [bbox_center_in_desired_frame], desired_frame_to_world
+        )[0]
+        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
+
+        return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -324,4 +425,3 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Global robot registry
         global REGISTERED_OBJECTS
         return REGISTERED_OBJECTS
-

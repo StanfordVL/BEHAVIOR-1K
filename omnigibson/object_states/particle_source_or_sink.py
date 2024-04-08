@@ -65,6 +65,7 @@ class ParticleSource(ParticleApplier):
         initial_speed (float): The initial speed for generated particles. Note that the
             direction of the velocity is inferred from the particle sampling process
     """
+
     def __init__(
         self,
         obj,
@@ -108,13 +109,14 @@ class ParticleSource(ParticleApplier):
         # Note: height must be considered in the world frame, so we convert the distance from local into world frame
         # Extents are in local frame, so we need to convert to world frame using link scale
         distance = self.link.scale[2] * self._projection_mesh_params["extents"][2]
-        t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
+        t = (-self._initial_speed + np.sqrt(self._initial_speed**2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
         self._n_steps_per_modification = np.ceil(1 + t / og.sim.get_rendering_dt()).astype(int)
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert is_physical_particle_system(system_name=system.name), \
-            "ParticleSource only supports PhysicalParticleSystem"
+        assert is_physical_particle_system(
+            system_name=system.name
+        ), "ParticleSource only supports PhysicalParticleSystem"
         return m.MAX_SOURCE_PARTICLES_PER_STEP
 
     @classmethod
@@ -182,7 +184,8 @@ class ParticleSink(ParticleRemover):
             specified in @conditions. If None, then it is assumed that no other visual particles can be removed. If
             not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
             2-tuples
-        """
+    """
+
     def __init__(
         self,
         obj,
@@ -220,8 +223,7 @@ class ParticleSink(ParticleRemover):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert is_physical_particle_system(system_name=system.name), \
-            "ParticleSink only supports PhysicalParticleSystem"
+        assert is_physical_particle_system(system_name=system.name), "ParticleSink only supports PhysicalParticleSystem"
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
 
     @property

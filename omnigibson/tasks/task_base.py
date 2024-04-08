@@ -23,6 +23,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
     """
+
     def __init__(self, termination_config=None, reward_config=None):
         # Make sure configs are dictionaries
         termination_config = dict() if termination_config is None else termination_config
@@ -31,8 +32,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Sanity check termination and reward conditions -- any keys found in the inputted config but NOT
         # found in the default config should raise an error
         unknown_termination_keys = set(termination_config.keys()) - set(self.default_termination_config.keys())
-        assert len(unknown_termination_keys) == 0, \
-            f"Got unknown termination config keys inputted: {unknown_termination_keys}"
+        assert (
+            len(unknown_termination_keys) == 0
+        ), f"Got unknown termination config keys inputted: {unknown_termination_keys}"
         unknown_reward_keys = set(reward_config.keys()) - set(self.default_reward_config.keys())
         assert len(unknown_reward_keys) == 0, f"Got unknown reward config keys inputted: {unknown_reward_keys}"
 
@@ -93,7 +95,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         obs_space = self._load_non_low_dim_observation_space()
 
         # Create the low dim obs space and add to the main obs space dict -- make sure we're flattening low dim obs
-        obs_space["low_dim"] = self._build_obs_box_space(shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64)
+        obs_space["low_dim"] = self._build_obs_box_space(
+            shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64
+        )
 
         return obs_space
 
@@ -102,10 +106,11 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Load this task
         """
         # Make sure the scene is of the correct type!
-        assert any([issubclass(env.scene.__class__, valid_cls) for valid_cls in self.valid_scene_types]), \
-            f"Got incompatible scene type {env.scene.__class__.__name__} for task {self.__class__.__name__}! " \
-            f"Scene class must be a subclass of at least one of: " \
+        assert any([issubclass(env.scene.__class__, valid_cls) for valid_cls in self.valid_scene_types]), (
+            f"Got incompatible scene type {env.scene.__class__.__name__} for task {self.__class__.__name__}! "
+            f"Scene class must be a subclass of at least one of: "
             f"{[cls_type.__name__ for cls_type in self.valid_scene_types]}"
+        )
 
         # Run internal method
         self._load(env=env)

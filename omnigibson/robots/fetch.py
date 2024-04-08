@@ -38,7 +38,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         name,
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -46,26 +45,21 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         self_collisions=False,
         load_config=None,
         fixed_base=False,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-
         # Unique to Fetch
         rigid_trunk=False,
         default_trunk_offset=0.365,
@@ -78,8 +72,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -127,7 +119,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
-                If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored. 
+                If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored.
                 Otherwise the reset_joint_pos will be initialized to the precomputed joint positions that represents default_arm_pose.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
@@ -144,7 +136,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         super().__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -223,7 +214,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         else:
             raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
-    
+
     def _post_load(self):
         super()._post_load()
 
@@ -231,7 +222,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         for wheel_name in ["l_wheel_link", "r_wheel_link"]:
             log.warning(
                 "Fetch wheel links are post-processed to use sphere approximation collision meshes."
-                "Please ignore any previous errors about these collision meshes.")
+                "Please ignore any previous errors about these collision meshes."
+            )
             wheel_link = self.links[wheel_name]
             assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
             wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
@@ -240,7 +232,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         torso_lift_link = self.links["torso_lift_link"]
         assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
         torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
-        
+
     @property
     def discrete_action_list(self):
         # Not supported for this robot
@@ -334,10 +326,12 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
             # If using rigid trunk, we also clamp its limits
             if self.rigid_trunk:
-                arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = \
-                    self.untucked_default_joint_pos[self.trunk_control_idx]
-                arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = \
-                    self.untucked_default_joint_pos[self.trunk_control_idx]
+                arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = self.untucked_default_joint_pos[
+                    self.trunk_control_idx
+                ]
+                arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = self.untucked_default_joint_pos[
+                    self.trunk_control_idx
+                ]
 
         return cfg
 
@@ -433,24 +427,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def manipulation_link_names(self):
         return [
-            "torso_lift_link", 
-            "head_pan_link", 
-            "head_tilt_link",  
-            "shoulder_pan_link", 
-            "shoulder_lift_link", 
-            "upperarm_roll_link", 
-            "elbow_flex_link", 
-            "forearm_roll_link", 
-            "wrist_flex_link", 
-            "wrist_roll_link", 
-            "gripper_link", 
-            "l_gripper_finger_link", 
-            "r_gripper_finger_link",
-        ]
-
-    @property
-    def arm_link_names(self):
-        return {self.default_arm: [
+            "torso_lift_link",
+            "head_pan_link",
+            "head_tilt_link",
             "shoulder_pan_link",
             "shoulder_lift_link",
             "upperarm_roll_link",
@@ -458,20 +437,39 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             "forearm_roll_link",
             "wrist_flex_link",
             "wrist_roll_link",
-        ]}
+            "gripper_link",
+            "l_gripper_finger_link",
+            "r_gripper_finger_link",
+        ]
+
+    @property
+    def arm_link_names(self):
+        return {
+            self.default_arm: [
+                "shoulder_pan_link",
+                "shoulder_lift_link",
+                "upperarm_roll_link",
+                "elbow_flex_link",
+                "forearm_roll_link",
+                "wrist_flex_link",
+                "wrist_roll_link",
+            ]
+        }
 
     @property
     def arm_joint_names(self):
-        return {self.default_arm: [
-            "torso_lift_joint",
-            "shoulder_pan_joint",
-            "shoulder_lift_joint",
-            "upperarm_roll_joint",
-            "elbow_flex_joint",
-            "forearm_roll_joint",
-            "wrist_flex_joint",
-            "wrist_roll_joint",
-        ]}
+        return {
+            self.default_arm: [
+                "torso_lift_joint",
+                "shoulder_pan_joint",
+                "shoulder_lift_joint",
+                "upperarm_roll_joint",
+                "elbow_flex_joint",
+                "forearm_roll_joint",
+                "wrist_flex_joint",
+                "wrist_roll_joint",
+            ]
+        }
 
     @property
     def eef_link_names(self):
@@ -499,10 +497,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {
-            self.default_arm : [np.deg2rad(-45), np.deg2rad(45)]
-        }
-    
+        return {self.default_arm: [np.deg2rad(-45), np.deg2rad(45)]}
+
     @property
     def eef_usd_path(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch_eef.usd")}

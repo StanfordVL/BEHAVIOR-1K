@@ -16,3 +16,8 @@ docker build \
     -t stanfordvl/omnigibson-vscode:latest \
     -f docker/vscode.Dockerfile \
     .
+
+docker build \
+    -t stanfordvl/omnigibson-colab:latest \
+    -f docker/colab.Dockerfile \
+    .

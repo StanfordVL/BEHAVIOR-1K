@@ -1,6 +1,6 @@
 import numpy as np
 from collections import namedtuple
-from scipy.spatial import ConvexHull, distance_matrix
+from scipy.spatial import ConvexHull, distance_matrix, QhullError
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
@@ -40,6 +40,7 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
     State representing the object's folded level.
     Value is a FoldedLevelData object.
     """
+
     def _initialize(self):
         super()._initialize()
         # Assume the initial state is unfolded
@@ -98,7 +99,13 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         """
         cloth = self.obj.root_link
         points = cloth.keypoint_particle_positions[:, dims]
-        hull = ConvexHull(points)
+        try:
+            hull = ConvexHull(points)
+
+        # The points may be 2D-degenerate, so catch the error and return 0 if so
+        except QhullError:
+            # This is a degenerate hull, so return 0 area and diagonal
+            return 0.0, 0.0
 
         # When input points are 2-dimensional, this is the area of the convex hull.
         # Ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
@@ -107,14 +114,15 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
 
         if m.DEBUG_CLOTH_PROJ_VIS:
             import matplotlib.pyplot as plt
-            ax = plt.gca()
-            ax.set_aspect('equal')
 
-            plt.plot(points[:, dims[0]], points[:, dims[1]], 'o')
+            ax = plt.gca()
+            ax.set_aspect("equal")
+
+            plt.plot(points[:, dims[0]], points[:, dims[1]], "o")
             for simplex in hull.simplices:
-                plt.plot(points[simplex, dims[0]], points[simplex, dims[1]], 'k-')
-            plt.plot(points[hull.vertices, dims[0]], points[hull.vertices, dims[1]], 'r--', lw=2)
-            plt.plot(points[hull.vertices[0], dims[0]], points[hull.vertices[0], dims[1]], 'ro')
+                plt.plot(points[simplex, dims[0]], points[simplex, dims[1]], "k-")
+            plt.plot(points[hull.vertices, dims[0]], points[hull.vertices, dims[1]], "r--", lw=2)
+            plt.plot(points[hull.vertices[0], dims[0]], points[hull.vertices[0], dims[1]], "ro")
             plt.show()
 
         return area, diagonal
@@ -130,9 +138,11 @@ class Folded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
     def _get_value(self):
         # Check the smoothness of the cloth
         folded_level = self.obj.states[FoldedLevel].get_value()
-        return folded_level.smoothness >= m.NORMAL_Z_PERCENTAGE and \
-            folded_level.area < m.FOLDED_AREA_THRESHOLD and \
-            folded_level.diagonal < m.FOLDED_DIAGONAL_THRESHOLD
+        return (
+            folded_level.smoothness >= m.NORMAL_Z_PERCENTAGE
+            and folded_level.area < m.FOLDED_AREA_THRESHOLD
+            and folded_level.diagonal < m.FOLDED_DIAGONAL_THRESHOLD
+        )
 
     def _set_value(self, new_value):
         if not new_value:
@@ -154,9 +164,11 @@ class Unfolded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
     def _get_value(self):
         # Check the smoothness of the cloth
         folded_level = self.obj.states[FoldedLevel].get_value()
-        return folded_level.smoothness >= m.NORMAL_Z_PERCENTAGE and \
-            folded_level.area >= m.UNFOLDED_AREA_THRESHOLD and \
-            folded_level.diagonal >= m.UNFOLDED_DIAGONAL_THRESHOLD
+        return (
+            folded_level.smoothness >= m.NORMAL_Z_PERCENTAGE
+            and folded_level.area >= m.UNFOLDED_AREA_THRESHOLD
+            and folded_level.diagonal >= m.UNFOLDED_DIAGONAL_THRESHOLD
+        )
 
     def _set_value(self, new_value):
         if not new_value:

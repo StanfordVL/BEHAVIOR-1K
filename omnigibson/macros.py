@@ -4,6 +4,7 @@ Set of macros to use globally for OmniGibson. These are generally magic numbers 
 NOTE: This is generally decentralized -- the monolithic @settings variable is created here with some global values,
 but submodules within OmniGibson may import this dictionary and add to it dynamically
 """
+
 import os
 import pathlib
 
@@ -42,7 +43,7 @@ if not os.path.isabs(gm.KEY_PATH):
 gm.GPU_ID = os.getenv("OMNIGIBSON_GPU_ID", None)
 
 # Whether to generate a headless or non-headless application upon OmniGibson startup
-gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
+gm.HEADLESS = os.getenv("OMNIGIBSON_HEADLESS", "False").lower() in ("true", "1", "t")
 
 # Whether to enable remote streaming. None disables it, other valid options are "native", "webrtc".
 gm.REMOTE_STREAMING = os.getenv("OMNIGIBSON_REMOTE_STREAMING", None)
@@ -61,7 +62,7 @@ gm.RENDER_VIEWER_CAMERA = True
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
 # This includes extra information for things such as object sampling, and also any debug
 # logging messages
-gm.DEBUG = (os.getenv("OMNIGIBSON_DEBUG", 'False').lower() in ('true', '1', 't'))
+gm.DEBUG = os.getenv("OMNIGIBSON_DEBUG", "False").lower() in ("true", "1", "t")
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = False
@@ -83,10 +84,16 @@ gm.ENABLE_CCD = False
 # Pairs setting -- USD default is 256 * 1024, physx default apparently is 32 * 1024.
 gm.GPU_PAIRS_CAPACITY = 256 * 1024
 # Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
-gm.GPU_AGGR_PAIRS_CAPACITY = (2 ** 14) * 1024
+gm.GPU_AGGR_PAIRS_CAPACITY = (2**14) * 1024
 
 # Maximum particle contacts allowed
 gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
+
+# Maximum rigid contacts -- 524288 is default value from omni, but increasing too much can sometimes lead to crashes
+gm.GPU_MAX_RIGID_CONTACT_COUNT = 524288 * 4
+
+# Maximum rigid patches -- 81920 is default value from omni, but increasing too much can sometimes lead to crashes
+gm.GPU_MAX_RIGID_PATCH_COUNT = 81920 * 4
 
 # Whether to enable object state logic or not
 gm.ENABLE_OBJECT_STATES = True
@@ -129,7 +136,9 @@ def create_module_macros(module_path):
     try:
         subsections = module_path.with_suffix("").relative_to(omnigibson_path).parts
     except ValueError:
-        raise ValueError("module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!")
+        raise ValueError(
+            "module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!"
+        )
 
     # Create and return the generated sub-dictionary
     def _recursively_get_or_create_dict(dic, keys):
@@ -146,4 +155,3 @@ def create_module_macros(module_path):
             return _recursively_get_or_create_dict(dic=dic[key], keys=keys[1:])
 
     return _recursively_get_or_create_dict(dic=macros, keys=subsections)
-

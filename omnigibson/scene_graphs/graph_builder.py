@@ -20,14 +20,14 @@ def _formatted_aabb(obj):
 
 class SceneGraphBuilder(object):
     def __init__(
-            self,
-            robot_name=None,
-            egocentric=False,
-            full_obs=False,
-            only_true=False,
-            merge_parallel_edges=False,
-            exclude_states=(object_states.Touching,)
-        ):
+        self,
+        robot_name=None,
+        egocentric=False,
+        full_obs=False,
+        only_true=False,
+        merge_parallel_edges=False,
+        exclude_states=(object_states.Touching,),
+    ):
         """
         A utility that builds a scene graph with objects as nodes and relative states as edges,
         alongside additional metadata.
@@ -90,7 +90,6 @@ class SceneGraphBuilder(object):
 
         return states
 
-
     def _get_boolean_binary_states(self, objs):
         states = []
         for obj1 in objs:
@@ -120,7 +119,9 @@ class SceneGraphBuilder(object):
         assert self._G is None, "Cannot start graph builder multiple times."
 
         if self._robot_name is None:
-            assert len(scene.robots) == 1, "Cannot build scene graph without specifying robot name if there are multiple robots."
+            assert (
+                len(scene.robots) == 1
+            ), "Cannot build scene graph without specifying robot name if there are multiple robots."
             self._robot = scene.robots[0]
         else:
             self._robot = scene.object_registry("name", self._robot_name)
@@ -187,7 +188,7 @@ class SceneGraphBuilder(object):
 
             # Get the bounding box.
             if hasattr(obj, "get_base_aligned_bbox"):
-                bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bbox(visual=True, fallback_to_aabb=True)
+                bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bbox(visual=True)
                 bbox_pose = T.pose2mat((bbox_center, bbox_orn))
             else:
                 bbox_pose, bbox_extent = _formatted_aabb(obj)
@@ -231,9 +232,11 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
         nodes = list(G.nodes)
         node_labels = {obj: obj.category for obj in nodes}
         colors = [
-            "yellow"
-            if obj.category == "agent"
-            else ("green" if obj.states[object_states.InFOVOfRobot].get_value() else "red")
+            (
+                "yellow"
+                if obj.category == "agent"
+                else ("green" if obj.states[object_states.InFOVOfRobot].get_value() else "red")
+            )
             for obj in nodes
         ]
         positions = (
@@ -253,17 +256,15 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
         )
 
         edge_labels = {
-            edge: ", ".join(
-                state + "=" + str(value)
-                for state, value in G.edges[edge]["states"]
-            )
-            for edge in G.edges
+            edge: ", ".join(state + "=" + str(value) for state, value in G.edges[edge]["states"]) for edge in G.edges
         }
         nx.drawing.draw_networkx_edge_labels(G, pos=positions, edge_labels=edge_labels, font_size=4)
 
     # Prepare pyplot figure that's sized to match the robot video.
     robot = scene.robots[0]
-    robot_camera_sensor, = [s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities]
+    (robot_camera_sensor,) = [
+        s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities
+    ]
     robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).astype(np.uint8)
     imgheight, imgwidth, _ = robot_view.shape
 
@@ -288,6 +289,7 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     # # Convert to BGR for cv2-based viewing.
     if show_window:
         import cv2
+
         cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imshow("SceneGraph", cv_img)
         cv2.waitKey(1)

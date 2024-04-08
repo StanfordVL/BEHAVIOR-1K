@@ -15,6 +15,7 @@ import progressbar
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
+
 if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
     import omnigibson.lazy as lazy
 
@@ -22,6 +23,7 @@ if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
 log = create_module_logger(module_name=__name__)
 
 pbar = None
+
 
 def show_progress(block_num, block_size, total_size):
     global pbar
@@ -35,6 +37,7 @@ def show_progress(block_num, block_size, total_size):
     else:
         pbar.finish()
         pbar = None
+
 
 def is_dot_file(p):
     """
@@ -92,9 +95,7 @@ def get_available_og_scenes():
     """
     og_dataset_path = gm.DATASET_PATH
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
-    available_og_scenes = sorted(
-        [f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")]
-    )
+    available_og_scenes = sorted([f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")])
     return available_og_scenes
 
 
@@ -159,7 +160,7 @@ def get_all_system_categories():
     og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "systems")
 
-    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
     return sorted(categories)
 
 
@@ -173,7 +174,7 @@ def get_all_object_categories():
     og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
-    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
     return sorted(categories)
 
 
@@ -216,7 +217,7 @@ def get_all_object_category_models(category):
 
 def get_all_object_category_models_with_abilities(category, abilities):
     """
-    Get all object models from @category whose assets are properly annotated with necessary metalinks to support
+    Get all object models from @category whose assets are properly annotated with necessary requirements to support
     abilities @abilities
 
     Args:
@@ -226,44 +227,56 @@ def get_all_object_category_models_with_abilities(category, abilities):
             models
 
     Returns:
-        list of str: all object models belonging to @category which are properly annotated with necessary metalinks
+        list of str: all object models belonging to @category which are properly annotated with necessary requirements
             to support the requested list of @abilities
     """
     # Avoid circular imports
     from omnigibson.objects.dataset_object import DatasetObject
-    from omnigibson.object_states.factory import get_states_for_ability
-    from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+    from omnigibson.object_states.factory import get_requirements_for_ability, get_states_for_ability
 
     # Get all valid models
     all_models = get_all_object_category_models(category=category)
 
     # Generate all object states required per object given the requested set of abilities
-    state_types_and_params = [(state_type, params) for ability, params in abilities.items()
-                              for state_type in get_states_for_ability(ability)]
-    for state_type, _ in state_types_and_params:
-        # Add each state's dependencies, too. Note that only required dependencies are added.
-        for dependency in state_type.get_dependencies():
-            if all(other_state != dependency for other_state, _ in state_types_and_params):
-                state_types_and_params.append((dependency, dict()))
+    abilities_info = {
+        ability: [(state_type, params) for state_type in get_states_for_ability(ability)]
+        for ability, params in abilities.items()
+    }
 
     # Get mapping for class init kwargs
     state_init_default_kwargs = dict()
-    for state_type, _ in state_types_and_params:
-        default_kwargs = inspect.signature(state_type.__init__).parameters
-        state_init_default_kwargs[state_type] = \
-            {kwarg: val.default for kwarg, val in default_kwargs.items()
-             if kwarg != "self" and val.default != inspect._empty}
+
+    for ability, state_types_and_params in abilities_info.items():
+        for state_type, _ in state_types_and_params:
+            # Add each state's dependencies, too. Note that only required dependencies are added.
+            for dependency in state_type.get_dependencies():
+                if all(other_state != dependency for other_state, _ in state_types_and_params):
+                    state_types_and_params.append((dependency, dict()))
+
+        for state_type, _ in state_types_and_params:
+            default_kwargs = inspect.signature(state_type.__init__).parameters
+            state_init_default_kwargs[state_type] = {
+                kwarg: val.default
+                for kwarg, val in default_kwargs.items()
+                if kwarg != "self" and val.default != inspect._empty
+            }
 
     # Iterate over all models and sanity check each one, making sure they satisfy all the requested @abilities
     valid_models = []
 
-    def supports_state_types(states_and_params, obj_prim):
-        # Check all link states
-        for state_type, params in states_and_params:
-            kwargs = deepcopy(state_init_default_kwargs[state_type])
-            kwargs.update(params)
-            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
-                return False
+    def supports_abilities(info, obj_prim):
+        for ability, states_and_params in info.items():
+            # Check ability requirements
+            for requirement in get_requirements_for_ability(ability):
+                if not requirement.is_compatible_asset(prim=obj_prim)[0]:
+                    return False
+
+            # Check all link states
+            for state_type, params in states_and_params:
+                kwargs = deepcopy(state_init_default_kwargs[state_type])
+                kwargs.update(params)
+                if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
+                    return False
         return True
 
     for model in all_models:
@@ -272,10 +285,38 @@ def get_all_object_category_models_with_abilities(category, abilities):
         with decrypted(usd_path) as fpath:
             stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
-            if supports_state_types(state_types_and_params, prim):
+            if supports_abilities(abilities_info, prim):
                 valid_models.append(model)
 
     return valid_models
+
+
+def get_attachment_metalinks(category, model):
+    """
+    Get attachment metalinks for an object model
+
+    Args:
+        category (str): Object category name
+        model (str): Object model name
+
+    Returns:
+        list of str: all attachment metalinks for the object model
+    """
+    # Avoid circular imports
+    from omnigibson.objects.dataset_object import DatasetObject
+    from omnigibson.object_states import AttachedTo
+
+    usd_path = DatasetObject.get_usd_path(category=category, model=model)
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
+    with decrypted(usd_path) as fpath:
+        stage = lazy.pxr.Usd.Stage.Open(fpath)
+        prim = stage.GetDefaultPrim()
+        attachment_metalinks = []
+        for child in prim.GetChildren():
+            if child.GetTypeName() == "Xform":
+                if AttachedTo.metalink_prefix in child.GetName():
+                    attachment_metalinks.append(child.GetName())
+        return attachment_metalinks
 
 
 def get_og_assets_version():
@@ -283,9 +324,7 @@ def get_og_assets_version():
     Returns:
         str: OmniGibson asset version
     """
-    process = subprocess.Popen(
-        ["git", "-C", gm.DATASET_PATH, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE
-    )
+    process = subprocess.Popen(["git", "-C", gm.DATASET_PATH, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE)
     git_head_hash = str(process.communicate()[0].strip())
     return "{}".format(git_head_hash)
 
@@ -351,58 +390,28 @@ def download_assets():
         with tempfile.TemporaryDirectory() as td:
             tmp_file = os.path.join(td, "og_assets.tar.gz")
             os.makedirs(gm.ASSET_PATH, exist_ok=True)
-            path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets_1_0_0.tar.gz"
             log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
             assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
-            assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0, "Assets extraction failed."
+            assert (
+                subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0
+            ), "Assets extraction failed."
             # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
-def download_demo_data():
+def download_demo_data(accept_license=False):
     """
     Download OmniGibson demo dataset
-    """
-    # TODO: Update. Right now, OG just downloads beta release
-    download_og_dataset()
-
-
-def print_user_agreement():
-    print('\n\nBEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT\n'
-        'Last revision: December 8, 2022\n'
-        'This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):\n\n'
-          '1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.\n'
-          '2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.\n'
-          '3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.\n'
-          '4. You may only use the Data within OmniGibson.\n'
-          '5. You may not redistribute the key or any other Data or elements in whole or part.\n'
-          '6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.\n\n')
-
-
-def download_key():
-    os.makedirs(os.path.dirname(gm.KEY_PATH), exist_ok=True)
-    if not os.path.exists(gm.KEY_PATH):
-        _=((()==())+(()==()));__=(((_<<_)<<_)*_);___=('c%'[::(([]!=[])-(()==()))])*(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(_+(()==())))))%((__+(((_<<_)<<_)+(_<<_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+_))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+_))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(_*_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)*_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_<<_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(()==()))))))
-        path = ___
-        assert urlretrieve(path, gm.KEY_PATH, show_progress), "Key download failed."
-
-
-def download_og_dataset():
-    """
-    Download OmniGibson dataset
     """
     # Print user agreement
     if os.path.exists(gm.KEY_PATH):
         print("OmniGibson dataset encryption key already installed.")
     else:
-        print("\n")
-        print_user_agreement()
-        while (
-            input(
-                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
-            )
-            != "y"
-        ):
-            print("You need to agree to the terms for using OmniGibson dataset.")
+        if not accept_license:
+            print("\n")
+            print_user_agreement()
+            while input("Do you agree to the above terms for using OmniGibson dataset? [y/n]") != "y":
+                print("You need to agree to the terms for using OmniGibson dataset.")
 
         download_key()
 
@@ -411,33 +420,130 @@ def download_og_dataset():
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(gm.DATASET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_demo_1_0_0.tar.gz"
         log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
         assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
-        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."
+        assert (
+            subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0
+        ), "Dataset extraction failed."
+
+
+def print_user_agreement():
+    print(
+        "\n\nBEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT\n"
+        "Last revision: December 8, 2022\n"
+        "This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):\n\n"
+        '1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.\n'
+        "2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.\n"
+        "3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.\n"
+        "4. You may only use the Data within OmniGibson.\n"
+        "5. You may not redistribute the key or any other Data or elements in whole or part.\n"
+        '6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.\n\n'
+    )
+
+
+def download_key():
+    os.makedirs(os.path.dirname(gm.KEY_PATH), exist_ok=True)
+    if not os.path.exists(gm.KEY_PATH):
+        _ = (() == ()) + (() == ())
+        __ = ((_ << _) << _) * _
+        ___ = (
+            ("c%"[:: (([] != []) - (() == ()))])
+            * (((_ << _) << _) + (((_ << _) * _) + ((_ << _) + (_ + (() == ())))))
+            % (
+                (__ + (((_ << _) << _) + (_ << _))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ * _)))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ * _)))),
+                (__ + (((_ << _) << _) + ((_ << _) * _))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (((_ << _) << _) + (((_ << _) * _) + ((_ << _) + _))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ()))))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ * _)))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + _))),
+                (__ + (((_ << _) << _) + (() == ()))),
+                (__ + (((_ << _) << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ * _) + (() == ())))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + _))),
+                (__ + (((_ << _) << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + (_ * _)))),
+                (__ + (((_ << _) << _) + ((_ * _) + (() == ())))),
+                (__ + (((_ << _) << _) + (() == ()))),
+                (__ + (((_ << _) << _) + ((_ << _) * _))),
+                (__ + (((_ << _) << _) + ((_ << _) + (() == ())))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + _))),
+                (__ + (((_ << _) << _) + (_ + (() == ())))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (() == ()))))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + (() == ())))),
+                (__ + (((_ << _) << _) + _)),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + _)))),
+                (__ + (((_ << _) * _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + (_ + (() == ())))),
+                (__ + (((_ << _) << _) + ((_ * _) + (() == ())))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + _)))),
+                (__ + (((_ << _) << _) + ((_ * _) + (() == ())))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + _)))),
+                (__ + (((_ << _) << _) + ((_ << _) + (() == ())))),
+                (__ + (((_ << _) << _) + ((_ * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + (() == ())))),
+                (__ + (((_ << _) << _) + _)),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + (_ + (() == ())))))),
+                (__ + (((_ << _) << _) + ((_ << _) + ((_ * _) + _)))),
+                (((_ << _) << _) + ((_ << _) + ((_ * _) + _))),
+                (__ + (((_ << _) << _) + ((_ << _) + (_ + (() == ()))))),
+                (__ + (((_ << _) << _) + ((_ * _) + (() == ())))),
+                (__ + (((_ << _) << _) + (((_ << _) * _) + ((_ << _) + (() == ()))))),
+            )
+        )
+        path = ___
+        assert urlretrieve(path, gm.KEY_PATH, show_progress), "Key download failed."
+
+
+def download_og_dataset(accept_license=False):
+    """
+    Download OmniGibson dataset
+    """
+    # Print user agreement
+    if os.path.exists(gm.KEY_PATH):
+        print("OmniGibson dataset encryption key already installed.")
+    else:
+        if not accept_license:
+            print("\n")
+            print_user_agreement()
+            while input("Do you agree to the above terms for using OmniGibson dataset? [y/n]") != "y":
+                print("You need to agree to the terms for using OmniGibson dataset.")
+
+        download_key()
+
+    if os.path.exists(gm.DATASET_PATH):
+        print("OmniGibson dataset already installed.")
+    else:
+        tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
+        os.makedirs(gm.DATASET_PATH, exist_ok=True)
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_1_0_0.tar.gz"
+        log.info(f"Downloading and decompressing OmniGibson dataset from {path}")
+        assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
+        assert (
+            subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0
+        ), "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
-
-
-def change_data_path():
-    """
-    Changes the data paths for this repo
-    """
-    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml")) as f:
-        global_config = yaml.load(f, Loader=yaml.FullLoader)
-    print("Current dataset path:")
-    for k, v in global_config.items():
-        print("{}: {}".format(k, v))
-    for k, v in global_config.items():
-        new_path = input("Change {} from {} to: ".format(k, v))
-        global_config[k] = new_path
-
-    print("New dataset path:")
-    for k, v in global_config.items():
-        print("{}: {}".format(k, v))
-    response = input("Save? [y/n]")
-    if response == "y":
-        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml"), "w") as f:
-            yaml.dump(global_config, f)
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
@@ -484,17 +590,14 @@ if __name__ == "__main__":
     parser.add_argument("--download_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_demo_data", action="store_true", help="download demo data Rs")
     parser.add_argument("--download_og_dataset", action="store_true", help="download OmniGibson Dataset")
-    parser.add_argument("--change_data_path", action="store_true", help="change the path to store assets and datasets")
-
+    parser.add_argument("--accept_license", action="store_true", help="pre-accept the OmniGibson dataset license")
     args = parser.parse_args()
 
     if args.download_assets:
         download_assets()
-    elif args.download_demo_data:
-        download_demo_data()
-    elif args.download_og_dataset:
-        download_og_dataset()
-    elif args.change_data_path:
-        change_data_path()
+    if args.download_demo_data:
+        download_demo_data(accept_license=args.accept_license)
+    if args.download_og_dataset:
+        download_og_dataset(accept_license=args.accept_license)
 
     og.shutdown()

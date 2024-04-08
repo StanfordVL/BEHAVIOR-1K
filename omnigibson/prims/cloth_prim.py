@@ -27,9 +27,8 @@ m = create_module_macros(module_path=__file__)
 
 # Subsample cloth particle points to boost performance
 m.N_CLOTH_KEYPOINTS = 1000
-m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
+m.KEYPOINT_COVERAGE_THRESHOLD = 0.75
 m.N_CLOTH_KEYFACES = 500
-
 
 
 class ClothPrim(GeomPrim):
@@ -80,15 +79,18 @@ class ClothPrim(GeomPrim):
         # (such as R/W to specific particle states) when flatcache is enabled
         assert not gm.ENABLE_FLATCACHE, "Cannot use flatcache with ClothPrim!"
 
-        self._mass_api = lazy.pxr.UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI) else \
-            lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
+        self._mass_api = (
+            lazy.pxr.UsdPhysics.MassAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI)
+            else lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
+        )
 
         # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
         # Clothify this prim, which is assumed to be a mesh
-        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self._prim)
+        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self._prim, remesh=self._load_config.get("remesh", True))
 
         # Track generated particle count
         positions = self.compute_particle_positions()
@@ -107,11 +109,13 @@ class ClothPrim(GeomPrim):
             keypoint_positions = positions[self._keypoint_idx]
             keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
             true_aabb = positions.min(axis=0), positions.max(axis=0)
-            overlap_vol = max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0) * \
-                max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
-                max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
+            overlap_vol = (
+                max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0)
+                * max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0)
+                * max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
+            )
             true_vol = np.product(true_aabb[1] - true_aabb[0])
-            if overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
+            if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
                 success = True
                 break
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
@@ -130,6 +134,18 @@ class ClothPrim(GeomPrim):
 
         # Store the default position of the points in the local frame
         self._default_positions = np.array(self.get_attribute(attr="points"))
+
+    @property
+    def visual_aabb(self):
+        return self.aabb
+
+    @property
+    def visual_aabb_extent(self):
+        return self.aabb_extent
+
+    @property
+    def visual_aabb_center(self):
+        return self.aabb_center
 
     @classproperty
     def cloth_system(cls):
@@ -183,8 +199,9 @@ class ClothPrim(GeomPrim):
             idxs (n-array or None): If set, will only set the requested indexed particle state
         """
         n_expected = self._n_particles if idxs is None else len(idxs)
-        assert len(positions) == n_expected, \
-            f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
+        assert (
+            len(positions) == n_expected
+        ), f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
 
         r = T.quat2mat(self.get_orientation())
         t = self.get_position()
@@ -281,8 +298,9 @@ class ClothPrim(GeomPrim):
             np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame
         """
-        assert vel.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
+        assert (
+            vel.shape[0] == self._n_particles
+        ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
 
         # the velocities attribute is w.r.t the world frame already
         self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel))
@@ -331,16 +349,19 @@ class ClothPrim(GeomPrim):
             list of CsRawData: raw contact info for this cloth body
         """
         contacts = []
+
         def report_hit(hit):
-            contacts.append(CsRawData(
-                time=0.0,  # dummy value
-                dt=0.0,  # dummy value
-                body0=self.prim_path,
-                body1=hit.rigid_body,
-                position=pos,
-                normal=np.zeros(3),  # dummy value
-                impulse=np.zeros(3),  # dummy value
-            ))
+            contacts.append(
+                CsRawData(
+                    time=0.0,  # dummy value
+                    dt=0.0,  # dummy value
+                    body0=self.prim_path,
+                    body1=hit.rigid_body,
+                    position=pos,
+                    normal=np.zeros(3),  # dummy value
+                    impulse=np.zeros(3),  # dummy value
+                )
+            )
             return True
 
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
@@ -411,7 +432,6 @@ class ClothPrim(GeomPrim):
         return np.zeros(3)
 
     def set_linear_velocity(self, velocity):
-
         """
         Sets the linear velocity of all the particles of the cloth prim.
 
@@ -528,26 +548,40 @@ class ClothPrim(GeomPrim):
         # Run super first
         super()._load_state(state=state)
         # Sanity check the identification number and particle group
-        assert self.particle_group == state["particle_group"], f"Got mismatch in particle group for this cloth " \
+        assert self.particle_group == state["particle_group"], (
+            f"Got mismatch in particle group for this cloth "
             f"when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
+        )
 
         # Set values appropriately
         self._n_particles = state["n_particles"]
         # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
         # JSON-serialization
-        self.particle_velocities = np.array(state["particle_velocities"]) if not isinstance(state["particle_velocities"], np.ndarray) else state["particle_velocities"]
-        self.set_particle_positions(positions=np.array(state["particle_positions"]) if not isinstance(state["particle_positions"], np.ndarray) else state["particle_positions"])
+        self.particle_velocities = (
+            np.array(state["particle_velocities"])
+            if not isinstance(state["particle_velocities"], np.ndarray)
+            else state["particle_velocities"]
+        )
+        self.set_particle_positions(
+            positions=(
+                np.array(state["particle_positions"])
+                if not isinstance(state["particle_positions"], np.ndarray)
+                else state["particle_positions"]
+            )
+        )
 
     def _serialize(self, state):
         # Run super first
         state_flat = super()._serialize(state=state)
 
-        return np.concatenate([
-            state_flat,
-            [state["particle_group"], state["n_particles"]],
-            state["particle_positions"].reshape(-1),
-            state["particle_velocities"].reshape(-1),
-        ]).astype(float)
+        return np.concatenate(
+            [
+                state_flat,
+                [state["particle_group"], state["n_particles"]],
+                state["particle_positions"].reshape(-1),
+                state["particle_velocities"].reshape(-1),
+            ]
+        ).astype(float)
 
     def _deserialize(self, state):
         # Run super first
@@ -557,8 +591,10 @@ class ClothPrim(GeomPrim):
         n_particles = int(state[idx + 1])
 
         # Sanity check the identification number
-        assert self.particle_group == particle_group, f"Got mismatch in particle group for this particle " \
+        assert self.particle_group == particle_group, (
+            f"Got mismatch in particle group for this particle "
             f"instancer when deserializing state! Should be: {self.particle_group}, got: {particle_group}."
+        )
 
         # De-compress from 1D array
         state_dict["particle_group"] = particle_group
@@ -571,7 +607,7 @@ class ClothPrim(GeomPrim):
         idx += 2
         for key, size in zip(keys, sizes):
             length = np.product(size)
-            state_dict[key] = state[idx: idx + length].reshape(size)
+            state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 
         return state_dict, idx

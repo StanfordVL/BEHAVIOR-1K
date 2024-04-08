@@ -1,7 +1,9 @@
 """
 Helper script to download OmniGibson dataset and assets.
 """
+
 import os
+
 os.environ["OMNIGIBSON_NO_OMNIVERSE"] = "1"
 
 from omnigibson.macros import gm
@@ -17,7 +19,9 @@ def main():
         print(f"OmniGibson will now install data under the following locations:")
         print(f"    dataset (~25GB): {gm.DATASET_PATH}")
         print(f"    assets (~2.5GB): {gm.ASSET_PATH}")
-        print(f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun scripts/download_dataset.py.")
+        print(
+            f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun scripts/download_dataset.py."
+        )
         if click.confirm("Do you want to continue?"):
             # Only download if the dataset path doesn't exist
             if not dataset_exists:
@@ -31,7 +35,9 @@ def main():
 
             print("\nOmniGibson setup completed!\n")
         else:
-            print("You chose not to install dataset for now. You can install it later by running python scripts/download_dataset.py.")
+            print(
+                "You chose not to install dataset for now. You can install it later by running python scripts/download_dataset.py."
+            )
 
 
 if __name__ == "__main__":

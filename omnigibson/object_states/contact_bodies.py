@@ -20,6 +20,7 @@ class ContactBodies(AbsoluteObjectState):
             if obj is not None:
                 rigid_prims.add(obj.links[link_name])
         # Ignore_objs should either be None or tuple (CANNOT be list because we need to hash these inputs)
-        assert ignore_objs is None or isinstance(ignore_objs, tuple), \
-            "ignore_objs must either be None or a tuple of objects to ignore!"
+        assert ignore_objs is None or isinstance(
+            ignore_objs, tuple
+        ), "ignore_objs must either be None or a tuple of objects to ignore!"
         return rigid_prims if ignore_objs is None else rigid_prims - prims_to_rigid_prim_set(ignore_objs)

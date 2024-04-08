@@ -28,6 +28,7 @@ class MaterialPrim(BasePrim):
             mtl_name (None or str): If specified, should be the name of the mtl preset to load.
                 None results in default, "OmniPBR"
     """
+
     # Persistent dictionary of materials, mapped from prim_path to MaterialPrim
     MATERIALS = dict()
 
@@ -78,7 +79,9 @@ class MaterialPrim(BasePrim):
         mtl_created = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name="OmniPBR.mdl" if self._load_config.get("mdl_name", None) is None else self._load_config["mdl_name"],
+            mdl_name=(
+                "OmniPBR.mdl" if self._load_config.get("mdl_name", None) is None else self._load_config["mdl_name"]
+            ),
             mtl_name="OmniPBR" if self._load_config.get("mtl_name", None) is None else self._load_config["mtl_name"],
             mtl_created_list=mtl_created,
         )
@@ -216,8 +219,9 @@ class MaterialPrim(BasePrim):
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
         # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
-        assert inp in self.shader_input_names, \
-            f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
+        assert (
+            inp in self.shader_input_names
+        ), f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
         self._shader.GetInput(inp).Set(val)
 
     @property
@@ -1086,7 +1090,9 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
         """
-        self.set_input(inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(
+            inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float))
+        )
 
     @property
     def specular_reflection_ior_preset(self):
@@ -1126,8 +1132,10 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
         """
-        assert self.is_glass, f"Tried to query glass_color shader input, " \
-                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        assert self.is_glass, (
+            f"Tried to query glass_color shader input, "
+            f"but material at {self.prim_path} is not an OmniGlass material!"
+        )
         return np.array(self.get_input(inp="glass_color"))
 
     @glass_color.setter
@@ -1136,6 +1144,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
         """
-        assert self.is_glass, f"Tried to set glass_color shader input, " \
-                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        assert self.is_glass, (
+            f"Tried to set glass_color shader input, " f"but material at {self.prim_path} is not an OmniGlass material!"
+        )
         self.set_input(inp="glass_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))

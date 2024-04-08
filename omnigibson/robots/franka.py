@@ -16,7 +16,6 @@ class FrankaPanda(ManipulationRobot):
         # Shared kwargs in hierarchy
         name,
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -24,25 +23,20 @@ class FrankaPanda(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -50,8 +44,6 @@ class FrankaPanda(ManipulationRobot):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -98,7 +90,6 @@ class FrankaPanda(ManipulationRobot):
         super().__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -146,7 +137,7 @@ class FrankaPanda(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
+
     @property
     def _default_joint_pos(self):
         return np.array([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
@@ -186,31 +177,35 @@ class FrankaPanda(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_description.yaml")}
-    
+
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
-    
+
     @property
     def eef_usd_path(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
-    
+
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-np.pi, 0, 0])}
-    
+
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
+            ]
+        }

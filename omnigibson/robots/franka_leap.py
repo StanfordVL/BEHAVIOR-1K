@@ -18,7 +18,6 @@ class FrankaLeap(ManipulationRobot):
         name,
         hand="right",
         prim_path=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -26,25 +25,20 @@ class FrankaLeap(ManipulationRobot):
         self_collisions=True,
         load_config=None,
         fixed_base=True,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
         sensor_config=None,
-
         # Unique to ManipulationRobot
         grasping_mode="physical",
-
         **kwargs,
     ):
         """
@@ -53,8 +47,6 @@ class FrankaLeap(ManipulationRobot):
             hand (str): One of {"left", "right"} - which hand to use, default is right
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -103,7 +95,6 @@ class FrankaLeap(ManipulationRobot):
         super().__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -163,19 +154,23 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def assisted_grasp_start_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
-            GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
-            GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
+                GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
+                GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
+            ]
+        }
 
     @property
     def assisted_grasp_end_points(self):
-        return {self.default_arm: [
-            GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
-            GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
-            GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
-        ]}
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
+                GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
+                GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+            ]
+        }
 
     @property
     def finger_lengths(self):
@@ -215,7 +210,7 @@ class FrankaLeap(ManipulationRobot):
     @property
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.usd")
-    
+
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
