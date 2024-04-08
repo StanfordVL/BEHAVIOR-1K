@@ -8,7 +8,7 @@ icon: material/knob
 
 In **`OmniGibson`**, `Controller`s convert high-level actions into low-level joint motor (position, velocity, or effort) controls for a subset of an individual [`Robot`](./robots.md)'s joints.
 
-In an [`Environment`](./environment.md) instance, actions are passed to controllers via the `env.step(action)` call, resulting in the following behavior:
+In an [`Environment`](./environments.md) instance, actions are passed to controllers via the `env.step(action)` call, resulting in the following behavior:
 
 <div class="annotate" markdown>
 - When `env.step(action)` is called, actions are parsed and passed to the respective robot owned by the environment (`env.robots`) via `robot.apply_action(action)`

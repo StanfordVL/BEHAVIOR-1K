@@ -55,7 +55,7 @@ It is important to note that object states are usually queried / computed _on de
 { .annotate }
 
 
-## Object State Types
+## Types
 **`OmniGibson`** currently supports 34 object states, consisting of 19 `AbsoluteObjectState`s, 11 `RelativeObjectState`s, and 4 `InstrinsicObjectState`s. Below, we provide a brief overview of each type:
 
 ### `AbsoluteObjectState`
