@@ -1,5 +1,9 @@
-from omnigibson.termination_conditions.termination_condition_base import REGISTERED_TERMINATION_CONDITIONS, \
-    REGISTERED_SUCCESS_CONDITIONS, REGISTERED_FAILURE_CONDITIONS, BaseTerminationCondition
+from omnigibson.termination_conditions.termination_condition_base import (
+    REGISTERED_TERMINATION_CONDITIONS,
+    REGISTERED_SUCCESS_CONDITIONS,
+    REGISTERED_FAILURE_CONDITIONS,
+    BaseTerminationCondition,
+)
 from omnigibson.termination_conditions.falling import Falling
 from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal

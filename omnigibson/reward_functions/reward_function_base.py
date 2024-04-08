@@ -10,6 +10,7 @@ class BaseRewardFunction(Registerable, metaclass=ABCMeta):
     Base RewardFunction class
     Reward-specific reset and get_reward methods are implemented in subclasses
     """
+
     def __init__(self):
         # Store internal vars that will be filled in at runtime
         self._reward = None

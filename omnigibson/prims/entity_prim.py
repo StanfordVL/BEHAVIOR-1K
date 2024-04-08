@@ -21,7 +21,7 @@ from omnigibson.macros import gm, create_module_macros
 m = create_module_macros(module_path=__file__)
 
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
-m.DEFAULT_SLEEP_THRESHOLD = 0.005
+m.DEFAULT_SLEEP_THRESHOLD = 0.001
 
 
 class EntityPrim(XFormPrim):
@@ -40,7 +40,7 @@ class EntityPrim(XFormPrim):
 
             visual_only (None or bool): If specified, whether this prim should include collisions or not.
                     Default is True.
-        """
+    """
 
     def __init__(
         self,
@@ -49,7 +49,7 @@ class EntityPrim(XFormPrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._root_link_name = None             # Name of the root link
+        self._root_link_name = None  # Name of the root link
         self._n_dof = None
         self._links = None
         self._joints = None
@@ -59,7 +59,9 @@ class EntityPrim(XFormPrim):
         self._articulation_view_direct = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
-        self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
+        self._prim_type = (
+            load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
+        )
         assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
@@ -105,7 +107,9 @@ class EntityPrim(XFormPrim):
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
                     for child in prim.GetChildren():
-                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(
+                            lazy.pxr.UsdPhysics.CollisionAPI
+                        ):
                             assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
                             cloth_mesh_prim = child
 
@@ -131,12 +135,16 @@ class EntityPrim(XFormPrim):
         if self.n_joints > 0:
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
+
             self._articulation_view_direct = ArticulationView(f"{self._prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
-        self.visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+        self.visual_only = (
+            self._load_config["visual_only"]
+            if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
+            else False
+        )
 
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
@@ -227,8 +235,10 @@ class EntityPrim(XFormPrim):
         # in the children joints
         valid_root_links = list(set(links_to_create.keys()) - joint_children)
 
-        assert len(valid_root_links) == 1, f"Only a single root link should have been found for {self.name}, " \
-                                           f"but found multiple instead: {valid_root_links}"
+        assert len(valid_root_links) == 1, (
+            f"Only a single root link should have been found for {self.name}, "
+            f"but found multiple instead: {valid_root_links}"
+        )
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
         # Now actually create the links
@@ -237,8 +247,10 @@ class EntityPrim(XFormPrim):
             # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
             # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
             link_load_config = {
-                "kinematic_only": self._load_config.get("kinematic_only", False)
-                if link_name == self._root_link_name else False,
+                "kinematic_only": (
+                    self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
+                ),
+                "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
                 prim_path=prim.GetPrimPath().__str__(),
@@ -284,9 +296,10 @@ class EntityPrim(XFormPrim):
             # We assume this object contains a single rigid body
             self._n_dof = 0
 
-        assert self.n_joints == len(self._joints), \
-            f"Number of joints inferred from prim tree ({self.n_joints}) does not match number of joints " \
+        assert self.n_joints == len(self._joints), (
+            f"Number of joints inferred from prim tree ({self.n_joints}) does not match number of joints "
             f"found in the articulation view ({len(self._joints)})!"
+        )
 
         self._update_joint_limits()
         self._compute_articulation_tree()
@@ -299,7 +312,9 @@ class EntityPrim(XFormPrim):
         if np.allclose(self.scale, np.ones(3)):
             return
 
-        prismatic_joints = {j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC}
+        prismatic_joints = {
+            j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC
+        }
 
         # If there are no prismatic joints, we can skip this step
         if len(prismatic_joints) == 0:
@@ -311,15 +326,18 @@ class EntityPrim(XFormPrim):
             if uniform_scale:
                 scale_along_axis = self.scale[0]
             else:
-                assert not self.initialized, \
-                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                assert (
+                    not self.initialized
+                ), "Cannot update joint limits for a non-uniformly scaled object when already initialized."
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame
                         _, link_local_orn = link.get_local_pose()
 
                         # Find the joint frame orientation in the parent link frame
-                        joint_local_orn = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+                        joint_local_orn = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            joint.get_attribute("physics:localRot0")
+                        )[[1, 2, 3, 0]]
 
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
@@ -349,10 +367,11 @@ class EntityPrim(XFormPrim):
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
-            assert self._articulation_view_direct.is_physics_handle_valid() and \
-                self._articulation_view_direct._physics_view.check(), \
-                "Articulation view must be valid if physics is running!"
-        
+            assert (
+                self._articulation_view_direct.is_physics_handle_valid()
+                and self._articulation_view_direct._physics_view.check()
+            ), "Articulation view must be valid if physics is running!"
+
         return self._articulation_view_direct
 
     @property
@@ -476,7 +495,21 @@ class EntityPrim(XFormPrim):
             dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
-    
+
+    @cached_property
+    def has_attachment_points(self):
+        """
+        Returns:
+            bool: Whether this object has any attachment points
+        """
+        children = list(self.prim.GetChildren())
+        while children:
+            child_prim = children.pop()
+            children.extend(child_prim.GetChildren())
+            if "attachment" in child_prim.GetName():
+                return True
+        return False
+
     def _compute_articulation_tree(self):
         """
         Get a graph of the articulation tree, where nodes are link names and edges
@@ -514,7 +547,7 @@ class EntityPrim(XFormPrim):
                 # Assert both bodies in links
                 if body0 not in G.nodes or body1 not in G.nodes:
                     continue
-            
+
                 # Add the joint
                 joint_type = JointType.get_type(prim_type.split("Physics")[-1])
                 G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=joint_type)
@@ -525,9 +558,10 @@ class EntityPrim(XFormPrim):
         # Assert all nodes have in-degree of 1 except root
         in_degrees = {node: G.in_degree(node) for node in G.nodes}
         assert in_degrees[self.root_link_name] == 0, "Root link should have in-degree of 0!"
-        assert all([in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]), \
-            "All non-root links should have in-degree of 1!"
-        
+        assert all(
+            [in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]
+        ), "All non-root links should have in-degree of 1!"
+
         self._articulation_tree = G
 
     @property
@@ -592,6 +626,23 @@ class EntityPrim(XFormPrim):
         """
         for link in self._links.values():
             link.disable_gravity()
+
+    def reset(self):
+        """
+        Resets this entity to some default, pre-defined state
+        """
+        # Make sure simulation is playing, otherwise, we cannot reset because physx requires active running
+        # simulation in order to set joints
+        assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+
+        # If this is a cloth, reset the particle positions
+        if self.prim_type == PrimType.CLOTH:
+            self.root_link.reset()
+
+        # Otherwise, set all joints to have 0 position and 0 velocity if this object has joints
+        elif self.n_joints > 0:
+            self.set_joint_positions(positions=np.zeros(self.n_dof), drive=False)
+            self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
@@ -730,8 +781,11 @@ class EntityPrim(XFormPrim):
         Returns:
             n- or k-array: normalized velocities in range [-1, 1] for the specified DOFs
         """
-        return velocities / self.max_joint_velocities if indices is None else \
-            velocities / self.max_joint_velocities[indices]
+        return (
+            velocities / self.max_joint_velocities
+            if indices is None
+            else velocities / self.max_joint_velocities[indices]
+        )
 
     def _denormalize_velocities(self, velocities, indices=None):
         """
@@ -747,8 +801,11 @@ class EntityPrim(XFormPrim):
         Returns:
             n- or k-array: de-normalized velocities for the specified DOFs
         """
-        return velocities * self.max_joint_velocities if indices is None else \
-            velocities * self.max_joint_velocities[indices]
+        return (
+            velocities * self.max_joint_velocities
+            if indices is None
+            else velocities * self.max_joint_velocities[indices]
+        )
 
     def _normalize_efforts(self, efforts, indices=None):
         """
@@ -1105,8 +1162,13 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many position iterations to take per physics step by the physx solver
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
-            self.articulated else self.root_link.solver_position_iteration_count
+        return (
+            lazy.omni.isaac.core.utils.prims.get_prim_property(
+                self.articulation_root_path, "physxArticulation:solverPositionIterationCount"
+            )
+            if self.articulated
+            else self.root_link.solver_position_iteration_count
+        )
 
     @solver_position_iteration_count.setter
     def solver_position_iteration_count(self, count):
@@ -1117,7 +1179,9 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
+            lazy.omni.isaac.core.utils.prims.set_prim_property(
+                self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
+            )
         else:
             for link in self._links.values():
                 link.solver_position_iteration_count = count
@@ -1128,8 +1192,13 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many velocity iterations to take per physics step by the physx solver
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
-            self.articulated else self.root_link.solver_velocity_iteration_count
+        return (
+            lazy.omni.isaac.core.utils.prims.get_prim_property(
+                self.articulation_root_path, "physxArticulation:solverVelocityIterationCount"
+            )
+            if self.articulated
+            else self.root_link.solver_velocity_iteration_count
+        )
 
     @solver_velocity_iteration_count.setter
     def solver_velocity_iteration_count(self, count):
@@ -1140,7 +1209,9 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
+            lazy.omni.isaac.core.utils.prims.set_prim_property(
+                self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
+            )
         else:
             for link in self._links.values():
                 link.solver_velocity_iteration_count = count
@@ -1151,8 +1222,13 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for stabilizing this articulation
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
-            self.articulated else self.root_link.stabilization_threshold
+        return (
+            lazy.omni.isaac.core.utils.prims.get_prim_property(
+                self.articulation_root_path, "physxArticulation:stabilizationThreshold"
+            )
+            if self.articulated
+            else self.root_link.stabilization_threshold
+        )
 
     @stabilization_threshold.setter
     def stabilization_threshold(self, threshold):
@@ -1163,7 +1239,9 @@ class EntityPrim(XFormPrim):
             threshold (float): Stabilization threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
+            lazy.omni.isaac.core.utils.prims.set_prim_property(
+                self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold
+            )
         else:
             for link in self._links.values():
                 link.stabilization_threshold = threshold
@@ -1178,8 +1256,13 @@ class EntityPrim(XFormPrim):
         if self.kinematic_only:
             return False
         else:
-            return og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)) \
-                if self.articulated else self.root_link.is_asleep
+            return (
+                og.sim.psi.is_sleeping(
+                    og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)
+                )
+                if self.articulated
+                else self.root_link.is_asleep
+            )
 
     @property
     def sleep_threshold(self):
@@ -1187,8 +1270,13 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for sleeping this articulation
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
-            self.articulated else self.root_link.sleep_threshold
+        return (
+            lazy.omni.isaac.core.utils.prims.get_prim_property(
+                self.articulation_root_path, "physxArticulation:sleepThreshold"
+            )
+            if self.articulated
+            else self.root_link.sleep_threshold
+        )
 
     @sleep_threshold.setter
     def sleep_threshold(self, threshold):
@@ -1199,7 +1287,9 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
+            lazy.omni.isaac.core.utils.prims.set_prim_property(
+                self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
+            )
         else:
             for link in self._links.values():
                 link.sleep_threshold = threshold
@@ -1211,7 +1301,9 @@ class EntityPrim(XFormPrim):
             bool: Whether self-collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
+        return lazy.omni.isaac.core.utils.prims.get_prim_property(
+            self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
+        )
 
     @self_collisions.setter
     def self_collisions(self, flag):
@@ -1222,7 +1314,9 @@ class EntityPrim(XFormPrim):
             flag (bool): Whether self collisions are enabled for this prim or not
         """
         assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
-        lazy.omni.isaac.core.utils.prims.set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
+        lazy.omni.isaac.core.utils.prims.set_prim_property(
+            self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
+        )
 
     @property
     def kinematic_only(self):
@@ -1242,23 +1336,13 @@ class EntityPrim(XFormPrim):
         if self._prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
-                               np.max(particle_positions, axis=0) + particle_contact_offset
+            aabb_lo, aabb_hi = (
+                np.min(particle_positions, axis=0) - particle_contact_offset,
+                np.max(particle_positions, axis=0) + particle_contact_offset,
+            )
         else:
-            points_world = []
-            for link in self._links.values():
-                hull_points = link.collision_boundary_points
-                if hull_points is None:
-                    continue
-                
-                position, orientation = link.get_position_orientation()
-                scale = link.scale
-                points_scaled = hull_points * scale
-                points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
-                points_transformed = points_rotated + position
-                points_world.append(points_transformed)
-
-            all_points = np.concatenate(points_world, axis=0)
+            points_world = [link.collision_boundary_points_world for link in self._links.values()]
+            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
             aabb_lo = np.min(all_points, axis=0)
             aabb_hi = np.max(all_points, axis=0)
         return aabb_lo, aabb_hi
@@ -1427,13 +1511,18 @@ class EntityPrim(XFormPrim):
         link.visible = False
         # Set a very small mass
         link.mass = 1e-6
+        link.density = 0.0
 
         self._links[link_name] = link
 
         # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidPrim)
         attachment_path = self.root_link.prim.GetPath().AppendElementString("attachment")
-        lazy.omni.kit.commands.execute("CreatePhysicsAttachment", target_attachment_path=attachment_path,
-                                  actor0_path=self.root_link.prim.GetPath(), actor1_path=link.prim.GetPath())
+        lazy.omni.kit.commands.execute(
+            "CreatePhysicsAttachment",
+            target_attachment_path=attachment_path,
+            actor0_path=self.root_link.prim.GetPath(),
+            actor1_path=link.prim.GetPath(),
+        )
 
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
@@ -1474,7 +1563,7 @@ class EntityPrim(XFormPrim):
         state_dict = dict(root_link=self.root_link.deserialize(state=state[:idx]))
         joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
+            joint_state_dict[prim_name] = prim.deserialize(state=state[idx : idx + prim.state_size])
             idx += prim.state_size
         state_dict["joints"] = joint_state_dict
 
@@ -1482,5 +1571,7 @@ class EntityPrim(XFormPrim):
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Subclass must implement this method for duplication functionality
-        raise NotImplementedError("Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
-                                  "functionality for EntityPrim!")
+        raise NotImplementedError(
+            "Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
+            "functionality for EntityPrim!"
+        )

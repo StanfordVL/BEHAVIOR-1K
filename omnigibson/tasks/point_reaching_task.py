@@ -48,24 +48,24 @@ class PointReachingTask(PointNavigationTask):
     """
 
     def __init__(
-            self,
-            robot_idn=0,
-            floor=0,
-            initial_pos=None,
-            initial_quat=None,
-            goal_pos=None,
-            goal_tolerance=0.1,
-            goal_in_polar=False,
-            path_range=None,
-            height_range=None,
-            visualize_goal=False,
-            visualize_path=False,
-            goal_height=0.06,
-            waypoint_height=0.05,
-            waypoint_width=0.1,
-            n_vis_waypoints=10,
-            reward_config=None,
-            termination_config=None,
+        self,
+        robot_idn=0,
+        floor=0,
+        initial_pos=None,
+        initial_quat=None,
+        goal_pos=None,
+        goal_tolerance=0.1,
+        goal_in_polar=False,
+        path_range=None,
+        height_range=None,
+        visualize_goal=False,
+        visualize_path=False,
+        goal_height=0.06,
+        waypoint_height=0.05,
+        waypoint_width=0.1,
+        n_vis_waypoints=10,
+        reward_config=None,
+        termination_config=None,
     ):
         # Store inputs
         self._height_range = height_range
@@ -86,7 +86,7 @@ class PointReachingTask(PointNavigationTask):
             waypoint_height=waypoint_height,
             waypoint_width=waypoint_width,
             n_vis_waypoints=n_vis_waypoints,
-            reward_type="l2",           # Must use l2 for reaching task
+            reward_type="l2",  # Must use l2 for reaching task
             reward_config=reward_config,
             termination_config=termination_config,
         )
@@ -128,7 +128,9 @@ class PointReachingTask(PointNavigationTask):
         low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(env=env, pos=self._goal_pos)
 
         # Add local eef position as well
-        low_dim_obs["eef_local_pos"] = self._global_pos_to_robot_frame(env=env, pos=env.robots[self._robot_idn].get_eef_position())
+        low_dim_obs["eef_local_pos"] = self._global_pos_to_robot_frame(
+            env=env, pos=env.robots[self._robot_idn].get_eef_position()
+        )
 
         return low_dim_obs, obs
 

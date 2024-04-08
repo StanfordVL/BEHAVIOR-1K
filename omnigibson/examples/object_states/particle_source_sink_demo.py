@@ -47,9 +47,11 @@ def main(random_selection=False, headless=False, short_exec=False):
             "toggleable": {},
             "particleSource": {
                 "conditions": {
-                    "water": [(ParticleModifyCondition.TOGGLEDON, True)],   # Must be toggled on for water source to be active
+                    "water": [
+                        (ParticleModifyCondition.TOGGLEDON, True)
+                    ],  # Must be toggled on for water source to be active
                 },
-                "initial_speed": 0.0,               # Water merely falls out of the spout
+                "initial_speed": 0.0,  # Water merely falls out of the spout
             },
             "particleSink": {
                 "conditions": {
@@ -67,13 +69,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 0.37860532, -0.65396566,  1.4067066 ]),
+        position=np.array([0.37860532, -0.65396566, 1.4067066]),
         orientation=np.array([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink
     for _ in range(10):
-        env.step(np.array([]))              # Empty action since no robots are in the scene
+        env.step(np.array([]))  # Empty action since no robots are in the scene
 
     sink = env.scene.object_registry("name", "sink")
     assert sink.states[object_states.ToggledOn].set_value(True)

@@ -1,18 +1,17 @@
-import itertools
 import math
 import os
-import stat
-import cv2
 import numpy as np
-
-import trimesh
-from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
+from omnigibson.utils.constants import (
+    AVERAGE_CATEGORY_SPECS,
+    DEFAULT_JOINT_FRICTION,
+    SPECIAL_JOINT_FRICTIONS,
+    JointType,
+)
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
@@ -43,7 +42,6 @@ class DatasetObject(USDObject):
         prim_path=None,
         category="object",
         model=None,
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -71,9 +69,6 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -119,6 +114,17 @@ class DatasetObject(USDObject):
             available_models = get_all_object_category_models(category=category)
             assert len(available_models) > 0, f"No available models found for category {category}!"
             model = np.random.choice(available_models)
+
+        # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
+        # TODO: Remove this once the asset is fixed!
+        from omnigibson.utils.bddl_utils import BAD_CLOTH_MODELS
+
+        if prim_type == PrimType.CLOTH and model in BAD_CLOTH_MODELS.get(category, dict()):
+            raise ValueError(
+                f"Cannot create cloth object category: {category}, model: {model} because it is "
+                f"currently broken ): This will be fixed in the next release!"
+            )
+
         self._model = model
         usd_path = self.get_usd_path(category=category, model=model)
 
@@ -129,7 +135,6 @@ class DatasetObject(USDObject):
             encrypted=True,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -175,7 +180,9 @@ class DatasetObject(USDObject):
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = np.array(probabilities) / np.sum(probabilities)
-            chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
+            chosen_orientation = np.array(
+                np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
+            )
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
@@ -195,6 +202,7 @@ class DatasetObject(USDObject):
 
         # Apply any forced light intensity updates.
         if gm.FORCE_LIGHT_INTENSITY is not None:
+
             def recursive_light_update(child_prim):
                 if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
                     child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
@@ -206,8 +214,10 @@ class DatasetObject(USDObject):
 
         # Apply any forced roughness updates
         for material in self.materials:
-            if ("reflection_roughness_texture_influence" in material.shader_input_names and
-                "reflection_roughness_constant" in material.shader_input_names):
+            if (
+                "reflection_roughness_texture_influence" in material.shader_input_names
+                and "reflection_roughness_constant" in material.shader_input_names
+            ):
                 material.reflection_roughness_texture_influence = 0.0
                 material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
@@ -222,7 +232,9 @@ class DatasetObject(USDObject):
         if self._load_config["bounding_box"] is not None:
             scale = np.ones(3)
             valid_idxes = self.native_bbox > 1e-4
-            scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+            scale[valid_idxes] = (
+                np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+            )
         else:
             scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
 
@@ -242,17 +254,21 @@ class DatasetObject(USDObject):
         for material in self.materials:
             material.shader_update_asset_paths_with_root_path(root_path)
 
-        # Assign realistic density and mass based on average object category spec
+        # Assign realistic density and mass based on average object category spec, or fall back to a default value
         if self.avg_obj_dims is not None and self.avg_obj_dims["density"] is not None:
-            if self._prim_type == PrimType.RIGID:
-                for link in self._links.values():
-                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                    if link.has_collision_meshes:
-                        link.mass = 0.0
-                        link.density = self.avg_obj_dims["density"]
+            density = self.avg_obj_dims["density"]
+        else:
+            density = 1000.0
 
-            elif self._prim_type == PrimType.CLOTH:
-                self.root_link.mass = self.avg_obj_dims["density"] * self.root_link.volume
+        if self._prim_type == PrimType.RIGID:
+            for link in self._links.values():
+                # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                if link.has_collision_meshes:
+                    link.mass = 0.0
+                    link.density = density
+
+        elif self._prim_type == PrimType.CLOTH:
+            self.root_link.mass = density * self.root_link.volume
 
     def _update_texture_change(self, object_state):
         """
@@ -306,8 +322,9 @@ class DatasetObject(USDObject):
         if orientation is None:
             orientation = self.get_orientation()
         if position is not None:
-            rotated_offset = T.pose_transform([0, 0, 0], orientation,
-                                              self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]
+            rotated_offset = T.pose_transform(
+                [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]
+            )[0]
             position = position + rotated_offset
         self.set_position_orientation(position, orientation)
 
@@ -347,8 +364,9 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) bounding box
         """
-        assert "ig:nativeBB" in self.property_names, \
-            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        assert (
+            "ig:nativeBB" in self.property_names
+        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
         return np.array(self.get_attribute(attr="ig:nativeBB"))
 
     @property
@@ -408,14 +426,6 @@ class DatasetObject(USDObject):
         return -self.scale * self.base_link_offset
 
     @property
-    def native_link_bboxes(self):
-        """
-        Returns:
-             dict: Keyword-mapped native bounding boxes for each link of this object
-        """
-        return None if self.metadata is None else self.metadata.get("link_bounding_boxes", None)
-
-    @property
     def scales_in_link_frame(self):
         """
         Returns:
@@ -435,8 +445,12 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
-                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            prim.GetAttribute("physics:localRot0").Get()
+                        )[[1, 2, 3, 0]]
+                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            prim.GetAttribute("physics:localRot1").Get()
+                        )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)
@@ -444,143 +458,6 @@ class DatasetObject(USDObject):
                         scales[child_name] = scale_in_child_lf
 
         return scales
-
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
-        """
-        Get a bounding box for this object that's axis-aligned in the object's base frame.
-
-        Args:
-            link_name (None or str): If specified, only get the bbox for the given link
-            visual (bool): Whether to aggregate the bounding boxes from the visual meshes. Otherwise, will use
-                collision meshes
-            xy_aligned (bool): Whether to align the bounding box to the global XY-plane
-            fallback_to_aabb (bool): If set and a link's info is not found, the (global-frame) AABB will be
-                dynamically computed directly from omniverse
-            link_bbox_type (str): Which type of link bbox to use, "axis_aligned" means the bounding box is axis-aligned
-                to the link frame, "oriented" means the bounding box has the minimum volume
-
-        Returns:
-            4-tuple:
-                - 3-array: (x,y,z) bbox center position in world frame
-                - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
-                - 3-array: (x,y,z) bbox extent in desired frame
-                - 3-array: (x,y,z) bbox center in desired frame
-        """
-        bbox_type = "visual" if visual else "collision"
-
-        # Get the base position transform.
-        pos, orn = self.get_position_orientation()
-        base_frame_to_world = T.pose2mat((pos, orn))
-
-        # Compute the world-to-base frame transform.
-        world_to_base_frame = trimesh.transformations.inverse_matrix(base_frame_to_world)
-
-        # Grab the corners of all the different links' bounding boxes. We will later fit a bounding box to
-        # this set of points to get our final, base-frame bounding box.
-        points = []
-
-        if self.prim_type == PrimType.CLOTH:
-            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
-            particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate([
-                particle_positions - particle_contact_offset,
-                particle_positions + particle_contact_offset
-            ], axis=0)
-            points.extend(trimesh.transformations.transform_points(particles_in_world_frame, world_to_base_frame))
-        else:
-            links = {link_name: self._links[link_name]} if link_name is not None else self._links
-            for link_name, link in links.items():
-                # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
-                meshes = link.visual_meshes if visual else link.collision_meshes
-                if len(meshes) == 0:
-                    continue
-
-                # If the link has a bounding box annotation.
-                if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
-                    # Check if the annotation is still missing.
-                    if bbox_type not in self.native_link_bboxes[link_name]:
-                        raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
-
-                    # Get the extent and transform.
-                    bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
-                    extent_in_bbox_frame = np.array(bb_data["extent"])
-                    bbox_to_link_origin = np.array(bb_data["transform"])
-
-                    # # Get the link's pose in the base frame.
-                    link_frame_to_world = T.pose2mat(link.get_position_orientation())
-                    link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
-
-                    # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
-                    # box's vertices into the link frame, and then scales them to match the scale applied to this object.
-                    # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
-                    # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
-                    # this time in the object's base link frame.
-                    scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
-                    bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
-
-                    # Compute the bounding box vertices in the base frame.
-                    # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                    bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                    vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
-
-                    # Add the points to our collection of points.
-                    points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-                elif fallback_to_aabb:  # always default to AABB for cloth
-                    # If we're visual and the mesh is not visible, there is no fallback so continue
-                    if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
-                        continue
-                    aabb_vertices_in_world = link.aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                            link.aabb_extent / 2
-                    )
-                    aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
-                        aabb_vertices_in_world, world_to_base_frame
-                    )
-                    points.extend(aabb_vertices_in_base_frame)
-                else:
-                    raise ValueError(
-                        "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
-                        "AABB as fallback." % link_name
-                    )
-
-        if xy_aligned:
-            # If the user requested an XY-plane aligned bbox, convert everything to that frame.
-            # The desired frame is same as the base_com frame with its X/Y rotations removed.
-            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
-
-            # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
-            # and then take the arctangent of its projection onto the XY plane.
-            rotated_X_axis = base_frame_to_world[:3, 0]
-            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
-                translate=translate, angles=[0, 0, rotation_around_Z_axis]
-            )
-
-            # We want to move our points to this frame as well.
-            world_to_xy_aligned_base_com = trimesh.transformations.inverse_matrix(xy_aligned_base_com_to_world)
-            base_com_to_xy_aligned_base_com = np.dot(world_to_xy_aligned_base_com, base_frame_to_world)
-            points = trimesh.transformations.transform_points(points, base_com_to_xy_aligned_base_com)
-
-            # Finally update our desired frame.
-            desired_frame_to_world = xy_aligned_base_com_to_world
-        else:
-            # Default desired frame is base CoM frame.
-            desired_frame_to_world = base_frame_to_world
-
-        # TODO: Implement logic to allow tight bounding boxes that don't necessarily have to match the base frame.
-        # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
-        # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, axis=0)
-        aabb_max_in_desired_frame = np.amax(points, axis=0)
-        bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
-        bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
-
-        # Transform the center to the world frame.
-        bbox_center_in_world = trimesh.transformations.transform_points(
-            [bbox_center_in_desired_frame], desired_frame_to_world
-        )[0]
-        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
-
-        return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
     @property
     def avg_obj_dims(self):
@@ -598,7 +475,6 @@ class DatasetObject(USDObject):
             prim_path=prim_path,
             name=name,
             category=self.category,
-            class_id=self.class_id,
             scale=self.scale,
             visible=self.visible,
             fixed_base=self.fixed_base,

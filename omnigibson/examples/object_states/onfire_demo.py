@@ -20,36 +20,42 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_configs = []
 
     # Light
-    obj_configs.append(dict(
-        type="LightObject",
-        light_type="Sphere",
-        name="light",
-        radius=0.01,
-        intensity=1e8,
-        position=[-2.0, -2.0, 1.0],
-    ))
+    obj_configs.append(
+        dict(
+            type="LightObject",
+            light_type="Sphere",
+            name="light",
+            radius=0.01,
+            intensity=1e8,
+            position=[-2.0, -2.0, 1.0],
+        )
+    )
 
     # Stove
-    obj_configs.append(dict(
-        type="DatasetObject",
-        name="stove",
-        category="stove",
-        model="yhjzwg",
-        bounding_box=[1.185, 0.978, 1.387],
-        position=[0, 0, 0.69],
-    ))
+    obj_configs.append(
+        dict(
+            type="DatasetObject",
+            name="stove",
+            category="stove",
+            model="yhjzwg",
+            bounding_box=[1.185, 0.978, 1.387],
+            position=[0, 0, 0.69],
+        )
+    )
 
     # 2 Apples
     for i in range(2):
-        obj_configs.append(dict(
-            type="DatasetObject",
-            name=f"apple{i}",
-            category="apple",
-            model="agveuv",
-            bounding_box=[0.065, 0.065, 0.077],
-            position=[0, i * 0.07, 2.0],
-            abilities={"flammable": {"ignition_temperature": 100, "distance_threshold": 0.5}},
-        ))
+        obj_configs.append(
+            dict(
+                type="DatasetObject",
+                name=f"apple{i}",
+                category="apple",
+                model="agveuv",
+                bounding_box=[0.065, 0.065, 0.077],
+                position=[0, i * 0.07, 2.0],
+                abilities={"flammable": {"ignition_temperature": 100, "distance_threshold": 0.5}},
+            )
+        )
 
     # Create the scene config to load -- empty scene with desired objects
     cfg = {

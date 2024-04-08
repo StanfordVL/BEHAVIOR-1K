@@ -2,6 +2,7 @@ import numpy as np
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.prims.cloth_prim import ClothPrim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -28,9 +29,12 @@ class LinkBasedStateMixin(BaseObjectState):
             if metalink_prefix in link.name:
                 return True, None
 
-        return False, f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} " \
-                      f"for obj {obj.name} but none was found! To get valid compatible object models, please use " \
-                      f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)"
+        return (
+            False,
+            f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} "
+            f"for obj {obj.name} but none was found! To get valid compatible object models, please use "
+            f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
+        )
 
     @classmethod
     def is_compatible_asset(cls, prim, **kwargs):
@@ -48,9 +52,12 @@ class LinkBasedStateMixin(BaseObjectState):
                 if metalink_prefix in child.GetName():
                     return True, None
 
-        return False, f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} " \
-                      f"for asset prim {prim.GetName()} but none was found! To get valid compatible object models, " \
-                      f"please use omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)"
+        return (
+            False,
+            f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} "
+            f"for asset prim {prim.GetName()} but none was found! To get valid compatible object models, "
+            f"please use omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
+        )
 
     @classproperty
     def metalink_prefix(cls):
@@ -102,10 +109,15 @@ class LinkBasedStateMixin(BaseObjectState):
 
         # TODO: Extend logic to account for multiple instances of the same metalink? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
-            if self.metalink_prefix in name or (self._default_link is not None and link.name == self._default_link.name):
+            if self.metalink_prefix in name or (
+                self._default_link is not None and link.name == self._default_link.name
+            ):
                 self._links[name] = link
-                assert np.allclose(link.scale, self.obj.scale), \
-                    f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
+                # Make sure the scale is similar if the link is not a cloth prim
+                if not isinstance(link, ClothPrim):
+                    assert np.allclose(
+                        link.scale, self.obj.scale
+                    ), f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
 
     @classproperty
     def _do_not_register_classes(cls):

@@ -26,9 +26,7 @@ class LazyImporter(ModuleType):
         try:
             return getattr(self._module, name)
         except:
-            raise AttributeError(
-                f"module {self.__name__} has no attribute {name}"
-            ) from None
+            raise AttributeError(f"module {self.__name__} has no attribute {name}") from None
 
     def _get_module(self, module_name: str):
         """Recursively create and return a LazyImporter for the given module name."""
@@ -36,7 +34,7 @@ class LazyImporter(ModuleType):
         # Get the fully qualified module name by prepending self._module_path
         if self._module_path:
             module_name = f"{self._module_path}.{module_name}"
-        
+
         if module_name in self._submodules:
             return self._submodules[module_name]
 

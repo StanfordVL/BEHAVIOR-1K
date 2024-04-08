@@ -67,6 +67,7 @@ def load_default_config():
         dict: Loaded default configuration file
     """
     from omnigibson import example_config_path
+
     return parse_config(f"{example_config_path}/default_cfg.yaml")
 
 

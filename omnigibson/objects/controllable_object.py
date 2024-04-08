@@ -20,12 +20,12 @@ class ControllableObject(BaseObject):
     are motorized (i.e.: non-zero low-level simulator joint motor gains) and intended to be controlled,
     e.g.: a conveyor belt or a robot agent
     """
+
     def __init__(
         self,
         name,
         prim_path=None,
         category="object",
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -47,8 +47,6 @@ class ControllableObject(BaseObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -86,17 +84,17 @@ class ControllableObject(BaseObject):
         self._action_normalize = action_normalize
 
         # Store internal placeholders that will be filled in later
-        self._dof_to_joints = None          # dict that will map DOF indices to JointPrims
+        self._dof_to_joints = None  # dict that will map DOF indices to JointPrims
         self._last_action = None
         self._controllers = None
         self.dof_names_ordered = None
+        self._control_enabled = True
 
         # Run super init
         super().__init__(
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -127,8 +125,11 @@ class ControllableObject(BaseObject):
         self._load_controllers()
 
         # Setup action space
-        self._action_space = self._create_discrete_action_space() if self._action_type == "discrete" \
+        self._action_space = (
+            self._create_discrete_action_space()
+            if self._action_type == "discrete"
             else self._create_continuous_action_space()
+        )
 
         # Reset the object and keep all joints still after loading
         self.reset()
@@ -186,7 +187,9 @@ class ControllableObject(BaseObject):
             controller = create_controller(**cfg)
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
-                assert self._joints[self.dof_names_ordered[idx]].driven, "Controllers should only control driveable joints!"
+                assert self._joints[
+                    self.dof_names_ordered[idx]
+                ].driven, "Controllers should only control driveable joints!"
             self._controllers[name] = controller
         self.update_controller_mode()
 
@@ -247,17 +250,18 @@ class ControllableObject(BaseObject):
         self._load_controllers()
 
         # (Re-)create the action space
-        self._action_space = self._create_discrete_action_space() if self._action_type == "discrete" \
+        self._action_space = (
+            self._create_discrete_action_space()
+            if self._action_type == "discrete"
             else self._create_continuous_action_space()
+        )
 
     def reset(self):
-        # Make sure simulation is playing, otherwise, we cannot reset because physx requires active running
-        # simulation in order to set joints
-        assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+        # Call super first
+        super().reset()
 
-        # Additionally set the joint states based on the reset values
+        # Override the reset joint state based on reset values
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
-        self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
     @abstractmethod
     def _create_discrete_action_space(self):
@@ -315,14 +319,28 @@ class ControllableObject(BaseObject):
 
         for name, controller in self._controllers.items():
             # Set command, then take a controller step
-            controller.update_goal(command=action[idx : idx + controller.command_dim], control_dict=self.get_control_dict())
+            controller.update_goal(
+                command=action[idx : idx + controller.command_dim], control_dict=self.get_control_dict()
+            )
             # Update idx
             idx += controller.command_dim
+
+    @property
+    def control_enabled(self):
+        return self._control_enabled
+
+    @control_enabled.setter
+    def control_enabled(self, value):
+        self._control_enabled = value
 
     def step(self):
         """
         Takes a controller step across all controllers and deploys the computed control signals onto the object.
         """
+        # Skip if we don't have control enabled
+        if not self.control_enabled:
+            return
+
         # Skip this step if our articulation view is not valid
         if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
             return
@@ -436,23 +454,27 @@ class ControllableObject(BaseObject):
                 # control types, and indices all match as expected
 
                 # Make sure the indices are mapped correctly
-                assert indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof, \
-                    "Got mismatched control indices for a single joint!"
+                assert (
+                    indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof
+                ), "Got mismatched control indices for a single joint!"
                 # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
                 for group_name, group in zip(
-                        ("joints", "control_types", "normalized"),
-                        (self._dof_to_joints, control_type, normalized),
+                    ("joints", "control_types", "normalized"),
+                    (self._dof_to_joints, control_type, normalized),
                 ):
-                    assert len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1, \
-                        f"Not all {group_name} were the same when trying to deploy control for a single joint!"
+                    assert (
+                        len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
+                    ), f"Not all {group_name} were the same when trying to deploy control for a single joint!"
                 # Assuming this all passes, we grab the control subvector, type, and normalized value accordingly
-                ctrl = control[cur_ctrl_idx: cur_ctrl_idx + joint_dof]
+                ctrl = control[cur_ctrl_idx : cur_ctrl_idx + joint_dof]
             else:
                 # Grab specific control. No need to do checks since this is a single value
                 ctrl = control[cur_ctrl_idx]
 
             # Deploy control based on type
-            ctrl_type = control_type[cur_ctrl_idx]       # In multi-DOF joint case all values were already checked to be the same
+            ctrl_type = control_type[
+                cur_ctrl_idx
+            ]  # In multi-DOF joint case all values were already checked to be the same
             if ctrl_type == ControlType.EFFORT:
                 eff_vec.append(ctrl)
                 eff_idxs.append(cur_ctrl_idx)
@@ -474,12 +496,16 @@ class ControllableObject(BaseObject):
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
             # Finally, increment the current index based on how many DOFs were just controlled
             cur_indices_idx += joint_dof
-            
+
         # set the targets for joints
         if using_pos:
-            self.set_joint_positions(positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized)
+            self.set_joint_positions(
+                positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized
+            )
         if using_vel:
-            self.set_joint_velocities(velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized)
+            self.set_joint_velocities(
+                velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized
+            )
         if using_eff:
             self.set_joint_efforts(efforts=np.array(eff_vec), indices=np.array(eff_idxs), normalized=normalized)
 
@@ -560,9 +586,9 @@ class ControllableObject(BaseObject):
         state_flat = super()._serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = np.concatenate([
-            c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()
-        ])
+        controller_states_flat = np.concatenate(
+            [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
+        )
 
         # Concatenate and return
         return np.concatenate([state_flat, controller_states_flat]).astype(float)
@@ -575,7 +601,7 @@ class ControllableObject(BaseObject):
         controller_states = dict()
         for c_name, c in self._controllers.items():
             state_size = c.state_size
-            controller_states[c_name] = c.deserialize(state=state[idx: idx + state_size])
+            controller_states[c_name] = c.deserialize(state=state[idx : idx + state_size])
             idx += state_size
         state_dict["controllers"] = controller_states
 
@@ -703,7 +729,7 @@ class ControllableObject(BaseObject):
             n-array: reset joint positions for this robot
         """
         return self._reset_joint_pos
-    
+
     @reset_joint_pos.setter
     def reset_joint_pos(self, value):
         """

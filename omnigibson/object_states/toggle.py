@@ -48,10 +48,13 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         cls._finger_contact_objs = set()
 
         # detect marker and hand interaction
-        robot_finger_links = set(link
-                                 for robot in og.sim.scene.robots if isinstance(robot, ManipulationRobot)
-                                 for finger_links in robot.finger_links.values()
-                                 for link in finger_links)
+        robot_finger_links = set(
+            link
+            for robot in og.sim.scene.robots
+            if isinstance(robot, ManipulationRobot)
+            for finger_links in robot.finger_links.values()
+            for link in finger_links
+        )
         cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
 
         # If there aren't any valid robot link paths, immediately return
@@ -114,9 +117,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
         self.visual_marker.visible = True
-
-        # Make sure the marker isn't translated at all
-        self.visual_marker.set_local_pose(position=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
         # Store the projection mesh's IDs
         projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)

@@ -163,11 +163,17 @@ class MultiFingerGripperController(GripperController):
         if self._mode == "binary":
             # Use max control signal
             if target[0] >= 0.0:
-                u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx] \
-                    if self._open_qpos is None else self._open_qpos
+                u = (
+                    self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
+                    if self._open_qpos is None
+                    else self._open_qpos
+                )
             else:
-                u = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx] \
-                    if self._closed_qpos is None else self._closed_qpos
+                u = (
+                    self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
+                    if self._closed_qpos is None
+                    else self._closed_qpos
+                )
         else:
             # Use continuous signal
             u = target
@@ -223,17 +229,11 @@ class MultiFingerGripperController(GripperController):
             finger_pos = control_dict["joint_position"][self.dof_idx]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
-            if (
-                    self._motor_type == "position"
-                    and np.mean(np.abs(finger_pos - self._control)) < m.POS_TOLERANCE
-            ):
+            if self._motor_type == "position" and np.mean(np.abs(finger_pos - self._control)) < m.POS_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-            elif (
-                    self._motor_type in {"velocity", "torque"}
-                    and np.mean(np.abs(self._control)) < m.VEL_TOLERANCE
-            ):
+            elif self._motor_type in {"velocity", "torque"} and np.mean(np.abs(self._control)) < m.VEL_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # Otherwise, the last control signal intends to "move" the gripper
@@ -243,10 +243,10 @@ class MultiFingerGripperController(GripperController):
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                assert np.all(
-                    (min_pos <= finger_pos) * (finger_pos <= max_pos)
-                ), f"Got invalid finger joint positions when checking for grasp! " \
-                   f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
+                assert np.all((min_pos <= finger_pos) * (finger_pos <= max_pos)), (
+                    f"Got invalid finger joint positions when checking for grasp! "
+                    f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
+                )
 
                 # Check distance from both ends of the joint limits
                 dist_from_lower_limit = finger_pos - min_pos
@@ -254,17 +254,15 @@ class MultiFingerGripperController(GripperController):
 
                 # If the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                        np.mean(dist_from_lower_limit) > m.POS_TOLERANCE
-                        and np.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                    np.mean(dist_from_lower_limit) > m.POS_TOLERANCE
+                    and np.mean(dist_from_upper_limit) > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
                 valid_grasp_vel = np.all(np.abs(finger_vel) < m.VEL_TOLERANCE)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
-                is_grasping = (
-                    IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
-                )
+                is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
 
         # Store calculated state
         self._is_grasping = is_grasping

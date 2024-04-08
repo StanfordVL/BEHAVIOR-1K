@@ -51,7 +51,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "prim_type": PrimType.CLOTH,
                 "abilities": {"cloth": {}},
                 "position": [-1, 1, 0.5],
-                "orientation": [0.7071, 0., 0.7071, 0.],
+                "orientation": [0.7071, 0.0, 0.7071, 0.0],
             },
         ],
     }
@@ -99,7 +99,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
-            indices = np.argsort(pos, axis=0)[:, 0][:(pos.shape[0] // 10)]
+            indices = np.argsort(pos, axis=0)[:, 0][: (pos.shape[0] // 10)]
             start = np.copy(pos[indices])
 
             # lift up a bit
@@ -123,9 +123,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
             y_extent = y_max - y_min
             if direction == 1:
-                indices = np.argsort(pos, axis=0)[:, 1][:(pos.shape[0] // 20)]
+                indices = np.argsort(pos, axis=0)[:, 1][: (pos.shape[0] // 20)]
             else:
-                indices = np.argsort(pos, axis=0)[:, 1][-(pos.shape[0] // 20):]
+                indices = np.argsort(pos, axis=0)[:, 1][-(pos.shape[0] // 20) :]
             start = np.copy(pos[indices])
 
             # lift up a bit

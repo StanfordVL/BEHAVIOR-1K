@@ -15,14 +15,7 @@ SENSOR_PRIMS_TO_SENSOR_CLS = {
 
 
 def create_sensor(
-        sensor_type,
-        prim_path,
-        name,
-        modalities="all",
-        enabled=True,
-        sensor_kwargs=None,
-        noise_type=None,
-        noise_kwargs=None
+    sensor_type, prim_path, name, modalities="all", enabled=True, sensor_kwargs=None, noise_type=None, noise_kwargs=None
 ):
     """
     Create a sensor of type @sensor_type with optional keyword args @sensor_kwargs that should be passed to the

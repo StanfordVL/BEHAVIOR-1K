@@ -178,7 +178,9 @@ class BaseController(Serializable, Registerable, Recreatable):
                     self._command_output_transform = (
                         self._command_output_limits[1] + self._command_output_limits[0]
                     ) / 2.0
-                    self._command_input_transform = (self._command_input_limits[1] + self._command_input_limits[0]) / 2.0
+                    self._command_input_transform = (
+                        self._command_input_limits[1] + self._command_input_limits[0]
+                    ) / 2.0
                 # Scale command
                 command = (
                     command - self._command_input_transform
@@ -197,8 +199,9 @@ class BaseController(Serializable, Registerable, Recreatable):
             control_dict (dict): Current state
         """
         # Sanity check the command
-        assert len(command) == self.command_dim, \
-            f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
+        assert (
+            len(command) == self.command_dim
+        ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
         # Preprocess and run internal command
         self._goal = self._update_goal(command=self._preprocess_command(np.array(command)), control_dict=control_dict)
@@ -304,17 +307,26 @@ class BaseController(Serializable, Registerable, Recreatable):
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = None if state["goal"] is None else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
+        self._goal = (
+            None
+            if state["goal"] is None
+            else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
+        )
 
     def _serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
-        goal_state_flattened = np.concatenate([goal_state.flatten() for goal_state in self._goal.values()]) if (
-            state)["goal_is_valid"] else np.zeros(self.goal_dim)
+        goal_state_flattened = (
+            np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])
+            if (state)["goal_is_valid"]
+            else np.zeros(self.goal_dim)
+        )
 
-        return np.concatenate([
-            [state["goal_is_valid"]],
-            goal_state_flattened,
-        ])
+        return np.concatenate(
+            [
+                [state["goal_is_valid"]],
+                goal_state_flattened,
+            ]
+        )
 
     def _deserialize(self, state):
         goal_is_valid = bool(state[0])
@@ -324,7 +336,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             goal = dict()
             for key, shape in self._goal_shapes.items():
                 length = np.product(shape)
-                goal[key] = state[idx:idx+length].reshape(shape)
+                goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:
             goal = None

@@ -12,21 +12,13 @@ gm.ENABLE_HQ_RENDERING = True
 
 
 def main():
-    # Create the scene config to load -- empty scene plus a light and a cabinet
+    # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
         "scene": {
             "type": "Scene",
             "floor_plane_visible": True,
         },
         "objects": [
-            {
-                "type": "LightObject",
-                "name": "light",
-                "light_type": "Sphere",
-                "radius": 0.01,
-                "intensity": 1e8,
-                "position": [-2.0, -2.0, 1.0],
-            },
             {
                 "type": "DatasetObject",
                 "name": "cabinet",
@@ -52,7 +44,7 @@ def main():
                             # enabled!
                             "water": [],
                         },
-            },
+                    },
                 },
                 "position": [0, 0, 0.59],
             },
@@ -64,8 +56,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 1.7789 , -1.68822,  1.13551]),
-        orientation=np.array([0.57065614, 0.20331904, 0.267029  , 0.74947212]),
+        position=np.array([1.7789, -1.68822, 1.13551]),
+        orientation=np.array([0.57065614, 0.20331904, 0.267029, 0.74947212]),
     )
 
     # Grab reference to object of interest

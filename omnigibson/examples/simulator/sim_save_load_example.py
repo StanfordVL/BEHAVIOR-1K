@@ -7,6 +7,7 @@ from omnigibson.utils.ui_utils import KeyboardEventHandler
 
 TEST_OUT_PATH = ""  # Define output directory here.
 
+
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Prompts the user to select whether they are saving or loading an environment, and interactively
@@ -34,9 +35,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set the camera to a good angle
     def set_camera_pose():
         og.sim.viewer_camera.set_position_orientation(
-            position=np.array([-0.229375, -3.40576 ,  7.26143 ]),
-            orientation=np.array([ 0.27619733, -0.00230233, -0.00801152,  0.9610648 ]),
+            position=np.array([-0.229375, -3.40576, 7.26143]),
+            orientation=np.array([0.27619733, -0.00230233, -0.00801152, 0.9610648]),
         )
+
     set_camera_pose()
 
     # Give user instructions, and then loop until completed
@@ -45,10 +47,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Notify user to manipulate environment until ready, then press Z to exit
         print()
         print("Modify the scene by SHIFT + left clicking objects and dragging them. Once finished, press Z.")
+
         # Register callback so user knows to press space once they're done manipulating the scene
         def complete_loop():
             nonlocal completed
             completed = True
+
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
         env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
