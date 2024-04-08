@@ -9,6 +9,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
+
 def setup_environment(load_object_categories):
     cfg = {
         "scene": {
@@ -65,9 +66,11 @@ def setup_environment(load_object_categories):
     env.reset()
     return env
 
+
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
+
 
 def primitive_tester(env, objects, primitives, primitives_args):
     for obj in objects:
@@ -89,6 +92,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
     return True
 
+
 def test_navigate():
     categories = ["floors", "ceilings", "walls"]
     env = setup_environment(categories)
@@ -106,6 +110,7 @@ def test_navigate():
 
     assert primitive_tester(env, objects, primitives, primitives_args)
 
+
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
     env = setup_environment(categories)
@@ -122,6 +127,7 @@ def test_grasp():
     primitives_args = [(obj_1["object"],)]
 
     assert primitive_tester(env, objects, primitives, primitives_args)
+
 
 def test_place():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
