@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import time
 import gym
@@ -678,16 +679,18 @@ class VisionSensor(BaseSensor):
             n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
-        projection_matrix = self.camera_parameters["cameraProjection"]
-        projection_matrix = np.array(projection_matrix).reshape(4, 4)
+        focal_length = self.camera_parameters["cameraFocalLength"]
+        width, height = self.camera_parameters["renderProductResolution"]
+        horizontal_aperture = self.camera_parameters["cameraAperture"][0]
+        horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
+        vertical_fov = horizontal_fov * height / width
 
-        fx = projection_matrix[0, 0]
-        fy = projection_matrix[1, 1]
-        cx = projection_matrix[0, 2]
-        cy = projection_matrix[1, 2]
-        s = projection_matrix[0, 1]  # Skew factor
+        fx = (width / 2.0) / np.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / np.tan(vertical_fov / 2.0)
+        cx = width / 2
+        cy = height / 2
 
-        intrinsic_matrix = np.array([[fx, s, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
         return intrinsic_matrix
 
     @property
