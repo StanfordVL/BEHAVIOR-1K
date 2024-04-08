@@ -9,13 +9,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
-
-def execute_controller(ctrl_gen, env):
-    for action in ctrl_gen:
-        env.step(action)
-
-
-def primitive_tester(load_object_categories, objects, primitives, primitives_args):
+def setup_environment(load_object_categories):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -66,12 +60,16 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     gm.ENABLE_OBJECT_STATES = True
     gm.USE_GPU_DYNAMICS = False
     gm.ENABLE_FLATCACHE = False
-
     # Create the environment
     env = og.Environment(configs=cfg)
-    robot = env.robots[0]
     env.reset()
+    return env
 
+def execute_controller(ctrl_gen, env):
+    for action in ctrl_gen:
+        env.step(action)
+
+def primitive_tester(env, objects, primitives, primitives_args):
     for obj in objects:
         og.sim.import_object(obj["object"])
         obj["object"].set_position_orientation(obj["position"], obj["orientation"])
@@ -91,10 +89,9 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
 
     return True
 
-
-@pytest.mark.skip(reason="primitives are broken")
 def test_navigate():
     categories = ["floors", "ceilings", "walls"]
+    env = setup_environment(categories)
 
     objects = []
     obj_1 = {
@@ -107,12 +104,11 @@ def test_navigate():
     primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
     primitives_args = [(obj_1["object"],)]
 
-    assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(env, objects, primitives, primitives_args)
 
-
-@pytest.mark.skip(reason="primitives are broken")
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
+    env = setup_environment(categories)
 
     objects = []
     obj_1 = {
@@ -125,12 +121,11 @@ def test_grasp():
     primitives = [StarterSemanticActionPrimitiveSet.GRASP]
     primitives_args = [(obj_1["object"],)]
 
-    assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(env, objects, primitives, primitives_args)
 
-
-@pytest.mark.skip(reason="primitives are broken")
 def test_place():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
+    env = setup_environment(categories)
 
     objects = []
     obj_1 = {
@@ -149,12 +144,13 @@ def test_place():
     primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
     primitives_args = [(obj_2["object"],), (obj_1["object"],)]
 
-    assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(env, objects, primitives, primitives_args)
 
 
 @pytest.mark.skip(reason="primitives are broken")
 def test_open_prismatic():
     categories = ["floors"]
+    env = setup_environment(categories)
 
     objects = []
     obj_1 = {
@@ -169,12 +165,13 @@ def test_open_prismatic():
     primitives = [StarterSemanticActionPrimitiveSet.OPEN]
     primitives_args = [(obj_1["object"],)]
 
-    assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(env, objects, primitives, primitives_args)
 
 
 @pytest.mark.skip(reason="primitives are broken")
 def test_open_revolute():
     categories = ["floors"]
+    env = setup_environment(categories)
 
     objects = []
     obj_1 = {
@@ -187,4 +184,4 @@ def test_open_revolute():
     primitives = [StarterSemanticActionPrimitiveSet.OPEN]
     primitives_args = [(obj_1["object"],)]
 
-    assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(env, objects, primitives, primitives_args)
