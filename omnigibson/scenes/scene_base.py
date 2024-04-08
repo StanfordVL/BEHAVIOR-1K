@@ -205,8 +205,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             og.sim.import_object(self._skybox, register=False)
             self._skybox.color = (1.07, 0.85, 0.61)
             # Default texture to use for skybox
-            default_skybox_texture = f"{gm.ASSET_PATH}/models/background/sky.jpg"
-            self._skybox.texture_file_path = default_skybox_texture
+            self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
     def _load_objects_from_scene_file(self):
         """

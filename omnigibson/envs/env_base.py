@@ -3,6 +3,7 @@ import numpy as np
 from copy import deepcopy
 
 import omnigibson as og
+from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.simulator import launch_simulator
@@ -266,8 +267,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 obj_config["name"] = f"obj{i}"
             # Pop the desired position and orientation
             position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
-            from omnigibson.objects import REGISTERED_OBJECTS
-
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
             obj = create_class_from_registry_and_config(
                 cls_name=obj_config["type"],
