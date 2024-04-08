@@ -47,7 +47,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/slicing_rule_before.png" alt="slicing_rule_before">
+            <img src="../assets/transition_rules/slicing_rule_after.png" alt="slicing_rule_after">
         </td>
     </tr>
     <tr>
@@ -68,7 +69,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/dicing_rule_before.png" alt="dicing_rule_before">
+            <img src="../assets/transition_rules/dicing_rule_after.png" alt="dicing_rule_after">
         </td>
     </tr>
     <tr>
@@ -87,7 +89,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/melting_rule_before.png" alt="melting_rule_before">
+            <img src="../assets/transition_rules/melting_rule_after.png" alt="melting_rule_after">
         </td>
     </tr>
     <tr>
@@ -106,7 +109,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/cooking_physical_particle_rule_before.png" alt="cooking_physical_particle_rule_before">
+            <img src="../assets/transition_rules/cooking_physical_particle_rule_after.png" alt="cooking_physical_particle_rule_after">
         </td>
     </tr>
     <tr>
@@ -125,7 +129,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/toggleable_machine_rule_before.png" alt="toggleable_machine_rule_before">
+            <img src="../assets/transition_rules/toggleable_machine_rule_after.png" alt="toggleable_machine_rule_after">
         </td>
     </tr>
     <tr>
@@ -146,7 +151,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/mixing_rule_before.png" alt="mixing_rule_before">
+            <img src="../assets/transition_rules/mixing_rule_after.png" alt="mixing_rule_after">
         </td>
     </tr>
     <tr>
@@ -167,7 +173,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/cooking_rule_before.png" alt="cooking_rule_before">
+            <img src="../assets/transition_rules/cooking_rule_after.png" alt="cooking_rule_after">
         </td>
     </tr>
     <tr>
@@ -187,7 +194,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/washer_rule_before.png" alt="washer_rule_before">
+            <img src="../assets/transition_rules/washer_rule_after.png" alt="washer_rule_after">
         </td>
     </tr>
     <tr>
@@ -207,7 +215,8 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
             </ul>
         </td>
         <td>
-            <img src="../assets/robots/Turtlebot.png" alt="rgb">
+            <img src="../assets/transition_rules/dryer_rule_before.png" alt="dryer_rule_before">
+            <img src="../assets/transition_rules/dryer_rule_after.png" alt="dryer_rule_after">
         </td>
     </tr>
 </table>
