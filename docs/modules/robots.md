@@ -4,6 +4,8 @@ icon: material/robot-outline
 
 # 🤖 **Robots**
 
+![Robot Family](../assets/robots/robot_family.png)
+
 ## Description
 
 In **`OmniGibson`**, `Robot`s define agents that can interact with other objects in a given environment. Each robot can _interact_ by deploying joint
