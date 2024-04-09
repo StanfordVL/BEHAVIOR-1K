@@ -7,7 +7,6 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import (
-    AVERAGE_CATEGORY_SPECS,
     DEFAULT_JOINT_FRICTION,
     SPECIAL_JOINT_FRICTIONS,
     JointType,
