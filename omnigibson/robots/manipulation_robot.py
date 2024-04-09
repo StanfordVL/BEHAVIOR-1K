@@ -479,7 +479,7 @@ class ManipulationRobot(BaseRobot):
         return controllers
 
     @classproperty
-    def n_arms(self):
+    def n_arms(cls):
         """
         Returns:
             int: Number of arms this robot has. Returns 1 by default
@@ -487,14 +487,14 @@ class ManipulationRobot(BaseRobot):
         return 1
 
     @classproperty
-    def arm_names(self):
+    def arm_names(cls):
         """
         Returns:
             list of str: List of arm names for this robot. Should correspond to the keys used to index into
                 arm- and gripper-related dictionaries, e.g.: eef_link_names, finger_link_names, etc.
                 Default is string enumeration based on @self.n_arms.
         """
-        return [str(i) for i in range(self.n_arms)]
+        return [str(i) for i in range(cls.n_arms)]
 
     @property
     def default_arm(self):

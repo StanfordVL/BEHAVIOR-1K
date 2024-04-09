@@ -186,11 +186,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return "Tiago"
 
     @classproperty
-    def n_arms(self):
+    def n_arms(cls):
         return 2
 
     @classproperty
-    def arm_names(self):
+    def arm_names(cls):
         return ["left", "right"]
 
     @property
