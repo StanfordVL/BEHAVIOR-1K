@@ -214,10 +214,12 @@ def launch_simulator(*args, **kwargs):
 
         Args:
             gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 120.0.
-            rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
-                application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 30.0.
+            physics_dt (None or float): dt between physics steps. If None, will use default value
+                1 / gm.DEFAULT_PHYSICS_FREQ
+            rendering_dt (None or float): dt between rendering steps. Note: rendering means rendering a frame of the
+                current application and not only rendering a frame to the viewports/ cameras. So UI elements of
+                Isaac Sim will be refreshed with this dt as well if running non-headless. If None, will use default
+                value 1 / gm.DEFAULT_RENDERING_FREQ
             stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
                 Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
@@ -230,8 +232,8 @@ def launch_simulator(*args, **kwargs):
         def __init__(
             self,
             gravity=9.81,
-            physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ,
-            rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ,
+            physics_dt=None,
+            rendering_dt=None,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -244,8 +246,8 @@ def launch_simulator(*args, **kwargs):
 
             # Run super init
             super().__init__(
-                physics_dt=physics_dt,
-                rendering_dt=rendering_dt,
+                physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt,
+                rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt,
                 stage_units_in_meters=stage_units_in_meters,
                 device=device,
             )
