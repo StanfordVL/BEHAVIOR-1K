@@ -13,15 +13,14 @@ def setup_environment(flatcache):
     """
     Sets up the environment with or without flatcache based on the flatcache parameter.
     """
-    # Ensure any existing simulation is stopped
-    if og.sim is not None:
-        og.sim.stop()
-
     if og.sim is None:
         # Set global flags
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
+    else:
+        # Make sure sim is stopped
+        og.sim.stop()
 
     # Define the environment configuration
     config = {

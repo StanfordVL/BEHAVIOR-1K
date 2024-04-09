@@ -24,15 +24,14 @@ def task_tester(task_type):
         },
     }
 
-    # Make sure sim is stopped
-    if og.sim is not None:
-        og.sim.stop()
-
     if og.sim is None:
         # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = True
+    else:
+        # Make sure sim is stopped
+        og.sim.stop()
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -81,12 +80,6 @@ def test_rs_int_full_load():
 
     # Make sure sim is stopped
     og.sim.stop()
-
-    if og.sim is None:
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = True
 
     # Create the environment
     env = og.Environment(configs=cfg)

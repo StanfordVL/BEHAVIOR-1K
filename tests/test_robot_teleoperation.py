@@ -25,14 +25,13 @@ def test_teleop():
         ],
     }
 
-    # Make sure sim is stopped
-    if og.sim is not None:
-        og.sim.stop()
-
     if og.sim is None:
         # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
         gm.USE_GPU_DYNAMICS = False
         gm.ENABLE_FLATCACHE = False
+    else:
+        # Make sure sim is stopped
+        og.sim.stop()
 
     # Create the environment
     env = og.Environment(configs=cfg)
