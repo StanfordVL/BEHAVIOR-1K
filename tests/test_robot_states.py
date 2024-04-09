@@ -19,10 +19,11 @@ def setup_environment(flatcache=True):
     if og.sim is not None:
         og.sim.stop()
 
-    # Set global flags
-    gm.ENABLE_OBJECT_STATES = True
-    gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
+    if og.sim is None:
+        # Set global flags
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
+        gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
 
     # Define the environment configuration
     config = {
