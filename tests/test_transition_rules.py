@@ -23,7 +23,6 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.skip(reason="dryer is not fillable yet.")
 @og_test
 def test_dryer_rule():
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
@@ -36,8 +35,8 @@ def test_dryer_rule():
     og.sim.step()
 
     # Place the two objects inside the dryer
-    remover_dishtowel.set_position_orientation([0.0, 0.0, 0.4], [0, 0, 0, 1])
-    bowl.set_position_orientation([0.0, 0.0, 0.5], [0, 0, 0, 1])
+    remover_dishtowel.set_position_orientation([0.06, 0, 0.2], [0.0311883, -0.23199339, -0.06849886, 0.96980107])
+    bowl.set_position_orientation([0.0, 0.0, 0.2], [0, 0, 0, 1])
     og.sim.step()
 
     assert remover_dishtowel.states[Saturated].set_value(water, True)
@@ -49,15 +48,23 @@ def test_dryer_rule():
 
     # The rule will not execute if Open is True
     clothes_dryer.states[Open].set_value(True)
+    clothes_dryer.states[ToggledOn].set_value(True)
     og.sim.step()
 
     assert remover_dishtowel.states[Saturated].get_value(water)
     assert clothes_dryer.states[Contains].get_value(water)
 
+    # The rule will not execute if ToggledOn is False
+    clothes_dryer.states[Open].set_value(False)
+    clothes_dryer.states[ToggledOn].set_value(False)
+    og.sim.step()
+
+    assert remover_dishtowel.states[Saturated].get_value(water)
+    assert clothes_dryer.states[Contains].get_value(water)
+
+    # The rule will execute if Open is False and ToggledOn is True
     clothes_dryer.states[Open].set_value(False)
     clothes_dryer.states[ToggledOn].set_value(True)
-
-    # The rule will execute when Open is False and ToggledOn is True
     og.sim.step()
 
     # Need to take one more step for the state setters to take effect
@@ -793,12 +800,12 @@ def test_cooking_object_rule_failure_wrong_container():
     og.sim.step()
 
     # This fails the recipe because it requires the baking sheet to be inside the oven, not the stockpot
-    stockpot.set_position_orientation([0, 0, 0.47], [0, 0, 0, 1])
+    stockpot.set_position_orientation([0, 0, 0.487], [0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.45], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.50], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.464], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.506], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[Inside].get_value(stockpot)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -835,7 +842,7 @@ def test_cooking_object_rule_failure_recipe_objects():
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
@@ -877,12 +884,12 @@ def test_cooking_object_rule_failure_unary_states():
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -920,12 +927,12 @@ def test_cooking_object_rule_failure_binary_system_states():
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -963,11 +970,11 @@ def test_cooking_object_rule_failure_binary_object_states():
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.12, 0.15, 0.47], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -1055,12 +1062,12 @@ def test_cooking_object_rule_success():
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0, 0, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.5], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.55], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
+    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
