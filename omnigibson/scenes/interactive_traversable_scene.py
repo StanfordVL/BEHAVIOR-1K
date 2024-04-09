@@ -138,7 +138,6 @@ class InteractiveTraversableScene(TraversableScene):
                 load_room_instances = [load_room_instances]
             load_room_instances_filtered = []
             for room_instance in load_room_instances:
-                load_room_instances_filtered.append(room_instance)
                 if room_instance not in self._seg_map.room_ins_name_to_ins_id:
                     log.warning("room_instance [{}] does not exist.".format(room_instance))
                 load_room_instances_filtered.append(room_instance)
