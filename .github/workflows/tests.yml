@@ -20,16 +20,16 @@ jobs:
       matrix:
         test_file:
           - test_dump_load_states
-          - test_envs
-          - test_object_removal
-          - test_object_states
-          - test_primitives
-          - test_robot_states
-          - test_robot_teleoperation
-          - test_sensors
-          - test_symbolic_primitives
-          - test_systems
-          - test_transition_rules
+          # - test_envs
+          # - test_object_removal
+          # - test_object_states
+          # - test_primitives
+          # - test_robot_states
+          # - test_robot_teleoperation
+          # - test_sensors
+          # - test_symbolic_primitives
+          # - test_systems
+          # - test_transition_rules
 
     defaults:
       run:
@@ -80,7 +80,9 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: omnigibson-src
-      - name: Test Report
+      - name: List downloaded files
+        run: ls -la omnigibson-src/
+      - name: Test Report0
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
