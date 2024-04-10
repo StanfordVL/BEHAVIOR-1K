@@ -188,7 +188,7 @@ class XFormPrim(BasePrim):
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         assert np.allclose(
-            local_transform[3, :3] @ local_transform[3, :3].T, np.eye(4), atol=1e-4
+            local_transform[:3, :3] @ local_transform[:3, :3].T, np.eye(3), atol=1e-4
         ), f"{self.prim_path} local transform is not orthogonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
