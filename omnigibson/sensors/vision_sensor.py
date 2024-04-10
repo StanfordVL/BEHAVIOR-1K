@@ -756,6 +756,9 @@ class VisionSensor(BaseSensor):
         # Render to update
         render()
 
+        cls.SEMANTIC_REMAPPER = Remapper()
+        cls.INSTANCE_REMAPPER = Remapper()
+        cls.INSTANCE_ID_REMAPPER = Remapper()
         cls.SENSORS = dict()
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None
