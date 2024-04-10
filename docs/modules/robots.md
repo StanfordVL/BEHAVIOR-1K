@@ -4,10 +4,12 @@ icon: material/robot-outline
 
 # 🤖 **Robots**
 
+![Robot Family](../assets/robots/robot_family.png)
+
 ## Description
 
 In **`OmniGibson`**, `Robot`s define agents that can interact with other objects in a given environment. Each robot can _interact_ by deploying joint
-commands via its set of [`Controller`](./controllers.md)s, and can _perceive_ its surroundings via its set of [`Sensor`](./sensor.md)s. 
+commands via its set of [`Controller`](./controllers.md)s, and can _perceive_ its surroundings via its set of [`Sensor`](./sensors.md)s. 
 
 **`OmniGibson`** supports both navigation and manipulation robots, and allows for modular specification of individual controllers for controlling the different components of a given robot. For example, the `Fetch` robot is a mobile manipulator composed of a mobile (two-wheeled) base, two head joints, a trunk, seven arm joints, and two gripper finger joints. `Fetch` owns 4 controllers, one for controlling the base, the head, the trunk + arm, and the gripper. There are multiple options for each controller depending on the desired action space. For more information, check out our [robot examples](../getting_started/examples.md#robots).
 
@@ -71,13 +73,13 @@ Usually, actions are passed to robots and observations retrieved via the `obs, i
 </div>
 
 1. `action` is a 1D-numpy array. For more information, please see the [Controller](./controllers.md) section!
-2. `obs` is a dict mapping observation name to observation data, and `info` is a dict of relevant metadata about the observations. For more information, please see the [Sensor](./sensor.md) section!
+2. `obs` is a dict mapping observation name to observation data, and `info` is a dict of relevant metadata about the observations. For more information, please see the [Sensor](./sensors.md) section!
 
 
 Controllers and sensors can be accessed directly via the `controllers` and `sensors` properties, respectively. And, like all objects in **`OmniGibson`**, common information such as joint data and object states can also be directly accessed from the `robot` class.
 
 
-## Models
+## Types
 **`OmniGibson`** currently supports 9 robots, consisting of 4 mobile robots, 2 manipulation robots, 2 mobile manipulation robots, and 1 anthropomorphic "robot" (a bimanual agent proxy used for VR teleoperation). Below, we provide a brief overview of each model:
 
 ### Mobile Robots

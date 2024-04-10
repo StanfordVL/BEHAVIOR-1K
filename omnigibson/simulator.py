@@ -18,8 +18,12 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
-from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
+from omnigibson.utils.python_utils import (
+    clear as clear_pu,
+    create_object_from_init_info,
+    Serializable,
+    meets_minimum_version,
+)
 from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
 from omnigibson.utils.ui_utils import (
     CameraMover,
@@ -94,12 +98,18 @@ def _launch_app():
         raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+
+    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
+    with open(version_file_path, "r") as file:
+        version_content = file.read().strip()
+        isaac_version = version_content.split("-")[0]
+        assert meets_minimum_version(
+            isaac_version, "2023.1.1"
+        ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
-
-    assert meets_minimum_isaac_version(
-        "2023.1.1"
-    ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
