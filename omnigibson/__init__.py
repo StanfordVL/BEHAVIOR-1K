@@ -7,8 +7,6 @@ import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.envs import Environment
-
-# TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
