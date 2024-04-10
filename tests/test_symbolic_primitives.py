@@ -13,7 +13,8 @@ from omnigibson.systems import get_system
 
 
 def start_env():
-    og.sim.stop()
+    if og.sim:
+        og.sim.stop()
     config = {
         "env": {"initial_pos_z_offset": 0.1},
         "render": {"viewer_width": 1280, "viewer_height": 720},

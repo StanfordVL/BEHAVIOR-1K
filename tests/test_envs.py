@@ -79,7 +79,8 @@ def test_rs_int_full_load():
     }
 
     # Make sure sim is stopped
-    og.sim.stop()
+    if og.sim:
+        og.sim.stop()
 
     # Create the environment
     env = og.Environment(configs=cfg)
