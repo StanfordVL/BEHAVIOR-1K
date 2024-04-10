@@ -259,12 +259,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Run super method first
         super()._initialize()
 
-        # Set the joint friction for EEF to be higher
-        for arm in self.arm_names:
-            for joint in self.finger_joints[arm]:
-                if joint.joint_type != JointType.JOINT_FIXED:
-                    joint.friction = 500
-
     def _postprocess_control(self, control, control_type):
         # Run super method first
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)

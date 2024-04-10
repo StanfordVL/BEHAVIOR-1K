@@ -31,7 +31,7 @@ Besides the actual data, `get_obs()` also returns a secondary dictionary contain
 For instance, calling `get_obs()` on an environment with a single robot, which has all modalities enabled, might produce results similar to this:
 
 <details>
-<summary>Click to see code!</summary>
+<summary>Example observations</summary>
 <pre><code>
 data: 
 {
@@ -75,9 +75,12 @@ info:
 </code></pre>
 </details>
 
-## Observations
+## Types
+**`OmniGibson`** currently supports two types of sensors (`VisionSensor`, `ScanSensor`), and three types of observations(vision, scan, low-dimensional). Below, we describe each of the types of observations:
 
-### Vision Sensor
+### Vision
+
+Vision observations are captured by the [`VisionSensor`](../reference/sensors/vision_sensor.html) class, which encapsulates a virtual pinhole camera sensor equipped with various modalities, including RGB, depth, normals, three types of segmentation, optical flow, 2D and 3D bounding boxes, shown below:
 
 <table markdown="span">
     <tr>
@@ -165,7 +168,7 @@ info:
     <tr>
         <td valign="top" width="60%">
             <strong>2D Bounding Box Tight</strong><br><br>  
-            2D bounding boxes wrapping individual objects, excluding any parts that are occluded.<br><br>
+            2D bounding boxes wrapping individual objects, excluding occluded parts.<br><br>
             Size: a list of <br>
             semanticID, numpy.uint32;<br> 
             x_min, numpy.int32;<br> 
@@ -215,7 +218,8 @@ info:
     </tr>
 </table>
 
-### Range Sensor
+### Range
+Range observations are captured by the [`ScanSensor`](../reference/sensors/scan_sensor.html) class, which encapsulates a virtual 2D LiDAR range sensor with the following observations:
 
 <table markdown="span">
     <tr>
@@ -240,7 +244,12 @@ info:
     </tr>
 </table>
 
-### Proprioception
+### Low-Dimensional
+Low-dimensional observations are not captured by any specific sensor, but are simply an aggregation of the underlying simulator state. There are two main types of low-dimensional observations: proprioception and task-relevant:
+
+
+#### Proprioception
+The following proprioceptive observations are supported off-the-shelf in **`OmniGibson`** (though additional ones may arbitrarily be added):
 
 <table markdown="span">
     <tr>
@@ -315,7 +324,8 @@ info:
     </tr>
 </table>
 
-### Task Observation
+#### Task-Relevant
+Each task implements its own set of relevant observations:
 
 <table markdown="span" style="width: 100%;">
     <tr>
