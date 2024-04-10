@@ -15,6 +15,14 @@ class Husky(LocomotionRobot):
         raise ValueError("Husky does not support discrete actions!")
 
     @property
+    def wheel_radius(self):
+        return 0.165
+
+    @property
+    def wheel_axle_length(self):
+        return 0.670
+
+    @property
     def base_control_idx(self):
         return np.array([0, 1, 2, 3])
 
