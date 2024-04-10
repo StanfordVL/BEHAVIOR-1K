@@ -93,7 +93,7 @@ jobs:
         with:
           name: Test Results
           working-directory: omnigibson-src
-          path: test_*.xml
+          path: ${{ github.run_id }}-tests-*
           reporter: java-junit
           fail-on-error: 'true'
           fail-on-empty: 'true'
