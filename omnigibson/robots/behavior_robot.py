@@ -9,6 +9,7 @@ from typing import List, Tuple, Iterable
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
@@ -139,12 +140,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def model_name(self):
         return "BehaviorRobot"
 
-    @property
-    def n_arms(self):
+    @classproperty
+    def n_arms(cls):
         return 2
 
-    @property
-    def arm_names(self):
+    @classproperty
+    def arm_names(cls):
         return ["left", "right"]
 
     @property
