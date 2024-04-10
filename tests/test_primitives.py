@@ -10,6 +10,10 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
 
+# Make sure that Omniverse is launched before setting up the tests.
+og.launch()
+
+
 def setup_environment(load_object_categories):
     cfg = {
         "scene": {
