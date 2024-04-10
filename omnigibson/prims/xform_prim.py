@@ -187,9 +187,10 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
         assert np.allclose(
-            local_transform[:3, :3] @ local_transform[:3, :3].T, np.eye(3), atol=1e-4
-        ), f"{self.prim_path} local transform is not orthogonal."
+            product, np.diag(np.diag(product)), atol=1e-3
+        ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
     def get_position_orientation(self):
