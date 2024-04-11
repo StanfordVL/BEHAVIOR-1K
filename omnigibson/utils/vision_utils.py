@@ -2,6 +2,7 @@ import colorsys
 
 import numpy as np
 from PIL import Image, ImageDraw
+
 import omnigibson as og
 from omnigibson.utils.constants import semantic_class_name_to_id
 

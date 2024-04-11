@@ -1,11 +1,12 @@
-import numpy as np
 import asyncio
 import os
 
+import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
+from omnigibson.utils.physx_utils import bind_material
 
 
 class MaterialPrim(BasePrim):

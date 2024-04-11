@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
+
 import omnigibson as og
-from omnigibson.macros import gm
+import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
-import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
-
 
 # Make sure that Omniverse is launched before setting up the tests.
 og.launch()

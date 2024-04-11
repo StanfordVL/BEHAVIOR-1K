@@ -1,14 +1,15 @@
 import os
+
 import pytest
 import yaml
 
-from omnigibson.macros import gm
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
-    SymbolicSemanticActionPrimitiveSet,
     SymbolicSemanticActionPrimitives,
+    SymbolicSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
 from omnigibson.systems import get_system
 
 

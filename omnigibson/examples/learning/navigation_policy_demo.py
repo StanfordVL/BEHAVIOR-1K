@@ -5,7 +5,10 @@ This only serves as a starting point that users can further build upon.
 """
 
 import argparse
-import os, time, cv2
+import os
+import time
+
+import cv2
 import yaml
 
 import omnigibson as og
@@ -15,15 +18,15 @@ from omnigibson.utils.python_utils import meets_minimum_version
 
 try:
     import gym
+    import tensorboard
     import torch as th
     import torch.nn as nn
-    import tensorboard
     from stable_baselines3 import PPO
+    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
     from stable_baselines3.common.preprocessing import maybe_transpose
     from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
     from stable_baselines3.common.utils import set_random_seed
-    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
     og.log.error(

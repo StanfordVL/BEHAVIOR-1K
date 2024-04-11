@@ -1,5 +1,5 @@
-from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 import omnigibson.utils.transform_utils as T
+from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
 class ReachingGoalReward(BaseRewardFunction):

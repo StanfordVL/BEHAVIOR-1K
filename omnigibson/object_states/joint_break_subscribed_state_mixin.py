@@ -1,5 +1,6 @@
-from omnigibson.object_states.object_state_base import BaseObjectState
 from abc import abstractmethod
+
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.python_utils import classproperty
 
 

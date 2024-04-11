@@ -1,7 +1,7 @@
 import numpy as np
 
-from omnigibson.tasks.task_base import BaseTask
 from omnigibson.scenes.scene_base import Scene
+from omnigibson.tasks.task_base import BaseTask
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object
 

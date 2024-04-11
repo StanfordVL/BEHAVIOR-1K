@@ -1,14 +1,14 @@
 import numpy as np
-from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.utils.python_utils import assert_valid_key
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
-from omnigibson.utils.usd_utils import create_primitive_mesh
-from omnigibson.utils.render_utils import create_pbr_material
+from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import create_primitive_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

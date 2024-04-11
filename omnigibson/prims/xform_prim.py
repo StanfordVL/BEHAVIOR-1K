@@ -1,16 +1,17 @@
 from collections.abc import Iterable
+
 import numpy as np
+import trimesh.transformations
+from scipy.spatial.transform import Rotation as R
+
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
-from omnigibson.prims.prim_base import BasePrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
-import omnigibson.utils.transform_utils as T
-from scipy.spatial.transform import Rotation as R
-from omnigibson.macros import gm
-import trimesh.transformations
 
 
 class XFormPrim(BasePrim):
@@ -187,6 +188,10 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        assert np.allclose(
+            product, np.diag(np.diag(product)), atol=1e-3
+        ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
     def get_position_orientation(self):
@@ -359,6 +364,7 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
+        assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:

@@ -1,19 +1,17 @@
 import math
-from collections.abc import Iterable
 import os
-
-import omnigibson.lazy as lazy
+from collections.abc import Iterable
 
 import numpy as np
 import trimesh
 
 import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
-
-import omnigibson.utils.transform_utils as T
 
 
 def array_to_vtarray(arr, element_type):

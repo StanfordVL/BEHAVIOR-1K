@@ -1,3 +1,5 @@
+import numpy as np
+
 import omnigibson as og
 from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
@@ -7,10 +9,8 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.constants import PrimType
-import numpy as np
-
+from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

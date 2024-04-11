@@ -1,19 +1,17 @@
 import cv2
 import numpy as np
-
 from IPython import embed
-from scipy.spatial.transform import Rotation as R
 from scipy.spatial import ConvexHull, distance_matrix
+from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, Dict, macros
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint
-import omnigibson.utils.transform_utils as T
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

@@ -1,36 +1,34 @@
 import json
-import bddl
 import os
 import random
-import numpy as np
-import networkx as nx
 from collections import defaultdict
-from bddl.activity import (
-    get_goal_conditions,
-    get_ground_goal_state_options,
-    get_initial_conditions,
-)
+
+import bddl
+import networkx as nx
+import numpy as np
+from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation
-from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormula
+from bddl.logic_base import AtomicFormula, BinaryAtomicFormula, UnaryAtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
+
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.asset_utils import (
-    get_attachment_metalinks,
-    get_all_object_categories,
-    get_all_object_category_models_with_abilities,
-)
-from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.python_utils import Wrapper
+from omnigibson import object_states
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots import BaseRobot
-from omnigibson import object_states
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
-from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
-from omnigibson.systems.system_base import is_system_active, get_system
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.systems.system_base import get_system, is_system_active
+from omnigibson.utils.asset_utils import (
+    get_all_object_categories,
+    get_all_object_category_models_with_abilities,
+    get_attachment_metalinks,
+)
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import Wrapper
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

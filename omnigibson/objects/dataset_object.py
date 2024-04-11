@@ -1,20 +1,15 @@
 import math
 import os
+
 import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.constants import (
-    DEFAULT_JOINT_FRICTION,
-    SPECIAL_JOINT_FRICTIONS,
-    JointType,
-)
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
-from omnigibson.utils.constants import PrimType
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

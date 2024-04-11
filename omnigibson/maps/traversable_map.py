@@ -8,8 +8,8 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 
 from omnigibson.maps.map_base import BaseMap
-from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.motion_planning_utils import astar
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

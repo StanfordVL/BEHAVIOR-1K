@@ -1,11 +1,10 @@
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm
-
 import omnigibson.lazy as lazy
+from omnigibson.macros import gm
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.transform_utils import pose2mat, mat2pose, relative_pose_transform
+from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
 
