@@ -91,6 +91,8 @@ def start_env():
         ],
     }
 
+    gm.USE_GPU_DYNAMICS = True
+
     env = og.Environment(configs=config)
 
     return env
