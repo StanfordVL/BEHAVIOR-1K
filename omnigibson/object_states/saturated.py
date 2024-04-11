@@ -1,9 +1,9 @@
 import numpy as np
-from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
-from omnigibson.systems.system_base import UUID_TO_SYSTEMS, REGISTERED_SYSTEMS
-from omnigibson.utils.python_utils import get_uuid
 
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS, UUID_TO_SYSTEMS
+from omnigibson.utils.python_utils import get_uuid
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

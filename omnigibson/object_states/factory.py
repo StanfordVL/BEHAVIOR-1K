@@ -1,8 +1,9 @@
-import networkx as nx
 from collections import namedtuple
 
-from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+import networkx as nx
+
 from omnigibson.object_states import *
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 
 # states: list of ObjectBaseState
 # requirements: list of ObjectBaseRequirement

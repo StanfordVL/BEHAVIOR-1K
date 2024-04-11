@@ -1,8 +1,8 @@
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 
 # Make sure object states, GPU dynamics, and transition rules are enabled
 gm.ENABLE_OBJECT_STATES = True

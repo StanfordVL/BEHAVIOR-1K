@@ -13,7 +13,6 @@ from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.utils.asset_utils import get_og_assets_version
 
-
 # Params to be set as needed.
 MAX_NUM_OBJS = 400  # Maximum no. of objects to add.
 NUM_OBJS_PER_ITER = 20  # No. of objects to add per iteration.

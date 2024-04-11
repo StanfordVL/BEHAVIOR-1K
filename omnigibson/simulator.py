@@ -1,50 +1,48 @@
-from collections import defaultdict
-import itertools
+import atexit
 import contextlib
+import itertools
+import json
 import logging
 import os
 import shutil
-import socket
-from pathlib import Path
-import atexit
 import signal
+import socket
+from collections import defaultdict
 from contextlib import nullcontext
+from pathlib import Path
 
 import numpy as np
-import json
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.utils.constants import LightingMode
-from omnigibson.utils.config_utils import NumpyEncoder
-from omnigibson.utils.python_utils import (
-    clear as clear_pu,
-    create_object_from_init_info,
-    Serializable,
-    meets_minimum_version,
-)
-from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
-from omnigibson.utils.ui_utils import (
-    CameraMover,
-    disclaimer,
-    create_module_logger,
-    suppress_omni_log,
-    print_icon,
-    print_logo,
-    logo_small,
-)
-from omnigibson.scenes import Scene
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
+from omnigibson.object_states.factory import get_states_by_dependency_order
+from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
+from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
-from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.factory import get_states_by_dependency_order
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.utils.constants import LightingMode
+from omnigibson.utils.python_utils import Serializable
+from omnigibson.utils.python_utils import clear as clear_pu
+from omnigibson.utils.python_utils import create_object_from_init_info, meets_minimum_version
+from omnigibson.utils.ui_utils import (
+    CameraMover,
+    create_module_logger,
+    disclaimer,
+    logo_small,
+    print_icon,
+    print_logo,
+    suppress_omni_log,
+)
+from omnigibson.utils.usd_utils import FlatcacheAPI, PoseAPI, RigidContactAPI
+from omnigibson.utils.usd_utils import clear as clear_uu
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -77,8 +75,9 @@ def _launch_app():
     # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
     if not gm.DEBUG:
         import sys
-        from numba.core.errors import NumbaPerformanceWarning
         import warnings
+
+        from numba.core.errors import NumbaPerformanceWarning
 
         # TODO: Find a more elegant way to prune omni logging
         # sys.argv.append("--/log/level=warning")

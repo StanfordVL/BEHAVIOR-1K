@@ -10,8 +10,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
-
+from omnigibson.utils.ui_utils import KeyboardRobotController, choose_from_options
 
 CONTROL_MODES = dict(
     random="Use autonomous random actions (default)",

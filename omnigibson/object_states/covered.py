@@ -1,10 +1,9 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.object_states.contact_particles import ContactParticles
-from omnigibson.systems.system_base import VisualParticleSystem, is_visual_particle_system, is_physical_particle_system
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.systems.system_base import VisualParticleSystem, is_physical_particle_system, is_visual_particle_system
 from omnigibson.utils.constants import PrimType
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

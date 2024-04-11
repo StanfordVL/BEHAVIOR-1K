@@ -1,24 +1,25 @@
 from abc import abstractmethod
 from copy import deepcopy
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 from omnigibson.macros import create_module_macros
-from omnigibson.sensors import (
-    create_sensor,
-    SENSOR_PRIMS_TO_SENSOR_CLS,
-    ALL_SENSOR_MODALITIES,
-    VisionSensor,
-    ScanSensor,
-)
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.controllable_object import ControllableObject
-from omnigibson.utils.gym_utils import GymObservable
-from omnigibson.utils.usd_utils import add_asset_to_stage
-from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
-from omnigibson.utils.vision_utils import segmentation_to_rgb
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
+from omnigibson.sensors import (
+    ALL_SENSOR_MODALITIES,
+    SENSOR_PRIMS_TO_SENSOR_CLS,
+    ScanSensor,
+    VisionSensor,
+    create_sensor,
+)
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
+from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.vision_utils import segmentation_to_rgb
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()

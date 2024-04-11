@@ -1,13 +1,14 @@
-import numpy as np
-from scipy.spatial.transform import Rotation as R, Slerp
 from math import ceil
-from omnigibson.macros import create_module_macros
 
-import omnigibson.utils.transform_utils as T
-from omnigibson.object_states.open_state import _get_relevant_joints
-from omnigibson.utils.constants import JointType, JointAxis
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Slerp
+
 import omnigibson.lazy as lazy
-
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.open_state import _get_relevant_joints
+from omnigibson.utils.constants import JointAxis, JointType
 
 m = create_module_macros(module_path=__file__)
 

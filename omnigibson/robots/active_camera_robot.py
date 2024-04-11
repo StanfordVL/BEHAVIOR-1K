@@ -1,4 +1,5 @@
 from abc import abstractmethod
+
 import numpy as np
 
 from omnigibson.robots.robot_base import BaseRobot

@@ -3,23 +3,24 @@ Helper classes and functions for streamlining user interactions
 """
 
 import contextlib
-
-import logging
-import numpy as np
-import sys
 import datetime
+import logging
+import sys
 from pathlib import Path
-from PIL import Image
-from termcolor import colored
-import omnigibson as og
-from omnigibson.macros import gm
-import omnigibson.utils.transform_utils as T
-import omnigibson.lazy as lazy
-from scipy.spatial.transform import Rotation as R
-from scipy.interpolate import CubicSpline
-from scipy.integrate import quad
+
 import imageio
+import numpy as np
 from IPython import embed
+from PIL import Image
+from scipy.integrate import quad
+from scipy.interpolate import CubicSpline
+from scipy.spatial.transform import Rotation as R
+from termcolor import colored
+
+import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 
 
 def print_icon():

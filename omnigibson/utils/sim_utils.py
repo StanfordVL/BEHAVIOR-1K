@@ -1,12 +1,13 @@
-import numpy as np
 from collections import namedtuple
 from collections.abc import Iterable
 
+import numpy as np
+
 import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils import python_utils
-import omnigibson.utils.transform_utils as T
-import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

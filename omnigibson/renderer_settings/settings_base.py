@@ -1,6 +1,7 @@
 from abc import ABCMeta
 
 import numpy as np
+
 import omnigibson.lazy as lazy
 
 

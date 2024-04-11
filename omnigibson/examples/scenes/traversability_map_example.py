@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 import omnigibson as og
-from omnigibson.utils.asset_utils import get_og_scene_path, get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_og_scenes, get_og_scene_path
 from omnigibson.utils.ui_utils import choose_from_options
 
 

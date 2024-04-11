@@ -1,21 +1,19 @@
-import numpy as np
-import networkx as nx
 from functools import cached_property
+
+import networkx as nx
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, JointType, JointAxis
+from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI
-
-from omnigibson.macros import gm, create_module_macros
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

@@ -1,10 +1,9 @@
-from omnigibson.objects import DatasetObject
-import omnigibson as og
-from omnigibson.utils.python_utils import NAMES
-
+import pytest
 from utils import og_test
 
-import pytest
+import omnigibson as og
+from omnigibson.objects import DatasetObject
+from omnigibson.utils.python_utils import NAMES
 
 
 @og_test

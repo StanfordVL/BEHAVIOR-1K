@@ -1,13 +1,15 @@
 from abc import abstractmethod
 from copy import deepcopy
-import numpy as np
+
 import gym
+import numpy as np
+
 import omnigibson as og
-from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, CachedFunctions
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

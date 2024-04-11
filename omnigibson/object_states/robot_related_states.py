@@ -1,8 +1,8 @@
 import numpy as np
+
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.sensors import VisionSensor
-
 
 _IN_REACH_DISTANCE_THRESHOLD = 2.0
 
