@@ -20,6 +20,10 @@ from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
 import imageio
 from IPython import embed
+import matplotlib.pyplot as plt
+from matplotlib.text import TextPath
+from matplotlib.font_manager import FontProperties
+import matplotlib.path as mpath
 
 
 def print_icon():
@@ -1001,6 +1005,65 @@ def generate_box_edges(center, extents):
     ]
 
     return edges
+
+
+def draw_text(text, position, rotation, color=(1.0, 0.0, 0.0, 1.0), font_size=5, line_size=1.0):
+    """
+    Draws text at a given position.
+    """
+
+    # First, get the line segments corresponding to the text
+    # font_family = "Ariel"
+    # fp = FontProperties(family=font_family)
+    path = TextPath((0, 0), text, size=font_size)
+
+    def _path_to_line_segments(path):
+        line_segments = []
+        subpath_start = None  # Store the start point of the current subpath
+
+        for points, code in zip(path.vertices, path.codes):
+            if code == mpath.Path.MOVETO:
+                # This is the starting point for drawing
+                current_point = points
+                subpath_start = points  # Remember the start of the subpath
+            elif code == mpath.Path.LINETO:
+                # This is a line to the next point
+                start_point = current_point
+                end_point = points
+                line_segments.append((start_point, end_point))
+                current_point = points
+            elif code == mpath.Path.CURVE3 or code == mpath.Path.CURVE4:
+                start_point = current_point
+                end_point = points[:2]
+                line_segments.append((start_point, end_point))
+                current_point = end_point
+            elif code == mpath.Path.CLOSEPOLY:
+                # This closes the path back to the starting point of the subpath
+                if np.allclose(current_point, subpath_start):
+                    # Only add a closing line if we're not already at the start point
+                    line_segments.append((current_point, subpath_start))
+                current_point = subpath_start  # Move back to start (though typically not needed)
+            else:
+                raise ValueError(f"What is {code}?")
+
+        return line_segments
+
+    # Convert the Path to line segments
+    line_segments = _path_to_line_segments(path)
+
+    # Transform the line segments to the desired position
+    all_verts = np.array([pt for segment in line_segments for pt in segment])
+    min_pt = np.min(all_verts, axis=0)
+    max_pt = np.max(all_verts, axis=0)
+    center = (min_pt + max_pt) / 2
+
+    def _transform_point(pt):
+        centered_pt = pt - center
+        return rotation.apply(np.array([centered_pt[0], centered_pt[1], 0])) + position
+
+    # Then, draw the line segments
+    for f, t in line_segments:
+        draw_line(_transform_point(f), _transform_point(t), color=color, size=line_size)
 
 
 def draw_line(start, end, color=(1.0, 0.0, 0.0, 1.0), size=1.0):
