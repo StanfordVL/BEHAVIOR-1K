@@ -1,10 +1,10 @@
 import numpy as np
+from test_robot_states_flatcache import camera_pose_test, setup_environment
 
 import omnigibson as og
-from omnigibson.sensors import VisionSensor
 from omnigibson.object_states import ObjectsInFOVOfRobot
+from omnigibson.sensors import VisionSensor
 from omnigibson.utils.constants import semantic_class_name_to_id
-from test_robot_states_flatcache import setup_environment, camera_pose_test
 
 
 def test_camera_pose_flatcache_off():
