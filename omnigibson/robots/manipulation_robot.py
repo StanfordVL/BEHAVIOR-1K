@@ -34,7 +34,7 @@ m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
 m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
-m.ASSIST_FORCE = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
+m.ASSIST_FORCE = None
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
@@ -1231,6 +1231,8 @@ class ManipulationRobot(BaseRobot):
 
         # Modify max force based on user-determined assist parameters
         # TODO
+        if m.ASSIST_FORCE is None:
+            m.ASSIST_FORCE = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
         max_force = m.ASSIST_FORCE if joint_type == "FixedJoint" else m.ASSIST_FORCE * m.ARTICULATED_ASSIST_FRACTION
         # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
 
@@ -1406,6 +1408,8 @@ class ManipulationRobot(BaseRobot):
 
         # Modify max force based on user-determined assist parameters
         # TODO
+        if m.ASSIST_FORCE is None:
+            m.ASSIST_FORCE = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
         max_force = m.ASSIST_FORCE
         # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
 

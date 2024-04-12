@@ -100,12 +100,12 @@ class ModifiedParticles(RelativeObjectState):
 
 
 class Saturated(RelativeObjectState, BooleanStateMixin):
-    def __init__(self, obj, default_limit=m.DEFAULT_SATURATION_LIMIT):
+    def __init__(self, obj, default_limit=None):
         # Run super first
         super().__init__(obj=obj)
 
         # Limits
-        self._default_limit = default_limit
+        self._default_limit = default_limit if default_limit is not None else m.DEFAULT_SATURATION_LIMIT
         self._limits = None
 
     def _initialize(self):
