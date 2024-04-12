@@ -191,10 +191,13 @@ def _launch_app():
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
 
+    # Let the hotkeys propagate.
+    app.update()
+
     # Disable all hotkeys for now. These are not exactly helpful and they cause collisions with
     # the OmniGibson-provided hotkeys.
     hotkey_registry = lazy.omni.kit.hotkeys.core.get_hotkey_registry()
-    for hotkey in hotkey_registry.get_all_hotkeys():
+    for hotkey in list(hotkey_registry.get_all_hotkeys()):
         hotkey_registry.deregister_hotkey(hotkey)
 
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.

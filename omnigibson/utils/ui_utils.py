@@ -1007,7 +1007,17 @@ def generate_box_edges(center, extents):
     return edges
 
 
-def draw_text(text, position, rotation, color=(1.0, 0.0, 0.0, 1.0), font_size=5, line_size=1.0):
+def draw_text(
+    text,
+    position,
+    orientation=None,
+    color=(1.0, 0.0, 0.0, 1.0),
+    font_size=12,
+    line_size=1.0,
+    anchor="center",
+    max_height=np.inf,
+    max_width=np.inf,
+):
     """
     Draws text at a given position.
     """
@@ -1046,23 +1056,57 @@ def draw_text(text, position, rotation, color=(1.0, 0.0, 0.0, 1.0), font_size=5,
             else:
                 raise ValueError(f"What is {code}?")
 
-        return line_segments
+        return np.array(line_segments)
 
     # Convert the Path to line segments
     line_segments = _path_to_line_segments(path)
 
     # Transform the line segments to the desired position
-    all_verts = np.array([pt for segment in line_segments for pt in segment])
-    min_pt = np.min(all_verts, axis=0)
-    max_pt = np.max(all_verts, axis=0)
+    all_verts = line_segments.reshape(-1, 2)
+    orig_min = np.min(all_verts, axis=0)
+    orig_max = np.max(all_verts, axis=0)
+    orig_ext = orig_max - orig_min
+
+    # Figure out the necessary scaling
+    scale = 1.0
+    max_dims = np.array([max_width, max_height])
+    if np.any(np.isfinite(max_dims)):
+        scale = np.min(max_dims / orig_ext)
+    transformed_line_segments = line_segments * scale
+
+    # Recompute the extents
+    transformed_verts = transformed_line_segments.reshape(-1, 2)
+    min_pt = np.min(transformed_verts, axis=0)
+    max_pt = np.max(transformed_verts, axis=0)
     center = (min_pt + max_pt) / 2
 
+    if anchor == "center":
+        anchor_pt = center
+    elif anchor == "bottomleft":
+        anchor_pt = min_pt
+    elif anchor == "topright":
+        anchor_pt = max_pt
+    elif anchor == "topleft":
+        anchor_pt = np.array([min_pt[0], max_pt[1]])
+    elif anchor == "bottomright":
+        anchor_pt = np.array([max_pt[0], min_pt[1]])
+    elif anchor == "bottomcenter":
+        anchor_pt = np.array([center[0], min_pt[1]])
+    elif anchor == "topcenter":
+        anchor_pt = np.array([center[0], max_pt[1]])
+    else:
+        raise ValueError(f"Unknown anchor point {anchor}")
+
+    rotation = R.identity()
+    if orientation is not None:
+        rotation = R.from_quat(orientation)
+
     def _transform_point(pt):
-        centered_pt = pt - center
+        centered_pt = pt - anchor_pt
         return rotation.apply(np.array([centered_pt[0], centered_pt[1], 0])) + position
 
     # Then, draw the line segments
-    for f, t in line_segments:
+    for f, t in transformed_line_segments:
         draw_line(_transform_point(f), _transform_point(t), color=color, size=line_size)
 
 
