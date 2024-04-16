@@ -68,7 +68,7 @@ class StatefulObject(BaseObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -86,7 +86,7 @@ class StatefulObject(BaseObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -129,7 +129,7 @@ class StatefulObject(BaseObject):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,

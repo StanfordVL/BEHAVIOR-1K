@@ -18,7 +18,7 @@ class GeomPrim(XFormPrim):
     created from scratch.at
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this mesh prim, the below values can be specified:
@@ -26,14 +26,14 @@ class GeomPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -49,7 +49,7 @@ class GeomPrim(XFormPrim):
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
 
-    def duplicate(self, prim_path):
+    def duplicate(self, relative_prim_path):
         # Cannot directly duplicate a mesh prim
         raise NotImplementedError("Cannot directly duplicate a geom prim!")
 
@@ -198,7 +198,7 @@ class CollisionGeomPrim(GeomPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -210,7 +210,7 @@ class CollisionGeomPrim(GeomPrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )

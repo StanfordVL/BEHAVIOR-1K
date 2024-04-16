@@ -39,7 +39,7 @@ class DatasetObject(USDObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         model=None,
         uuid=None,
@@ -60,7 +60,7 @@ class DatasetObject(USDObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             model (None or str): If specified, this is used in conjunction with
@@ -130,7 +130,7 @@ class DatasetObject(USDObject):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=usd_path,
             encrypted=True,
             name=name,
@@ -469,10 +469,10 @@ class DatasetObject(USDObject):
         """
         return AVERAGE_CATEGORY_SPECS.get(self.category, None)
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=self.category,
             scale=self.scale,

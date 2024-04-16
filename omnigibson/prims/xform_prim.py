@@ -23,7 +23,7 @@ class XFormPrim(BasePrim):
         unless it is a non-root articulation link.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified:
@@ -34,7 +34,7 @@ class XFormPrim(BasePrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -46,13 +46,13 @@ class XFormPrim(BasePrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
 
     def _load(self):
-        return og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        return og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
     def _post_load(self):
         # run super first
@@ -198,7 +198,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        return PoseAPI.get_world_pose(self._prim_path)
+        return PoseAPI.get_world_pose(self.prim_path)
 
     def set_position(self, position):
         """
@@ -334,7 +334,7 @@ class XFormPrim(BasePrim):
         """
         Returns the scaled transform of this prim.
         """
-        return PoseAPI.get_world_pose_with_scale(self._prim_path)
+        return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
         return trimesh.transformations.transform_points(points, self.scaled_transform)
@@ -395,7 +395,7 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self.prim_path)
 
     def remove_filtered_collision_pair(self, prim):
         """
@@ -406,7 +406,7 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
         pos, ori = self.get_local_pose()

@@ -16,11 +16,11 @@ class MaterialPrim(BasePrim):
     the specified prim path will be created.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
+            @relative_prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
             for their class. For this material prim, the below values can be specified:
 
             mdl_name (None or str): If specified, should be the name of the mdl preset to load (including .mdl).
@@ -32,6 +32,8 @@ class MaterialPrim(BasePrim):
     # Persistent dictionary of materials, mapped from prim_path to MaterialPrim
     MATERIALS = dict()
 
+    # TODO(rl): Figure out if the caller knows the material here.
+    # TODO(rl): Figure out if this material is safe to share across scene instances.
     @classmethod
     def get_material(cls, name, prim_path, load_config=None):
         """
@@ -57,7 +59,7 @@ class MaterialPrim(BasePrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -69,7 +71,7 @@ class MaterialPrim(BasePrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -88,10 +90,10 @@ class MaterialPrim(BasePrim):
         material_path = mtl_created[0]
 
         # Move prim to desired location
-        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self._prim_path)
+        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
 
         # Return generated material
-        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._prim_path)
+        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path)
 
     @classmethod
     def clear(cls):
@@ -127,7 +129,7 @@ class MaterialPrim(BasePrim):
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.MATERIALS.pop(self._prim_path)
+        self.MATERIALS.pop(self.prim_path)
 
         # Run super
         super().remove()
@@ -137,7 +139,7 @@ class MaterialPrim(BasePrim):
         super()._post_load()
 
         # Add this material to the list of global materials
-        self.MATERIALS[self._prim_path] = self
+        self.MATERIALS[self.prim_path] = self
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)

@@ -26,7 +26,7 @@ class ControllableObject(BaseObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -46,7 +46,7 @@ class ControllableObject(BaseObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -92,19 +92,19 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
-        if prim_path:
+        if relative_prim_path:
             # If prim path is specified, assert that the last element starts with controllable_ to ensure that
             # the object will be included in the ControllableObjectViewAPI.
-            assert prim_path.split("/")[-1].startswith(
+            assert relative_prim_path.split("/")[-1].startswith(
                 "controllable_"
-            ), "If prim_path is specified, the last element of the path must start with 'controllable_'."
+            ), "If relative_prim_path is specified, the last element of the path must start with 'controllable_'."
         else:
             # If prim path is not specified, set it to the default path, but prepend controllable.
-            prim_path = f"/World/controllable_{name}"
+            relative_prim_path = f"/controllable_{name}"
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,

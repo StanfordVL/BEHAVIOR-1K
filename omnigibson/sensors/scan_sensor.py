@@ -112,7 +112,7 @@ class ScanSensor(BaseSensor):
 
     def _load(self):
         # Define a LIDAR prim at the current stage
-        result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self._prim_path)
+        result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self.prim_path)
 
         return lidar.GetPrim()
 
@@ -230,7 +230,7 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            raw_scan = self._rs.get_linear_depth_data(self._prim_path)
+            raw_scan = self._rs.get_linear_depth_data(self.prim_path)
             # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
             raw_scan = np.clip(raw_scan, self.min_range, self.max_range)
             obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)

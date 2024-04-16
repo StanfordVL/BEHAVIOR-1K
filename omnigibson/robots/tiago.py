@@ -278,7 +278,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visible = False
 
         self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
-            f"{self._prim_path}/rootJoint"
+            f"{self.prim_path}/rootJoint"
         )
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose

@@ -117,7 +117,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         # Create a visual marker to be moved by the user, representing desired end-effector position
         marker = PrimitiveObject(
-            prim_path=f"/World/marker",
+            relative_prim_path=f"/marker",
             name="marker",
             primitive_type="Sphere",
             radius=0.03,

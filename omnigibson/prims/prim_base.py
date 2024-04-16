@@ -20,21 +20,21 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         unless it is a non-root articulation link.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
+            @relative_prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
             for their class.
     """
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
-        self._prim_path = prim_path
+        self._relative_prim_path = relative_prim_path
         self._name = name
         self._load_config = dict() if load_config is None else load_config
 
@@ -50,9 +50,10 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         super().__init__()
 
         # Run some post-loading steps if this prim has already been loaded
-        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self._prim_path):
+        # TODO(rl): URGENT!!!! Move this code elsewhere. Prims should need to be loaded.
+        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
             log.debug(f"prim {name} already exists, skipping load")
-            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self._prim_path)
+            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
             self._loaded = True
             # Run post load.
             self._post_load()
@@ -71,7 +72,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         """
         assert (
             not self._initialized
-        ), f"Prim {self.name} at prim_path {self._prim_path} can only be initialized once! (It is already initialized)"
+        ), f"Prim {self.name} at prim_path {self.prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
         # Cache state size
@@ -143,7 +144,9 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         Returns:
             str: prim path in the stage.
         """
-        return self._prim_path
+        # TODO(rl): URGENT - make self._scene available
+        assert self._scene is not None, f"Scene is not set for prim with {self._relative_prim_path}"
+        return self._scene.prim_path + self._relative_prim_path
 
     @property
     def name(self):
@@ -202,18 +205,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         """
         return lazy.omni.isaac.core.utils.prims.is_prim_path_valid(self.prim_path)
 
-    def change_prim_path(self, new_prim_path):
-        """
-        Moves prim from the old path to a new one.
-
-        Args:
-            new_prim_path (str): new path of the prim to be moved to.
-        """
-        lazy.omni.isaac.core.utils.prims.move_prim(path_from=self.prim_path, path_to=new_prim_path)
-        self._prim_path = new_prim_path
-        self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._prim_path)
-        return
-
     def get_attribute(self, attr):
         """
         Get this prim's attribute. Should be a valid attribute under self._prim.GetAttributes()
@@ -264,13 +255,13 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         """
         return self._prim.GetCustomData()
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         """
-        Generates a new instance of this prim's class with specified @prim_path, @name, and @load_config, but otherwise
+        Generates a new instance of this prim's class with specified @relative_prim_path, @name, and @load_config, but otherwise
         all other kwargs should be identical to this instance's values.
 
         Args:
-            prim_path (str): Absolute path to the newly generated prim
+            relative_prim_path (str): Absolute path to the newly generated prim
             name (str): Name for the newly created prim
             load_config (dict): Keyword-mapped kwargs to use to set specific attributes for the created prim's instance
 
@@ -278,25 +269,25 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             BasePrim: Generated prim object (not loaded, and not initialized!)
         """
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
 
-    def duplicate(self, prim_path):
+    def duplicate(self, relative_prim_path):
         """
-        Duplicates this object, and generates a new instance at @prim_path.
+        Duplicates this object, and generates a new instance at @relative_prim_path.
         Note that the created object is automatically loaded into the simulator, but is NOT initialized
         until a sim step occurs!
 
         Args:
-            prim_path (str): Absolute path to the newly generated prim
+            relative_prim_path (str): Absolute path to the newly generated prim
 
         Returns:
             BasePrim: Generated prim object
         """
         new_prim = self._create_prim_with_same_kwargs(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=f"{self.name}_copy{self._n_duplicates}",
             load_config=self._load_config,
         )

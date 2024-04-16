@@ -180,7 +180,7 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
         return lazy.pxr.UsdGeom.Camera.Define(
-            lazy.omni.isaac.core.utils.stage.get_current_stage(), self._prim_path
+            lazy.omni.isaac.core.utils.stage.get_current_stage(), self.prim_path
         ).GetPrim()
 
     def _post_load(self):
@@ -188,10 +188,10 @@ class VisionSensor(BaseSensor):
         super()._post_load()
 
         # Add this sensor to the list of global sensors
-        self.SENSORS[self._prim_path] = self
+        self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
-        self._render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, resolution)
+        self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -231,7 +231,7 @@ class VisionSensor(BaseSensor):
         self._viewport = viewport
 
         # Link the camera and viewport together
-        self._viewport.viewport_api.set_active_camera(self._prim_path)
+        self._viewport.viewport_api.set_active_camera(self.prim_path)
 
         # Requires 3 render updates to propagate changes
         for i in range(3):
@@ -502,7 +502,7 @@ class VisionSensor(BaseSensor):
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.SENSORS.pop(self._prim_path)
+        self.SENSORS.pop(self.prim_path)
 
         # Remove viewport
         self._viewport.destroy()

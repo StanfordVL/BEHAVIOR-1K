@@ -184,11 +184,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             pass
 
         if needs_dummy:
-            dummy_path = f"{self._prim_path}_dummy"
+            dummy_path = f"{self.prim_path}_dummy"
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
+            # TODO(rl): URGENT - Relativize
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
-                prim_path=dummy_path,
+                relative_prim_path=dummy_path,
                 scale=self._load_config.get("scale", None),
                 visible=False,
                 fixed_base=True,

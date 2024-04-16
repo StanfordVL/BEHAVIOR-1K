@@ -40,7 +40,7 @@ class JointPrim(BasePrim):
             unless it is a non-root articulation link.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this joint prim, the below values can be specified:
@@ -63,7 +63,7 @@ class JointPrim(BasePrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
         articulation_view=None,
@@ -86,7 +86,7 @@ class JointPrim(BasePrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -100,7 +100,7 @@ class JointPrim(BasePrim):
 
         # Define a joint prim at the current stage
         prim = create_joint(
-            prim_path=self._prim_path,
+            prim_path=self.prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
         )
 
@@ -161,7 +161,7 @@ class JointPrim(BasePrim):
         """
         # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
         # first, then get the corresponding joint index from that dof offset.
-        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self._prim_path)
+        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self.prim_path)
         joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
         # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
         # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
@@ -887,6 +887,6 @@ class JointPrim(BasePrim):
             5 * self.n_dof,
         )
 
-    def duplicate(self, prim_path):
+    def duplicate(self, relative_prim_path):
         # Cannot directly duplicate a joint prim
         raise NotImplementedError("Cannot directly duplicate a joint prim!")

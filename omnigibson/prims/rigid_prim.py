@@ -33,11 +33,11 @@ class RigidPrim(XFormPrim):
         it will apply it.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
+            @relative_prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
             specified:
 
             scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
@@ -51,7 +51,7 @@ class RigidPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -71,7 +71,7 @@ class RigidPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -81,7 +81,7 @@ class RigidPrim(XFormPrim):
         # Import now to avoid too-eager load of Omni classes due to inheritance
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
-        self._rigid_prim_view_direct = RigidPrimView(self._prim_path)
+        self._rigid_prim_view_direct = RigidPrimView(self.prim_path)
 
         # Set it to be kinematic if necessary
         kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
@@ -145,7 +145,7 @@ class RigidPrim(XFormPrim):
 
         # Get contact info first
         if self.contact_reporting_enabled:
-            self._cs.get_rigid_body_raw_data(self._prim_path)
+            self._cs.get_rigid_body_raw_data(self.prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -194,7 +194,8 @@ class RigidPrim(XFormPrim):
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
-                    "prim_path": mesh_path,
+                    # TODO(rl): URGENT - relativize this path
+                    "relative_prim_path": mesh_path,
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                 }
                 if is_collision:
@@ -260,7 +261,7 @@ class RigidPrim(XFormPrim):
         # Make sure we have the ability to grab contacts for this object
         contacts = []
         if self.contact_reporting_enabled:
-            raw_data = self._cs.get_rigid_body_raw_data(self._prim_path)
+            raw_data = self._cs.get_rigid_body_raw_data(self.prim_path)
             for c in raw_data:
                 # convert handles to prim paths for comparison
                 c = [*c]  # CsRawData enforces body0 and body1 types to be ints, but we want strings

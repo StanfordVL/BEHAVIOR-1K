@@ -19,7 +19,7 @@ class USDObject(StatefulObject):
         name,
         usd_path,
         encrypted=False,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -39,7 +39,7 @@ class USDObject(StatefulObject):
             name (str): Name for the object. Names need to be unique per scene
             usd_path (str): global path to the USD file to load
             encrypted (bool): whether this file is encrypted (and should therefore be decrypted) or not
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -69,7 +69,7 @@ class USDObject(StatefulObject):
         self._usd_path = usd_path
         self._encrypted = encrypted
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,
@@ -97,7 +97,7 @@ class USDObject(StatefulObject):
             usd_path = self._usd_path.replace(".usd", f".{self.uuid}.usd")
             decrypt_file(encrypted_filename, usd_path)
 
-        prim = add_asset_to_stage(asset_path=usd_path, prim_path=self._prim_path)
+        prim = add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
 
         if self._encrypted:
             # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
@@ -106,10 +106,10 @@ class USDObject(StatefulObject):
 
         return prim
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=self._usd_path,
             name=name,
             category=self.category,

@@ -344,8 +344,9 @@ def launch_simulator(*args, **kwargs):
                 viewport_name (str): Name of the viewport this camera should attach to. Default is "Viewport", which is
                     the default viewport's name in Isaac Sim
             """
+            # TODO(rl): URGENT: Relativize
             self._viewer_camera = VisionSensor(
-                prim_path=prim_path,
+                relative_prim_path=prim_path,
                 name=prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
                 image_height=self.viewer_height,

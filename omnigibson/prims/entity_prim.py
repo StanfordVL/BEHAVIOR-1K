@@ -31,7 +31,7 @@ class EntityPrim(XFormPrim):
     be converted into an articulation!
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that by default, this assumes an articulation already exists (i.e.:
@@ -44,7 +44,7 @@ class EntityPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -67,7 +67,7 @@ class EntityPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -120,7 +120,7 @@ class EntityPrim(XFormPrim):
             # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
             # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
-            new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
+            new_path = f"{self.prim_path}/{old_link_prim.GetName()}_cloth"
             lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
             lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
@@ -137,7 +137,7 @@ class EntityPrim(XFormPrim):
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
 
-            self._articulation_view_direct = ArticulationView(f"{self._prim_path}/{self.root_link_name}")
+            self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -257,7 +257,8 @@ class EntityPrim(XFormPrim):
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
-                prim_path=prim.GetPrimPath().__str__(),
+                # TODO(rl): URGENT: relativize this. This is a bug.
+                relative_prim_path=prim.GetPrimPath().__str__(),
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
@@ -289,7 +290,8 @@ class EntityPrim(XFormPrim):
                         joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
                         joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
-                            prim_path=joint_path,
+                            # TODO(rl): URGENT: relativize this. This is a bug.
+                            relative_prim_path=joint_path,
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
@@ -404,7 +406,7 @@ class EntityPrim(XFormPrim):
             None or str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
                 this corresponds to self.prim_path
         """
-        return self._prim_path if self.n_joints > 0 else None
+        return self.prim_path if self.n_joints > 0 else None
 
     @property
     def root_link_name(self):
@@ -1487,9 +1489,9 @@ class EntityPrim(XFormPrim):
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
         stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
-        link_prim = stage.DefinePrim(f"{self._prim_path}/{link_name}", "Xform")
-        vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
-        col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
+        link_prim = stage.DefinePrim(f"{self.prim_path}/{link_name}", "Xform")
+        vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/visuals").GetPrim()
+        col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/collisions").GetPrim()
 
         # Set the radius to be 0.03m. In theory, we want this radius to be as small as possible. Otherwise, the cloth
         # dynamics will be unrealistic. However, in practice, if the radius is too small, the attachment becomes very
@@ -1578,7 +1580,7 @@ class EntityPrim(XFormPrim):
 
         return state_dict, idx
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Subclass must implement this method for duplication functionality
         raise NotImplementedError(
             "Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
