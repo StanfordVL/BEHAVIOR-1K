@@ -401,12 +401,6 @@ def launch_simulator(*args, **kwargs):
                 lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-<<<<<<< HEAD
-            lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
-            # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
-            # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
-=======
->>>>>>> og-develop
 
         @property
         def viewer_visibility(self):

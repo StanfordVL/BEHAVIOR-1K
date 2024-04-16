@@ -9,17 +9,12 @@ from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
-<<<<<<< HEAD
-from omnigibson.sensors import create_sensor, VisionSensor
-from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict, recursively_generate_compatible_dict
-=======
 from omnigibson.sensors import create_sensor
 from omnigibson.utils.gym_utils import (
     GymObservable,
     recursively_generate_flat_dict,
     recursively_generate_compatible_dict,
 )
->>>>>>> og-develop
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import (
@@ -469,12 +464,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab all observations from each robot
         for robot in self.robots:
-<<<<<<< HEAD
             if gym.spaces.utils.flatdim(robot.observation_space) > 0:
                 obs[robot.name] = robot.get_obs()
-=======
-            obs[robot.name], info[robot.name] = robot.get_obs()
->>>>>>> og-develop
 
         # Add task observations
         if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
@@ -485,14 +476,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             external_obs = dict()
             external_info = dict()
             for sensor_name, sensor in self._external_sensors.items():
-<<<<<<< HEAD
                 if not self._external_sensors_include_in_obs[sensor_name]:
                     continue
 
                 external_obs[sensor_name] = sensor.get_obs()
-=======
-                external_obs[sensor_name], external_info[sensor_name] = sensor.get_obs()
->>>>>>> og-develop
             obs["external"] = external_obs
             info["external"] = external_info
 
@@ -604,7 +591,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             self._current_step += 1
 
             # Hacky way of getting the success condition
-            info["is_success"] = info["reward"]["grasp"]["grasp_success"]
+            # info["is_success"] = info["reward"]["grasp"]["grasp_success"]
 
             return obs, reward, terminated, truncated, info
         except:

@@ -5,12 +5,8 @@ It currently only works with Fetch and Tiago with their JointControllers set to 
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
-<<<<<<< HEAD
-# from functools import cached_property
-=======
 
 from functools import cached_property
->>>>>>> og-develop
 import inspect
 import logging
 import random
@@ -895,22 +891,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return self.robot.arm_control_idx["left"]
             else:
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-<<<<<<< HEAD
-            
-        if isinstance(self.robot, Fetch):
-            return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-        
-        # Otherwise just return the default arm control idx
-        return self.robot.arm_control_idx[self.arm]
-    
-    @property
-=======
 
         # Otherwise just return the default arm control idx
         return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
     @cached_property
->>>>>>> og-develop
     def _manipulation_descriptor_path(self):
         """The appropriate manipulation descriptor for the current settings."""
         if isinstance(self.robot, Tiago) and m.TIAGO_TORSO_FIXED:
