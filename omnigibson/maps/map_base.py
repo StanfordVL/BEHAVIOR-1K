@@ -8,8 +8,8 @@ class BaseMap:
     """
 
     def __init__(
-            self,
-            map_resolution=0.1,
+        self,
+        map_resolution=0.1,
     ):
         """
         Args:

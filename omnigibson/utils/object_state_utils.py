@@ -20,26 +20,32 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 10
-m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
-    "bimodal_stdev_fraction": 1e-6,
-    "bimodal_mean_fraction": 1.0,
-    "aabb_offset_fraction": 0.02,
-    "max_sampling_attempts": 50,
-})
+m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict(
+    {
+        "bimodal_stdev_fraction": 1e-6,
+        "bimodal_mean_fraction": 1.0,
+        "aabb_offset_fraction": 0.02,
+        "max_sampling_attempts": 50,
+    }
+)
 
-m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
-    "bimodal_stdev_fraction": 0.4,
-    "bimodal_mean_fraction": 0.5,
-    "aabb_offset_fraction": -0.02,
-    "max_sampling_attempts": 100,
-})
+m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict(
+    {
+        "bimodal_stdev_fraction": 0.4,
+        "bimodal_mean_fraction": 0.5,
+        "aabb_offset_fraction": -0.02,
+        "max_sampling_attempts": 100,
+    }
+)
 
-m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict({
-    "bimodal_stdev_fraction": 1e-6,
-    "bimodal_mean_fraction": 0.5,
-    "aabb_offset_fraction": 0.02,
-    "max_sampling_attempts": 50,
-})
+m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict(
+    {
+        "bimodal_stdev_fraction": 1e-6,
+        "bimodal_mean_fraction": 0.5,
+        "aabb_offset_fraction": 0.02,
+        "max_sampling_attempts": 50,
+    }
+)
 
 
 def sample_cuboid_for_predicate(predicate, on_obj, bbox_extent):
@@ -50,8 +56,10 @@ def sample_cuboid_for_predicate(predicate, on_obj, bbox_extent):
     elif predicate == "under":
         params = m.UNDER_RAY_CASTING_SAMPLING_PARAMS
     else:
-        raise ValueError(f"predicate must be onTop, under or inside in order to use ray casting-based "
-                            f"kinematic sampling, but instead got: {predicate}")
+        raise ValueError(
+            f"predicate must be onTop, under or inside in order to use ray casting-based "
+            f"kinematic sampling, but instead got: {predicate}"
+        )
 
     if predicate == "under":
         start_points, end_points = sampling_utils.sample_raytest_start_end_symmetric_bimodal_distribution(
@@ -108,8 +116,9 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
-    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02,\
-        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    assert (
+        z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
+    ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
 
     # Wake objects accordingly and make sure both are kept still
     objA.wake()
@@ -143,6 +152,7 @@ def sample_kinematics(
 
         # Run import here to avoid circular imports
         from omnigibson.objects.dataset_object import DatasetObject
+
         if isinstance(objA, DatasetObject) and objA.prim_type == PrimType.RIGID:
             # Retrieve base CoM frame-aligned bounding box parallel to the XY plane
             parallel_bbox_center, parallel_bbox_orn, parallel_bbox_extents, _ = objA.get_base_aligned_bbox(
@@ -254,8 +264,9 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
     Returns:
         bool: True if successfully sampled, else False
     """
-    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02,\
-        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    assert (
+        z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
+    ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
 
     if not (obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
         raise ValueError("sample_cloth_on_rigid requires obj1 is cloth and obj2 is rigid.")
@@ -277,16 +288,16 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         high = np.array([other_aabb_high[0], other_aabb_high[1], z_value])
     else:
         # Always sample the center of the other object's AABB
-        low = np.array([(other_aabb_low[0] + other_aabb_high[0]) / 2.0,
-                        (other_aabb_low[1] + other_aabb_high[1]) / 2.0,
-                        z_value])
+        low = np.array(
+            [(other_aabb_low[0] + other_aabb_high[0]) / 2.0, (other_aabb_low[1] + other_aabb_high[1]) / 2.0, z_value]
+        )
         high = low
 
     for _ in range(max_trials):
         # Sample a random position
         pos = np.random.uniform(low, high)
         # Sample a random orientation in the z-axis
-        orn = T.euler2quat(np.array([0., 0., np.random.uniform(0, np.pi * 2)]))
+        orn = T.euler2quat(np.array([0.0, 0.0, np.random.uniform(0, np.pi * 2)]))
 
         obj.set_position_orientation(pos, orn)
         obj.root_link.reset()

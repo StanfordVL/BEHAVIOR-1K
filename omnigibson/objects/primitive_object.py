@@ -31,7 +31,6 @@ class PrimitiveObject(StatefulObject):
         primitive_type,
         prim_path=None,
         category="object",
-        class_id=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -57,8 +56,6 @@ class PrimitiveObject(StatefulObject):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
-                If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -98,7 +95,7 @@ class PrimitiveObject(StatefulObject):
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
-        self._extents = np.ones(3)            # (x,y,z extents)
+        self._extents = np.ones(3)  # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
@@ -108,7 +105,6 @@ class PrimitiveObject(StatefulObject):
             prim_path=prim_path,
             name=name,
             category=category,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -129,8 +125,12 @@ class PrimitiveObject(StatefulObject):
 
         # Define a nested mesh corresponding to the root link for this prim
         base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
-        self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
-        self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
+        self._vis_geom = create_primitive_mesh(
+            prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type
+        )
+        self._col_geom = create_primitive_mesh(
+            prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type
+        )
 
         # Add collision API to collision geom
         lazy.pxr.UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
@@ -146,18 +146,6 @@ class PrimitiveObject(StatefulObject):
         return prim
 
     def _post_load(self):
-        # Run super first
-        super()._post_load()
-
-        # Set the collision approximation appropriately
-        if self._primitive_type == "Sphere":
-            col_approximation = "boundingSphere"
-        elif self._primitive_type == "Cube":
-            col_approximation = "boundingCube"
-        else:
-            col_approximation = "convexHull"
-        self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
-
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
             log.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
@@ -168,6 +156,21 @@ class PrimitiveObject(StatefulObject):
                 self.height = self._load_config["height"]
             if self._load_config["size"] is not None:
                 self.size = self._load_config["size"]
+
+        # This step might will perform cloth remeshing if self._prim_type == PrimType.CLOTH.
+        # Therefore, we need to apply size, radius, and height before this to scale the points properly.
+        super()._post_load()
+
+        # Cloth primitive does not have collision meshes
+        if self._prim_type != PrimType.CLOTH:
+            # Set the collision approximation appropriately
+            if self._primitive_type == "Sphere":
+                col_approximation = "boundingSphere"
+            elif self._primitive_type == "Cube":
+                col_approximation = "boundingCube"
+            else:
+                col_approximation = "convexHull"
+            self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
 
     def _initialize(self):
         # Run super first
@@ -210,15 +213,22 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
         original_extent = np.array(self._extents)
-        self._extents = np.ones(3) * radius * 2.0 if self._primitive_type == "Sphere" else \
-            np.array([radius * 2.0, radius * 2.0, self._extents[2]])
+        self._extents = (
+            np.ones(3) * radius * 2.0
+            if self._primitive_type == "Sphere"
+            else np.array([radius * 2.0, radius * 2.0, self._extents[2]])
+        )
         attr_pairs = []
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     vals = np.array(attr.Get()).astype(np.float64)
                     attr_pairs.append([attr, vals])
-                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                geom.GetExtentAttr().Set(
+                    lazy.pxr.Vt.Vec3fArray(
+                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                    )
+                )
 
         # Calculate how much to scale extents by and then modify the points / normals accordingly
         scaling_factor = 2.0 * radius / original_extent[0]
@@ -269,7 +279,11 @@ class PrimitiveObject(StatefulObject):
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
-                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                geom.GetExtentAttr().Set(
+                    lazy.pxr.Vt.Vec3fArray(
+                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                    )
+                )
 
     @property
     def size(self):
@@ -308,7 +322,11 @@ class PrimitiveObject(StatefulObject):
                     # Scale all three axes by the scaling factor
                     vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
-                geom.GetExtentAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]))
+                geom.GetExtentAttr().Set(
+                    lazy.pxr.Vt.Vec3fArray(
+                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                    )
+                )
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
@@ -317,7 +335,6 @@ class PrimitiveObject(StatefulObject):
             primitive_type=self._primitive_type,
             name=name,
             category=self.category,
-            class_id=self.class_id,
             scale=self.scale,
             visible=self.visible,
             fixed_base=self.fixed_base,
@@ -357,7 +374,9 @@ class PrimitiveObject(StatefulObject):
         # Run super first
         state_flat = super()._serialize(state=state)
 
-        return np.concatenate([
-            state_flat,
-            np.array([state["radius"], state["height"], state["size"]]),
-        ]).astype(float)
+        return np.concatenate(
+            [
+                state_flat,
+                np.array([state["radius"], state["height"], state["size"]]),
+            ]
+        ).astype(float)

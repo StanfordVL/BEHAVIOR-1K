@@ -4,6 +4,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
+# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
+Image.MAX_IMAGE_PIXELS = None
+
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.motion_planning_utils import astar
@@ -84,9 +87,7 @@ class TraversableMap(BaseMap):
                 height, width = trav_map.shape
                 assert height == width, "trav map is not a square"
                 self.trav_map_original_size = height
-                map_size = int(
-                    self.trav_map_original_size * self.map_default_resolution / self.map_resolution
-                )
+                map_size = int(self.trav_map_original_size * self.map_default_resolution / self.map_resolution)
 
             # We resize the traversability map to the new size computed before
             trav_map = cv2.resize(trav_map, (map_size, map_size))
@@ -105,7 +106,7 @@ class TraversableMap(BaseMap):
             int: Number of floors belonging to this map's associated scene
         """
         return len(self.floor_heights)
-    
+
     def _erode_trav_map(self, trav_map, robot=None):
         # Erode the traversability map to account for the robot's size
         if robot:
@@ -124,7 +125,7 @@ class TraversableMap(BaseMap):
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
-                                 Warning: if @reference_point is given, @floor must be given; 
+                                 Warning: if @reference_point is given, @floor must be given;
                                           otherwise, this would lead to undefined behavior
             reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
@@ -139,11 +140,11 @@ class TraversableMap(BaseMap):
         # If nothing is given, sample a random floor and a random point on that floor
         if floor is None and reference_point is None:
             floor = np.random.randint(0, self.n_floors)
-        
+
         # create a deep copy so that we don't erode the original map
         trav_map = self.floor_map[floor].copy()
         trav_map = self._erode_trav_map(trav_map, robot=robot)
-        
+
         if reference_point is not None:
             # Find connected component
             _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)

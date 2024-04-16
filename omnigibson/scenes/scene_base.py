@@ -7,11 +7,20 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
-    create_object_from_init_info
+from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.python_utils import (
+    classproperty,
+    Serializable,
+    Registerable,
+    Recreatable,
+    create_object_from_init_info,
+)
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import CollisionAPI
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
@@ -34,13 +43,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     Base class for all Scene objects.
     Contains the base functionalities for an arbitrary scene with an arbitrary set of added objects
     """
+
     def __init__(
-            self,
-            scene_file=None,
-            use_floor_plane=True,
-            floor_plane_visible=True,
-            use_skybox=True,
-            floor_plane_color=(1.0, 1.0, 1.0),
+        self,
+        scene_file=None,
+        use_floor_plane=True,
+        floor_plane_visible=True,
+        use_skybox=True,
+        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -53,12 +63,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Store internal variables
         self.scene_file = scene_file
-        self._loaded = False                    # Whether this scene exists in the stage or not
-        self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
+        self._loaded = False  # Whether this scene exists in the stage or not
+        self._initialized = False  # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self._world_prim = None
         self._initial_state = None
-        self._objects_info = None                       # Information associated with this scene
+        self._objects_info = None  # Information associated with this scene
         self._use_floor_plane = use_floor_plane
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
@@ -170,6 +180,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
+        # Create collision group for fixed base objects' non root links, root links, and building structures
+        CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+        # Disable collision between root links of fixed base objects
+        CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+        # Disable collision between building structures
+        CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+
+        # Disable collision between building structures and 1. fixed base objects, 2. attached objects
+        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
+        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+
         # We just add a ground plane if requested
         if self._use_floor_plane:
             self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
@@ -179,6 +200,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self._skybox = LightObject(
                 prim_path="/World/skybox",
                 name="skybox",
+                category="background",
                 light_type="Dome",
                 intensity=1500,
                 fixed_base=True,
@@ -206,7 +228,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create desired systems
         for system_name in init_systems:
-            get_system(system_name)
+            if gm.USE_GPU_DYNAMICS:
+                get_system(system_name)
+            else:
+                log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly
@@ -339,13 +364,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         registry.add(obj=SYSTEM_REGISTRY)
 
         # Add registry for objects
-        registry.add(obj=SerializableRegistry(
-            name="object_registry",
-            class_types=BaseObject,
-            default_key="name",
-            unique_keys=self.object_registry_unique_keys,
-            group_keys=self.object_registry_group_keys,
-        ))
+        registry.add(
+            obj=SerializableRegistry(
+                name="object_registry",
+                class_types=BaseObject,
+                default_key="name",
+                unique_keys=self.object_registry_unique_keys,
+                group_keys=self.object_registry_group_keys,
+            )
+        )
 
         return registry
 
@@ -426,20 +453,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
         # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
-        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
-            # TODO: Remove building hotfix once asset collision meshes are fixed!!
-            building_categories = {"walls", "floors", "ceilings"}
-            for fixed_obj in self.fixed_objects.values():
-                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
-                if obj.category in building_categories:
-                    for link in fixed_obj.links.values():
-                        obj.root_link.add_filtered_collision_pair(link)
-                elif fixed_obj.category in building_categories:
-                    for link in obj.links.values():
-                        fixed_obj.root_link.add_filtered_collision_pair(link)
-                else:
-                    # Only filter out root links
-                    obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
+        # We do this by adding the object to our tracked collision groups
+        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+            # TODO: Remove structure hotfix once asset collision meshes are fixed!!
+            if obj.category in STRUCTURE_CATEGORIES:
+                CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
+            else:
+                for link in obj.links.values():
+                    CollisionAPI.add_to_collision_group(
+                        col_group="fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links",
+                        prim_path=link.prim_path,
+                    )
 
         # Add this object to our registry based on its type, if we want to register it
         if register:
@@ -457,8 +481,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Args:
             obj (BaseObject): Object to remove
         """
-        # Remove from the appropriate registry
-        self.object_registry.remove(obj)
+        # Remove from the appropriate registry if registered.
+        # Sometimes we don't register objects to the object registry during import_object (e.g. particle templates)
+        if self.object_registry.object_is_registered(obj):
+            self.object_registry.remove(obj)
 
         # Remove from omni stage
         obj.remove()
@@ -499,7 +525,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             dict: Keyword-mapped objects that are fixed in the scene, IGNORING any robots.
                 Maps object name to their object class instances (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[]) if obj.category != robot_macros.ROBOT_CATEGORY}
+        return {
+            obj.name: obj
+            for obj in self.object_registry("fixed_base", True, default_val=[])
+            if obj.category != robot_macros.ROBOT_CATEGORY
+        }
 
     def get_random_floor(self):
         """
@@ -518,7 +548,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         Args:
             floor (None or int): floor number. None means the floor is randomly sampled
-                                 Warning: if @reference_point is given, @floor must be given; 
+                                 Warning: if @reference_point is given, @floor must be given;
                                           otherwise, this would lead to undefined behavior
             reference_point (3-array): (x,y,z) if given, sample a point in the same connected component as this point
 
@@ -592,7 +622,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             size=size,
             color=None if color is None else np.array(color),
             visible=visible,
-
             # TODO: update with new PhysicsMaterial API
             # static_friction=static_friction,
             # dynamic_friction=dynamic_friction,
@@ -602,6 +631,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane = XFormPrim(
             prim_path=plane.prim_path,
             name=plane.name,
+        )
+
+        # Assign floors category to the floor plane
+        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim=self._floor_plane.prim,
+            semantic_label="floors",
+            type_label="class",
         )
 
     def update_initial_state(self, state=None):

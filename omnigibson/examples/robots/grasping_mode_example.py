@@ -1,6 +1,7 @@
 """
 Example script demo'ing robot manipulation control with grasping.
 """
+
 import numpy as np
 
 import omnigibson as og
@@ -33,7 +34,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     scene_cfg = dict(type="Scene")
     robot0_cfg = dict(
         type="Fetch",
-        obs_modalities=["rgb"],     # we're just doing a grasping demo so we don't need all observation modalities
+        obs_modalities=["rgb"],  # we're just doing a grasping demo so we don't need all observation modalities
         action_type="continuous",
         action_normalize=True,
         grasping_mode=grasping_mode,
@@ -91,8 +92,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-2.39951,  2.26469,  2.66227]),
-        orientation=np.array([-0.23898481,  0.48475231,  0.75464013, -0.37204802]),
+        position=np.array([-2.39951, 2.26469, 2.66227]),
+        orientation=np.array([-0.23898481, 0.48475231, 0.75464013, -0.37204802]),
     )
 
     # Create teleop controller

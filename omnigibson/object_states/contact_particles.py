@@ -17,6 +17,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     """
     Object state that handles contact checking between rigid bodies and individual particles.
     """
+
     def _get_value(self, system, link=None):
         """
         Args:
@@ -27,8 +28,9 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             set of int: Set of particle IDs in contact
         """
         # Make sure system is valid
-        assert is_physical_particle_system(system_name=system.name), \
-            "Can only get ContactParticles for a PhysicalParticleSystem!"
+        assert is_physical_particle_system(
+            system_name=system.name
+        ), "Can only get ContactParticles for a PhysicalParticleSystem!"
 
         # Variables to update mid-iteration
         contacts = set()
@@ -49,7 +51,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             return continue_traversal
 
         # Grab the relaxed AABB of this object or its link for coarse filtering of particles to ignore checking
-        lower, upper = self.obj.states[AABB].get_value() if link is None else link.aabb
+        lower, upper = self.obj.states[AABB].get_value() if link is None else link.visual_aabb
 
         # Add margin for filtering inbound
         lower = lower - (system.particle_radius + m.CONTACT_AABB_TOLERANCE)

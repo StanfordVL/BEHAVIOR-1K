@@ -22,11 +22,11 @@ m.IK_MAX_ITERATIONS = 100
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
-    "absolute_pose": 6,             # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
-    "pose_absolute_ori": 6,         # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
-    "pose_delta_ori": 6,            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
-    "position_fixed_ori": 3,        # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
-    "position_compliant_ori": 3,    # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+    "absolute_pose": 6,  # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+    "pose_absolute_ori": 6,  # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+    "pose_delta_ori": 6,  # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+    "position_fixed_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
+    "position_compliant_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
 }
 IK_MODES = set(IK_MODE_COMMAND_DIMS.keys())
 
@@ -48,13 +48,14 @@ class InverseKinematicsController(JointController, ManipulationController):
         robot_urdf_path,
         eef_name,
         control_freq,
-        reset_joint_pos, 
+        reset_joint_pos,
         control_limits,
         dof_idx,
         command_input_limits="default",
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
         kp=None,
         damping_ratio=None,
+        use_impedances=True,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
@@ -91,9 +92,11 @@ class InverseKinematicsController(JointController, ManipulationController):
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
             kp (None or float): The proportional gain applied to the joint controller. If None, a default value
-                will be used.
+                will be used. Only relevant if @use_impedances=True
             damping_ratio (None or float): The damping ratio applied to the joint controller. If None, a default
-                value will be used.
+                value will be used. Only relevant if @use_impedances=True
+            use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
+                applied
             mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
                 cartesian values, relative to the robot base frame. Valid options are:
                     - "absolute_pose": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
@@ -177,7 +180,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             damping_ratio=damping_ratio,
             motor_type="position",
             use_delta_commands=False,
-            use_impedances=True,
+            use_impedances=use_impedances,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
@@ -221,19 +224,23 @@ class InverseKinematicsController(JointController, ManipulationController):
         state_flat = super()._serialize(state=state)
 
         # Serialize state for this controller
-        return np.concatenate([
-            state_flat,
-            self.control_filter.serialize(state=state["control_filter"]),
-        ]).astype(float)
+        return np.concatenate(
+            [
+                state_flat,
+                self.control_filter.serialize(state=state["control_filter"]),
+            ]
+        ).astype(float)
 
     def _deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["control_filter"] = self.control_filter.deserialize(state=state[idx + 4: idx + 4 + self.control_filter.state_size])
+        state_dict["control_filter"] = self.control_filter.deserialize(
+            state=state[idx : idx + self.control_filter.state_size]
+        )
 
-        return state_dict, idx + 4 + self.control_filter.state_size
+        return state_dict, idx + self.control_filter.state_size
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
@@ -251,8 +258,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative.astype(np.float32) \
-                    if (self._goal is None) else self._goal["target_quat"]
+                self._fixed_quat_target = (
+                    quat_relative.astype(np.float32) if (self._goal is None) else self._goal["target_quat"]
+                )
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation

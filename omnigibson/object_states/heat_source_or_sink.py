@@ -1,3 +1,4 @@
+import omnigibson as og
 from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
@@ -5,8 +6,10 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.toggle import ToggledOn
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.python_utils import classproperty
-import omnigibson.utils.transform_utils as T
+from omnigibson.utils.constants import PrimType
+import numpy as np
 
 
 # Create settings for this module
@@ -21,7 +24,7 @@ m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
-class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
+class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     """
     This state indicates the heat source or heat sink state of the object.
 
@@ -80,6 +83,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # If the heat source needs to contain an object inside to heat it,
         # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
+
+        # Internal state that gets cached
+        self._affected_objects = None
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -183,21 +189,103 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         if not self.get_value():
             return False
 
-        # Otherwise, check for other edge cases
-        # If we require the object to be inside, make sure the object is inside, otherwise, we return 0
-        # Otherwise, make sure the object is within close proximity of this heat source
-        if self.requires_inside:
-            if not obj.states[Inside].get_value(self.obj):
-                return False
-        else:
-            aabb_lower, aabb_upper = obj.states[AABB].get_value()
-            obj_pos = (aabb_lower + aabb_upper) / 2.0
-            # Position is either the AABB center of the default link or the metalink position itself
-            heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
-            if T.l2_distance(heat_source_pos, obj_pos) > self.distance_threshold:
-                return False
+        # If the object is not affected, we return False
+        if obj not in self._affected_objects:
+            return False
 
         # If all checks pass, we're actively influencing the object!
         return True
+
+    def _update(self):
+        # Avoid circular imports
+        from omnigibson.object_states.temperature import Temperature
+        from omnigibson.objects.stateful_object import StatefulObject
+
+        # Update the internally tracked nearby objects to accelerate filtering for affects_obj
+        affected_objects = set()
+
+        # Only update if we're valid
+        if self.get_value():
+
+            def overlap_callback(hit):
+                nonlocal affected_objects
+                # global affected_objects
+                obj = og.sim.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
+                if obj is not None:
+                    affected_objects.add(obj)
+                # Always continue traversal
+                return True
+
+            if self.requires_inside:
+                # Use overlap_box check to check for objects inside the box!
+                aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
+                half_extent = (aabb_upper - aabb_lower) / 2.0
+                aabb_center = (aabb_upper + aabb_lower) / 2.0
+
+                og.sim.psqi.overlap_box(
+                    halfExtent=half_extent,
+                    pos=aabb_center,
+                    rot=np.array([0, 0, 0, 1.0]),
+                    reportFn=overlap_callback,
+                )
+
+                # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
+                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                n_cloth_objs = len(cloth_objs)
+                if n_cloth_objs > 0:
+                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    for i, obj in enumerate(cloth_objs):
+                        cloth_positions[i] = obj.get_position()
+                    for idx in np.where(
+                        np.all(
+                            (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
+                            axis=-1,
+                        )
+                    )[0]:
+                        affected_objects.add(cloth_objs[idx])
+
+                # Additionally prune objects based on Inside requirement -- cast to avoid in-place operations
+                for obj in tuple(affected_objects):
+                    if not obj.states[Inside].get_value(self.obj):
+                        affected_objects.remove(obj)
+
+            else:
+                # Position is either the AABB center of the default link or the metalink position itself
+                heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
+
+                # Use overlap_sphere check!
+                og.sim.psqi.overlap_sphere(
+                    radius=self.distance_threshold,
+                    pos=heat_source_pos,
+                    reportFn=overlap_callback,
+                )
+
+                # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
+                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                n_cloth_objs = len(cloth_objs)
+                if n_cloth_objs > 0:
+                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    for i, obj in enumerate(cloth_objs):
+                        cloth_positions[i] = obj.get_position()
+                    for idx in np.where(
+                        np.linalg.norm(heat_source_pos.reshape(1, 3) - cloth_positions, axis=-1)
+                        <= self.distance_threshold
+                    )[0]:
+                        affected_objects.add(cloth_objs[idx])
+
+        # Remove self (we cannot affect ourselves) and update the internal set of objects, and remove self
+        if self.obj in affected_objects:
+            affected_objects.remove(self.obj)
+        self._affected_objects = {
+            obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states
+        }
+
+        # Propagate the affected objects' temperatures
+        if len(self._affected_objects) > 0:
+            Temperature.update_temperature_from_heatsource_or_sink(
+                objs=self._affected_objects,
+                temperature=self.temperature,
+                rate=self.heating_rate,
+            )
 
     # Nothing needs to be done to save/load HeatSource

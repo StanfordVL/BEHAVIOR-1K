@@ -18,8 +18,11 @@ class ClothStateMixin(BaseObjectState):
 
         # Check for cloth type
         if obj.prim_type != PrimType.CLOTH:
-            return False, f"Cannot use ClothStateMixin {cls.__name__} with rigid object, make sure object is created " \
-                          f"with prim_type=PrimType.CLOTH!"
+            return (
+                False,
+                f"Cannot use ClothStateMixin {cls.__name__} with rigid object, make sure object is created "
+                f"with prim_type=PrimType.CLOTH!",
+            )
 
         # Check for GPU dynamics
         if not gm.USE_GPU_DYNAMICS:

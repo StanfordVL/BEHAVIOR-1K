@@ -5,6 +5,7 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin, Relati
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.object_state_utils import m as os_m
+from omnigibson.utils.constants import PrimType
 
 
 class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
@@ -15,11 +16,18 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         deps.update({Touching, VerticalAdjacency})
         return deps
 
-    def _set_value(self, other, new_value):
+    def _set_value(self, other, new_value, reset_before_sampling=False):
         if not new_value:
             raise NotImplementedError("OnTop does not support set_value(False)")
 
+        if other.prim_type == PrimType.CLOTH:
+            raise ValueError("Cannot set an object on top of a cloth object.")
+
         state = og.sim.dump_state(serialized=False)
+
+        # Possibly reset this object if requested
+        if reset_before_sampling:
+            self.obj.reset()
 
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
             if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
@@ -30,10 +38,12 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         return False
 
     def _get_value(self, other):
+        if other.prim_type == PrimType.CLOTH:
+            raise ValueError("Cannot detect if an object is on top of a cloth object.")
+
         touching = self.obj.states[Touching].get_value(other)
         if not touching:
             return False
 
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        other_adjacency = other.states[VerticalAdjacency].get_value()
-        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors and self.obj not in other_adjacency.negative_neighbors
+        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors

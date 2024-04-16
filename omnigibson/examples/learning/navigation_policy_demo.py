@@ -26,12 +26,23 @@ try:
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
+<<<<<<< HEAD
     og.log.error("torch, stable-baselines3, or tensorboard is not installed. "
                  "See which packages are missing, and then run the following for any missing packages:\n"
                  "pip install torch\n"
                  "pip install stable-baselines3==1.7.0\n"
                  "pip install tensorboard\n"
                  "Also, please use gymnasium instead of gym: pip install gymnasium>=0.28.1")
+=======
+    og.log.error(
+        "torch, stable-baselines3, or tensorboard is not installed. "
+        "See which packages are missing, and then run the following for any missing packages:\n"
+        "pip install stable-baselines3[extra]\n"
+        "pip install tensorboard\n"
+        "pip install shimmy>=0.2.1\n"
+        "Also, please update gym to >=0.26.1 after installing sb3: pip install gym>=0.26.1"
+    )
+>>>>>>> og-develop
     exit(1)
 
 assert meets_minimum_version(gym.__version__, "0.28.1"), "Please install/update gym to version >= 0.28.1"
@@ -49,7 +60,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         super().__init__(observation_space, features_dim=1)
         extractors = {}
         self.step_index = 0
-        self.img_save_dir = 'img_save_dir'
+        self.img_save_dir = "img_save_dir"
         os.makedirs(self.img_save_dir, exist_ok=True)
         total_concat_size = 0
         feature_size = 128
@@ -112,7 +123,7 @@ def main():
     args = parser.parse_args()
     tensorboard_log_dir = os.path.join("log_dir", time.strftime("%Y%m%d-%H%M%S"))
     os.makedirs(tensorboard_log_dir, exist_ok=True)
-    prefix = ''
+    prefix = ""
     seed = 0
 
     # Load config
@@ -166,7 +177,7 @@ def main():
             policy_kwargs=policy_kwargs,
             n_steps=20 * 10,
             batch_size=8,
-            device='cuda',
+            device="cuda",
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
         eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)

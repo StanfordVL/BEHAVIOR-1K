@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>OmniGibson Profiling</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="profiling.css">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
+    </head>
+    <body>
+        <header id="header">
+            <h1>OmniGibson Profiling</h1>
+            <div class="header-item">
+                <strong class="header-label">Last Update:</strong>
+                <span id="last-update"></span>
+            </div>
+            <div class="header-item">
+                <strong class="header-label">Repository:</strong>
+                <a id="repository-link" rel="noopener"></a>
+            </div>
+            <br>
+            <div class="header-item">
+                <button id="dl-button">Download data as JSON</button>
+            </div>
+        </header>
+        <main id="main">
+            <!-- Basics -->
+            <h2>Baselines</h2>
+            <h5>*Ran with GPU dynamics on</h5>
+            <div class="row">
+                <div class="col-3">
+                <div class="list-group list-group-light" id="baseline_tab" role="tablist">
+                    <a class="list-group-item list-group-item-action active px-2 border-0" id="baseline_total_tab"
+                    data-toggle="list" href="#baseline_total" role="tab" aria-controls="baseline_total">FPS</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="baseline_loading_tab"
+                    data-toggle="list" href="#baseline_loading" role="tab" aria-controls="baseline_loading">Loading Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="baseline_omni_tab"
+                    data-toggle="list" href="#baseline_omni" role="tab" aria-controls="baseline_omni">Native Omni Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="baseline_non_omni_tab"
+                    data-toggle="list" href="#baseline_non_omni" role="tab" aria-controls="baseline_non_omni">OmniGibson Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="baseline_mem_tab"
+                    data-toggle="list" href="#baseline_mem" role="tab" aria-controls="baseline_mem">Memory Usage</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="baseline_vram_tab"
+                    data-toggle="list" href="#baseline_vram" role="tab" aria-controls="baseline_vram">VRAM Usage</a>
+                </div>
+                </div>
+                <div class="col-9">
+                <div class="tab-content" id="nav-tabContent">
+                    <div class="tab-pane fade show active" id="baseline_total" role="tabpanel" aria-labelledby="baseline_total_tab">
+                        <canvas id="baseline_total_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="baseline_loading" role="tabpanel" aria-labelledby="baseline_loading_tab">
+                        <canvas id="baseline_loading_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="baseline_omni" role="tabpanel" aria-labelledby="baseline_omni_tab">
+                        <canvas id="baseline_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="baseline_non_omni" role="tabpanel" aria-labelledby="baseline_non_omni_tab">
+                        <canvas id="baseline_non_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="baseline_mem" role="tabpanel" aria-labelledby="baseline_mem_tab">
+                        <canvas id="baseline_mem_canvas"></canvas>
+                    </div> 
+                    <div class="tab-pane fade" id="baseline_vram" role="tabpanel" aria-labelledby="baseline_vram_tab">
+                        <canvas id="baseline_vram_canvas"></canvas>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- scenes -->
+            <h2>Scenes</h2>
+            <h5>* Ran with GPU dynamics off</h5>
+            <div class="row">
+                <div class="col-3">
+                <div class="list-group list-group-light" id="scene_tab" role="tablist">
+                    <a class="list-group-item list-group-item-action active px-2 border-0" id="scene_total_tab"
+                    data-toggle="list" href="#scene_total" role="tab" aria-controls="scene_total">FPS</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="scene_loading_tab"
+                    data-toggle="list" href="#scene_loading" role="tab" aria-controls="scene_loading">Loading Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="scene_omni_tab"
+                    data-toggle="list" href="#scene_omni" role="tab" aria-controls="scene_omni">Native Omni Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="scene_non_omni_tab"
+                    data-toggle="list" href="#scene_non_omni" role="tab" aria-controls="scene_non_omni">OmniGibson Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="scene_mem_tab"
+                    data-toggle="list" href="#scene_mem" role="tab" aria-controls="scene_mem">Memory Usage</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="scene_vram_tab"
+                    data-toggle="list" href="#scene_vram" role="tab" aria-controls="scene_vram">VRAM Usage</a>
+                </div>
+                </div>
+                <div class="col-9">
+                <div class="tab-content" id="nav-tabContent">
+                    <div class="tab-pane fade show active" id="baseline_total" role="tabpanel" aria-labelledby="scene_total_tab">
+                        <canvas id="scene_total_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="scene_loading" role="tabpanel" aria-labelledby="scene_loading_tab">
+                        <canvas id="scene_loading_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="scene_omni" role="tabpanel" aria-labelledby="scene_omni_tab">
+                        <canvas id="scene_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="scene_non_omni" role="tabpanel" aria-labelledby="scene_non_omni_tab">
+                        <canvas id="scene_non_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="scene_mem" role="tabpanel" aria-labelledby="scene_mem_tab">
+                        <canvas id="scene_mem_canvas"></canvas>
+                    </div> 
+                    <div class="tab-pane fade" id="scene_vram" role="tabpanel" aria-labelledby="scene_vram_tab">
+                        <canvas id="scene_vram_canvas"></canvas>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Non-physics -->
+            <h2>Non-physics Features</h2>
+            <h5>* Ran with GPU dynamics on</h5>
+            <div class="row">
+                <div class="col-3">
+                <div class="list-group list-group-light" id="np_tab" role="tablist">
+                    <a class="list-group-item list-group-item-action active px-2 border-0" id="np_total_tab"
+                    data-toggle="list" href="#np_total" role="tab" aria-controls="np_total">FPS</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="np_loading_tab"
+                    data-toggle="list" href="#np_loading" role="tab" aria-controls="np_loading">Loading Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="np_omni_tab"
+                    data-toggle="list" href="#np_omni" role="tab" aria-controls="np_omni">Native Omni Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="np_non_omni_tab"
+                    data-toggle="list" href="#np_non_omni" role="tab" aria-controls="np_non_omni">OmniGibson Step Time</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="np_mem_tab"
+                    data-toggle="list" href="#np_mem" role="tab" aria-controls="np_mem">Memory Usage</a>
+                    <a class="list-group-item list-group-item-action px-2 border-0" id="np_vram_tab"
+                    data-toggle="list" href="#np_vram" role="tab" aria-controls="np_vram">VRAM Usage</a>
+                </div>
+                </div>
+                <div class="col-9">
+                <div class="tab-content" id="nav-tabContent">
+                    <div class="tab-pane fade show active" id="np_total" role="tabpanel" aria-labelledby="np_total_tab">
+                        <canvas id="np_total_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="np_loading" role="tabpanel" aria-labelledby="np_loading_tab">
+                        <canvas id="np_loading_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="np_omni" role="tabpanel" aria-labelledby="np_omni_tab">
+                        <canvas id="np_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="np_non_omni" role="tabpanel" aria-labelledby="np_non_omni_tab">
+                        <canvas id="np_non_omni_canvas"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="np_mem" role="tabpanel" aria-labelledby="np_mem_tab">
+                        <canvas id="np_mem_canvas"></canvas>
+                    </div> 
+                    <div class="tab-pane fade" id="np_vram" role="tabpanel" aria-labelledby="np_vram_tab">
+                        <canvas id="np_vram_canvas"></canvas>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </main>
+        <footer>
+            <br>
+            <div class="spacer"></div>
+        </footer>
+        <script src="data.js"></script>
+        <script src="profiling.js"></script>
+    </body>
+</html>

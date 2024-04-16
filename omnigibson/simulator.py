@@ -3,6 +3,7 @@ import itertools
 import contextlib
 import logging
 import os
+import shutil
 import socket
 from pathlib import Path
 import atexit
@@ -17,19 +18,32 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
-from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
-from omnigibson.utils.ui_utils import (CameraMover, disclaimer, create_module_logger, suppress_omni_log,
-                                       print_icon, print_logo, logo_small)
+from omnigibson.utils.python_utils import (
+    clear as clear_pu,
+    create_object_from_init_info,
+    Serializable,
+    meets_minimum_version,
+)
+from omnigibson.utils.usd_utils import clear as clear_uu, FlatcacheAPI, RigidContactAPI, PoseAPI
+from omnigibson.utils.ui_utils import (
+    CameraMover,
+    disclaimer,
+    create_module_logger,
+    suppress_omni_log,
+    print_icon,
+    print_logo,
+    logo_small,
+)
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.transition_rules import TransitionRuleAPI
 
 # Create module logger
@@ -38,8 +52,11 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
-m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
+m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
+
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -52,7 +69,7 @@ def _launch_app():
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
-    config_kwargs = {"headless":  gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
+    config_kwargs = {"headless": gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
@@ -62,15 +79,37 @@ def _launch_app():
         import sys
         from numba.core.errors import NumbaPerformanceWarning
         import warnings
+
         # TODO: Find a more elegant way to prune omni logging
         # sys.argv.append("--/log/level=warning")
         # sys.argv.append("--/log/fileLogLevel=warning")
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / "omnigibson.kit"
+    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
+
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+
+    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
+    with open(version_file_path, "r") as file:
+        version_content = file.read().strip()
+        isaac_version = version_content.split("-")[0]
+        assert meets_minimum_version(
+            isaac_version, "2023.1.1"
+        ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
@@ -79,7 +118,6 @@ def _launch_app():
     # Enable additional extensions we need
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
     lazy.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.syntheticdata")
 
     # Additional import for windows
     if os.name == "nt":
@@ -111,13 +149,15 @@ def _launch_app():
             lazy.omni.isaac.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
-            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
+            raise ValueError(
+                f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc."
+            )
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
         og_log = lazy.omni.log.get_log()
         og_log.set_channel_enabled("carb.windowing-glfw.plugin", False, lazy.omni.log.SettingBehavior.OVERRIDE)
-        
+
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
         og_log = lazy.omni.log.get_log()
@@ -125,21 +165,36 @@ def _launch_app():
             og_log.set_channel_enabled(channel, False, lazy.omni.log.SettingBehavior.OVERRIDE)
 
     # Possibly hide windows if in debug mode
+    hide_window_names = []
+    if not gm.RENDER_VIEWER_CAMERA:
+        hide_window_names.append("Viewport")
     if gm.GUI_VIEWPORT_ONLY:
-        hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
-                             "Flow", "Semantics Schema Editor"]
-        for name in hide_window_names:
-            window = lazy.omni.ui.Workspace.get_window(name)
-            if window is not None:
-                window.visible = False
-                app.update()
+        hide_window_names.extend(
+            [
+                "Console",
+                "Main ToolBar",
+                "Stage",
+                "Layer",
+                "Property",
+                "Render Settings",
+                "Content",
+                "Flow",
+                "Semantics Schema Editor",
+            ]
+        )
+
+    for name in hide_window_names:
+        window = lazy.omni.ui.Workspace.get_window(name)
+        if window is not None:
+            window.visible = False
+            app.update()
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
-    
+
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
     sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
-    
+
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
     signal.signal(signal.SIGINT, og.shutdown_handler)
 
@@ -159,27 +214,28 @@ def launch_simulator(*args, **kwargs):
 
         Args:
             gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+            physics_dt (float): dt between physics steps. Defaults to 1.0 / 120.0.
             rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
                 application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+                be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 30.0.
             stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
                 Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
-            """
+        """
+
         _world_initialized = False
 
         def __init__(
-                self,
-                gravity=9.81,
-                physics_dt=1.0 / 60.0,
-                rendering_dt=1.0 / 60.0,
-                stage_units_in_meters=1.0,
-                viewer_width=gm.DEFAULT_VIEWER_WIDTH,
-                viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-                device=None,
+            self,
+            gravity=9.81,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
+            stage_units_in_meters=1.0,
+            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            device=None,
         ):
             # Store vars needed for initialization
             self.gravity = gravity
@@ -221,20 +277,25 @@ def launch_simulator(*args, **kwargs):
 
             # Set of categories that can be grasped by assisted grasping
             self.object_state_types = get_states_by_dependency_order()
-            self.object_state_types_requiring_update = \
-                [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
-            self.object_state_types_on_contact = \
-                {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
-            self.object_state_types_on_joint_break = \
-                {state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)}
+            self.object_state_types_requiring_update = [
+                state
+                for state in self.object_state_types
+                if (issubclass(state, UpdateStateMixin) or issubclass(state, GlobalUpdateStateMixin))
+            ]
+            self.object_state_types_on_contact = {
+                state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)
+            }
+            self.object_state_types_on_joint_break = {
+                state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
+            }
 
             # Auto-load the dummy stage
             self.clear()
 
             # Set the viewer dimensions
-            # TODO: Make this toggleable so we don't always have a viewer if we don't want to
-            self.viewer_width = viewer_width
-            self.viewer_height = viewer_height
+            if gm.RENDER_VIEWER_CAMERA:
+                self.viewer_width = viewer_width
+                self.viewer_height = viewer_height
 
             # Toggle simulator state once so that downstream omni features can be used without bugs
             # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -250,8 +311,8 @@ def launch_simulator(*args, **kwargs):
         def __new__(
             cls,
             gravity=9.81,
-            physics_dt=1.0 / 60.0,
-            rendering_dt=1.0 / 60.0,
+            physics_dt=1.0 / 120.0,
+            rendering_dt=1.0 / 30.0,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
@@ -276,7 +337,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._viewer_camera = VisionSensor(
                 prim_path=prim_path,
-                name=prim_path.split("/")[-1],                  # Assume name is the lowest-level name in the prim_path
+                name=prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
                 image_height=self.viewer_height,
                 image_width=self.viewer_width,
@@ -303,15 +364,11 @@ def launch_simulator(*args, **kwargs):
             """
             assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
             self._physics_context.set_gravity(value=-self.gravity)
-            # Also make sure we invert the collision group filter settings so that different collision groups cannot
-            # collide with each other, and modify settings for speed optimization
-            self._physics_context.set_invert_collision_group_filter(True)
+            # Also make sure we don't invert the collision group filter settings so that different collision groups by
+            # default collide with each other, and modify settings for speed optimization
+            self._physics_context.set_invert_collision_group_filter(False)
             self._physics_context.enable_ccd(gm.ENABLE_CCD)
-
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
-            else:
-                self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
+            self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
 
             # Enable GPU dynamics based on whether we need omni particles feature
             if gm.USE_GPU_DYNAMICS:
@@ -326,17 +383,30 @@ def launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
             self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
+            self._physics_context.set_gpu_max_rigid_contact_count(gm.GPU_MAX_RIGID_CONTACT_COUNT)
+            self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
-            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
-            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
-            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            if gm.ENABLE_HQ_RENDERING:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)  # "Auto"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
+            else:
+                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
+                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
+                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)
+                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
+<<<<<<< HEAD
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
             # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
             # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
+=======
+>>>>>>> og-develop
 
         @property
         def viewer_visibility(self):
@@ -407,6 +477,7 @@ def launch_simulator(*args, **kwargs):
             """
             Enables keyboard control of the active viewer camera for this simulation
             """
+            assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
             self._camera_mover = CameraMover(cam=self._viewer_camera)
             self._camera_mover.print_info()
             return self._camera_mover
@@ -423,6 +494,11 @@ def launch_simulator(*args, **kwargs):
 
             # Clear the existing scene if any
             self.clear()
+
+            # Initialize all global updatable object states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
 
             self._scene = scene
             self._scene.load()
@@ -477,7 +553,43 @@ def launch_simulator(*args, **kwargs):
 
         def remove_object(self, obj):
             """
-            Remove a non-robot object from the simulator.
+            Remove one or a list of non-robot object from the simulator.
+
+            Args:
+                obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
+            """
+            objs = [obj] if isinstance(obj, BaseObject) else obj
+
+            if self.is_playing():
+                state = self.dump_state()
+
+                # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
+                # with another object (in some specific configuration only, not always), the simulator crashes. Therefore,
+                # we first move the object to a safe location, then remove it.
+                pos = list(m.OBJECT_GRAVEYARD_POS)
+                for ob in objs:
+                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    pos[0] += max(ob.aabb_extent)
+
+                # One physics timestep will elapse
+                self.step_physics()
+
+            for ob in objs:
+                self._remove_object(ob)
+
+            if self.is_playing():
+                # Update all handles that are now broken because objects have changed
+                self.update_handles()
+
+                # Load the state back
+                self.load_state(state)
+
+            # Refresh all current rules
+            TransitionRuleAPI.prune_active_rules()
+
+        def _remove_object(self, obj):
+            """
+            Remove a non-robot object from the simulator. Should not be called directly by the user.
 
             Args:
                 obj (BaseObject): a non-robot object to remove
@@ -495,15 +607,7 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-
             self._scene.remove_object(obj)
-            self.app.update()
-
-            # Update all handles that are now broken because objects have changed
-            self.update_handles()
-
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
 
         def remove_prim(self, prim):
             """
@@ -512,8 +616,11 @@ def launch_simulator(*args, **kwargs):
             Args:
                 prim (BasePrim): a prim to remove
             """
-            # Remove prim
-            prim.remove()
+            # [omni.physx.tensors.plugin] prim '[prim_path]' was deleted while being used by a shape in a tensor view
+            # class. The physics.tensors simulationView was invalidated.
+            with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+                # Remove prim
+                prim.remove()
 
             # Update all handles that are now broken because prims have changed
             self.update_handles()
@@ -522,6 +629,11 @@ def launch_simulator(*args, **kwargs):
             """
             Reset internal variables when a new stage is loaded
             """
+
+        def render(self):
+            super().render()
+            # During rendering, the Fabric API is updated, so we can mark it as clean
+            PoseAPI.mark_valid()
 
         def update_handles(self):
             # Handles are only relevant when physx is running
@@ -538,6 +650,9 @@ def launch_simulator(*args, **kwargs):
                     # Only need to update if object is already initialized as well
                     if obj.initialized:
                         obj.update_handles()
+                for system in self.scene.systems:
+                    if issubclass(system, MacroPhysicalParticleSystem):
+                        system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
@@ -588,9 +703,13 @@ def launch_simulator(*args, **kwargs):
                 if gm.ENABLE_OBJECT_STATES:
                     # Step the object states in global topological order (if the scene exists)
                     for state_type in self.object_state_types_requiring_update:
-                        for obj in self.scene.get_objects_with_state(state_type):
-                            # Only update objects that have been initialized so far
-                            if obj.initialized:
+                        if issubclass(state_type, GlobalUpdateStateMixin):
+                            state_type.global_update()
+                        if issubclass(state_type, UpdateStateMixin):
+                            for obj in self.scene.get_objects_with_state(state_type):
+                                # Update the state (object should already be initialized since
+                                # this step will only occur after objects are initialized and sim
+                                # is playing
                                 obj.states[state_type].update()
 
                     for obj in self.scene.objects:
@@ -607,7 +726,6 @@ def launch_simulator(*args, **kwargs):
             Step any omni-related things
             """
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            BoundingBoxAPI.clear()
             RigidContactAPI.clear()
 
         def play(self):
@@ -631,10 +749,6 @@ def launch_simulator(*args, **kwargs):
                 with suppress_omni_log(channels=channels):
                     super().play()
 
-                # If we're stopped, take a physics step and update the physics sim view. This must happen BEFORE the
-                # handles are updated, since updating the physics view makes the per-object physics view invalid
-                self.step_physics()
-
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
@@ -653,6 +767,9 @@ def launch_simulator(*args, **kwargs):
                         for robot in self.scene.robots:
                             if robot.initialized:
                                 robot.update_controller_mode()
+
+                        # Also refresh any transition rules that became stale while sim was stopped
+                        TransitionRuleAPI.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -720,6 +837,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
             self._omni_update_step()
+            PoseAPI.invalidate()
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -742,23 +860,35 @@ def launch_simulator(*args, **kwargs):
                     if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
                         continue
                     # If any of the objects doesn't have states that require on_contact callbacks, skip
-                    if len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0 or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0:
+                    if (
+                        len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0
+                        or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0
+                    ):
                         continue
                     headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.uuid))].append(contact_header)
 
-                for (actor0_obj, actor1_obj) in headers:
+                for actor0_obj, actor1_obj in headers:
                     for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                         for state_type in self.object_state_types_on_contact:
                             if state_type in obj0.states:
-                                obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
+                                obj0.states[state_type].on_contact(
+                                    obj1, headers[(actor0_obj, actor1_obj)], contact_data
+                                )
 
         def _on_simulation_event(self, event):
             """
             This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
             """
             if gm.ENABLE_OBJECT_STATES:
-                if event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
-                    joint_path = str(lazy.pxr.PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                if (
+                    event.type == int(lazy.omni.physx.bindings._physx.SimulationEvent.JOINT_BREAK)
+                    and self._objects_require_joint_break_callback
+                ):
+                    joint_path = str(
+                        lazy.pxr.PhysicsSchemaTools.decodeSdfPath(
+                            event.payload["jointPath"][0], event.payload["jointPath"][1]
+                        )
+                    )
                     obj = None
                     # TODO: recursively try to find the parent object of this joint
                     tokens = joint_path.split("/")
@@ -793,8 +923,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_playing or sim_is_paused:
                 self.stop()
             yield
-            if sim_is_playing: self.play()
-            elif sim_is_paused: self.pause()
+            if sim_is_playing:
+                self.play()
+            elif sim_is_paused:
+                self.pause()
 
         @contextlib.contextmanager
         def playing(self):
@@ -807,8 +939,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_stopped or sim_is_paused:
                 self.play()
             yield
-            if sim_is_stopped: self.stop()
-            elif sim_is_paused: self.pause()
+            if sim_is_stopped:
+                self.stop()
+            elif sim_is_paused:
+                self.pause()
 
         @contextlib.contextmanager
         def paused(self):
@@ -821,8 +955,10 @@ def launch_simulator(*args, **kwargs):
             if sim_is_stopped or sim_is_playing:
                 self.pause()
             yield
-            if sim_is_stopped: self.stop()
-            elif sim_is_playing: self.play()
+            if sim_is_stopped:
+                self.stop()
+            elif sim_is_playing:
+                self.play()
 
         @contextlib.contextmanager
         def slowed(self, dt):
@@ -895,7 +1031,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_play.pop(name)
+            self._callbacks_on_play.pop(name, None)
 
         def remove_callback_on_stop(self, name):
             """
@@ -904,7 +1040,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_stop.pop(name)
+            self._callbacks_on_stop.pop(name, None)
 
         def remove_callback_on_import_obj(self, name):
             """
@@ -913,7 +1049,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_import_obj.pop(name)
+            self._callbacks_on_import_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
@@ -922,7 +1058,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_remove_obj.pop(name)
+            self._callbacks_on_remove_obj.pop(name, None)
 
         @classmethod
         def clear_instance(cls):
@@ -1010,9 +1146,16 @@ def launch_simulator(*args, **kwargs):
                 self._camera_mover.clear()
                 self._camera_mover = None
 
-            # Clear all transition rules if being used
-            if gm.ENABLE_TRANSITION_RULES:
-                TransitionRuleAPI.clear()
+            # Clear all global update states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_clear()
+
+            # Clear all materials
+            MaterialPrim.clear()
+
+            # Clear all transition rules
+            TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_pu()
@@ -1138,12 +1281,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1 / 60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1 / 120.0
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1152,8 +1295,7 @@ def launch_simulator(*args, **kwargs):
 
             # Clear physics context
             self._physics_context = None
-            if meets_minimum_isaac_version("2023.0.0"):
-                self._physx_fabric_interface = None
+            self._physx_fabric_interface = None
 
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
@@ -1174,12 +1316,12 @@ def launch_simulator(*args, **kwargs):
 
             # Store physics dt and rendering dt to reuse later
             # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/60, 1/60
+            # of 1/120, 1/30
             try:
                 physics_dt = self.get_physics_dt()
             except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
-                physics_dt = 1/60.
+                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
+                physics_dt = 1 / 120.0
             rendering_dt = self.get_rendering_dt()
 
             # Open new stage -- suppressing warning that we're opening a new stage
@@ -1223,20 +1365,29 @@ def launch_simulator(*args, **kwargs):
             # Update internal callbacks
             self._setup_default_callback_fns()
             self._stage_open_callback = (
-                lazy.omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
+                lazy.omni.usd.get_context()
+                .get_stage_event_stream()
+                .create_subscription_to_pop(self._stage_open_callback_fn)
             )
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
-            self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
+            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
+                self._on_contact
+            )
+            self._simulation_event_callback = (
+                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                    self._on_simulation_event
+                )
+            )
 
             # Set the lighting mode to be stage by default
             self.set_lighting_mode(mode=LightingMode.STAGE)
 
             # Set the viewer camera, and then set its default pose
-            self._set_viewer_camera()
-            self.viewer_camera.set_position_orientation(
-                position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
-            )
+            if gm.RENDER_VIEWER_CAMERA:
+                self._set_viewer_camera()
+                self.viewer_camera.set_position_orientation(
+                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                )
 
         def close(self):
             """
@@ -1296,12 +1447,14 @@ def launch_simulator(*args, **kwargs):
             # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
             # step is needed to propagate specific states in physics backend
             # TODO: This should be resolved in a future omniverse release!
-            disclaimer("Attempting to load simulator state.\n"
-                    "Currently, omniverse does not support exclusively stepping kinematics, so we cannot update some "
-                    "of our object states relying on updated kinematics until a simulator step is taken!\n"
-                    "Object states such as OnTop, Inside, etc. relying on relative spatial information will inaccurate"
-                    "until a single sim step is taken.\n"
-                    "This should be resolved by the next NVIDIA Isaac Sim release.")
+            disclaimer(
+                "Attempting to load simulator state.\n"
+                "Currently, omniverse does not support exclusively stepping kinematics, so we cannot update some "
+                "of our object states relying on updated kinematics until a simulator step is taken!\n"
+                "Object states such as OnTop, Inside, etc. relying on relative spatial information will inaccurate"
+                "until a single sim step is taken.\n"
+                "This should be resolved by the next NVIDIA Isaac Sim release."
+            )
 
         def _serialize(self, state):
             # Default state is from the scene

@@ -12,6 +12,7 @@ from omnigibson.tasks.task_base import BaseTask
 
 REGISTERED_PRIMITIVE_SETS = {}
 
+
 class ActionPrimitiveError(ValueError):
     class Reason(IntEnum):
         # A primitive could not be executed because a precondition was not satisfied, e.g. PLACE was called without an
@@ -63,7 +64,7 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
             REGISTERED_PRIMITIVE_SETS[cls.__name__] = cls
 
     def __init__(self, env):
-        self.env = env
+        self.env: Environment = env
 
     @property
     def robot(self):
@@ -80,7 +81,7 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
     def apply(self, action):
         """
         Apply a primitive action.
-        
+
         Given a higher-level action in the same format as the action space (e.g. as a number),
         generates a sequence of lower level actions (or raise ActionPrimitiveError). The action
         will get resolved and passed into apply_ref.
@@ -91,7 +92,7 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
     def apply_ref(self, action, *args):
         """
         Apply a primitive action by reference.
-        
+
         Given a higher-level action from the corresponding action set enum and any necessary arguments,
         generates a sequence of lower level actions (or raise ActionPrimitiveError)
         """

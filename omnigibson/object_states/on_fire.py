@@ -1,7 +1,6 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
 # Create settings for this module
@@ -14,7 +13,7 @@ m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
-class OnFire(HeatSourceOrSink, UpdateStateMixin):
+class OnFire(HeatSourceOrSink):
     """
     This state indicates the heat source is currently on fire.
 
@@ -72,6 +71,9 @@ class OnFire(HeatSourceOrSink, UpdateStateMixin):
         return deps
 
     def _update(self):
+        # Call super first
+        super()._update()
+
         # If it's on fire, maintain the fire temperature
         if self.get_value():
             self.obj.states[Temperature].set_value(self.temperature)

@@ -70,6 +70,7 @@ class GymObservable(metaclass=ABCMeta):
     Args:
         kwargs: dict, does nothing, used to sink any extraneous arguments during initialization
     """
+
     def __init__(self, *args, **kwargs):
         # Initialize variables that we will fill in later
         self.observation_space = None
@@ -87,7 +88,9 @@ class GymObservable(metaclass=ABCMeta):
             kwargs (dict): Any keyword args necessary for grabbing observations
 
         Returns:
-            dict: Keyword-mapped observations mapping observation names to nested observations
+            2-tuple:
+                dict: Keyword-mapped observations mapping observation names to nested observations
+                dict: Additional information about the observations
         """
         raise NotImplementedError()
 

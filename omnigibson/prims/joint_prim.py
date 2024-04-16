@@ -4,11 +4,10 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import PoseAPI, create_joint
 from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 from omnigibson.controllers.controller_base import ControlType
 
@@ -80,7 +79,9 @@ class JointPrim(BasePrim):
         # The following values will only be valid if this joint is part of an articulation
         self._n_dof = None  # The number of degrees of freedom this joint provides
         self._joint_idx = None  # The index of this joint in the parent articulation's joint array
-        self._joint_dof_offset = None  # The starting index of the DOFs for this joint in the parent articulation's DOF array
+        self._joint_dof_offset = (
+            None  # The starting index of the DOFs for this joint in the parent articulation's DOF array
+        )
         self._joint_name = None  # The name of this joint in the parent's articulation tree
 
         # Run super method
@@ -92,8 +93,10 @@ class JointPrim(BasePrim):
 
     def _load(self):
         # Make sure this joint isn't articulated
-        assert not self.articulated, "Joint cannot be created, since this is an articulated joint! We are assuming" \
-                                     "the joint already exists in the stage."
+        assert not self.articulated, (
+            "Joint cannot be created, since this is an articulated joint! We are assuming"
+            "the joint already exists in the stage."
+        )
 
         # Define a joint prim at the current stage
         prim = create_joint(
@@ -116,8 +119,9 @@ class JointPrim(BasePrim):
             # We MUST already have the joint state API defined beforehand in the USD
             # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
             # happens because joint prims are usually created externally during an EntityPrim's initialization phase
-            assert self._prim.HasAPI(lazy.pxr.PhysxSchema.JointStateAPI), \
-                "Revolute or Prismatic joints must already have JointStateAPI added!"
+            assert self._prim.HasAPI(
+                lazy.pxr.PhysxSchema.JointStateAPI
+            ), "Revolute or Prismatic joints must already have JointStateAPI added!"
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
@@ -161,10 +165,12 @@ class JointPrim(BasePrim):
         joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
         # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
         # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
-        self._joint_idx = next(i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset)
+        self._joint_idx = next(
+            i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset
+        )
         self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
         self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
-        
+
     def set_control_type(self, control_type, kp=None, kd=None):
         """
         Sets the control type for this joint.
@@ -187,7 +193,7 @@ class JointPrim(BasePrim):
             assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
             assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
             kp = 0.0
-        else:   # Efforts
+        else:  # Efforts
             assert kp is None, "kp gain must not be specified for setting EFFORT control!"
             assert kd is None, "kd gain must not be specified for setting EFFORT control!"
             kp, kd = 0.0, 0.0
@@ -208,10 +214,11 @@ class JointPrim(BasePrim):
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
-            assert self._articulation_view_direct.is_physics_handle_valid() and \
-                self._articulation_view_direct._physics_view.check(), \
-                "Articulation view must be valid if physics is running!"
-        
+            assert (
+                self._articulation_view_direct.is_physics_handle_valid()
+                and self._articulation_view_direct._physics_view.check()
+            ), "Articulation view must be valid if physics is running!"
+
         return self._articulation_view_direct
 
     @property
@@ -269,8 +276,12 @@ class JointPrim(BasePrim):
             4-array: (x,y,z,w) local quaternion orientation of this joint, relative to the parent link
         """
         # Grab local rotation to parent and child links
-        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
-        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
+        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[
+            [1, 2, 3, 0]
+        ]
+        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[
+            [1, 2, 3, 0]
+        ]
 
         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
         return T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
@@ -324,7 +335,9 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_vel = self._articulation_view.get_max_velocities(joint_indices=self.dof_indices)[0][0]
-        default_max_vel = m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == JointType.JOINT_REVOLUTE else m.DEFAULT_MAX_PRISMATIC_VEL
+        default_max_vel = (
+            m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == JointType.JOINT_REVOLUTE else m.DEFAULT_MAX_PRISMATIC_VEL
+        )
         return default_max_vel if raw_vel is None or np.abs(raw_vel) > m.INF_VEL_THRESHOLD else raw_vel
 
     @max_velocity.setter
@@ -423,7 +436,11 @@ class JointPrim(BasePrim):
         Returns:
             float: friction for this joint
         """
-        return self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0]
+        return (
+            self._articulation_view.get_friction_coefficients(joint_indices=self.dof_indices)[0][0]
+            if og.sim.is_playing()
+            else self.get_attribute("physxJoint:jointFriction")
+        )
 
     @friction.setter
     def friction(self, friction):
@@ -433,7 +450,9 @@ class JointPrim(BasePrim):
         Args:
             friction (float): friction to set
         """
-        self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
+        self.set_attribute("physxJoint:jointFriction", friction)
+        if og.sim.is_playing():
+            self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
 
     @property
     def lower_limit(self):
@@ -447,10 +466,14 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(joint_indices=self.dof_indices).flatten()
-        return -m.DEFAULT_MAX_POS \
-            if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_lower) > m.INF_POS_THRESHOLD \
+        raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(
+            joint_indices=self.dof_indices
+        ).flatten()
+        return (
+            -m.DEFAULT_MAX_POS
+            if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_lower) > m.INF_POS_THRESHOLD
             else raw_pos_lower
+        )
 
     @lower_limit.setter
     def lower_limit(self, lower_limit):
@@ -462,7 +485,9 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_joint_limits(np.array([[lower_limit, self.upper_limit]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_joint_limits(
+            np.array([[lower_limit, self.upper_limit]]), joint_indices=self.dof_indices
+        )
 
     @property
     def upper_limit(self):
@@ -475,10 +500,14 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(joint_indices=self.dof_indices).flatten()
-        return m.DEFAULT_MAX_POS \
-            if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_upper) > m.INF_POS_THRESHOLD \
+        raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(
+            joint_indices=self.dof_indices
+        ).flatten()
+        return (
+            m.DEFAULT_MAX_POS
+            if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_upper) > m.INF_POS_THRESHOLD
             else raw_pos_upper
+        )
 
     @upper_limit.setter
     def upper_limit(self, upper_limit):
@@ -490,7 +519,9 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_joint_limits(np.array([[self.lower_limit, upper_limit]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_joint_limits(
+            np.array([[self.lower_limit, upper_limit]]), joint_indices=self.dof_indices
+        )
 
     @property
     def has_limit(self):
@@ -500,7 +531,9 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return np.all(np.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD)
+        return np.all(
+            np.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD
+        )
 
     @property
     def axis(self):
@@ -534,7 +567,7 @@ class JointPrim(BasePrim):
             int: Number of degrees of freedom this joint has
         """
         return self._n_dof
-    
+
     @property
     def dof_indices(self):
         """
@@ -721,8 +754,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set position for articulated joints!"
         if drive:
             assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
-            assert self._control_type == ControlType.POSITION, \
-                "Trying to set joint position target, but control type is not position!"
+            assert (
+                self._control_type == ControlType.POSITION
+            ), "Trying to set joint position target, but control type is not position!"
 
         # Standardize input
         pos = np.array([pos]) if self._n_dof == 1 and not isinstance(pos, Iterable) else np.array(pos)
@@ -734,7 +768,7 @@ class JointPrim(BasePrim):
         # Set the DOF(s) in this joint
         if not drive:
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
-            BoundingBoxAPI.clear()
+            PoseAPI.invalidate()
 
         # Also set the target
         self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
@@ -756,8 +790,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
             assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
-            assert self._control_type == ControlType.VELOCITY, \
-                f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
+            assert (
+                self._control_type == ControlType.VELOCITY
+            ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
         # Standardize input
         vel = np.array([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else np.array(vel)
@@ -829,23 +864,28 @@ class JointPrim(BasePrim):
                 self.set_vel(state["target_vel"], drive=True)
 
     def _serialize(self, state):
-        return np.concatenate([
-            state["pos"],
-            state["vel"],
-            state["effort"],
-            state["target_pos"],
-            state["target_vel"],
-        ]).astype(float)
+        return np.concatenate(
+            [
+                state["pos"],
+                state["vel"],
+                state["effort"],
+                state["target_pos"],
+                state["target_vel"],
+            ]
+        ).astype(float)
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort
-        return dict(
-            pos=state[0:self.n_dof],
-            vel=state[self.n_dof:2*self.n_dof],
-            effort=state[2*self.n_dof:3*self.n_dof],
-            target_pos=state[3*self.n_dof:4*self.n_dof],
-            target_vel=state[4*self.n_dof:5*self.n_dof],
-        ), 5*self.n_dof
+        return (
+            dict(
+                pos=state[0 : self.n_dof],
+                vel=state[self.n_dof : 2 * self.n_dof],
+                effort=state[2 * self.n_dof : 3 * self.n_dof],
+                target_pos=state[3 * self.n_dof : 4 * self.n_dof],
+                target_vel=state[4 * self.n_dof : 5 * self.n_dof],
+            ),
+            5 * self.n_dof,
+        )
 
     def duplicate(self, prim_path):
         # Cannot directly duplicate a joint prim

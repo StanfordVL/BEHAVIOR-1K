@@ -3,6 +3,7 @@ Example script demo'ing robot control.
 
 Options for random actions, as well as selection of robot action space
 """
+
 import numpy as np
 import yaml
 
@@ -58,17 +59,31 @@ def choose_controllers(robot, random_selection=False):
     return controller_choices
 
 
-def main(random_selection=False, headless=False, short_exec=False):
+def main(random_selection=False, headless=False, short_exec=False, quickstart=False):
     """
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
+<<<<<<< HEAD
     # Create the config for generating the environment we want
     env_cfg = dict()
     env_cfg["action_frequency"] = 10
     env_cfg["physics_frequency"] = 60
+=======
+    # Choose scene to load
+    scene_model = "Rs_int"
+    if not quickstart:
+        scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
+
+    # Choose robot to create
+    robot_name = "Fetch"
+    if not quickstart:
+        robot_name = choose_from_options(
+            options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
+        )
+>>>>>>> og-develop
 
     # # Add the robot we want to load
     # robot0_cfg = dict()
@@ -77,11 +92,26 @@ def main(random_selection=False, headless=False, short_exec=False):
     # robot0_cfg["action_type"] = "continuous"
     # robot0_cfg["action_normalize"] = True
 
+<<<<<<< HEAD
     # # Create the environment
+=======
+    # Add the robot we want to load
+    robot0_cfg = dict()
+    robot0_cfg["type"] = robot_name
+    robot0_cfg["obs_modalities"] = ["rgb"]
+    robot0_cfg["action_type"] = "continuous"
+    robot0_cfg["action_normalize"] = True
+
+    # Compile config
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+
+    # Create the environment
+>>>>>>> og-develop
     env = og.Environment(configs=cfg)
 
     # # Choose robot controller to use
     robot = env.robots[0]
+<<<<<<< HEAD
     # controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
     # # Choose control mode
@@ -90,6 +120,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     #     control_mode = "random"
     # else:
     #     control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
+=======
+    controller_choices = {
+        "base": "DifferentialDriveController",
+        "arm_0": "InverseKinematicsController",
+        "gripper_0": "MultiFingerGripperController",
+        "camera": "JointController",
+    }
+    if not quickstart:
+        controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
+
+    # Choose control mode
+    if random_selection:
+        control_mode = "random"
+    elif quickstart:
+        control_mode = "teleop"
+    else:
+        control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
+>>>>>>> og-develop
 
     # # Update the control mode of the robot
     # controller_config = {component: {"name": name} for component, name in controller_choices.items()}
@@ -131,9 +179,16 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
+<<<<<<< HEAD
         action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         _, reward, _, _, _ = env.step(action=action)
         print(reward)
+=======
+        action = (
+            action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
+        )
+        env.step(action=action)
+>>>>>>> og-develop
         step += 1
 
     # Always shut down the environment cleanly at the end
@@ -141,4 +196,14 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Teleoperate a robot in a BEHAVIOR scene.")
+
+    parser.add_argument(
+        "--quickstart",
+        action="store_true",
+        help="Whether the example should be loaded with default settings for a quick start.",
+    )
+    args = parser.parse_args()
+    main(quickstart=args.quickstart)

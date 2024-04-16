@@ -1,17 +1,20 @@
 ![splash](./docs/assets/splash.png)
 
 # <h1><img height="40" src="./docs/assets/OmniGibson_logo.png" style="float:left;padding-right:10px"> OmniGibson</h1>
-
-### 
+[![Tests](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml/badge.svg?branch=og-develop&event=push)](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml)
+[![Docker Image Version (latest by date)](https://img.shields.io/docker/v/stanfordvl/omnigibson?label=docker&sort=semver)](https://hub.docker.com/r/stanfordvl/omnigibson)
+[![Realtime Speed](https://behavior.stanford.edu/knowledgebase/profile/badge.svg)](https://stanfordvl.github.io/OmniGibson/profiling/)
 
 -------
 
-## Need support? Join our Discord!
+### Need support? Join our Discord!
 <a href="https://discord.gg/bccR5vGFEx"><img src="https://discordapp.com/api/guilds/1166422812160966707/widget.png?style=banner3"></a>
 
 -------
 
-## Latest Updates
+### Latest Updates
+- [03/17/24] **v1.0.0**: First full release with 1,004 pre-sampled tasks, all 50 scenes, and many new objects! [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v1.0.0)
+
 - [08/04/23] **v0.2.0**: More assets! 600 pre-sampled tasks, 7 new scenes, and many new objects 📈 [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.2.0)
 
 - [04/10/22] **v0.1.0**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.1.0)
@@ -42,3 +45,8 @@ year={2022},
 url={https://openreview.net/forum?id=_8DoIe8G3t}
 }
 ```
+
+### Profiling
+Click on the plot to access our profiling page with more examples.
+
+[![Profiling](https://behavior.stanford.edu/knowledgebase/profile/plot.png)](https://stanfordvl.github.io/OmniGibson/profiling/)

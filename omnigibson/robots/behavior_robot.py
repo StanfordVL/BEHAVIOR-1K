@@ -14,16 +14,14 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.teleop_utils import TeleopData
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
-m.COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
+m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # Offset between the body and parts
-m.HEAD_TO_BODY_OFFSET = ([0, 0, -0.4], [0, 0, 0, 1])
-m.RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, 0, 0]))
-m.LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, 0, 0]))
+m.HEAD_TO_BODY_OFFSET = [0, 0, -0.4]
+m.HAND_TO_BODY_OFFSET = {"left": [0, -0.15, -0.4], "right": [0, 0.15, -0.4]}
 m.BODY_HEIGHT_OFFSET = 0.45
 # Hand parameters
 m.HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
@@ -46,6 +44,7 @@ m.ARM_JOINT_STIFFNESS = 1e6
 m.ARM_JOINT_MAX_EFFORT = 300
 m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
+m.FINGER_JOINT_MAX_VELOCITY = np.pi * 4
 
 
 class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -54,39 +53,32 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     """
 
     def __init__(
-            self,
-            # Shared kwargs in hierarchy
-            name,
-            prim_path=None,
-            class_id=None,
-            uuid=None,
-            scale=None,
-            visible=True,
-            visual_only=False,
-            self_collisions=True,
-            load_config=None,
-
-            # Unique to USDObject hierarchy
-            abilities=None,
-
-            # Unique to ControllableObject hierarchy
-            control_freq=None,
-            controller_config=None,
-            action_type="continuous",
-            action_normalize=False,
-            reset_joint_pos=None,
-
-            # Unique to BaseRobot
-            obs_modalities="rgb",
-            proprio_obs="default",
-
-            # Unique to ManipulationRobot
-            grasping_mode="assisted",
-            
-            # unique to BehaviorRobot
-            use_ghost_hands=True,
-
-            **kwargs
+        self,
+        # Shared kwargs in hierarchy
+        name,
+        prim_path=None,
+        uuid=None,
+        scale=None,
+        visible=True,
+        visual_only=False,
+        self_collisions=True,
+        load_config=None,
+        # Unique to USDObject hierarchy
+        abilities=None,
+        # Unique to ControllableObject hierarchy
+        control_freq=None,
+        controller_config=None,
+        action_type="continuous",
+        action_normalize=False,
+        reset_joint_pos=None,
+        # Unique to BaseRobot
+        obs_modalities="rgb",
+        proprio_obs="default",
+        # Unique to ManipulationRobot
+        grasping_mode="assisted",
+        # unique to BehaviorRobot
+        use_ghost_hands=True,
+        **kwargs,
     ):
         """
         Initializes BehaviorRobot
@@ -97,7 +89,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super(BehaviorRobot, self).__init__(
             prim_path=prim_path,
             name=name,
-            class_id=class_id,
             uuid=uuid,
             scale=scale,
             visible=visible,
@@ -120,22 +111,19 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # setup eef parts
         self.parts = OrderedDict()
-        self.parts["left"] = BRPart(
-            name="lh", parent=self, prim_path="lh_palm", eef_type="hand",
-            offset_to_body=m.LH_TO_BODY_OFFSET, **kwargs
-        )
-
-        self.parts["right"] = BRPart(
-            name="rh", parent=self, prim_path="rh_palm", eef_type="hand",
-            offset_to_body=m.RH_TO_BODY_OFFSET, **kwargs
-        )
-
+        for arm_name in self.arm_names:
+            self.parts[arm_name] = BRPart(
+                name=arm_name,
+                parent=self,
+                prim_path=f"{arm_name}_palm",
+                eef_type="hand",
+                offset_to_body=m.HAND_TO_BODY_OFFSET[arm_name],
+                **kwargs,
+            )
         self.parts["head"] = BRPart(
-            name="head", parent=self,  prim_path="eye", eef_type="head",
-            offset_to_body=m.HEAD_TO_BODY_OFFSET, **kwargs
+            name="head", parent=self, prim_path="eye", eef_type="head", offset_to_body=m.HEAD_TO_BODY_OFFSET, **kwargs
         )
 
-        # private fields
         # whether to use ghost hands (visual markers to help visualize current vr hand pose)
         self._use_ghost_hands = use_ghost_hands
         # prim for the world_base_fixed_joint, used to reset the robot pose
@@ -150,14 +138,14 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def model_name(self):
         return "BehaviorRobot"
-    
+
     @property
     def n_arms(self):
         return 2
 
     @property
     def arm_names(self):
-        return ["lh", "rh"]
+        return ["left", "right"]
 
     @property
     def eef_link_names(self):
@@ -168,24 +156,28 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def arm_link_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
-        return {arm: [f"{arm}_{component}" for component in m.COMPONENT_SUFFIXES] for arm in self.arm_names + ['head']}
-    
+        return {arm: [f"{arm}_{component}" for component in m.COMPONENT_SUFFIXES] for arm in self.arm_names + ["head"]}
+
     @property
     def finger_link_names(self):
         return {
-            arm: [f"{arm}_{link_name}" for link_name in itertools.chain(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)]
+            arm: [
+                f"{arm}_{link_name}" for link_name in itertools.chain(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)
+            ]
             for arm in self.arm_names
         }
 
     @property
     def base_joint_names(self):
         return [f"base_{component}_joint" for component in m.COMPONENT_SUFFIXES]
-    
+
     @property
     def arm_joint_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
-        return {eef: [f"{eef}_{component}_joint" for component in m.COMPONENT_SUFFIXES] for eef in self.arm_names + ["head"]}
-    
+        return {
+            eef: [f"{eef}_{component}_joint" for component in m.COMPONENT_SUFFIXES] for eef in self.arm_names + ["head"]
+        }
+
     @property
     def finger_joint_names(self):
         return {
@@ -194,17 +186,19 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 [f"{arm}_{to_link}__{arm}_{m.PALM_LINK_NAME}" for to_link in m.FINGER_MID_LINK_NAMES]
                 +
                 # proximal-to-tip joints.
-                [f"{arm}_{to_link}__{arm}_{from_link}" for from_link, to_link in zip(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)]
+                [
+                    f"{arm}_{to_link}__{arm}_{from_link}"
+                    for from_link, to_link in zip(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)
+                ]
             )
             for arm in self.arm_names
         }
-    
+
     @property
     def base_control_idx(self):
-        # TODO: might need to refactor out joints
         joints = list(self.joints.keys())
-        return tuple(joints.index(joint) for joint in self.base_joint_names)
-    
+        return [joints.index(joint) for joint in self.base_joint_names]
+
     @property
     def arm_control_idx(self):
         joints = list(self.joints.keys())
@@ -236,10 +230,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def _default_controllers(self):
-        controllers = {
-            "base": "JointController",
-            "camera": "JointController"
-        }
+        controllers = {"base": "JointController", "camera": "JointController"}
         controllers.update({f"arm_{arm_name}": "JointController" for arm_name in self.arm_names})
         controllers.update({f"gripper_{arm_name}": "MultiFingerGripperController" for arm_name in self.arm_names})
         return controllers
@@ -270,7 +261,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "use_delta_commands": False,
             }
         return dic
-    
+
     @property
     def _default_gripper_multi_finger_controller_configs(self):
         dic = {}
@@ -285,7 +276,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "mode": "independent",
             }
         return dic
-    
+
     @property
     def _default_camera_joint_controller_config(self):
         return {
@@ -297,6 +288,26 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "command_input_limits": None,
             "use_delta_commands": False,
         }
+
+    @property
+    def _default_gripper_joint_controller_configs(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to default gripper joint controller config
+                to control this robot's gripper
+        """
+        dic = {}
+        for arm in self.arm_names:
+            dic[arm] = {
+                "name": "JointController",
+                "control_freq": self._control_freq,
+                "motor_type": "position",
+                "control_limits": self.control_limits,
+                "dof_idx": self.gripper_control_idx[arm],
+                "command_input_limits": None,
+                "use_delta_commands": False,
+            }
+        return dic
 
     @property
     def _default_controller_config(self):
@@ -332,7 +343,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def _create_discrete_action_space(self):
         raise ValueError("BehaviorRobot does not support discrete actions!")
-    
+
     def update_controller_mode(self):
         super().update_controller_mode()
         # set base joint properties
@@ -351,11 +362,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             for joint_name in self.finger_joint_names[arm]:
                 self.joints[joint_name].stiffness = m.FINGER_JOINT_STIFFNESS
                 self.joints[joint_name].max_effort = m.FINGER_JOINT_MAX_EFFORT
-   
+                self.joints[joint_name].max_velocity = m.FINGER_JOINT_MAX_VELOCITY
+
     @property
     def base_footprint_link_name(self):
         """
-        Name of the actual root link that we are interested in. 
+        Name of the actual root link that we are interested in.
         """
         return "base"
 
@@ -377,28 +389,28 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             if position is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
             if orientation is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]]))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
+                )
 
     @property
     def assisted_grasp_start_points(self):
-        side_coefficients = {"lh": np.array([1, -1, 1]), "rh": np.array([1, 1, 1])}
+        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_BASE_POS),
-                GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_CENTER_POS * side_coefficients[arm]),
                 GraspingPoint(
-                    link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_1_POS * side_coefficients[arm]
+                    link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_CENTER_POS * side_coefficients[arm]
                 ),
-                GraspingPoint(
-                    link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_2_POS * side_coefficients[arm]
-                ),
+                GraspingPoint(link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_1_POS * side_coefficients[arm]),
+                GraspingPoint(link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_2_POS * side_coefficients[arm]),
             ]
             for arm in self.arm_names
         }
 
     @property
     def assisted_grasp_end_points(self):
-        side_coefficients = {"lh": np.array([1, -1, 1]), "rh": np.array([1, 1, 1])}
+        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{finger}", position=m.FINGER_TIP_POS * side_coefficients[arm])
@@ -409,17 +421,18 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def update_hand_contact_info(self):
         """
-        Helper function that updates the contact info for the hands and body. 
+        Helper function that updates the contact info for the hands and body.
         Can be used in the future with device haptics to provide collision feedback.
         """
         self._part_is_in_contact["body"] = len(self.links["body"].contact_list()) > 0
         for hand_name in self.arm_names:
-            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 \
-               or np.any([len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]])
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or np.any(
+                [len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]]
+            )
 
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         """
-        Generates an action for the BehaviorRobot to perform based on vr data dict.
+        Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 
         Action space (all non-normalized values that will be clipped if they are too large)
         Body:
@@ -428,15 +441,15 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         - 6DOF pose - relative to body frame (where the body will be after applying this frame's action)
         Left hand, right hand (in that order):
         - 6DOF pose - relative to body frame (same as above)
-        - 10DOF gripper joint rotation 
+        - 10DOF gripper joint rotation
 
         Total size: 44
         """
         # Actions are stored as 1D numpy array
         action = np.zeros(self.action_dim)
         # Update body action space
-        if teleop_data.is_valid["head"]:
-            head_pos, head_orn = teleop_data.transforms["head"]
+        if teleop_action.is_valid["head"]:
+            head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])
             des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
             des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
@@ -448,26 +461,25 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
             hand_data = 0
-            if teleop_data.is_valid[part_name]: 
-                part_pos, part_orn = teleop_data.transforms[part_name]
-                # apply eef rotation offset to part transform first
-                des_world_part_pos = part_pos
-                des_world_part_orn = T.quat_multiply(part_orn, eef_part.offset_to_body[1])
-                if eef_part.name in self.arm_names:
+            if teleop_action.is_valid[part_name]:
+                des_world_part_pos, des_world_part_orn = teleop_action[part_name][:3], T.euler2quat(
+                    teleop_action[part_name][3:6]
+                )
+                if part_name in self.arm_names:
                     # compute gripper action
-                    if hasattr(teleop_data, "hand_data"):
+                    if hasattr(teleop_action, "hand_data"):
                         # hand tracking mode, compute joint rotations for each independent hand joint
-                        hand_data = teleop_data.hand_data[part_name]
+                        hand_data = teleop_action.hand_data[part_name]
                         hand_data = hand_data[:, :2].T.reshape(-1)
                     else:
                         # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
-                        hand_data = teleop_data.grippers[part_name] * 2 - 1
-                    action[self.controller_action_idx[f"gripper_{eef_part.name}"]] = hand_data
+                        hand_data = teleop_action[part_name][6] * 2 - 1
+                    action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data
                     # update ghost hand if necessary
                     if self._use_ghost_hands:
                         self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
             else:
-               des_world_part_pos, des_world_part_orn = eef_part.local_position_orientation
+                des_world_part_pos, des_world_part_orn = eef_part.local_position_orientation
 
             # Get local pose with respect to the new body frame
             des_local_part_pos, des_local_part_orn = T.relative_pose_transform(
@@ -475,13 +487,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             )
             # apply shoulder position offset to the part transform to get final destination pose
             des_local_part_pos, des_local_part_orn = T.pose_transform(
-                eef_part.offset_to_body[0], [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
+                eef_part.offset_to_body, [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
             )
             des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
-            controller_name = "camera" if part_name == "head" else "arm_" + eef_part.name
+            controller_name = "camera" if part_name == "head" else "arm_" + part_name
             action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
             # If we reset, teleop the robot parts to the desired pose
-            if eef_part.name in self.arm_names and teleop_data.reset[part_name]:
+            if part_name in self.arm_names and teleop_action.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
         return action
 
@@ -489,7 +501,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 class BRPart(ABC):
     """This is the interface that all BehaviorRobot eef parts must implement."""
 
-    def __init__(self, name: str, parent: BehaviorRobot, prim_path: str, eef_type: str, offset_to_body: List[float]) -> None:
+    def __init__(
+        self, name: str, parent: BehaviorRobot, prim_path: str, eef_type: str, offset_to_body: List[float]
+    ) -> None:
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
 
@@ -498,7 +512,7 @@ class BRPart(ABC):
             parent (BehaviorRobot): the parent BR object
             prim_path (str): prim path to the root link of the eef
             eef_type (str): type of eef. One of hand, head
-            offset_to_body (List[float]): relative rotation offset between the shoulder_rz link and the eef link.
+            offset_to_body (List[float]): relative POSITION offset between the rz link and the eef link.
         """
         self.name = name
         self.parent = parent

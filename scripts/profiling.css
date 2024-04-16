@@ -1,0 +1,71 @@
+h1 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10vh 0 3vh 0;
+    width: 100vw;
+}
+
+h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20vh 0 0 0;
+}
+
+h5 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1vh 0 9vh 0;
+    font-size: small;
+    font-weight: normal;
+}
+
+.list-group {
+    display: inline-block;
+    position: relative;
+    left: 7vw;
+    width: 13vw;
+    text-align: center;
+}
+
+.tab-content {
+    display: inline-block;
+    width: 60vw;
+}
+
+.row {
+    width: 100vw;
+}
+
+#dl-button {
+    color: #fff;
+    background-color: #3298dc;
+    border-color: transparent;
+    cursor: pointer;
+    text-align: center;
+    width: 10vw;
+    border-radius: 3px;
+}
+
+button:hover {
+    background-color: #2793da;
+    flex: none;
+}
+
+.spacer {
+    flex: auto;
+}
+
+header {
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.header-item {
+    margin-top: 2vh;
+}

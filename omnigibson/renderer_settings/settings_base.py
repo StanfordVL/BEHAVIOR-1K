@@ -25,8 +25,8 @@ class SubSettingsBase(metaclass=ABCMeta):
         """
         The path of "enabled" setting for this sub-settings class.
 
-        Subclass with "enabled" mode needs to overwrite this method. 
-        
+        Subclass with "enabled" mode needs to overwrite this method.
+
         Returns:
             str or None: The path of "enabled" mode for this sub-setting class.
                 Defaults to None, which means this sub-setting group cannot be enabled/disabled.
@@ -36,7 +36,7 @@ class SubSettingsBase(metaclass=ABCMeta):
     def is_enabled(self):
         """
         Get the enabled status for this sub-setting class.
-        
+
         Returns:
             bool: Whether this sub-setting group is enabled.
                 Returns true if this sub-setting group has no "enabled" mode.
@@ -105,7 +105,7 @@ class SettingItem:
     def value(self):
         """
         Get the current setting value.
-        
+
         Returns:
             any: The current setting value.
         """
@@ -114,7 +114,7 @@ class SettingItem:
     def get(self):
         """
         Get the current setting value.
-        
+
         Returns:
             any: The current setting value.
         """
@@ -129,7 +129,7 @@ class SettingItem:
     def set(self, value):
         """
         Set the current setting to @value.
-        
+
         Args:
             value (any): Value to set for the current setting value.
         """
