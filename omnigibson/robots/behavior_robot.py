@@ -15,6 +15,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.utils.python_utils import classproperty
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
@@ -140,12 +141,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def model_name(self):
         return "BehaviorRobot"
 
-    @property
-    def n_arms(self):
+    @classproperty
+    def n_arms(cls):
         return 2
 
-    @property
-    def arm_names(self):
+    @classproperty
+    def arm_names(cls):
         return ["left", "right"]
 
     @property

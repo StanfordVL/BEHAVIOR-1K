@@ -106,6 +106,10 @@ gm.ENABLE_TRANSITION_RULES = False
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
 
+# Default physics / rendering frequencies (Hz)
+gm.DEFAULT_RENDERING_FREQ = 30
+gm.DEFAULT_PHYSICS_FREQ = 120
+
 # (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
 gm.AG_CLOTH = False
 

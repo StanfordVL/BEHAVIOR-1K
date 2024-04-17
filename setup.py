@@ -48,6 +48,5 @@ setup(
     ],
     tests_require=[],
     python_requires=">=3",
-    package_data={"": ["omnigibson/global_config.yaml"]},
     include_package_data=True,
 )  # yapf: disable

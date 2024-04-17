@@ -165,6 +165,7 @@ def assert_test_env():
                 get_obj_cfg("half_apple", "half_apple", "sguztn"),
                 get_obj_cfg("washer", "washer", "dobgmu"),
                 get_obj_cfg("carpet_sweeper", "carpet_sweeper", "xboreo"),
+                get_obj_cfg("clothes_dryer", "clothes_dryer", "smcyys"),
             ],
             "robots": [
                 {
