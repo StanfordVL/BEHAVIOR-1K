@@ -7,9 +7,8 @@ from typing import Optional
 
 import grpc
 import gymnasium as gym
-from telegym.protos import environment_pb2, environment_pb2_grpc
-
 import wandb
+from telegym.protos import environment_pb2, environment_pb2_grpc
 
 
 def _unwrap_wrapper(env: gym.Env, wrapper_class: str) -> Optional[gym.Wrapper]:

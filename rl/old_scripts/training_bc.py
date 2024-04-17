@@ -19,6 +19,7 @@ try:
 except ImportError:
     smart_open = None
 
+import wandb
 from ray.rllib.algorithms.bc import BCConfig
 from ray.rllib.evaluation.sample_batch_builder import SampleBatchBuilder
 from ray.rllib.models.preprocessors import DictFlatteningPreprocessor
@@ -39,8 +40,6 @@ from ray.rllib.utils.spaces.space_utils import clip_action, normalize_action
 from ray.rllib.utils.typing import Any, FileType, SampleBatchType
 from ray.tune.logger import pretty_print
 from ray.tune.registry import register_env
-
-import wandb
 
 if TYPE_CHECKING:
     from ray.rllib.evaluation import RolloutWorker
