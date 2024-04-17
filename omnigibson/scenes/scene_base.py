@@ -1,29 +1,30 @@
 import json
 from abc import ABC
 from itertools import combinations
+
 import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.objects.light_object import LightObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
-    classproperty,
-    Serializable,
-    Registerable,
     Recreatable,
+    Registerable,
+    Serializable,
+    classproperty,
     create_object_from_init_info,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import CollisionAPI
-from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
-from omnigibson.objects.light_object import LightObject
-from omnigibson.robots.robot_base import m as robot_macros
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

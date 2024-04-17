@@ -1,8 +1,9 @@
 import argparse
 import logging
-import socket
 import os
+import socket
 import sys
+
 import yaml
 
 log = logging.getLogger(__name__)
@@ -10,25 +11,25 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_directory)
 sys.path.append(parent_directory)
 
-from telegym import GRPCClientVecEnv
-
 import torch as th
 import torch.nn as nn
-import wandb
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import (
+    BaseCallback,
+    CallbackList,
+    CheckpointCallback,
+    EvalCallback,
+    StopTrainingOnNoModelImprovement,
+)
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
-from stable_baselines3.common.callbacks import (
-    CallbackList,
-    CheckpointCallback,
-    StopTrainingOnNoModelImprovement,
-    BaseCallback,
-    EvalCallback,
-)
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
+from telegym import GRPCClientVecEnv
 from wandb.integration.sb3 import WandbCallback
+
+import wandb
 from wandb import AlertLevel
 
 # Parse args

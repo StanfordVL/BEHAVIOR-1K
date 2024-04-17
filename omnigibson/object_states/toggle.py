@@ -3,14 +3,13 @@ import numpy as np
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
-from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import create_primitive_mesh, RigidContactAPI
+from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import PrimType
-
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import RigidContactAPI, create_primitive_mesh
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

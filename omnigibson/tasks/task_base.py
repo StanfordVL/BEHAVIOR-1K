@@ -1,9 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
-import numpy as np
-from omnigibson.utils.python_utils import classproperty, Registerable
-from omnigibson.utils.gym_utils import GymObservable
 
+import numpy as np
+
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_TASKS = dict()
 

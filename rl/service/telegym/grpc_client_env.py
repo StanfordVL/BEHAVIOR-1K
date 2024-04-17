@@ -1,11 +1,11 @@
-import pickle
-import grpc
-from telegym.protos import environment_pb2
-from telegym.protos import environment_pb2_grpc
-
-import gymnasium as gym
 import asyncio
+import pickle
 import time
+
+import grpc
+import gymnasium as gym
+from telegym.protos import environment_pb2, environment_pb2_grpc
+
 import wandb
 
 

@@ -2,33 +2,32 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states import Saturated
 from omnigibson.object_states.factory import (
     get_default_states,
-    get_state_name,
-    get_requirements_for_ability,
-    get_states_for_ability,
-    get_states_by_dependency_order,
-    get_texture_change_states,
     get_fire_states,
+    get_requirements_for_ability,
+    get_state_name,
+    get_states_by_dependency_order,
+    get_states_for_ability,
     get_steam_states,
-    get_visual_states,
     get_texture_change_priority,
+    get_texture_change_states,
+    get_visual_states,
 )
-from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.utils.constants import PrimType, EmitterType
+from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
-from omnigibson.object_states import Saturated
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

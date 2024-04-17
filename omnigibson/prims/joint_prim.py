@@ -1,16 +1,16 @@
 from collections.abc import Iterable
+
 import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
+from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.usd_utils import PoseAPI, create_joint
-from omnigibson.utils.constants import JointType, JointAxis
+from omnigibson.utils.constants import JointAxis, JointType
 from omnigibson.utils.python_utils import assert_valid_key
-import omnigibson.utils.transform_utils as T
-
-from omnigibson.controllers.controller_base import ControlType
-
+from omnigibson.utils.usd_utils import PoseAPI, create_joint
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

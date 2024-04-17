@@ -7,20 +7,19 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
-import omnigibson.lazy as lazy
+from collections.abc import Iterable
 
+import numpy as np
+
+import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.systems import get_system
-import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
-from omnigibson.utils.python_utils import classproperty
-import omnigibson as og
-
-import numpy as np
-from collections.abc import Iterable
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

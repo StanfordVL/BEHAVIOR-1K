@@ -1,6 +1,7 @@
+import numpy as np
+
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-import numpy as np
 from omnigibson.utils.python_utils import classproperty
 
 

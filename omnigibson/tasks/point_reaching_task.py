@@ -1,9 +1,8 @@
 import numpy as np
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.tasks.point_navigation_task import PointNavigationTask
 from omnigibson.termination_conditions.point_goal import PointGoal
-import omnigibson.utils.transform_utils as T
-
 
 # Valid point navigation reward types
 POINT_NAVIGATION_REWARD_TYPES = {"l2", "geodesic"}

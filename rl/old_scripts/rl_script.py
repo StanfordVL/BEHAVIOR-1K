@@ -1,5 +1,6 @@
-from omnigibson.envs.rl_env import RLEnv
 from ray.rllib.algorithms.ppo import PPOConfig
+
+from omnigibson.envs.rl_env import RLEnv
 
 
 def main():

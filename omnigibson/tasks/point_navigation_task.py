@@ -1,6 +1,7 @@
 import numpy as np
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.object_states import Pose
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.reward_functions.collision_reward import CollisionReward
@@ -8,13 +9,12 @@ from omnigibson.reward_functions.point_goal_reward import PointGoalReward
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
-from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

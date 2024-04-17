@@ -3,9 +3,9 @@ import tempfile
 
 import omnigibson as og
 from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.usd_utils import add_asset_to_stage
-from omnigibson.utils.asset_utils import decrypt_file
 
 
 class USDObject(StatefulObject):

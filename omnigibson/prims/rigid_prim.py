@@ -1,17 +1,18 @@
 from functools import cached_property
-from scipy.spatial import ConvexHull, QhullError
+
 import numpy as np
+from scipy.spatial import ConvexHull, QhullError
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.prims.xform_prim import XFormPrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import PoseAPI, get_mesh_volume_and_com, check_extent_radius_ratio
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import PoseAPI, check_extent_radius_ratio, get_mesh_volume_and_com
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

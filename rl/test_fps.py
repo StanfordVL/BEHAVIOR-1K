@@ -1,9 +1,11 @@
 import os
-import yaml
+import time
+
 import numpy as np
+import yaml
+
 import omnigibson as og
 from omnigibson.macros import gm
-import time
 
 gm.USE_FLATCACHE = True
 

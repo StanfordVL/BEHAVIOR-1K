@@ -1,13 +1,13 @@
 from abc import abstractmethod
 
 import numpy as np
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 from transforms3d.euler import euler2quat
 from transforms3d.quaternions import qmult, quat2mat
 
 from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class LocomotionRobot(BaseRobot):

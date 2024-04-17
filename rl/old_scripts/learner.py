@@ -1,10 +1,10 @@
 import argparse
 import subprocess
 import uuid
-import torch as th
 
-from stable_baselines3 import PPO
+import torch as th
 from dask.distributed import Client
+from stable_baselines3 import PPO
 
 
 class PolicyWrapper:

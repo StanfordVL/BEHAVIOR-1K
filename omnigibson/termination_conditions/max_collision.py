@@ -1,5 +1,5 @@
-from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
 
 class MaxCollision(FailureCondition):

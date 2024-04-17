@@ -1,8 +1,8 @@
 import copy
 
 import numpy as np
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn
 
 import omnigibson as og
 from omnigibson.envs.env_base import Environment

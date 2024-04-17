@@ -6,9 +6,8 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.utils.sampling_utils import raytest_batch, raytest
 from omnigibson.utils.constants import PrimType
-
+from omnigibson.utils.sampling_utils import raytest, raytest_batch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

@@ -1,7 +1,7 @@
-import cv2
-import numpy as np
 from collections.abc import Iterable
 
+import cv2
+import numpy as np
 from transforms3d.quaternions import quat2mat
 
 import omnigibson.lazy as lazy

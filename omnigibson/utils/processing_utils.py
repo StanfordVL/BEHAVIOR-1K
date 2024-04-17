@@ -1,4 +1,5 @@
 import numpy as np
+
 from omnigibson.utils.python_utils import Serializable
 
 

@@ -1,9 +1,10 @@
-import omnigibson as og
 import numpy as np
-from omnigibson.macros import gm
-from telemoma.human_interface.teleop_core import TeleopAction
-from omnigibson.utils.transform_utils import quat2euler
 import pytest
+from telemoma.human_interface.teleop_core import TeleopAction
+
+import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson.utils.transform_utils import quat2euler
 
 
 @pytest.mark.skip(reason="test hangs on CI")

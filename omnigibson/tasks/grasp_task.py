@@ -1,15 +1,19 @@
-import random
-import numpy as np
 import json
 import os
-from scipy.spatial.transform import Rotation as R
-import omnigibson as og
-from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
-from omnigibson.reward_functions.grasp_reward import GraspReward
+import random
 
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.tasks.task_base import BaseTask
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    PlanningContext,
+    StarterSemanticActionPrimitives,
+)
+from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
+from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.falling import Falling
 from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
@@ -17,7 +21,6 @@ from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 

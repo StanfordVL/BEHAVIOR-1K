@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
+from omnigibson.utils.python_utils import Recreatable, Serializable, UniquelyNamed
 from omnigibson.utils.sim_utils import check_deletable_prim
 from omnigibson.utils.ui_utils import create_module_logger
 

@@ -1,15 +1,14 @@
+import numpy as np
+import pytest
+from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_plane, place_objA_on_objB_bbox
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system, VisualParticleSystem
+from omnigibson.systems import VisualParticleSystem, get_system, is_physical_particle_system, is_visual_particle_system
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
-import omnigibson.utils.transform_utils as T
-import omnigibson as og
-
-from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane, SYSTEM_EXAMPLES
-
-import pytest
-import numpy as np
 
 
 @og_test

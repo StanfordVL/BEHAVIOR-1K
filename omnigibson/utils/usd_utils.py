@@ -1,21 +1,18 @@
 import collections
 import math
-from collections.abc import Iterable
 import os
-
-import omnigibson.lazy as lazy
+from collections.abc import Iterable
 
 import numpy as np
 import trimesh
 
 import omnigibson as og
-from omnigibson.macros import gm
-
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
-from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.ui_utils import suppress_omni_log, create_module_logger
-
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

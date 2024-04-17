@@ -1,5 +1,5 @@
-from omnigibson.scenes.scene_base import Scene
 from omnigibson.maps.traversable_map import TraversableMap
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger

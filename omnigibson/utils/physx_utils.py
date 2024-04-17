@@ -1,9 +1,9 @@
 import numpy as np
 
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.utils.ui_utils import suppress_omni_log
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.utils.ui_utils import suppress_omni_log
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

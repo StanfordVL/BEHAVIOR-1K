@@ -1,9 +1,10 @@
 import os
+
 import numpy as np
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 
 
 class FrankaAllegro(ManipulationRobot):

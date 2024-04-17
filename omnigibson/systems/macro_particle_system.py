@@ -1,21 +1,22 @@
 import os
+
 import matplotlib.pyplot as plt
+import numpy as np
 import trimesh
+from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import FlatcacheAPI
-from omnigibson.prims.geom_prim import VisualGeomPrim, CollisionVisualGeomPrim
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem, VisualParticleSystem
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import classproperty, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.usd_utils import FlatcacheAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

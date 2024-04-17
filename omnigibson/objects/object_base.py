@@ -1,19 +1,19 @@
 from abc import ABCMeta
-import numpy as np
 from collections.abc import Iterable
+
+import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.usd_utils import create_joint, CollisionAPI
-from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
-from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 import omnigibson.utils.transform_utils as T
-
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
+from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.usd_utils import CollisionAPI, create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()

@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from collections import defaultdict
+
 import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, macros, gm
-from omnigibson.prims.geom_prim import VisualGeomPrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -15,30 +16,29 @@ from omnigibson.object_states.object_state_base import IntrinsicObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import (
-    BaseSystem,
-    VisualParticleSystem,
-    PhysicalParticleSystem,
-    get_system,
-    is_visual_particle_system,
-    is_physical_particle_system,
-    is_fluid_system,
-    is_system_active,
     REGISTERED_SYSTEMS,
+    BaseSystem,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    get_system,
+    is_fluid_system,
+    is_physical_particle_system,
+    is_system_active,
+    is_visual_particle_system,
 )
-from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
-    get_particle_positions_in_frame,
     get_particle_positions_from_frame,
+    get_particle_positions_in_frame,
 )
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
-
+from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import FlatcacheAPI, create_primitive_mesh
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

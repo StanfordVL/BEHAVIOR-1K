@@ -1,19 +1,16 @@
 import asyncio
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import Any, List, Optional, Sequence, Type
-import warnings
-
-import gymnasium as gym
 
 import grpc
+import gymnasium as gym
 import numpy as np
-from telegym.protos import environment_pb2
-from telegym.protos import environment_pb2_grpc
-from telegym.grpc_client_env import GRPCClientEnv
-
-from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
 from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
+from telegym.grpc_client_env import GRPCClientEnv
+from telegym.protos import environment_pb2, environment_pb2_grpc
 
 
 class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrationService):

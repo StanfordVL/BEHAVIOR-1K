@@ -1,14 +1,15 @@
 from functools import cached_property
+
 import numpy as np
 import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
-import omnigibson.utils.transform_utils as T
 
 
 class GeomPrim(XFormPrim):

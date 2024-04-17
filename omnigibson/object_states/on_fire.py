@@ -1,7 +1,6 @@
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-
+from omnigibson.object_states.temperature import Temperature
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

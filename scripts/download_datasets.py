@@ -6,9 +6,10 @@ import os
 
 os.environ["OMNIGIBSON_NO_OMNIVERSE"] = "1"
 
-from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import download_og_dataset, download_assets
 import click
+
+from omnigibson.macros import gm
+from omnigibson.utils.asset_utils import download_assets, download_og_dataset
 
 
 def main():

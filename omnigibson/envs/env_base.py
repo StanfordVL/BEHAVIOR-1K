@@ -1,30 +1,30 @@
-import gymnasium as gym
-import numpy as np
 from copy import deepcopy
 
+import gymnasium as gym
+import numpy as np
+
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
+from omnigibson.scenes import REGISTERED_SCENES
+from omnigibson.sensors import VisionSensor, create_sensor
 from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
-from omnigibson.scenes import REGISTERED_SCENES
-from omnigibson.sensors import create_sensor, VisionSensor
+from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.gym_utils import (
     GymObservable,
-    recursively_generate_flat_dict,
     recursively_generate_compatible_dict,
+    recursively_generate_flat_dict,
 )
-from omnigibson.utils.config_utils import parse_config
-from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import (
-    assert_valid_key,
-    merge_nested_dicts,
-    create_class_from_registry_and_config,
     Recreatable,
+    assert_valid_key,
+    create_class_from_registry_and_config,
+    merge_nested_dicts,
 )
-from omnigibson.macros import gm
-
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

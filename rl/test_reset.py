@@ -1,25 +1,26 @@
 import argparse
-from datetime import datetime
 import math
 import os
 import uuid
-import numpy as np
+from datetime import datetime
+
+import h5py
 import matplotlib.pyplot as plt
+import numpy as np
 import yaml
+from PIL import Image
+from tqdm import tqdm
+
 import omnigibson as og
-from omnigibson.macros import gm
+import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.sensors.scan_sensor import ScanSensor
 from omnigibson.sensors.vision_sensor import VisionSensor
-import omnigibson.utils.transform_utils as T
-from omnigibson.objects.dataset_object import DatasetObject
-import h5py
-
-from PIL import Image
-from tqdm import tqdm
 
 
 def step_sim(time):

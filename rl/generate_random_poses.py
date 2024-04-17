@@ -1,24 +1,25 @@
 import argparse
-from datetime import datetime
+import json
 import math
 import os
+import random
 import uuid
-import numpy as np
+from datetime import datetime
+
 import matplotlib.pyplot as plt
+import numpy as np
 import yaml
+from tqdm import tqdm
+
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    PlanningContext,
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
-    PlanningContext,
 )
+from omnigibson.macros import gm
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
-
-import random
-from tqdm import tqdm
-import json
 
 
 def get_random_joint_position(robot):

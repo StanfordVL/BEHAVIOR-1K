@@ -6,50 +6,46 @@ See provided tiago_primitives.yaml config file for an example. See examples/acti
 runnable examples.
 """
 
-from functools import cached_property
 import inspect
 import logging
 import random
-from aenum import IntEnum, auto
+from functools import cached_property
 from math import ceil
-import cv2
-from matplotlib import pyplot as plt
 
+import cv2
 import gymnasium as gym
 import numpy as np
+from aenum import IntEnum, auto
+from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation, Slerp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveError,
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.controllers import JointController, DifferentialDriveController
+from omnigibson.controllers import DifferentialDriveController, JointController
+from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import BaseRobot, Fetch, Tiago
 from omnigibson.tasks.behavior_task import BehaviorTask
+from omnigibson.utils.control_utils import FKSolver, IKSolver
+from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import (
-    plan_base_motion,
+    detect_robot_collision_in_sim,
     plan_arm_motion,
     plan_arm_motion_ik,
+    plan_base_motion,
     set_base_and_detect_collision,
-    detect_robot_collision_in_sim,
 )
-
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.control_utils import IKSolver
-from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
-from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.control_utils import FKSolver
-
+from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.utils.ui_utils import create_module_logger
-
-from omnigibson.objects.usd_object import USDObject
 
 m = create_module_macros(module_path=__file__)
 

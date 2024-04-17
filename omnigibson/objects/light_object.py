@@ -1,11 +1,12 @@
+import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-import numpy as np
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

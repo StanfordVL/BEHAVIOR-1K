@@ -1,18 +1,19 @@
-import yaml
-import numpy as np
 import argparse
+import cProfile
+import io
+import os
+import pstats
+import time
+
+import numpy as np
+import yaml
 
 import omnigibson as og
-from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 import omnigibson.utils.transform_utils as T
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision, set_base_and_detect_collision
-
-import cProfile, pstats, io
-import time
-import os
-import argparse
 
 
 def pause(time):

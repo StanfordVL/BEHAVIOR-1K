@@ -1,13 +1,14 @@
-import numpy as np
-from math import ceil
 import heapq
+from math import ceil
+
+import numpy as np
 
 import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
-import omnigibson.lazy as lazy
 
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3

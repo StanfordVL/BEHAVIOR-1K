@@ -1,12 +1,11 @@
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
-import omnigibson.utils.transform_utils as T
-import omnigibson as og
-from omnigibson.sensors import VisionSensor
-
-from utils import og_test, place_obj_on_floor_plane, SYSTEM_EXAMPLES
-
-import pytest
 import numpy as np
+import pytest
+from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.sensors import VisionSensor
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 
 
 @og_test

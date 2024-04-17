@@ -1,14 +1,14 @@
-from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
 import pickle
 import threading
-from typing import Optional
-import grpc
-from telegym.protos import environment_pb2
-from telegym.protos import environment_pb2_grpc
-
-import gymnasium as gym
 import time
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+from typing import Optional
+
+import grpc
+import gymnasium as gym
+from telegym.protos import environment_pb2, environment_pb2_grpc
+
 import wandb
 
 

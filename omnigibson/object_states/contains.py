@@ -1,17 +1,19 @@
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
+
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.systems.system_base import (
-    VisualParticleSystem,
     PhysicalParticleSystem,
-    is_visual_particle_system,
+    VisualParticleSystem,
     is_physical_particle_system,
+    is_visual_particle_system,
 )
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
-import omnigibson.utils.transform_utils as T
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

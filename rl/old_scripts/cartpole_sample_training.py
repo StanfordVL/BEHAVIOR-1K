@@ -1,17 +1,13 @@
-from ray.rllib.algorithms.sac import SACConfig
-from ray.rllib.algorithms.dqn import DQNConfig
+import gymnasium as gym
+from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.ddpg.ddpg import DDPGConfig
+from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.algorithms.impala import ImpalaConfig
-from ray.rllib.offline.estimators import (
-    ImportanceSampling,
-    WeightedImportanceSampling,
-    DirectMethod,
-    DoublyRobust,
-)
+from ray.rllib.algorithms.sac import SACConfig
+from ray.rllib.offline.estimators import DirectMethod, DoublyRobust, ImportanceSampling, WeightedImportanceSampling
 from ray.rllib.offline.estimators.fqe_torch_model import FQETorchModel
 from ray.tune.logger import pretty_print
-from ray.rllib.algorithms.algorithm import Algorithm
-import gymnasium as gym
+
 import wandb
 
 wandb.init(

@@ -1,26 +1,24 @@
-from omnigibson.macros import macros as m
-from omnigibson.object_states import *
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
-import omnigibson.utils.transform_utils as T
-from omnigibson.objects import DatasetObject
-from omnigibson.transition_rules import REGISTERED_RULES
-import omnigibson as og
-from omnigibson.macros import macros as m
+import numpy as np
+import pytest
 from scipy.spatial.transform import Rotation as R
-
 from utils import (
-    og_test,
     get_random_pose,
-    place_objA_on_objB_bbox,
+    og_test,
     place_obj_on_floor_plane,
-    retrieve_obj_cfg,
+    place_objA_on_objB_bbox,
     remove_all_systems,
+    retrieve_obj_cfg,
 )
 
-import pytest
-import numpy as np
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import macros as m
+from omnigibson.object_states import *
+from omnigibson.objects import DatasetObject
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
+from omnigibson.transition_rules import REGISTERED_RULES
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 
 
 @pytest.mark.skip(reason="dryer is not fillable yet.")

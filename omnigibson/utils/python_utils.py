@@ -5,9 +5,9 @@ A set of utility functions for general python usage
 import inspect
 import re
 from abc import ABCMeta
-from copy import deepcopy
 from collections.abc import Iterable
-from functools import wraps, cache
+from copy import deepcopy
+from functools import cache, wraps
 from importlib import import_module
 
 import numpy as np

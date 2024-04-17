@@ -1,9 +1,8 @@
+import sys
+
 from stable_baselines3 import A2C
 from stable_baselines3.common.vec_env import VecFrameStack, VecMonitor, VecVideoRecorder
-
 from telegym.grpc_client_vec_env import GRPCClientVecEnv
-
-import sys
 
 n_envs = int(sys.argv[1])
 env = GRPCClientVecEnv("0.0.0.0:50051", n_envs)

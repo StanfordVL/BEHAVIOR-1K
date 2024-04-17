@@ -1,6 +1,7 @@
-import numpy as np
 import time
 from typing import Iterable, Optional, Tuple
+
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,10 +11,10 @@ from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
 try:
+    from telemoma.configs.base_config import teleop_config
     from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
     from telemoma.human_interface.teleop_policy import TeleopPolicy
     from telemoma.utils.general_utils import AttrDict
-    from telemoma.configs.base_config import teleop_config
 except ImportError as e:
     raise e from ValueError("For teleoperation, install telemoma by running 'pip install telemoma'")
 

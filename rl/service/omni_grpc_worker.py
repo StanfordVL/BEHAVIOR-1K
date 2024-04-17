@@ -1,12 +1,13 @@
-import os
-import yaml
-import numpy as np
-import omnigibson as og
-from omnigibson.macros import gm
-import wandb
 import argparse
+import os
 
+import numpy as np
+import yaml
 from telegym import serve_env_over_grpc
+
+import omnigibson as og
+import wandb
+from omnigibson.macros import gm
 
 gm.USE_FLATCACHE = True
 
@@ -36,7 +37,8 @@ def main(local_addr, learner_addr, render):
 
 
 if __name__ == "__main__":
-    import sys, socket
+    import socket
+    import sys
 
     parser = argparse.ArgumentParser()
     parser.add_argument("learner_addr", type=str)

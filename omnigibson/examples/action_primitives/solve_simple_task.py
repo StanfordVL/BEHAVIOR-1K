@@ -1,13 +1,14 @@
 import os
-import yaml
+
 import numpy as np
+import yaml
 
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
