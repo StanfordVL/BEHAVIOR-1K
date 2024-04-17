@@ -192,7 +192,7 @@ class MultiFingerGripperController(GripperController):
                 )
         else:
             # Use continuous signal
-            u = target
+            u = np.full(self.dof_idx.shape, target)
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:

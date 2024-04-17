@@ -255,6 +255,12 @@ class BaseController(Serializable, Registerable, Recreatable):
             if self.control_type == ControlType.POSITION
             else [True] * self.control_dim
         )
+
+        # print("control:",control)
+        # print("idx:",idx)
+        # print("dof_idx:", self.dof_idx)
+        # print("control_dim:", self.control_dim)
+        # print("clip_ctrl:", clipped_control)
         control[idx] = clipped_control[idx]
         return control
 
