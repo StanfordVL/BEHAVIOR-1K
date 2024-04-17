@@ -90,7 +90,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -171,7 +171,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         needs_dummy = False
         if not self.fixed_base:
             # TODO: Make this work after controllers get updated post-load.
-            # TODO(rl): Make this work - for now this feature is disabled because we can't check the config
+            # TODO(parallel): Make this work - for now this feature is disabled because we can't check the config
             # at this time.
             # Check if we have any operational space controllers or joint controllers with use_impedances on.
             # for cfg in self._controller_config.values():
@@ -186,10 +186,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         if needs_dummy:
             dummy_path = f"{self.prim_path}_dummy"
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
-            # TODO(rl): URGENT - Relativize
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
-                relative_prim_path=dummy_path,
+                relative_prim_path=self.scene.absolute_prim_path_to_relative(dummy_path),
                 scale=self._load_config.get("scale", None),
                 visible=False,
                 fixed_base=True,
@@ -365,7 +364,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         ori = T.quat2euler(quat)
 
         # Compute ori2d
-        # TODO(rl): Dedupe this code that is also used in get_2d_orientation
+        # TODO(parallel): Dedupe this code that is also used in get_2d_orientation
         ori_2d = 0.0
         fwd = R.from_quat(quat).apply([1, 0, 0])
         fwd[2] = 0.0

@@ -13,10 +13,10 @@ import numpy as np
 
 
 @og_test
-def test_on_top():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_on_top(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -39,10 +39,10 @@ def test_on_top():
 
 
 @og_test
-def test_inside():
-    bottom_cabinet = og.sim.scene.object_registry("name", "bottom_cabinet")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_inside(env):
+    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position([0.0, 0.0, 0.08])
@@ -71,10 +71,10 @@ def test_inside():
 
 
 @og_test
-def test_under():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_under(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -97,10 +97,10 @@ def test_under():
 
 
 @og_test
-def test_touching():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_touching(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -122,10 +122,10 @@ def test_touching():
 
 
 @og_test
-def test_contact_bodies():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_contact_bodies(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(breakfast_table)
     for i, obj in enumerate((bowl, dishtowel)):
@@ -149,10 +149,10 @@ def test_contact_bodies():
 
 
 @og_test
-def test_next_to():
-    bottom_cabinet = og.sim.scene.object_registry("name", "bottom_cabinet")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_next_to(env):
+    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
@@ -174,9 +174,9 @@ def test_next_to():
 
 
 @og_test
-def test_overlaid():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    carpet = og.sim.scene.object_registry("name", "carpet")
+def test_overlaid(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    carpet = env.scene.object_registry("name", "carpet")
 
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
@@ -198,9 +198,9 @@ def test_overlaid():
 
 
 @og_test
-def test_pose():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_pose(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(pos1, orn1)
@@ -222,9 +222,9 @@ def test_pose():
 
 
 @og_test
-def test_aabb():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_aabb(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     pos1, orn1 = get_random_pose()
     breakfast_table.set_position_orientation(pos1, orn1)
@@ -250,10 +250,10 @@ def test_aabb():
 
 
 @og_test
-def test_adjacency():
-    bottom_cabinet = og.sim.scene.object_registry("name", "bottom_cabinet")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
+def test_adjacency(env):
+    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
+    bowl = env.scene.object_registry("name", "bowl")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
@@ -289,13 +289,13 @@ def test_adjacency():
 
 
 @og_test
-def test_temperature():
-    microwave = og.sim.scene.object_registry("name", "microwave")
-    stove = og.sim.scene.object_registry("name", "stove")
-    fridge = og.sim.scene.object_registry("name", "fridge")
-    plywood = og.sim.scene.object_registry("name", "plywood")
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_temperature(env):
+    microwave = env.scene.object_registry("name", "microwave")
+    stove = env.scene.object_registry("name", "stove")
+    fridge = env.scene.object_registry("name", "fridge")
+    plywood = env.scene.object_registry("name", "plywood")
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     place_obj_on_floor_plane(microwave)
     place_obj_on_floor_plane(stove, x_offset=1.0)
@@ -423,9 +423,9 @@ def test_temperature():
 
 
 @og_test
-def test_max_temperature():
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_max_temperature(env):
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert bagel.states[MaxTemperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
     assert dishtowel.states[MaxTemperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
@@ -445,10 +445,10 @@ def test_max_temperature():
 
 
 @og_test
-def test_heat_source_or_sink():
-    microwave = og.sim.scene.object_registry("name", "microwave")
-    stove = og.sim.scene.object_registry("name", "stove")
-    fridge = og.sim.scene.object_registry("name", "fridge")
+def test_heat_source_or_sink(env):
+    microwave = env.scene.object_registry("name", "microwave")
+    stove = env.scene.object_registry("name", "stove")
+    fridge = env.scene.object_registry("name", "fridge")
 
     assert microwave.states[HeatSourceOrSink].requires_inside
     assert microwave.states[HeatSourceOrSink].requires_closed
@@ -496,9 +496,9 @@ def test_heat_source_or_sink():
 
 
 @og_test
-def test_cooked():
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_cooked(env):
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Cooked].get_value()
     assert not dishtowel.states[Cooked].get_value()
@@ -525,9 +525,9 @@ def test_cooked():
 
 
 @og_test
-def test_burnt():
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_burnt(env):
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Burnt].get_value()
     assert not dishtowel.states[Burnt].get_value()
@@ -554,9 +554,9 @@ def test_burnt():
 
 
 @og_test
-def test_frozen():
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_frozen(env):
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Frozen].get_value()
     assert not dishtowel.states[Frozen].get_value()
@@ -583,9 +583,9 @@ def test_frozen():
 
 
 @og_test
-def test_heated():
-    bagel = og.sim.scene.object_registry("name", "bagel")
-    dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
+def test_heated(env):
+    bagel = env.scene.object_registry("name", "bagel")
+    dishtowel = env.scene.object_registry("name", "cookable_dishtowel")
 
     assert not bagel.states[Heated].get_value()
     assert not dishtowel.states[Heated].get_value()
@@ -612,8 +612,8 @@ def test_heated():
 
 
 @og_test
-def test_on_fire():
-    plywood = og.sim.scene.object_registry("name", "plywood")
+def test_on_fire(env):
+    plywood = env.scene.object_registry("name", "plywood")
 
     assert not plywood.states[OnFire].get_value()
 
@@ -637,9 +637,9 @@ def test_on_fire():
 
 
 @og_test
-def test_toggled_on():
-    stove = og.sim.scene.object_registry("name", "stove")
-    robot = og.sim.scene.object_registry("name", "robot0")
+def test_toggled_on(env):
+    stove = env.scene.object_registry("name", "stove")
+    robot = env.scene.object_registry("name", "robot0")
 
     stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -np.pi / 2.0]))
     robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
@@ -688,10 +688,10 @@ def test_toggled_on():
 
 @pytest.mark.skip(reason="skipping attachment for now")
 @og_test
-def test_attached_to():
-    shelf_back_panel = og.sim.scene.object_registry("name", "shelf_back_panel")
-    shelf_shelf = og.sim.scene.object_registry("name", "shelf_shelf")
-    shelf_baseboard = og.sim.scene.object_registry("name", "shelf_baseboard")
+def test_attached_to(env):
+    shelf_back_panel = env.scene.object_registry("name", "shelf_back_panel")
+    shelf_shelf = env.scene.object_registry("name", "shelf_shelf")
+    shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
 
     shelf_back_panel.set_position_orientation([0, 0, 0.01], [0, 0, 0, 1])
     shelf_back_panel.keep_still()
@@ -749,8 +749,8 @@ def test_attached_to():
 
 
 @og_test
-def test_particle_source():
-    sink = og.sim.scene.object_registry("name", "sink")
+def test_particle_source(env):
+    sink = env.scene.object_registry("name", "sink")
 
     place_obj_on_floor_plane(sink)
     for _ in range(3):
@@ -777,8 +777,8 @@ def test_particle_source():
 
 
 @og_test
-def test_particle_sink():
-    sink = og.sim.scene.object_registry("name", "sink")
+def test_particle_sink(env):
+    sink = env.scene.object_registry("name", "sink")
     place_obj_on_floor_plane(sink)
     for _ in range(3):
         og.sim.step()
@@ -806,10 +806,10 @@ def test_particle_sink():
 
 
 @og_test
-def test_particle_applier():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    spray_bottle = og.sim.scene.object_registry("name", "spray_bottle")
-    applier_dishtowel = og.sim.scene.object_registry("name", "applier_dishtowel")
+def test_particle_applier(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    spray_bottle = env.scene.object_registry("name", "spray_bottle")
+    applier_dishtowel = env.scene.object_registry("name", "applier_dishtowel")
 
     # Test projection
 
@@ -867,10 +867,10 @@ def test_particle_applier():
 
 
 @og_test
-def test_particle_remover():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    vacuum = og.sim.scene.object_registry("name", "vacuum")
-    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+def test_particle_remover(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    vacuum = env.scene.object_registry("name", "vacuum")
+    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
 
     # Test projection
 
@@ -932,8 +932,8 @@ def test_particle_remover():
 
 
 @og_test
-def test_saturated():
-    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+def test_saturated(env):
+    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
 
     place_obj_on_floor_plane(remover_dishtowel)
 
@@ -968,9 +968,9 @@ def test_saturated():
 
 
 @og_test
-def test_open():
-    microwave = og.sim.scene.object_registry("name", "microwave")
-    bottom_cabinet = og.sim.scene.object_registry("name", "bottom_cabinet")
+def test_open(env):
+    microwave = env.scene.object_registry("name", "microwave")
+    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
 
     # By default, objects should not be open.
     assert not microwave.states[Open].get_value()
@@ -1014,8 +1014,8 @@ def test_open():
 
 
 @og_test
-def test_folded_unfolded():
-    carpet = og.sim.scene.object_registry("name", "carpet")
+def test_folded_unfolded(env):
+    carpet = env.scene.object_registry("name", "carpet")
 
     place_obj_on_floor_plane(carpet)
 
@@ -1057,9 +1057,9 @@ def test_folded_unfolded():
 
 
 @og_test
-def test_draped():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    carpet = og.sim.scene.object_registry("name", "carpet")
+def test_draped(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    carpet = env.scene.object_registry("name", "carpet")
 
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
@@ -1083,8 +1083,8 @@ def test_draped():
 
 
 @og_test
-def test_filled():
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
+def test_filled(env):
+    stockpot = env.scene.object_registry("name", "stockpot")
     systems = [
         get_system(system_name)
         for system_name, system_class in SYSTEM_EXAMPLES.items()
@@ -1110,8 +1110,8 @@ def test_filled():
 
 
 @og_test
-def test_contains():
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
+def test_contains(env):
+    stockpot = env.scene.object_registry("name", "stockpot")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
@@ -1148,10 +1148,10 @@ def test_contains():
 
 
 @og_test
-def test_covered():
-    bracelet = og.sim.scene.object_registry("name", "bracelet")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    microwave = og.sim.scene.object_registry("name", "microwave")
+def test_covered(env):
+    bracelet = env.scene.object_registry("name", "bracelet")
+    bowl = env.scene.object_registry("name", "bowl")
+    microwave = env.scene.object_registry("name", "microwave")
     systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, bowl, microwave):
         for system in systems:

@@ -48,7 +48,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
 
     if import_robot:
         turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=["rgb"])
-        og.sim.import_object(turtlebot)
+        scene.add_object(turtlebot)
         og.sim.step()
 
     if non_rigid_simulation:
@@ -61,7 +61,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
             abilities={"cloth": {}},
             bounding_box=[0.3, 0.5, 0.7],
         )
-        og.sim.import_object(cloth)
+        scene.add_object(cloth)
         og.sim.step()
         water_system = get_system("water")
         for i in range(100):
@@ -75,7 +75,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     fps = []
     physics_fps = []
     render_fps = []
-    print(len(og.sim.scene.objects))
+    print(len(scene.objects))
     for i in range(NUM_STEPS):
         start = time.time()
         if import_robot:

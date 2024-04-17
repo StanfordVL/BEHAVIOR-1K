@@ -32,8 +32,8 @@ class MaterialPrim(BasePrim):
     # Persistent dictionary of materials, mapped from prim_path to MaterialPrim
     MATERIALS = dict()
 
-    # TODO(rl): Figure out if the caller knows the material here.
-    # TODO(rl): Figure out if this material is safe to share across scene instances.
+    # TODO(parallel): Figure out if the caller knows the material here.
+    # TODO(parallel): Figure out if this material is safe to share across scene instances.
     @classmethod
     def get_material(cls, name, prim_path, load_config=None):
         """

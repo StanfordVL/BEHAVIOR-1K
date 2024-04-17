@@ -8,7 +8,7 @@ import pytest
 
 
 @og_test
-def test_removal_and_readdition():
+def test_removal_and_readdition(env):
     # Make a copy of NAMES
     initial_names = NAMES.copy()
 
@@ -20,7 +20,7 @@ def test_removal_and_readdition():
     )
 
     # Import it into the scene
-    og.sim.import_object(apple)
+    env.scene.add_object(apple)
 
     # Check that NAMES has changed
     assert NAMES != initial_names
@@ -42,7 +42,7 @@ def test_removal_and_readdition():
         category="apple",
         model="agveuv",
     )
-    og.sim.import_object(apple2)
+    env.scene.add_object(apple2)
     og.sim.step()
 
     # Clear the stuff we added
@@ -50,7 +50,7 @@ def test_removal_and_readdition():
 
 
 @og_test
-def test_readdition():
+def test_readdition(env):
     # Make a copy of NAMES
     initial_names = NAMES.copy()
 
@@ -62,7 +62,7 @@ def test_readdition():
     )
 
     # Import it into the scene
-    og.sim.import_object(apple)
+    env.scene.add_object(apple)
 
     # Check that NAMES has changed
     new_names = NAMES.copy()
@@ -79,7 +79,7 @@ def test_readdition():
             category="apple",
             model="agveuv",
         )
-        og.sim.import_object(apple2)
+        env.scene.add_object(apple2)
 
     # Check that NAMES has not changed
     assert NAMES == new_names

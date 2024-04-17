@@ -61,7 +61,9 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False)
+
+        # TODO(parallel): How should we handle these sceneless imports?
+        og.sim.scenes[0].add_object(obj=particle_template, register=False)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -959,8 +961,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Create any groups we don't already have
         for name in groups_to_create:
-            # @TODO(rl): Which scene
-            obj = og.sim.scene.object_registry("name", name)
+            # TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("name", name)
             info = name_to_info_mapping[name]
             cls.create_attachment_group(obj=obj)
             is_cloth = cls._is_cloth_obj(obj=obj)
@@ -1092,8 +1094,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         indices_to_remove = np.array([], dtype=int)
         for info in state["groups"].values():
-            # @TODO(rl): Which scene
-            obj = og.sim.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
+            # @TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("uuid", info["particle_attached_obj_uuid"])
             # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
             if obj is not None:
                 group_objects.append(obj)
@@ -1149,8 +1151,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         idx = 1
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
-            # @TODO(rl): Which scene
-            obj = og.sim.scene.object_registry("uuid", obj_uuid)
+            # @TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("uuid", obj_uuid)
             assert obj is not None, f"Object with UUID {obj_uuid} not found in the scene"
             is_cloth = cls._is_cloth_obj(obj=obj)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}

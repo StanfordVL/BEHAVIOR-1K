@@ -86,7 +86,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -229,7 +229,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
 
         # Temporarily enforce the base link to use a cube approximation (caster wheels are messed up otherwise)
-        # TODO(rl): Do not include this in the PR.
+        # TODO(undorl): Do not include this in the PR.
         base_link = self.root_link
         assert set(base_link.collision_meshes) == {"collisions"}, "Base link should only have 1 collision!"
         base_link.collision_meshes["collisions"].set_collision_approximation("boundingCube")

@@ -43,7 +43,7 @@ def benchmark_scene(sim):
     assets_version = get_og_assets_version()
     print("assets_version", assets_version)
 
-    scene = Scene(floor_plane_visible=True)
+    scene = Scene()
     sim.import_scene(scene)
     sim.play()
 
@@ -61,7 +61,7 @@ def benchmark_scene(sim):
                 scale=OBJ_SCALE,
                 visual_only=False,
             )
-            sim.import_object(obj=obj, auto_initialize=False)
+            scene.add_object(obj=obj, auto_initialize=False)
             # x, y, z = _get_position(obj_idx, RAND_POSITION)
             x, y = 0, 0
             z = 0.5 + j * OBJ_SCALE * 2.25

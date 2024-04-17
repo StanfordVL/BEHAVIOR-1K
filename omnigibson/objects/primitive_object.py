@@ -347,6 +347,7 @@ class PrimitiveObject(StatefulObject):
     def _dump_state(self):
         state = super()._dump_state()
         # state["extents"] = self._extents
+        # TODO: Why are these here and not in the init kwargs?
         state["radius"] = self.radius if self._primitive_type in VALID_RADIUS_OBJECTS else -1
         state["height"] = self.height if self._primitive_type in VALID_HEIGHT_OBJECTS else -1
         state["size"] = self.size if self._primitive_type in VALID_SIZE_OBJECTS else -1

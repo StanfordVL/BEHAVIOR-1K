@@ -536,7 +536,7 @@ class BRPart(ABC):
                 visible=False,
                 visual_only=True,
             )
-            og.sim.import_object(self.ghost_hand)
+            self.scene.add_object(self.ghost_hand)
 
     @property
     def local_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:

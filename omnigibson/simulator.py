@@ -17,6 +17,8 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.objects.controllable_object import ControllableObject
+from omnigibson.objects.light_object import LightObject
+from omnigibson.prims import XFormPrim
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import (
@@ -26,6 +28,7 @@ from omnigibson.utils.python_utils import (
     meets_minimum_version,
 )
 from omnigibson.utils.usd_utils import (
+    CollisionAPI,
     ControllableObjectViewAPI,
     clear as clear_uu,
     FlatcacheAPI,
@@ -243,12 +246,23 @@ def launch_simulator(*args, **kwargs):
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            use_floor_plane=False,
+            floor_plane_visible=True,
+            floor_plane_color=(1.0, 1.0, 1.0),
+            use_skybox=True,
             device=None,
         ):
             # Store vars needed for initialization
             self.gravity = gravity
+            self._use_floor_plane = use_floor_plane
+            self._floor_plane_visible = floor_plane_visible
+            self._floor_plane_color = floor_plane_color
+            self._use_skybox = use_skybox
             self._viewer_camera = None
             self._camera_mover = None
+
+            self._floor_plane = None
+            self._skybox = None
 
             # Run super init
             super().__init__(
@@ -334,7 +348,7 @@ def launch_simulator(*args, **kwargs):
                 lazy.carb.log_info("Simulator is defined already, returning the previously defined one")
             return Simulator._instance
 
-        def _set_viewer_camera(self, prim_path="/World/viewer_camera", viewport_name="Viewport"):
+        def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
             Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
             and sets this camera as the active camera for the viewer
@@ -344,18 +358,15 @@ def launch_simulator(*args, **kwargs):
                 viewport_name (str): Name of the viewport this camera should attach to. Default is "Viewport", which is
                     the default viewport's name in Isaac Sim
             """
-            # TODO(rl): URGENT: Relativize
             self._viewer_camera = VisionSensor(
-                relative_prim_path=prim_path,
-                name=prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
+                relative_prim_path=relative_prim_path,
+                name=relative_prim_path.split("/")[-1],  # Assume name is the lowest-level name in the prim_path
                 modalities="rgb",
                 image_height=self.viewer_height,
                 image_width=self.viewer_width,
                 viewport_name=viewport_name,
             )
-            if not self._viewer_camera.loaded:
-                # @TODO(rl): How to access scene here
-                self._viewer_camera.load(None)
+            self._viewer_camera.load(None)
 
             # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
             # nearby objects (default min is 1 m)
@@ -546,10 +557,7 @@ def launch_simulator(*args, **kwargs):
                 obj (BaseObject): an object to load
                 register (bool): whether to register this object internally in the scene registry
             """
-            assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
-
-            # Load the object in omniverse by adding it to the scene
-            # self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
+            assert isinstance(obj, BaseObject), "post_import_object can only be called with BaseObject"
 
             # Run any callbacks
             for callback in self._callbacks_on_import_obj.values():
@@ -1044,7 +1052,7 @@ def launch_simulator(*args, **kwargs):
 
         def add_callback_on_import_obj(self, name, callback):
             """
-            Adds a function @callback, referenced by @name, to be executed every time sim.import_object() is called
+            Adds a function @callback, referenced by @name, to be executed every time sim.post_import_object() is called
 
             Args:
                 name (str): Name of the callback
@@ -1168,6 +1176,14 @@ def launch_simulator(*args, **kwargs):
                 Usd.Prim: Prim at /World
             """
             return lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path="/World")
+
+        @property
+        def floor_plane(self):
+            return self._floor_plane
+
+        @property
+        def skybox(self):
+            return self._skybox
 
         def clear(self) -> None:
             """
@@ -1425,6 +1441,61 @@ def launch_simulator(*args, **kwargs):
 
             # Set the lighting mode to be stage by default
             self.set_lighting_mode(mode=LightingMode.STAGE)
+
+            # Import and configure the floor plane and the skybox
+            # Create collision group for fixed base objects' non root links, root links, and building structures
+            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+            # Disable collision between root links of fixed base objects
+            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            # Disable collision between building structures
+            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+
+            # Disable collision between building structures and fixed base objects
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+
+            # We just add a ground plane if requested
+            if self._use_floor_plane:
+                plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+                    prim_path="/World/ground_plane",
+                    name="ground_plane",
+                    z_position=0,
+                    size=None,
+                    color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
+                    visible=self._floor_plane_visible,
+                    # TODO: update with new PhysicsMaterial API
+                    # static_friction=static_friction,
+                    # dynamic_friction=dynamic_friction,
+                    # restitution=restitution,
+                )
+
+                self._floor_plane = XFormPrim(
+                    relative_prim_path="/ground_plane",
+                    name=plane.name,
+                )
+                self._floor_plane.load(None)
+
+                # Assign floors category to the floor plane
+                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                    prim=self._floor_plane.prim,
+                    semantic_label="floors",
+                    type_label="class",
+                )
+
+            # Also add skybox if requested
+            if self._use_skybox:
+                self._skybox = LightObject(
+                    prim_path="/World/skybox",
+                    name="skybox",
+                    category="background",
+                    light_type="Dome",
+                    intensity=1500,
+                    fixed_base=True,
+                )
+                # TODO(parallel): This doesnt exist
+                self.add_object(self._skybox, register=False)
+                self._skybox.color = (1.07, 0.85, 0.61)
+                self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:

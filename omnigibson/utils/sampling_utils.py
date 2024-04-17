@@ -11,7 +11,7 @@ from scipy.stats import truncnorm
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, draw_line
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -120,23 +120,12 @@ def draw_debug_markers(hit_positions, radius=0.01):
         hit_positions ((n, 3)-array): Desired positions to place markers at
         radius (float): Radius of the generated virtual marker
     """
-    # Import here to avoid circular imports
-    from omnigibson.objects.primitive_object import PrimitiveObject
-
     color = np.concatenate([np.random.rand(3), [1]])
     for vec in hit_positions:
-        time_str = str(time.time())
-        cur_time = time_str[(time_str.index(".") + 1) :]
-        obj = PrimitiveObject(
-            prim_path=f"/World/debug_marker_{cur_time}",
-            name=f"debug_marker_{cur_time}",
-            primitive_type="Sphere",
-            visual_only=True,
-            rgba=color,
-            radius=radius,
-        )
-        og.sim.import_object(obj)
-        obj.set_position(vec)
+        for dim in range(3):
+            start_point = vec + np.eye(3)[dim] * radius
+            end_point = vec - np.eye(3)[dim] * radius
+            draw_line(start_point, end_point, color)
 
 
 def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distance):

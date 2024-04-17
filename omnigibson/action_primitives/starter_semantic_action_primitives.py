@@ -348,7 +348,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """Loads a copy of the robot that can be manipulated into arbitrary configurations for collision checking in planning."""
         robot_copy = RobotCopy()
 
-        # TODO(rl): Replace ID with prim path
+        # TODO(parallel): Replace ID with prim path
         robots_to_copy = {"original": {"robot": self.robot, "copy_path": f"/World/robot_copy_{self.env.id}"}}
         if hasattr(self.robot, "simplified_mesh_usd_path"):
             simplified_robot = {
@@ -375,7 +375,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot_to_copy = None
             if robot_type == "simplified":
                 robot_to_copy = rc["robot"]
-                og.sim.import_object(robot_to_copy)
+                self.env.scene.add_object(robot_to_copy)
             else:
                 robot_to_copy = rc["robot"]
 

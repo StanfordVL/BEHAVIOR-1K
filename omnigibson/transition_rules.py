@@ -192,7 +192,8 @@ class TransitionRuleAPI:
             state = og.sim.dump_state()
             for added_obj_attr in added_obj_attrs:
                 new_obj = added_obj_attr.obj
-                og.sim.import_object(new_obj)
+                # TODO(parallel): How do we tell what scene to add these objects to?
+                og.sim.scenes[0].add_object(new_obj)
                 # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
                 # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
                 if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
@@ -1834,7 +1835,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-            # @TODO(rl): Which scene
+            # TODO(parallel): Which scene
             n_category_objs = len(og.sim.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
@@ -2256,7 +2257,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            # @TODO(rl): Which scene
+            # TODO(parallel): Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 
@@ -2280,7 +2281,7 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
-            # @TODO(rl): Which scene
+            # TODO(parallel): Which scene
             if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
                 return True
 

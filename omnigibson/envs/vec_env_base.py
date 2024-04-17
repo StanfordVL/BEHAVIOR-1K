@@ -2,7 +2,7 @@ import copy
 import omnigibson as og
 
 
-# TODO(rl): Figure out if there is a good interface to implement
+# TODO(parallel): Figure out if there is a good interface to implement in Gymnasium
 class VectorEnvironment:
 
     def __init__(self, num_envs, config):

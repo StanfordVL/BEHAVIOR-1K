@@ -62,7 +62,7 @@ class ControllableObject(BaseObject):
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -538,7 +538,7 @@ class ControllableObject(BaseObject):
         # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
         # the functions that this class also implements. The API centralizes access for all of the robots in the scene
         # removing the need for multiple reads and writes.
-        # TODO(rl): CachedFunctions can now be entirely removed since the API already implements caching.
+        # TODO(cgokmen): CachedFunctions can now be entirely removed since the ControllableObjectViewAPI already implements caching.
         fcns = CachedFunctions()
         fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]

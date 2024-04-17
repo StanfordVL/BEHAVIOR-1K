@@ -4,6 +4,7 @@ Helper utility functions for computing relevant object information
 
 import omnigibson as og
 import numpy as np
+from omnigibson.scenes import Scene
 import omnigibson.utils.transform_utils as T
 from scipy.spatial.transform import Rotation as R
 from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
@@ -117,7 +118,7 @@ def compute_obj_kinematic_metadata(obj):
         - "base_aligned_bboxes": TODO
     """
     assert obj.scene is not None
-    assert obj.scene.floor_plane is not None, "An empty scene must be used in order to compute kinematic metadata!"
+    assert type(obj.scene) == Scene, "An empty scene must be used in order to compute kinematic metadata!"
     assert np.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
     og.sim.stop()
 

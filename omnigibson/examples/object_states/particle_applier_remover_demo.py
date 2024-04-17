@@ -157,7 +157,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         )
     modifier._post_load()
     modifier._loaded = True
-    og.sim.import_object(modifier)
+    env.scene.add_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle

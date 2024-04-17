@@ -123,7 +123,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     shelf_baseboard.keep_still()
     shelf_baseboard.set_linear_velocity(np.array([-0.2, 0, 0]))
 
-    shelf_side_left = og.sim.scene.object_registry("name", "shelf_side_left")
+    shelf_side_left = env.scene.object_registry("name", "shelf_side_left")
     shelf_side_left.set_position_orientation([-0.4, 0.0, 0.2], [0, 0, 0, 1])
     shelf_side_left.keep_still()
 

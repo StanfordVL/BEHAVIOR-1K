@@ -841,52 +841,6 @@ class JointPrim(BasePrim):
         if not self.driven:
             self.set_effort(np.zeros(self.n_dof))
 
-    def _dump_state(self):
-        pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
-        target_pos, target_vel = self.get_target() if self.articulated else (np.array([]), np.array([]))
-        return dict(
-            pos=pos,
-            vel=vel,
-            effort=effort,
-            target_pos=target_pos,
-            target_vel=target_vel,
-        )
-
-    def _load_state(self, state):
-        if self.articulated:
-            self.set_pos(state["pos"], drive=False)
-            self.set_vel(state["vel"], drive=False)
-            if self.driven:
-                self.set_effort(state["effort"])
-            if self._control_type == ControlType.POSITION:
-                self.set_pos(state["target_pos"], drive=True)
-            elif self._control_type == ControlType.VELOCITY:
-                self.set_vel(state["target_vel"], drive=True)
-
-    def _serialize(self, state):
-        return np.concatenate(
-            [
-                state["pos"],
-                state["vel"],
-                state["effort"],
-                state["target_pos"],
-                state["target_vel"],
-            ]
-        ).astype(float)
-
-    def _deserialize(self, state):
-        # We deserialize deterministically by knowing the order of values -- pos, vel, effort
-        return (
-            dict(
-                pos=state[0 : self.n_dof],
-                vel=state[self.n_dof : 2 * self.n_dof],
-                effort=state[2 * self.n_dof : 3 * self.n_dof],
-                target_pos=state[3 * self.n_dof : 4 * self.n_dof],
-                target_vel=state[4 * self.n_dof : 5 * self.n_dof],
-            ),
-            5 * self.n_dof,
-        )
-
     def duplicate(self, relative_prim_path):
         # Cannot directly duplicate a joint prim
         raise NotImplementedError("Cannot directly duplicate a joint prim!")

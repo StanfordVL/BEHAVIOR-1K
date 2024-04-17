@@ -21,9 +21,6 @@ class TraversableScene(Scene):
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
-        use_floor_plane=True,
-        floor_plane_visible=True,
-        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -35,10 +32,6 @@ class TraversableScene(Scene):
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
-            use_floor_plane (bool): whether to load a flat floor plane into the simulator
-            floor_plane_visible (bool): whether to render the additionally added floor plane
-            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
-                to the generated floor plane
         """
         log.info("TraversableScene model: {}".format(scene_model))
         self.scene_model = scene_model
@@ -54,9 +47,6 @@ class TraversableScene(Scene):
         # Run super init
         super().__init__(
             scene_file=scene_file,
-            use_floor_plane=use_floor_plane,
-            floor_plane_visible=floor_plane_visible,
-            floor_plane_color=floor_plane_color,
         )
 
     @property

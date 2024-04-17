@@ -73,7 +73,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     env.reset()
 
     for obj in objects:
-        og.sim.import_object(obj["object"])
+        env.scene.add_object(obj["object"])
         obj["object"].set_position_orientation(obj["position"], obj["orientation"])
         og.sim.step()
 

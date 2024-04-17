@@ -108,7 +108,7 @@ def shared_env():
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
-    og.sim.scene.reset()
+    shared_env.scene.reset()
     return shared_env
 
 

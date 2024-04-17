@@ -1288,8 +1288,9 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert og.sim.scene.loaded, "Scene is not loaded"
-                og.sim.import_object(simulator_obj)
+                # TODO(parallel): This whole class needs to track an env or a scene.
+                assert len(og.sim.scenes) == 1, "Scene is not loaded"
+                og.sim.scenes[0].add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)

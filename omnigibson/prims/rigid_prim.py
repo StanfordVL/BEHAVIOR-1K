@@ -57,6 +57,7 @@ class RigidPrim(XFormPrim):
     ):
         # Other values that will be filled in at runtime
         self._rigid_prim_view_direct = None
+        self._is_part_of_articulation = None
         self._cs = None  # Contact sensor interface
         self._body_name = None
 
@@ -87,6 +88,11 @@ class RigidPrim(XFormPrim):
         kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
         self.set_attribute("physics:kinematicEnabled", kinematic_only)
         self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
+
+        # Check if it's part of an articulation view
+        self._is_part_of_articulation = (
+            "is_part_of_articulation" in self._load_config and self._load_config["is_part_of_articulation"]
+        )
 
         # run super first
         super()._post_load()
@@ -194,8 +200,7 @@ class RigidPrim(XFormPrim):
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
-                    # TODO(rl): URGENT - relativize this path
-                    "relative_prim_path": mesh_path,
+                    "relative_prim_path": self.scene.absolute_prim_path_to_relative(mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                 }
                 if is_collision:
@@ -790,6 +795,11 @@ class RigidPrim(XFormPrim):
         self._kinematic_world_pose_cache = None
 
     def _dump_state(self):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self.is_articulation_link:
+            return {}
+
         # Grab pose from super class
         state = super()._dump_state()
         state["lin_vel"] = self.get_linear_velocity()
@@ -798,6 +808,11 @@ class RigidPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self.is_articulation_link:
+            return
+
         # Call super first
         super()._load_state(state=state)
 
@@ -806,6 +821,11 @@ class RigidPrim(XFormPrim):
         self.set_angular_velocity(np.array(state["ang_vel"]))
 
     def _serialize(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self.is_articulation_link:
+            return np.array([])
+
         # Run super first
         state_flat = super()._serialize(state=state)
 
@@ -818,6 +838,11 @@ class RigidPrim(XFormPrim):
         ).astype(float)
 
     def _deserialize(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self.is_articulation_link:
+            return {}, idx
+
         # Call supermethod first
         state_dic, idx = super()._deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel

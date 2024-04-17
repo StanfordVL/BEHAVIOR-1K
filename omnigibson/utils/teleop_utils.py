@@ -49,7 +49,7 @@ class TeleopSystem(TeleopPolicy):
                 self.control_markers[arm_name] = USDObject(
                     name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True
                 )
-                og.sim.import_object(self.control_markers[arm_name])
+                self.robot.scene.add_object(self.control_markers[arm_name])
 
     def get_obs(self) -> TeleopObservation:
         """

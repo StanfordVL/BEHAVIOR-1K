@@ -107,7 +107,7 @@ class ManipulationRobot(BaseRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -423,12 +423,12 @@ class ManipulationRobot(BaseRobot):
         fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
             self.articulation_root_path, self.eef_link_names[arm]
         )
-        # TODO(rl): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
+        # TODO(parallel): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        # TODO(rl): Replace this with a ControllableObjectViewAPI call too.
+        # TODO(parallel): Replace this with a ControllableObjectViewAPI call too.
         # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
         #     eef_link_idx, :, -self.n_joints :
         # ]

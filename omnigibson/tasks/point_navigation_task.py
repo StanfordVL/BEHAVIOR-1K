@@ -184,8 +184,8 @@ class PointNavigationTask(BaseTask):
             )
 
             # Load the objects into the simulator
-            og.sim.import_object(self._initial_pos_marker)
-            og.sim.import_object(self._goal_pos_marker)
+            env.scene.add_object(self._initial_pos_marker)
+            env.scene.add_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
@@ -200,7 +200,7 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                og.sim.import_object(waypoint)
+                env.scene.add_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints

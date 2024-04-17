@@ -27,7 +27,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=robot_name,
             obs_modalities=[],  # We're just moving robots around so don't load any observation modalities
         )
-        og.sim.import_object(robot)
+        env.scene.add_object(robot)
 
         # At least one step is always needed while sim is playing for any imported object to be fully initialized
         og.sim.play()

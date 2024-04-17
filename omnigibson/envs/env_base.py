@@ -403,7 +403,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_objects()
         self._load_task()
-        # TODO(rl): Do not merge this
+        # TODO(undorl): Do not merge this
         # self._load_external_sensors()
 
         og.sim.play()

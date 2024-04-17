@@ -10,10 +10,10 @@ import numpy as np
 
 
 @og_test
-def test_seg():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
-    robot = og.sim.scene.robots[0]
+def test_seg(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
+    robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))

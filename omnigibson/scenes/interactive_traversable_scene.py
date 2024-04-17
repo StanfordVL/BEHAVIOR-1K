@@ -1,4 +1,5 @@
 import os
+import omnigibson as og
 from omnigibson.robots.robot_base import REGISTERED_ROBOTS
 from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.scenes.traversable_scene import TraversableScene
@@ -84,6 +85,9 @@ class InteractiveTraversableScene(TraversableScene):
             load_object_categories, not_load_object_categories, load_room_types, load_room_instances
         )
 
+        # Assert that the floor plane is not enabled
+        assert not og.sim.floor_plane, "Floor plane should not be enabled for interactive scenes!"
+
         # Run super init first
         super().__init__(
             scene_model=scene_model,
@@ -93,7 +97,6 @@ class InteractiveTraversableScene(TraversableScene):
             trav_map_with_objects=trav_map_with_objects,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
-            use_floor_plane=False,
         )
 
     def get_scene_loading_info(self, scene_model, scene_instance=None):

@@ -439,7 +439,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_added_obj(self, obj):
         """
-        Internal callback function to be called when sim.import_object() is called to potentially update internal
+        Internal callback function to be called when new objects are added to the simulator to potentially update internal
         bddl object scope
 
         Args:

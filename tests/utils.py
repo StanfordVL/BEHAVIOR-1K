@@ -20,11 +20,11 @@ SYSTEM_EXAMPLES = {
 
 def og_test(func):
     def wrapper():
-        assert_test_scene()
+        env = assert_test_env()
         try:
-            func()
+            func(env)
         finally:
-            og.sim.scene.reset()
+            env.scene.reset()
 
     return wrapper
 
@@ -65,8 +65,11 @@ def get_obj_cfg(
     }
 
 
-def assert_test_scene():
-    if og.sim is None or og.sim.scene is None:
+env = None
+
+
+def assert_test_env():
+    if og.sim is None or len(og.sim.scenes) == 0:
         cfg = {
             "scene": {
                 "type": "Scene",
@@ -184,16 +187,20 @@ def assert_test_scene():
         gm.ENABLE_FLATCACHE = False
 
         # Create the environment
+        global env
         env = og.Environment(configs=cfg)
 
         # Additional processing for the tests to pass more deterministically
         og.sim.stop()
         bounding_box_object_names = ["bagel_dough", "raw_egg"]
         for name in bounding_box_object_names:
-            obj = og.sim.scene.object_registry("name", name)
+            obj = env.scene.object_registry("name", name)
             for collision_mesh in obj.root_link.collision_meshes.values():
                 collision_mesh.set_collision_approximation("boundingCube")
         og.sim.play()
+
+    assert env is not None, "Environment not created"
+    return env
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):

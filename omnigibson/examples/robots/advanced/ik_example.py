@@ -124,7 +124,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             visual_only=True,
             rgba=[1.0, 0, 0, 1.0],
         )
-        og.sim.import_object(marker)
+        env.scene.add_object(marker)
 
         # Get initial EE position and set marker to that location
         command = robot.get_eef_position()

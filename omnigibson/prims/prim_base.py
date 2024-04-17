@@ -39,6 +39,8 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         self._load_config = dict() if load_config is None else load_config
 
         # Other values that will be filled in at runtime
+        self._scene = None
+        self._scene_assigned = False
         self._applied_visual_material = None
         self._loaded = False  # Whether this prim exists in the stage or not
         self._initialized = False  # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
@@ -48,15 +50,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
         # Run super init
         super().__init__()
-
-        # Run some post-loading steps if this prim has already been loaded
-        # TODO(rl): URGENT!!!! Move this code elsewhere. Prims should need to be loaded.
-        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
-            log.debug(f"prim {name} already exists, skipping load")
-            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
-            self._loaded = True
-            # Run post load.
-            self._post_load()
 
     def _initialize(self):
         """
@@ -88,9 +81,24 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             Usd.Prim: Prim object loaded into the simulator
         """
         # Load the prim if it doesn't exist yet.
-        if not self._loaded:
+        assert (
+            not self._loaded
+        ), f"Prim {self.name} at prim_path {self.prim_path} can only be loaded once! (It is already loaded)"
+
+        # Assign the scene first.
+        self._scene = scene
+        self._scene_assigned = True
+
+        # Then check if the prim is already loaded
+        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
+            log.debug(f"prim {self.name} already exists, skipping load")
+            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+        else:
+            # If not, load it.
             self._prim = self._load()
-            self._loaded = True
+
+        # Mark the prim as loaded.
+        self._loaded = True
 
         # Run any post-loading logic
         self._post_load()
@@ -144,9 +152,14 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         Returns:
             str: prim path in the stage.
         """
-        # TODO(rl): URGENT - make self._scene available
-        assert self._scene is not None, f"Scene is not set for prim with {self._relative_prim_path}"
-        return self._scene.prim_path + self._relative_prim_path
+        assert self._scene_assigned, f"A scene was not yet set for prim with {self._relative_prim_path}"
+
+        # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+        # viewer camera or one of the scene prims.
+        if self._scene is None:
+            return og.sim.world_prim.prim.GetPrimPath().pathString + self._relative_prim_path
+
+        return self._scene.relative_prim_path_to_absolute(self._relative_prim_path)
 
     @property
     def name(self):
@@ -291,7 +304,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             name=f"{self.name}_copy{self._n_duplicates}",
             load_config=self._load_config,
         )
-        og.sim.import_object(new_prim, register=False)
+        self.scene.add_object(new_prim, register=False)
 
         # Increment duplicate count
         self._n_duplicates += 1

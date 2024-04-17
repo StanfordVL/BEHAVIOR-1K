@@ -254,11 +254,11 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": (
                     self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
                 ),
+                "is_part_of_articulation": self.articulation_view is not None,
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
-                # TODO(rl): URGENT: relativize this. This is a bug.
-                relative_prim_path=prim.GetPrimPath().__str__(),
+                relative_prim_path=self.scene.absolute_prim_path_to_relative(prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
@@ -290,8 +290,7 @@ class EntityPrim(XFormPrim):
                         joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
                         joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
-                            # TODO(rl): URGENT: relativize this. This is a bug.
-                            relative_prim_path=joint_path,
+                            relative_prim_path=self.scene.absolute_prim_path_to_relative(joint_path),
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
@@ -1536,6 +1535,7 @@ class EntityPrim(XFormPrim):
         )
 
     def _dump_state(self):
+        # TODO(parallel): Use articulation view here.
         # We don't call super, instead, this state is simply the root link state and all joint states
         state = dict(root_link=self.root_link._dump_state())
         joint_state = dict()
@@ -1546,6 +1546,7 @@ class EntityPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
+        # TODO(parallel): Use articulation view here.
         # Load base link state and joint states
         self.root_link._load_state(state=state["root_link"])
         for joint_name, joint_state in state["joints"].items():

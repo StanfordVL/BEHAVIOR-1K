@@ -1523,7 +1523,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def _create_particle_prototypes(cls):
         # Load the particle template
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False)
+
+        # TODO(parallel): How should we handle these sceneless imports?
+        og.sim.scenes[0].add_object(obj=particle_template, register=False)
         cls._particle_template = particle_template
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
