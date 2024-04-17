@@ -1094,7 +1094,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         indices_to_remove = np.array([], dtype=int)
         for info in state["groups"].values():
-            # @TODO(parallel): Which scene
+            # TODO(parallel): Which scene
             obj = og.sim.scenes[0].object_registry("uuid", info["particle_attached_obj_uuid"])
             # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
             if obj is not None:
@@ -1151,7 +1151,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         idx = 1
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
-            # @TODO(parallel): Which scene
+            # TODO(parallel): Which scene
             obj = og.sim.scenes[0].object_registry("uuid", obj_uuid)
             assert obj is not None, f"Object with UUID {obj_uuid} not found in the scene"
             is_cloth = cls._is_cloth_obj(obj=obj)

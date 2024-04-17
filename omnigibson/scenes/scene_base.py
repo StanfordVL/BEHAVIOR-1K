@@ -31,9 +31,6 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Default texture to use for skybox
-m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
-
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
 
@@ -72,14 +69,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             SerializableRegistry: Master registry containing sub-registries of objects, robots, systems, etc.
         """
         return self._registry
-
-    @property
-    def skybox(self):
-        """
-        Returns:
-            None or LightObject: Skybox light associated with this scene, if it is used
-        """
-        return self._skybox
 
     @property
     def object_registry(self):

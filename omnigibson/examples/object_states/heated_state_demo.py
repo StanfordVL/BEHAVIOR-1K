@@ -53,7 +53,7 @@ def main():
     )
 
     # Dim the skybox so we can see the bowls' steam effectively
-    env.scene.skybox.intensity = 100.0
+    og.sim.skybox.intensity = 100.0
 
     # Grab reference to objects of relevance
     objs = list(env.scene.object_registry("category", "bowl"))

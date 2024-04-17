@@ -1495,7 +1495,7 @@ def launch_simulator(*args, **kwargs):
                 # TODO(parallel): This doesnt exist
                 self.add_object(self._skybox, register=False)
                 self._skybox.color = (1.07, 0.85, 0.61)
-                self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
+                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:

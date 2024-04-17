@@ -116,7 +116,10 @@ class LightObject(StatefulObject):
         super()._post_load()
 
         # Grab reference to light link
-        self._light_link = XFormPrim(relative_prim_path=f"{self.relative_prim_path}/base_link/light", name=f"{self.name}:light_link")
+        self._light_link = XFormPrim(
+            relative_prim_path=f"{self.relative_prim_path}/base_link/light", name=f"{self.name}:light_link"
+        )
+        self._light_link.load(self.scene)
 
         # Apply Shaping API and set default cone angle attribute
         shaping_api = lazy.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
