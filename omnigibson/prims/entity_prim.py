@@ -1536,7 +1536,6 @@ class EntityPrim(XFormPrim):
         )
 
     def _dump_state(self):
-        # TODO(parallel): Use articulation view here.
         # We don't call super, instead, this state is simply the root link state and all joint states
         state = dict(root_link=self.root_link._dump_state())
         joint_state = dict()
@@ -1547,7 +1546,6 @@ class EntityPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
-        # TODO(parallel): Use articulation view here.
         # Load base link state and joint states
         self.root_link._load_state(state=state["root_link"])
         for joint_name, joint_state in state["joints"].items():
