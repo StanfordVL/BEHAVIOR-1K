@@ -157,7 +157,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         # When the scene is set to None, this prim is not in a scene but is global e.g. like the
         # viewer camera or one of the scene prims.
         if self._scene is None:
-            return og.sim.world_prim.prim.GetPrimPath().pathString + self._relative_prim_path
+            return "/World" + self._relative_prim_path
 
         return self._scene.relative_prim_path_to_absolute(self._relative_prim_path)
 
