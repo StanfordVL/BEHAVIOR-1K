@@ -529,7 +529,7 @@ def launch_simulator(*args, **kwargs):
             self.stop()
             log.info("Imported scene.")
 
-        def post_import_object(self, obj, register=True):
+        def post_import_object(self, obj):
             """
             Import an object into the simulator.
 

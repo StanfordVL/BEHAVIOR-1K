@@ -251,22 +251,23 @@ class RigidContactAPIImpl:
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
+                # TODO(parallel): How to make this work with the floor plane?
+                # If there are no collidable objects in the scene, skip.
+                if len(column_filters[scene_idx]) == 0:
+                    continue
+
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
                     pattern=self.get_row_filter(),  # TODO (parallel): This can easily be made per-scene too.
                     filter_patterns=column_filters[scene_idx],
                     max_contact_data_count=self.get_max_contact_data_count(),
                 )
 
-        # Create deterministic mapping from path to row index
-        for scene_idx, _ in enumerate(og.sim.scenes):
-            self._PATH_TO_ROW_IDX[scene_idx] = {
-                path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
-            }
+                self._PATH_TO_ROW_IDX[scene_idx] = {
+                    path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
+                }
 
-        # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
-        for scene_idx, _ in enumerate(og.sim.scenes):
-            self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
-            self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
+                self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
+                self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         # n_bodies = len(cls._PATH_TO_COL_IDX)

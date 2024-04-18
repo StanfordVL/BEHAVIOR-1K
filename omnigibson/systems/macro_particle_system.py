@@ -66,9 +66,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
-
-        # TODO(parallel): How should we handle these sceneless imports?
-        og.sim.scenes[0].add_object(obj=particle_template, register=False)
+        particle_template.load(None)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)

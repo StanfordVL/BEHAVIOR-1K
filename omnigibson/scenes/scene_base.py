@@ -189,7 +189,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
             # Import into the simulator
-            self.add_object(obj, register=True)
+            self.add_object(obj)
             # Set the init pose accordingly
             obj.set_local_pose(
                 position=init_state[obj_name]["root_link"]["pos"],
@@ -377,13 +377,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj, register=True):
+    def add_object(self, obj):
         """
         Add an object to the scene. The scene should already be loaded.
 
         Args:
             obj (BaseObject): the object to load
-            register (bool): whether to track this object internally in the scene registry
 
         Returns:
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
@@ -407,11 +406,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     )
 
         # Add this object to our registry based on its type, if we want to register it
-        if register:
-            self.object_registry.add(obj)
+        self.object_registry.add(obj)
 
-            # Run any additional scene-specific logic with the created object
-            self._add_object(obj)
+        # Run any additional scene-specific logic with the created object
+        self._add_object(obj)
 
         # Inform the simulator that there is a new object here.
         og.sim.post_import_object(obj)
