@@ -276,6 +276,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         implement / extend the _initialize() method.
         """
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
+        assert og.sim.is_playing(), "Simulator must be playing in order to initialize the scene!"
         self._initialize()
 
         # Grab relevant objects info
@@ -291,7 +292,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             with open(self.scene_file, "r") as f:
                 scene_info = json.load(f)
             init_state = scene_info["state"]
-            og.sim.load_state(init_state, serialized=False)
+            self.load_state(init_state, serialized=False)
 
         self._initial_state = init_state
 

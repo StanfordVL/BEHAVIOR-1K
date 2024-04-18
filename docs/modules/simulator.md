@@ -19,7 +19,7 @@ Because this `Simulator` is a global singleton, it is only instantiated exactly 
 After **`OmniGibson`** is launched, the simulator interface can be accessed globally via `og.sim`. Below, we briefly describe multiple common usages of the simulation interface:
 
 #### Importing and Removing Scenes / Objects
-The simulator can directly import a scene via `sim.import_scene(scene)` or object via `sim.import_object(object)`. The imported scene and its corresponding objects can be directly accessed via `sim.scene`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear the entire scene via `sim.clear()`.
+The simulator can directly import a scene via `sim.import_scene(scene)`, and an object can be imported into a scene via `scene.import_object(object)`. The imported scene and its corresponding objects can be directly accessed through `sim.scenes`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear the entire scene via `sim.clear()`.
 
 #### Propagating Physics
 The simulator can be manually stepped, with or without physics / rendering (`sim.step()`, `sim.step_physics()`, `sim.render()`), and can be stopped (`sim.stop()`), paused (`sim.pause()`), or played (`sim.play()`). Note that physics only runs when the simulator is playing! The current sim mode can be checked via `sim.is_stopped()`, `sim.is_paused()`, and `sim.is_playing()`.
@@ -32,7 +32,7 @@ The simulator can be manually stepped, with or without physics / rendering (`sim
 If necessary, low-level physics behavior can also be set as well, via the physics interface (`sim.pi`), physics simulation interface (`sim.psi`), physics scene query interface (`sim.psqi`), and physics context (`sim.get_physics_context()`). The simulation timesteps can also be directly set via `sim.set_simulation_dt(...)`.
 
 #### Callbacks
-It may be useful to have callbacks trigger when certain simulation events occur. We provide utility functions to add / remove callbacks when `sim.play()`, `sim.stop()`, `sim.import_object()`, and `sim.remove_object()` is called.
+It may be useful to have callbacks trigger when certain simulation events occur. We provide utility functions to add / remove callbacks when `sim.play()`, `sim.stop()`, `scene.import_object()`, and `scene.remove_object()` is called.
 
 #### Viewport Camera
 The simulator owns a global [`VisionSensor`](./sensors.md) camera which can be controlled by the user and accessed via `sim.viewer_camera`. To enable keyboard teleoperation of the camera, call `sim.enable_viewer_camera_teleoperation()`.

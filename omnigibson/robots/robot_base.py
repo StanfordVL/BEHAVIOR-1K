@@ -266,6 +266,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )
+                    sensor.load(self.scene)
                     self._sensors[sensor.name] = sensor
                     sensor_counts[prim_type] += 1
 
