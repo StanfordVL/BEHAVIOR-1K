@@ -5,11 +5,6 @@ from typing import List
 
 from future.utils import with_metaclass
 
-from omnigibson import Environment
-from omnigibson.robots import BaseRobot
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.tasks.task_base import BaseTask
-
 REGISTERED_PRIMITIVE_SETS = {}
 
 
