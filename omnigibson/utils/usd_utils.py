@@ -500,7 +500,7 @@ class CollisionAPI:
 
         # Create the group
         col_group_prim_path = f"/World/collision_groups/{col_group}"
-        group = lazy.pxr.UsdPhysics.CollisionGroup.Define(og.sim.stage, col_group_prim_path)
+        group = lazy.pxr.UsdPhysics.CollisionGroup.Define(stage, col_group_prim_path)
         if filter_self_collisions:
             # Do not collide with self
             group.GetFilteredGroupsRel().AddTarget(col_group_prim_path)
