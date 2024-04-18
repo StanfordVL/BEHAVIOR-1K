@@ -1451,11 +1451,15 @@ def launch_simulator(*args, **kwargs):
 
             # Import and configure the floor plane and the skybox
             # Create collision group for fixed base objects' non root links, root links, and building structures
-            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+            CollisionAPI.create_collision_group(
+                self.stage, col_group="fixed_base_nonroot_links", filter_self_collisions=False
+            )
             # Disable collision between root links of fixed base objects
-            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            CollisionAPI.create_collision_group(
+                self.stage, col_group="fixed_base_root_links", filter_self_collisions=True
+            )
             # Disable collision between building structures
-            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+            CollisionAPI.create_collision_group(self.stage, col_group="structures", filter_self_collisions=True)
 
             # Disable collision between building structures and fixed base objects
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
