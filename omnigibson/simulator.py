@@ -540,15 +540,6 @@ def launch_simulator(*args, **kwargs):
             self.stop()
             log.info("Imported scene.")
 
-        def initialize_object_on_next_sim_step(self, obj):
-            """
-            Initializes the object upon the next simulation step
-
-            Args:
-                obj (BasePrim): Object to initialize as soon as a new sim step is called
-            """
-            self._objects_to_initialize.append(obj)
-
         def post_import_object(self, obj, register=True):
             """
             Import an object into the simulator.
@@ -568,7 +559,7 @@ def launch_simulator(*args, **kwargs):
                 self._link_id_to_objects[lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
 
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
-            self.initialize_object_on_next_sim_step(obj=obj)
+            self._objects_to_initialize.append(obj)
 
         def pre_remove_object(self, obj):
             """
@@ -1503,8 +1494,7 @@ def launch_simulator(*args, **kwargs):
                     intensity=1500,
                     fixed_base=True,
                 )
-                # TODO(parallel): This doesnt exist
-                self.add_object(self._skybox, register=False)
+                self._skybox.load(None)
                 self._skybox.color = (1.07, 0.85, 0.61)
                 self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
