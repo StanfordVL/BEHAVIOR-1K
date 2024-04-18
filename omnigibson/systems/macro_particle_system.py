@@ -16,7 +16,11 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty, snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
-from omnigibson.utils.usd_utils import FlatcacheAPI
+from omnigibson.utils.usd_utils import (
+    FlatcacheAPI,
+    absolute_prim_path_to_scene_relative,
+    scene_relative_prim_path_to_absolute,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -231,12 +235,12 @@ class MacroParticleSystem(BaseSystem):
         cls._color = color
 
     @classmethod
-    def add_particle(cls, prim_path, scale, idn=None):
+    def add_particle(cls, scene, relative_prim_path, scale, idn=None):
         """
         Adds a particle to this system.
 
         Args:
-            prim_path (str): Absolute path to the newly created particle, minus the name for this particle
+            relative_prim_path (str): Scene-relative path to the newly created particle, minus the name for this particle
             scale (3-array): (x,y,z) scale to set for the added particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
@@ -248,7 +252,7 @@ class MacroParticleSystem(BaseSystem):
         name = cls.particle_idn2name(idn=cls.next_available_particle_idn if idn is None else idn)
         # Make sure name doesn't already exist
         assert name not in cls.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
-        new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
+        new_particle = cls._load_new_particle(scene=scene, relative_prim_path=f"{relative_prim_path}/{name}", name=name)
 
         # Set the scale and make sure the particle is visible
         new_particle.scale *= scale
@@ -281,6 +285,7 @@ class MacroParticleSystem(BaseSystem):
     @classmethod
     def generate_particles(
         cls,
+        scene,
         positions,
         orientations=None,
         scales=None,
@@ -299,19 +304,19 @@ class MacroParticleSystem(BaseSystem):
 
         # Add particles
         for scale in scales:
-            cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=scale)
+            cls.add_particle(scene=None, relative_prim_path=f"{cls.relative_prim_path}/particles", scale=scale)
 
         # Set the tfs
         cls.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         """
         Loads a new particle into the current stage, leveraging @cls.particle_object as a template for the new particle
         to load. This function should be implemented by any subclasses.
 
         Args:
-            prim_path (str): The absolute stage path at which to create the new particle
+            relative_prim_path (str): The scene-relative path at which to create the new particle
             name (str): The name to assign to this new particle at the path
 
         Returns:
@@ -430,9 +435,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 )
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
+        prim_path = scene_relative_prim_path_to_absolute(scene, relative_prim_path)
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
@@ -445,8 +451,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 semantic_label=cls.name,
                 type_label="class",
             )
-        # TODO(parallel): Fix these
-        return VisualGeomPrim(prim_path=prim_path, name=name)
+        result = VisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result.load(scene)
+        return result
 
     @classmethod
     def _clear(cls):
@@ -545,8 +552,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position += offset
 
             # Create particle
+            particle_prim_path = obj.prim_path if is_cloth else link_prim_path
             particle = cls.add_particle(
-                prim_path=obj.prim_path if is_cloth else link_prim_path,
+                scene=obj.scene,
+                relative_prim_path=absolute_prim_path_to_scene_relative(obj.scene, particle_prim_path),
                 scale=scale,
             )
 
@@ -972,8 +981,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 # Reference is either the face ID (int) if cloth group or link name (str) if rigid body group
                 # Create the necessary particles
                 # Use scale (1,1,1) since it will get overridden anyways when loading state
+                particle_prim_path = obj.prim_path if is_cloth else obj.links[reference].prim_path
                 particle = cls.add_particle(
-                    prim_path=obj.prim_path if is_cloth else obj.links[reference].prim_path,
+                    scene=obj.scene,
+                    relative_prim_path=absolute_prim_path_to_scene_relative(obj.scene, particle_prim_path),
                     scale=np.ones(3),
                     idn=int(particle_idn),
                 )
@@ -1222,9 +1233,10 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             cls.refresh_particles_view()
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
+        prim_path = scene_relative_prim_path_to_absolute(scene, relative_prim_path)
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
@@ -1239,7 +1251,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 semantic_label=cls.name,
                 type_label="class",
             )
-        return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
+        result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result.load(scene)
+        return result
 
     @classmethod
     def process_particle_object(cls):
@@ -1294,9 +1308,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         cls.refresh_particles_view()
 
     @classmethod
-    def add_particle(cls, prim_path, scale, idn=None):
+    def add_particle(cls, scene, relative_prim_path, scale, idn=None):
         # Run super first
-        particle = super().add_particle(prim_path=prim_path, scale=scale, idn=idn)
+        particle = super().add_particle(scene=scene, relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
         cls.refresh_particles_view()
@@ -1549,7 +1563,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         if n_particles_to_generate > 0:
             for i in range(n_particles_to_generate):
                 # Min scale == max scale, so no need for sampling
-                cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=cls.max_scale)
+                cls.add_particle(
+                    scene=None, relative_prim_path=f"{cls.relative_prim_path}/particles", scale=cls.max_scale
+                )
         else:
             # Remove excess particles
             cls.remove_particles(idxs=np.arange(-n_particles_to_generate))

@@ -7,6 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative
 
 
 class MaterialPrim(BasePrim):
@@ -36,7 +37,7 @@ class MaterialPrim(BasePrim):
     # TODO(parallel): Figure out if the caller knows the material here.
     # TODO(parallel): Figure out if this material is safe to share across scene instances.
     @classmethod
-    def get_material(cls, name, prim_path, load_config=None):
+    def get_material(cls, scene, name, prim_path, load_config=None):
         """
         Get a material prim from the persistent dictionary of materials, or create a new one if it doesn't exist.
 
@@ -54,7 +55,12 @@ class MaterialPrim(BasePrim):
             return cls.MATERIALS[prim_path]
 
         # Otherwise, create a new one and return it
-        new_material = cls(prim_path=prim_path, name=name, load_config=load_config)
+        relative_prim_path = absolute_prim_path_to_scene_relative(scene, prim_path)
+        new_material = cls(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+        new_material.load(scene)
+        assert (
+            new_material.prim_path == prim_path
+        ), f"Material prim path {new_material.prim_path} does not match {prim_path}"
         cls.MATERIALS[prim_path] = new_material
         return new_material
 

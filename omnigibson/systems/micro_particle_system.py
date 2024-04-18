@@ -20,7 +20,7 @@ from omnigibson.utils.physx_utils import create_physx_particle_system, create_ph
 from omnigibson.utils.python_utils import assert_valid_key, classproperty, snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative, mesh_prim_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -523,6 +523,7 @@ class MicroParticleSystem(BaseSystem):
         """
         # Default is PBR material
         return MaterialPrim.get_material(
+            scene=None,
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
@@ -1385,9 +1386,12 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @classmethod
     def _create_particle_prototypes(cls):
         # Simulate particles with simple spheres
-        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
+        prototype_prim_path = f"{cls.prim_path}/prototype0"
+        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
-        prototype = VisualGeomPrim(prim_path=prototype.GetPath().pathString, name=prototype.GetPath().pathString)
+        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(None, prototype_prim_path)
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{cls.name}_prototype0")
+        prototype.load(None)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
@@ -1400,6 +1404,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
     def _get_particle_material_template(cls):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
         return MaterialPrim.get_material(
+            scene=None,
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
@@ -1545,7 +1550,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
         lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with VisualGeomPrim with the correct scale
-        prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
+        relative_prototype_path = absolute_prim_path_to_scene_relative(None, prototype_path)
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
+        prototype.load(None)
         prototype.scale *= cls.max_scale
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(

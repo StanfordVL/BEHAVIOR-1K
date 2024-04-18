@@ -9,7 +9,7 @@ from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, 
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import RigidContactAPI, create_primitive_mesh
+from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -114,8 +114,11 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
-        # TODO(parallel): Update this
-        self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
+        relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
+        self.visual_marker = VisualGeomPrim(
+            relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker"
+        )
+        self.visual_marker.load(self.obj.scene)
         self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
         self.visual_marker.visible = True

@@ -20,7 +20,11 @@ from omnigibson.sensors import (
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, add_asset_to_stage
+from omnigibson.utils.usd_utils import (
+    ControllableObjectViewAPI,
+    absolute_prim_path_to_scene_relative,
+    add_asset_to_stage,
+)
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 
 # Global dicts that will contain mappings
@@ -188,7 +192,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
-                relative_prim_path=self.absolute_prim_path_to_scene_relative(dummy_path),
+                relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, dummy_path),
                 scale=self._load_config.get("scale", None),
                 visible=False,
                 fixed_base=True,
@@ -258,7 +262,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-                        relative_prim_path=self.absolute_prim_path_to_scene_relative(str(prim.GetPrimPath())),
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )

@@ -33,7 +33,7 @@ from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
-from omnigibson.utils.python_utils import clear as clear_pu
+from omnigibson.utils.python_utils import clear as clear_python_utils
 from omnigibson.utils.python_utils import create_object_from_init_info, meets_minimum_version
 from omnigibson.utils.ui_utils import (
     CameraMover,
@@ -52,7 +52,7 @@ from omnigibson.utils.usd_utils import (
     PoseAPI,
     RigidContactAPI,
 )
-from omnigibson.utils.usd_utils import clear as clear_uu
+from omnigibson.utils.usd_utils import clear as clear_usd_utils
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -312,6 +312,15 @@ def launch_simulator(*args, **kwargs):
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
 
+            # Clear physics context
+            self._physx_fabric_interface = None
+
+            # Create world prim
+            self.stage.DefinePrim("/World", "Xform")
+
+            # Initialize all APIs and the stage
+            self.clear()
+
             # Set the viewer dimensions
             if gm.RENDER_VIEWER_CAMERA:
                 self.viewer_width = viewer_width
@@ -327,14 +336,6 @@ def launch_simulator(*args, **kwargs):
             # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
             # and crashes
             self._set_physics_engine_settings()
-
-        def __new__(
-            cls,
-            *args,
-            **kwargs,
-        ):
-            # Override the SimulationContext instancing system
-            return object.__new__(cls, *args, **kwargs)
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -605,6 +606,8 @@ def launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
+
+            # TODO(parallel): Make this work
             self._scene.remove_object(obj)
 
         def pre_remove_prim(self, prim):
@@ -1192,8 +1195,8 @@ def launch_simulator(*args, **kwargs):
             TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
-            clear_pu()
-            clear_uu()
+            clear_python_utils()
+            clear_usd_utils()
             self._objects_to_initialize = []
             self._objects_require_contact_callback = False
             self._objects_require_joint_break_callback = False
@@ -1204,8 +1207,94 @@ def launch_simulator(*args, **kwargs):
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
 
-            # Load dummy stage, but don't clear sim to prevent circular loops
-            self._init_stage(physics_dt=self.get_physics_dt(), rendering_dt=self.get_rendering_dt())
+            # Now start rebuilding everything
+            # Update internal vars
+            self._physx_interface = lazy.omni.physx.get_physx_interface()
+            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
+            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
+
+            # Update internal settings
+            # TODO(parallel): Is this needed?
+            self._set_physics_engine_settings()
+            self._set_renderer_settings()
+
+            # Update internal callbacks
+            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
+                self._on_contact
+            )
+            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
+                lambda _: self._on_physics_step()
+            )
+            self._simulation_event_callback = (
+                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                    self._on_simulation_event
+                )
+            )
+
+            # Set the lighting mode to be stage by default
+            self.set_lighting_mode(mode=LightingMode.STAGE)
+
+            # Import and configure the floor plane and the skybox
+            # Create collision group for fixed base objects' non root links, root links, and building structures
+            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+            # Disable collision between root links of fixed base objects
+            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            # Disable collision between building structures
+            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+
+            # Disable collision between building structures and fixed base objects
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+
+            # We just add a ground plane if requested
+            if self._use_floor_plane:
+                plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+                    prim_path="/World/ground_plane",
+                    name="ground_plane",
+                    z_position=0,
+                    size=None,
+                    color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
+                    visible=self._floor_plane_visible,
+                    # TODO: update with new PhysicsMaterial API
+                    # static_friction=static_friction,
+                    # dynamic_friction=dynamic_friction,
+                    # restitution=restitution,
+                )
+
+                self._floor_plane = XFormPrim(
+                    relative_prim_path="/ground_plane",
+                    name=plane.name,
+                )
+                self._floor_plane.load(None)
+
+                # Assign floors category to the floor plane
+                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                    prim=self._floor_plane.prim,
+                    semantic_label="floors",
+                    type_label="class",
+                )
+
+            # Also add skybox if requested
+            if self._use_skybox:
+                self._skybox = LightObject(
+                    relative_prim_path="/skybox",
+                    name="skybox",
+                    category="background",
+                    light_type="Dome",
+                    intensity=1500,
+                    fixed_base=True,
+                )
+                self._skybox.load(None)
+                self._skybox.color = (1.07, 0.85, 0.61)
+                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+
+            # Set the viewer camera, and then set its default pose
+            if gm.RENDER_VIEWER_CAMERA:
+                self._set_viewer_camera()
+                self.viewer_camera.set_position_orientation(
+                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                )
 
         def write_metadata(self, key, data):
             """
@@ -1310,182 +1399,6 @@ def launch_simulator(*args, **kwargs):
                     json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
 
                 log.info("The current simulation environment saved.")
-
-        def _open_new_stage(self):
-            """
-            Opens a new stage
-            """
-            # Stop the physics if we're playing
-            if not self.is_stopped():
-                log.warning("Stopping simulation in order to open new stage.")
-                self.stop()
-
-            # Store physics dt and rendering dt to reuse later
-            # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/120, 1/30
-            try:
-                physics_dt = self.get_physics_dt()
-            except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
-                physics_dt = 1 / 120.0
-            rendering_dt = self.get_rendering_dt()
-
-            # Open new stage -- suppressing warning that we're opening a new stage
-            with suppress_omni_log(None):
-                lazy.omni.isaac.core.utils.stage.create_new_stage()
-
-            # Clear physics context
-            self._physics_context = None
-            self._physx_fabric_interface = None
-
-            # Create world prim
-            self.stage.DefinePrim("/World", "Xform")
-
-            self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
-
-        def _load_stage(self, usd_path):
-            """
-            Open the stage specified by USD file at @usd_path
-
-            Args:
-                usd_path (str): Absolute filepath to USD stage that should be loaded
-            """
-            # Stop the physics if we're playing
-            if not self.is_stopped():
-                log.warning("Stopping simulation in order to load stage.")
-                self.stop()
-
-            # Store physics dt and rendering dt to reuse later
-            # Note that the stage may have been deleted previously; if so, we use the default values
-            # of 1/120, 1/30
-            try:
-                physics_dt = self.get_physics_dt()
-            except:
-                print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/120.")
-                physics_dt = 1 / 120.0
-            rendering_dt = self.get_rendering_dt()
-
-            # Open new stage -- suppressing warning that we're opening a new stage
-            with suppress_omni_log(None):
-                lazy.omni.isaac.core.utils.stage.open_stage(usd_path=usd_path)
-
-            self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
-
-        def _init_stage(
-            self,
-            physics_dt=None,
-            rendering_dt=None,
-            stage_units_in_meters=None,
-            physics_prim_path="/physicsScene",
-            sim_params=None,
-            set_defaults=True,
-            backend="numpy",
-            device=None,
-        ):
-            # Run super first
-            super()._init_stage(
-                physics_dt=physics_dt,
-                rendering_dt=rendering_dt,
-                stage_units_in_meters=stage_units_in_meters,
-                physics_prim_path=physics_prim_path,
-                sim_params=sim_params,
-                set_defaults=set_defaults,
-                backend=backend,
-                device=device,
-            )
-
-            # Update internal vars
-            self._physx_interface = lazy.omni.physx.get_physx_interface()
-            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
-            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
-
-            # Update internal settings
-            self._set_physics_engine_settings()
-            self._set_renderer_settings()
-
-            # Update internal callbacks
-            self._setup_default_callback_fns()
-            self._stage_open_callback = (
-                lazy.omni.usd.get_context()
-                .get_stage_event_stream()
-                .create_subscription_to_pop(self._stage_open_callback_fn)
-            )
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
-                self._on_contact
-            )
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
-                lambda _: self._on_physics_step()
-            )
-            self._simulation_event_callback = (
-                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
-                    self._on_simulation_event
-                )
-            )
-
-            # Set the lighting mode to be stage by default
-            self.set_lighting_mode(mode=LightingMode.STAGE)
-
-            # Import and configure the floor plane and the skybox
-            # Create collision group for fixed base objects' non root links, root links, and building structures
-            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
-            # Disable collision between root links of fixed base objects
-            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
-            # Disable collision between building structures
-            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
-
-            # Disable collision between building structures and fixed base objects
-            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
-            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
-
-            # We just add a ground plane if requested
-            if self._use_floor_plane:
-                plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-                    prim_path="/World/ground_plane",
-                    name="ground_plane",
-                    z_position=0,
-                    size=None,
-                    color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
-                    visible=self._floor_plane_visible,
-                    # TODO: update with new PhysicsMaterial API
-                    # static_friction=static_friction,
-                    # dynamic_friction=dynamic_friction,
-                    # restitution=restitution,
-                )
-
-                self._floor_plane = XFormPrim(
-                    relative_prim_path="/ground_plane",
-                    name=plane.name,
-                )
-                self._floor_plane.load(None)
-
-                # Assign floors category to the floor plane
-                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-                    prim=self._floor_plane.prim,
-                    semantic_label="floors",
-                    type_label="class",
-                )
-
-            # Also add skybox if requested
-            if self._use_skybox:
-                self._skybox = LightObject(
-                    relative_prim_path="/skybox",
-                    name="skybox",
-                    category="background",
-                    light_type="Dome",
-                    intensity=1500,
-                    fixed_base=True,
-                )
-                self._skybox.load(None)
-                self._skybox.color = (1.07, 0.85, 0.61)
-                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
-
-            # Set the viewer camera, and then set its default pose
-            if gm.RENDER_VIEWER_CAMERA:
-                self._set_viewer_camera()
-                self.viewer_camera.set_position_orientation(
-                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
-                )
 
         def close(self):
             """

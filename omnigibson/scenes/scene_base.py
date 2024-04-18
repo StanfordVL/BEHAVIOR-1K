@@ -461,31 +461,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         assert self._scene_prim is not None, "Scene prim is not loaded yet!"
         return self.prim.prim_path
 
-    def absolute_prim_path_to_relative(self, prim_path):
-        """
-        Converts an absolute prim path to a relative prim path within this scene
-
-        Args:
-            prim_path (str): absolute prim path
-
-        Returns:
-            str: relative prim path
-        """
-        assert prim_path.startswith(self.prim_path), "Prim path must be within this scene!"
-        return prim_path[len(self.prim_path) :]
-
-    def relative_prim_path_to_absolute(self, prim_path):
-        """
-        Converts a relative prim path within this scene to an absolute prim path
-
-        Args:
-            prim_path (str): relative prim path
-
-        Returns:
-            str: absolute prim path
-        """
-        return self.prim_path + prim_path
-
     @property
     def n_floors(self):
         """

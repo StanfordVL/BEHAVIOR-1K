@@ -84,7 +84,7 @@ class XFormPrim(BasePrim):
         if self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
-            material = MaterialPrim.get_material(prim_path=material_prim_path, name=material_name)
+            material = MaterialPrim.get_material(scene=self.scene, prim_path=material_prim_path, name=material_name)
             assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
             material.add_user(self)
             self._material = material

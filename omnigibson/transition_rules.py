@@ -1659,7 +1659,11 @@ class RecipeRule(BaseTransitionRule):
         cls._OBJECTS_TO_IDX = dict()
 
         # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
-        objects_by_category = og.sim.scene.object_registry.get_dict("category")
+        objects_by_category = defaultdict(list)
+        for scene in og.sim.scenes:
+            scene_objects_by_category = scene.object_registry.get_dict("category")
+            for cat, objs in scene_objects_by_category.items():
+                objects_by_category[cat].extend(objs)
 
         for name, recipe in cls._RECIPES.items():
             # If all pre-requisites met, add to active recipes
@@ -1835,8 +1839,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-            # TODO(parallel): Which scene
-            n_category_objs = len(og.sim.scene.object_registry("category", category, []))
+            n_category_objs = len(container.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
             for i in range(n_instances):
@@ -2257,8 +2260,10 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            # TODO(parallel): Which scene
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            has_category = any(
+                len(scene.object_registry("category", category, default_val=set())) > 0 for scene in og.sim.scenes
+            )
+            if has_category:
                 return True
 
         # None found, return False
@@ -2281,8 +2286,10 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
-            # TODO(parallel): Which scene
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            has_category = any(
+                len(scene.object_registry("category", category, default_val=set())) > 0 for scene in og.sim.scenes
+            )
+            if has_category:
                 return True
 
         # None found, return False

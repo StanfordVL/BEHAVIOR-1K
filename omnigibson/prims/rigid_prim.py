@@ -12,7 +12,12 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, check_extent_radius_ratio, get_mesh_volume_and_com
+from omnigibson.utils.usd_utils import (
+    PoseAPI,
+    absolute_prim_path_to_scene_relative,
+    check_extent_radius_ratio,
+    get_mesh_volume_and_com,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -201,12 +206,12 @@ class RigidPrim(XFormPrim):
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
-                    "relative_prim_path": self.absolute_prim_path_to_scene_relative(mesh_path),
+                    "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                 }
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
-                    mesh.load(self._scene)
+                    mesh.load(self.scene)
                     # We also modify the collision mesh's contact and rest offsets, since omni's default values result
                     # in lightweight objects sometimes not triggering contacts correctly
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
@@ -225,7 +230,7 @@ class RigidPrim(XFormPrim):
                         mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-                    self._visual_meshes[mesh_name].load(self._scene)
+                    self._visual_meshes[mesh_name].load(self.scene)
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
@@ -800,7 +805,7 @@ class RigidPrim(XFormPrim):
     def _dump_state(self):
         # If we are part of an articulation, there's nothing to do, the entityprim will take care
         # of setting everything for us.
-        if self.is_articulation_link:
+        if self._is_part_of_articulation:
             return {}
 
         # Grab pose from super class
@@ -813,7 +818,7 @@ class RigidPrim(XFormPrim):
     def _load_state(self, state):
         # If we are part of an articulation, there's nothing to do, the entityprim will take care
         # of setting everything for us.
-        if self.is_articulation_link:
+        if self._is_part_of_articulation:
             return
 
         # Call super first
@@ -826,7 +831,7 @@ class RigidPrim(XFormPrim):
     def _serialize(self, state):
         # If we are part of an articulation, there's nothing to do, the entityprim will take care
         # of setting everything for us.
-        if self.is_articulation_link:
+        if self._is_part_of_articulation:
             return np.array([])
 
         # Run super first
@@ -843,8 +848,8 @@ class RigidPrim(XFormPrim):
     def _deserialize(self, state):
         # If we are part of an articulation, there's nothing to do, the entityprim will take care
         # of setting everything for us.
-        if self.is_articulation_link:
-            return {}, idx
+        if self._is_part_of_articulation:
+            return {}, 0
 
         # Call supermethod first
         state_dic, idx = super()._deserialize(state=state)

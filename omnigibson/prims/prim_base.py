@@ -5,6 +5,7 @@ import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable, UniquelyNamed
 from omnigibson.utils.sim_utils import check_deletable_prim
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -147,53 +148,21 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         return self._state_size
 
     @property
+    def scene(self):
+        """
+        Returns:
+            Scene: Scene object that this prim is loaded into
+        """
+        assert self._scene_assigned, "Scene has not been assigned to this prim yet!"
+        return self._scene
+
+    @property
     def prim_path(self):
         """
         Returns:
             str: prim path in the stage.
         """
-        return self.scene_relative_prim_path_to_absolute(self._relative_prim_path)
-
-    def scene_relative_prim_path_to_absolute(self, relative_prim_path):
-        """
-        Converts a scene-relative prim path to an absolute prim path.
-
-        Args:
-            relative_prim_path (str): Relative prim path in the scene
-
-        Returns:
-            str: Absolute prim path in the stage
-        """
-        assert self._scene_assigned, f"A scene was not yet set for prim with {self._relative_prim_path}"
-
-        # When the scene is set to None, this prim is not in a scene but is global e.g. like the
-        # viewer camera or one of the scene prims.
-        if self._scene is None:
-            return "/World" + relative_prim_path
-
-        return self._scene.relative_prim_path_to_absolute(relative_prim_path)
-
-    def absolute_prim_path_to_scene_relative(self, absolute_prim_path):
-        """
-        Converts an absolute prim path to a scene-relative prim path.
-
-        Args:
-            absolute_prim_path (str): Absolute prim path in the stage
-
-        Returns:
-            str: Relative prim path in the scene
-        """
-        assert self._scene_assigned, f"A scene was not yet set for prim with {self._relative_prim_path}"
-
-        # When the scene is set to None, this prim is not in a scene but is global e.g. like the
-        # viewer camera or one of the scene prims.
-        if self._scene is None:
-            assert absolute_prim_path.startswith(
-                "/World"
-            ), f"Expected absolute prim path to start with /World, got {absolute_prim_path}"
-            return absolute_prim_path[len("/World") :]
-
-        return self._scene.absolute_prim_path_to_relative(absolute_prim_path)
+        return scene_relative_prim_path_to_absolute(self.scene, self._relative_prim_path)
 
     @property
     def name(self):

@@ -841,6 +841,18 @@ class JointPrim(BasePrim):
         if not self.driven:
             self.set_effort(np.zeros(self.n_dof))
 
+    def _dump_state(self):
+        return {}
+
+    def _load_state(self, state):
+        pass
+
+    def _serialize(self, state):
+        return np.array([])
+
+    def _deserialize(self, state):
+        return {}, 0
+
     def duplicate(self, relative_prim_path):
         # Cannot directly duplicate a joint prim
         raise NotImplementedError("Cannot directly duplicate a joint prim!")

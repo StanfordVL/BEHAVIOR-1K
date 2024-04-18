@@ -204,7 +204,7 @@ class RigidContactAPIImpl:
 
     @classmethod
     def get_row_filter(cls):
-        return "/World/*/*"
+        return "/World/scene_*/*/*"
 
     @classmethod
     def get_column_filters(cls):
@@ -252,7 +252,7 @@ class RigidContactAPIImpl:
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
-                    pattern=self.get_row_filter(),
+                    pattern=self.get_row_filter(),  # TODO (parallel): This can easily be made per-scene too.
                     filter_patterns=column_filters[scene_idx],
                     max_contact_data_count=self.get_max_contact_data_count(),
                 )
@@ -779,7 +779,7 @@ class ControllableObjectViewAPI:
         # Create the actual articulation view. Note that even though we search for base_link here,
         # the returned things will not necessarily be the base_link prim paths, but the appropriate
         # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
-        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/controllable_*/base_link")
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/scene_*/controllable_*/base_link")
         view_prim_paths = cls._VIEW.prim_paths
         assert (
             set(view_prim_paths) == expected_prim_paths
@@ -1330,3 +1330,49 @@ def get_world_prim():
         Usd.Prim: Active world prim in the current stage
     """
     return lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+
+
+def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
+    """
+    Converts a scene-relative prim path to an absolute prim path.
+
+    Args:
+        scene (Scene): Scene object that the prim is in. None if it's global.
+        relative_prim_path (str): Relative prim path in the scene
+
+    Returns:
+        str: Absolute prim path in the stage
+    """
+    # Make sure the relative path is actually relative
+    assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
+
+    # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+    # viewer camera or one of the scene prims.
+    if scene is None:
+        return "/World" + relative_prim_path
+
+    return scene.prim_path + relative_prim_path
+
+
+def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
+    """
+    Converts an absolute prim path to a scene-relative prim path.
+
+    Args:
+        scene (Scene): Scene object that the prim is in. None if it's global.
+        absolute_prim_path (str): Absolute prim path in the stage
+
+    Returns:
+        str: Relative prim path in the scene
+    """
+    assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"
+
+    # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+    # viewer camera or one of the scene prims.
+    if scene is None:
+        assert not absolute_prim_path.startswith(
+            "/World/scene_"
+        ), f"Expected global prim path, got {absolute_prim_path}"
+        return absolute_prim_path[len("/World") :]
+
+    return absolute_prim_path[len(scene.prim_path) :]

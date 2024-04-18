@@ -100,7 +100,15 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Returns:
             str: Path to this system's prim in the scene stage
         """
-        return f"/World/{cls.name}"
+        return "/World" + cls.relative_prim_path
+
+    @classproperty
+    def relative_prim_path(cls):
+        """
+        Returns:
+            str: Path to this system's prim in the scene stage relative to the world
+        """
+        return f"/{cls.name}"
 
     @classproperty
     def n_particles(cls):

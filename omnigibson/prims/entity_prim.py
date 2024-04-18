@@ -13,7 +13,7 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -256,11 +256,11 @@ class EntityPrim(XFormPrim):
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
-                relative_prim_path=self.absolute_prim_path_to_scene_relative(prim.GetPrimPath().__str__()),
+                relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
-            self._links[link_name].load(self._scene)
+            self._links[link_name].load(self.scene)
 
     def update_joints(self):
         """
@@ -289,11 +289,11 @@ class EntityPrim(XFormPrim):
                         joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
                         joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
-                            relative_prim_path=self.absolute_prim_path_to_scene_relative(joint_path),
+                            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
-                        joint.load(self._scene)
+                        joint.load(self.scene)
                         joint.initialize()
                         self._joints[joint_name] = joint
         else:
@@ -1512,9 +1512,10 @@ class EntityPrim(XFormPrim):
 
         # Create a attachment point link
         link = RigidPrim(
-            relative_prim_path=self.absolute_prim_path_to_scene_relative(link_prim.GetPrimPath().pathString),
+            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, link_prim.GetPrimPath().pathString),
             name=f"{self._name}:{link_name}",
         )
+        link.load(self.scene)
         link.disable_collisions()
         # TODO (eric): Should we disable gravity for this link?
         # link.disable_gravity()
