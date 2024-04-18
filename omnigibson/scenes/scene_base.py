@@ -238,7 +238,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._registry = self._create_registry()
 
         # Store world prim and load the scene into the simulator
-        scene_relative_path = f"/{self.idx}"
+        scene_relative_path = f"/scene_{self.idx}"
         self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
         self._scene_prim.load(None)
         self._load()
@@ -305,7 +305,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name=self.idx,
+            name=f"scene_{self.idx}",
             class_types=SerializableRegistry,
         )
 
