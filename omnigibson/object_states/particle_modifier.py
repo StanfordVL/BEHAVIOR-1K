@@ -1070,15 +1070,22 @@ class ParticleApplier(ParticleModifier):
                     parent_scale=self.link.scale,
                     material=system.material,
                 )
-            # TODO(parallel): Update this
+            relative_projection_system_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, self.projection_system.GetPrimPath().pathString
+            )
             self.projection_system_prim = BasePrim(
-                prim_path=self.projection_system.GetPrimPath().pathString, name=projection_name
+                relative_prim_path=relative_projection_system_path, name=projection_name
             )
-            # TODO(parallel): Update this
+            self.projection_system_prim.load(self.obj.scene)
+
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
-            self.projection_source_sphere = VisualGeomPrim(
-                prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere"
+            relative_projection_source_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, projection_visualization_path
             )
+            self.projection_source_sphere = VisualGeomPrim(
+                relative_prim_path=relative_projection_source_path, name=f"{name_prefix}_projection_source_sphere"
+            )
+            self.projection_source_sphere.load(self.obj.scene)
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh

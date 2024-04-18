@@ -1214,7 +1214,7 @@ def launch_simulator(*args, **kwargs):
             self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
 
             # Update internal settings
-            # TODO(parallel): Is this needed?
+            # TODO: Is this needed?
             self._set_physics_engine_settings()
             self._set_renderer_settings()
 
