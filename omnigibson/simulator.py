@@ -236,8 +236,6 @@ def launch_simulator(*args, **kwargs):
             device (None or str): specifies the device to be used if running on the gpu with torch backend
         """
 
-        _world_initialized = False
-
         def __init__(
             self,
             gravity=9.81,
@@ -277,10 +275,6 @@ def launch_simulator(*args, **kwargs):
                 stage_units_in_meters=stage_units_in_meters,
                 device=device,
             )
-
-            if self._world_initialized:
-                return
-            Simulator._world_initialized = True
 
             # Store other references to variables that will be initialized later
             self._scenes = []
@@ -1110,14 +1104,9 @@ def launch_simulator(*args, **kwargs):
 
         @classmethod
         def clear_instance(cls):
-            lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
-            Simulator._world_initialized = None
-            return
-
-        def __del__(self):
-            lazy.omni.isaac.core.simulation_context.SimulationContext.__del__(self)
-            Simulator._world_initialized = None
-            return
+            raise ValueError(
+                "You should not open a new stage - a single stage should be opened for the entire OG process lifetime."
+            )
 
         @property
         def pi(self):
