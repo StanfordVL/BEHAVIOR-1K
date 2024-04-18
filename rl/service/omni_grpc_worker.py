@@ -2,11 +2,11 @@ import argparse
 import os
 
 import numpy as np
+import wandb
 import yaml
 from telegym import serve_env_over_grpc
 
 import omnigibson as og
-import wandb
 from omnigibson.macros import gm
 
 gm.USE_FLATCACHE = True

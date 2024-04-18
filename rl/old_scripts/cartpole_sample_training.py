@@ -1,4 +1,5 @@
 import gymnasium as gym
+import wandb
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.ddpg.ddpg import DDPGConfig
 from ray.rllib.algorithms.dqn import DQNConfig
@@ -7,8 +8,6 @@ from ray.rllib.algorithms.sac import SACConfig
 from ray.rllib.offline.estimators import DirectMethod, DoublyRobust, ImportanceSampling, WeightedImportanceSampling
 from ray.rllib.offline.estimators.fqe_torch_model import FQETorchModel
 from ray.tune.logger import pretty_print
-
-import wandb
 
 wandb.init(
     # set the wandb project where this run will be logged

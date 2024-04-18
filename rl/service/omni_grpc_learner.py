@@ -13,6 +13,7 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
+import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import (
     BaseCallback,
@@ -27,10 +28,8 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
 from telegym import GRPCClientVecEnv
-from wandb.integration.sb3 import WandbCallback
-
-import wandb
 from wandb import AlertLevel
+from wandb.integration.sb3 import WandbCallback
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
