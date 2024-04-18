@@ -711,16 +711,18 @@ def launch_simulator(*args, **kwargs):
                         if issubclass(state_type, GlobalUpdateStateMixin):
                             state_type.global_update()
                         if issubclass(state_type, UpdateStateMixin):
-                            for obj in self.scene.get_objects_with_state(state_type):
-                                # Update the state (object should already be initialized since
-                                # this step will only occur after objects are initialized and sim
-                                # is playing
-                                obj.states[state_type].update()
+                            for scene in self.scenes:
+                                for obj in scene.get_objects_with_state(state_type):
+                                    # Update the state (object should already be initialized since
+                                    # this step will only occur after objects are initialized and sim
+                                    # is playing
+                                    obj.states[state_type].update()
 
-                    for obj in self.scene.objects:
-                        # Only update visuals for objects that have been initialized so far
-                        if isinstance(obj, StatefulObject) and obj.initialized:
-                            obj.update_visuals()
+                    for scene in self.scenes:
+                        for obj in scene.objects:
+                            # Only update visuals for objects that have been initialized so far
+                            if isinstance(obj, StatefulObject) and obj.initialized:
+                                obj.update_visuals()
 
                 # Possibly run transition rule step
                 if gm.ENABLE_TRANSITION_RULES:
@@ -1315,53 +1317,53 @@ def launch_simulator(*args, **kwargs):
             """
             return self.world_prim.GetCustomDataByKey(key)
 
-        def restore(self, json_path):
+        def restore(self, json_paths):
             """
-            Restore a simulation environment from @json_path.
+            Restore simulation environments from @json_paths.
 
             Args:
-                json_path (str): Full path of JSON file to load, which contains information
+                json_paths (List[str]): Full paths of JSON file to load, which contains information
                     to recreate a scene.
             """
-            if not json_path.endswith(".json"):
-                log.error(f"You have to define the full json_path to load from. Got: {json_path}")
-                return
+            for json_path in json_paths:
+                if not json_path.endswith(".json"):
+                    log.error(f"You have to define the full json_path to load from. Got: {json_path}")
+                    return
 
-            # Load the info from the json
-            with open(json_path, "r") as f:
-                scene_info = json.load(f)
-            init_info = scene_info["init_info"]
-            state = scene_info["state"]
+                # Load the info from the json
+                with open(json_path, "r") as f:
+                    scene_info = json.load(f)
+                init_info = scene_info["init_info"]
+                state = scene_info["state"]
 
-            # Override the init info with our json path
-            init_info["args"]["scene_file"] = json_path
+                # Override the init info with our json path
+                init_info["args"]["scene_file"] = json_path
 
-            # Also make sure we have any additional modifications necessary from the specific scene
-            og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
+                # Also make sure we have any additional modifications necessary from the specific scene
+                og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-            # Recreate and import the saved scene
-            og.sim.stop()
-            recreated_scene = create_object_from_init_info(init_info)
-            self.import_scene(scene=recreated_scene)
+                # Recreate and import the saved scene
+                og.sim.stop()
+                recreated_scene = create_object_from_init_info(init_info)
+                self.import_scene(scene=recreated_scene)
 
-            # Start the simulation and restore the dynamic state of the scene and then pause again
-            self.play()
-            self.load_state(state, serialized=False)
+                # Start the simulation and restore the dynamic state of the scene and then pause again
+                self.play()
+                recreated_scene.load_state(state, serialized=False)
 
             log.info("The saved simulation environment loaded.")
 
-            return
-
-        def save(self, json_path=None):
+        def save(self, json_paths=None):
             """
             Saves the current simulation environment to @json_path.
 
             Args:
-                json_path (None or str): Full path of JSON file to save (should end with .json), which contains information
-                    to recreate the current scene, if specified. If None, will return json string insted
+                json_paths (None or List[str]): Full path of JSON files to save (should end with .json), which contains information
+                    to recreate the current scenes, if specified. List should have one element per currently loaded scene.
+                    If None, will return a list of JSON strings instead.
 
             Returns:
-                None or str: If @json_path is None, returns dumped json string. Else, None
+                None or str: If @json_paths is None, returns list of dumped json strings. Else, None
             """
             # Make sure the sim is not stopped, since we need to grab joint states
             assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
@@ -1371,34 +1373,46 @@ def launch_simulator(*args, **kwargs):
             if len(self._objects_to_initialize) > 0:
                 log.error("There are still objects to initialize! Please take one additional sim step and then save.")
                 return
-            if not self.scene:
+            if not self.scenes:
                 log.warning("Scene has not been loaded. Nothing to save.")
                 return
             if not json_path.endswith(".json"):
                 log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
                 return
 
+            if not json_paths:
+                json_paths = [None] * len(self.scenes)
+
+            assert len(json_paths) == len(self.scenes), "Number of json paths should match the number of scenes"
+
             # Update scene info
-            self.scene.update_objects_info()
+            jsons = []
+            for scene, json_path in zip(self.scenes, json_paths):
+                scene.update_objects_info()
 
-            # Dump saved current state and also scene init info
-            scene_info = {
-                "metadata": self.world_prim.GetCustomData(),
-                "state": self.scene.dump_state(serialized=False),
-                "init_info": self.scene.get_init_info(),
-                "objects_info": self.scene.get_objects_info(),
-            }
+                # Dump saved current state and also scene init info
+                scene_info = {
+                    "metadata": self.world_prim.GetCustomData(),
+                    "state": scene.dump_state(serialized=False),
+                    "init_info": scene.get_init_info(),
+                    "objects_info": scene.get_objects_info(),
+                }
 
-            # Write this to the json file
-            if json_path is None:
-                return json.dumps(scene_info, cls=NumpyEncoder, indent=4)
+                # Write this to the json file
+                if json_path is None:
+                    jsons.append(json.dumps(scene_info, cls=NumpyEncoder, indent=4))
 
-            else:
-                Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
-                with open(json_path, "w+") as f:
-                    json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
+                else:
+                    Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
+                    with open(json_path, "w+") as f:
+                        json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
 
-                log.info("The current simulation environment saved.")
+                    log.info(f"Scene {scene.idx} saved.")
+
+            if jsons:
+                return jsons
+
+            return None
 
         def close(self):
             """

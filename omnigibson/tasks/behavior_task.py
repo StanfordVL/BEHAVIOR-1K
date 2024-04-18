@@ -550,7 +550,7 @@ class BehaviorTask(BaseTask):
             return
         # Write metadata and then save
         self.write_task_metadata()
-        og.sim.save(json_path=path)
+        og.sim.save(json_paths=[path])
 
     @property
     def name(self):
