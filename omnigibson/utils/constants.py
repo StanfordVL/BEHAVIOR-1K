@@ -139,14 +139,6 @@ AVERAGE_OBJ_DENSITY = 67.0
 AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
 
 
-def get_collision_group_mask(groups_to_exclude=[]):
-    """Get a collision group mask that has collisions enabled for every group except those in groups_to_exclude."""
-    collision_mask = ALL_COLLISION_GROUPS_MASK
-    for group in groups_to_exclude:
-        collision_mask &= ~(1 << group)
-    return collision_mask
-
-
 class OccupancyGridState:
     OBSTACLES = 0.0
     UNKNOWN = 0.5
