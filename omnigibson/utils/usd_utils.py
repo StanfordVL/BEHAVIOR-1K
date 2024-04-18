@@ -491,7 +491,7 @@ class CollisionAPI:
             filter_self_collisions (bool): Whether to ignore self-collisions within the group. Default is False
         """
         # Can only be done when sim is stopped
-        assert og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
+        assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
         # Make sure the group doesn't already exist
         assert (
