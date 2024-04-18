@@ -574,20 +574,7 @@ def launch_simulator(*args, **kwargs):
                 self.step_physics()
 
             for ob in objs:
-                # Run any callbacks
-                for callback in self._callbacks_on_remove_obj.values():
-                    callback(ob)
-
-                # pop all link ids
-                for link in ob.links.values():
-                    self._link_id_to_objects.pop(lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
-
-                # If it was queued up to be initialized, remove it from the queue as well
-                for i, initialize_obj in enumerate(self._objects_to_initialize):
-                    if ob.name == initialize_obj.name:
-                        self._objects_to_initialize.pop(i)
-                        break
-                ob.scene.remove_object(ob)
+                self._remove_object(ob)
 
             if self.is_playing():
                 # Update all handles that are now broken because objects have changed
@@ -598,6 +585,28 @@ def launch_simulator(*args, **kwargs):
 
             # Refresh all current rules
             TransitionRuleAPI.prune_active_rules()
+
+        def _remove_object(self, obj):
+            """
+            Remove a non-robot object from the simulator. Should not be called directly by the user.
+
+            Args:
+                obj (BaseObject): a non-robot object to remove
+            """
+            # Run any callbacks
+            for callback in self._callbacks_on_remove_obj.values():
+                callback(obj)
+
+            # pop all link ids
+            for link in obj.links.values():
+                self._link_id_to_objects.pop(lazy.pxr.PhysicsSchemaTools.sdfPathToInt(link.prim_path))
+
+            # If it was queued up to be initialized, remove it from the queue as well
+            for i, initialize_obj in enumerate(self._objects_to_initialize):
+                if obj.name == initialize_obj.name:
+                    self._objects_to_initialize.pop(i)
+                    break
+            obj.scene.remove_object(obj)
 
         def remove_prim(self, prim):
             """

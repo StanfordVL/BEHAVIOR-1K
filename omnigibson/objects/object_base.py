@@ -113,6 +113,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["uuid"] = self.uuid
 
     def load(self, scene):
+        assert (
+            scene is not None
+        ), "Scene must be specified to load an object - only prims can be loaded without a scene!"
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
