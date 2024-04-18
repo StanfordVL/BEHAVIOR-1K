@@ -64,7 +64,7 @@ class ManipulationRobot(BaseRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -163,7 +163,7 @@ class ManipulationRobot(BaseRobot):
 
         # Call super() method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,

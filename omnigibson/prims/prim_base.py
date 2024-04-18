@@ -152,14 +152,48 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         Returns:
             str: prim path in the stage.
         """
+        return self.scene_relative_prim_path_to_absolute(self._relative_prim_path)
+
+    def scene_relative_prim_path_to_absolute(self, relative_prim_path):
+        """
+        Converts a scene-relative prim path to an absolute prim path.
+
+        Args:
+            relative_prim_path (str): Relative prim path in the scene
+
+        Returns:
+            str: Absolute prim path in the stage
+        """
         assert self._scene_assigned, f"A scene was not yet set for prim with {self._relative_prim_path}"
 
         # When the scene is set to None, this prim is not in a scene but is global e.g. like the
         # viewer camera or one of the scene prims.
         if self._scene is None:
-            return "/World" + self._relative_prim_path
+            return "/World" + relative_prim_path
 
-        return self._scene.relative_prim_path_to_absolute(self._relative_prim_path)
+        return self._scene.relative_prim_path_to_absolute(relative_prim_path)
+
+    def absolute_prim_path_to_scene_relative(self, absolute_prim_path):
+        """
+        Converts an absolute prim path to a scene-relative prim path.
+
+        Args:
+            absolute_prim_path (str): Absolute prim path in the stage
+
+        Returns:
+            str: Relative prim path in the scene
+        """
+        assert self._scene_assigned, f"A scene was not yet set for prim with {self._relative_prim_path}"
+
+        # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+        # viewer camera or one of the scene prims.
+        if self._scene is None:
+            assert absolute_prim_path.startswith(
+                "/World"
+            ), f"Expected absolute prim path to start with /World, got {absolute_prim_path}"
+            return absolute_prim_path[len("/World") :]
+
+        return self._scene.absolute_prim_path_to_relative(absolute_prim_path)
 
     @property
     def name(self):

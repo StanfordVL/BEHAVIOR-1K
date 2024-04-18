@@ -18,7 +18,7 @@ class FrankaLeap(ManipulationRobot):
         # Shared kwargs in hierarchy
         name,
         hand="right",
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -94,7 +94,7 @@ class FrankaLeap(ManipulationRobot):
         self.hand = hand
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,

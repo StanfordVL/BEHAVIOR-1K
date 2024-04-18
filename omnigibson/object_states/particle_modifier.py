@@ -154,6 +154,7 @@ def create_projection_visualization(
     # Override the prototype with our own sphere with optional material
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
+    # TODO(parallel): Update
     prototype = VisualGeomPrim(prim_path=prototype_path, name=f"{projection_name}_prototype")
     prototype.initialize()
     # Set the scale (native scaling --> radius 0.5) and possibly update the material
@@ -386,7 +387,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     )
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
-            self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
+            # TODO(parallel): Update
+            self.projection_mesh = VisualGeomPrim(
+                relative_prim_path=self.obj.absolute_prim_path_to_scene_relative(mesh_prim_path),
+                name=f"{name_prefix}_projection_mesh",
+            )
             self.projection_mesh.initialize()
             self.projection_mesh.visible = False
 
@@ -1061,9 +1066,11 @@ class ParticleApplier(ParticleModifier):
                     parent_scale=self.link.scale,
                     material=system.material,
                 )
+            # TODO(parallel): Update this
             self.projection_system_prim = BasePrim(
                 prim_path=self.projection_system.GetPrimPath().pathString, name=projection_name
             )
+            # TODO(parallel): Update this
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
             self.projection_source_sphere = VisualGeomPrim(
                 prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere"

@@ -58,7 +58,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -89,7 +89,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
 
         super(BehaviorRobot, self).__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,
@@ -117,13 +117,18 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.parts[arm_name] = BRPart(
                 name=arm_name,
                 parent=self,
-                prim_path=f"{arm_name}_palm",
+                relative_prim_path=f"/{arm_name}_palm",
                 eef_type="hand",
                 offset_to_body=m.HAND_TO_BODY_OFFSET[arm_name],
                 **kwargs,
             )
         self.parts["head"] = BRPart(
-            name="head", parent=self, prim_path="eye", eef_type="head", offset_to_body=m.HEAD_TO_BODY_OFFSET, **kwargs
+            name="head",
+            parent=self,
+            relative_prim_path="/eye",
+            eef_type="head",
+            offset_to_body=m.HEAD_TO_BODY_OFFSET,
+            **kwargs,
         )
 
         # whether to use ghost hands (visual markers to help visualize current vr hand pose)
@@ -531,7 +536,7 @@ class BRPart(ABC):
         if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
-                prim_path=f"/World/{gh_name}",
+                relative_prim_path=f"/{gh_name}",
                 usd_path=os.path.join(gm.ASSET_PATH, f"models/behavior_robot/usd/{gh_name}.usd"),
                 name=gh_name,
                 scale=0.001,

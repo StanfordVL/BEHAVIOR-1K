@@ -48,14 +48,14 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     print(time.time() - start)
 
     if import_robot:
-        turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=["rgb"])
+        turtlebot = Turtlebot(relative_prim_path="/robot", name="agent", obs_modalities=["rgb"])
         scene.add_object(turtlebot)
         og.sim.step()
 
     if non_rigid_simulation:
         cloth = DatasetObject(
             name="cloth",
-            prim_path="/World/cloth",
+            relative_prim_path="/cloth",
             category="t_shirt",
             model="kvidcx",
             prim_type=PrimType.CLOTH,

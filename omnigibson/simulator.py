@@ -253,7 +253,7 @@ def launch_simulator(*args, **kwargs):
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
             # called downstream during the initialization of this object will try to access og.sim.
             # This makes that possible (and also introduces possible issues around circular dependencies)
-            Simulator._instance = self
+            assert og.sim is None, "Only one Simulator instance can be created at a time!"
             og.sim = self
 
             # Store vars needed for initialization
@@ -312,9 +312,6 @@ def launch_simulator(*args, **kwargs):
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
 
-            # Auto-load the dummy stage
-            self.clear()
-
             # Set the viewer dimensions
             if gm.RENDER_VIEWER_CAMERA:
                 self.viewer_width = viewer_width
@@ -333,21 +330,11 @@ def launch_simulator(*args, **kwargs):
 
         def __new__(
             cls,
-            gravity=9.81,
-            physics_dt=1.0 / 120.0,
-            rendering_dt=1.0 / 30.0,
-            stage_units_in_meters=1.0,
-            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
-            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            device_idx=0,
+            *args,
+            **kwargs,
         ):
-            # Overwrite since we have different kwargs
-            if Simulator._instance is None:
-                # The init function assigns itself as Simulator._instance as soon as it starts.
-                object.__new__(cls)
-            else:
-                lazy.carb.log_info("Simulator is defined already, returning the previously defined one")
-            return Simulator._instance
+            # Override the SimulationContext instancing system
+            return object.__new__(cls, *args, **kwargs)
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -1184,6 +1171,8 @@ def launch_simulator(*args, **kwargs):
                 scene.clear()
             self._scenes = []
 
+            # TODO(parallel): Clear scene prims
+
             # Clear all vision sensors and remove viewer camera reference and camera mover reference
             VisionSensor.clear()
             self._viewer_camera = None
@@ -1216,7 +1205,7 @@ def launch_simulator(*args, **kwargs):
             self._callbacks_on_remove_obj = dict()
 
             # Load dummy stage, but don't clear sim to prevent circular loops
-            self._open_new_stage()
+            self._init_stage(physics_dt=self.get_physics_dt(), rendering_dt=self.get_rendering_dt())
 
         def write_metadata(self, key, data):
             """
@@ -1479,7 +1468,7 @@ def launch_simulator(*args, **kwargs):
             # Also add skybox if requested
             if self._use_skybox:
                 self._skybox = LightObject(
-                    prim_path="/World/skybox",
+                    relative_prim_path="/skybox",
                     name="skybox",
                     category="background",
                     light_type="Dome",

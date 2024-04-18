@@ -13,7 +13,14 @@ SENSOR_PRIMS_TO_SENSOR_CLS = {
 
 
 def create_sensor(
-    sensor_type, prim_path, name, modalities="all", enabled=True, sensor_kwargs=None, noise_type=None, noise_kwargs=None
+    sensor_type,
+    relative_prim_path,
+    name,
+    modalities="all",
+    enabled=True,
+    sensor_kwargs=None,
+    noise_type=None,
+    noise_kwargs=None,
 ):
     """
     Create a sensor of type @sensor_type with optional keyword args @sensor_kwargs that should be passed to the
@@ -23,7 +30,7 @@ def create_sensor(
     Args:
         sensor_type (str): Type of sensor to create. Should be either one of SENSOR_PRIM_TO_SENSOR.keys() or
             one of REGISTERED_SENSORS (i.e.: the string name of the desired class to create)
-        prim_path (str): prim path of the Sensor to encapsulate or create.
+        relative_prim_path (str): prim path of the Sensor to encapsulate or create.
         name (str): Name for the sensor. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Valid options are part of
             sensor.all_modalities. Default is "all", which corresponds to all modalities being used
@@ -58,7 +65,7 @@ def create_sensor(
     # Create the sensor
     sensor_kwargs = dict() if sensor_kwargs is None else sensor_kwargs
     sensor = sensor_cls(
-        prim_path=prim_path,
+        relative_prim_path=relative_prim_path,
         name=name,
         modalities=modalities,
         enabled=enabled,

@@ -48,7 +48,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -139,7 +139,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=self.usd_path,
             name=name,
             category=m.ROBOT_CATEGORY,
@@ -188,7 +188,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
-                relative_prim_path=self.scene.absolute_prim_path_to_relative(dummy_path),
+                relative_prim_path=self.absolute_prim_path_to_scene_relative(dummy_path),
                 scale=self._load_config.get("scale", None),
                 visible=False,
                 fixed_base=True,
@@ -258,7 +258,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-                        prim_path=str(prim.GetPrimPath()),
+                        relative_prim_path=self.absolute_prim_path_to_scene_relative(str(prim.GetPrimPath())),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )

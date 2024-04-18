@@ -118,7 +118,7 @@ class LightObject(StatefulObject):
 
         # Grab reference to light link
         self._light_link = XFormPrim(
-            relative_prim_path=f"{self.relative_prim_path}/base_link/light", name=f"{self.name}:light_link"
+            relative_prim_path=f"{self._relative_prim_path}/base_link/light", name=f"{self.name}:light_link"
         )
         self._light_link.load(self.scene)
 

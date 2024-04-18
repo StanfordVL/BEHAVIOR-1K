@@ -445,6 +445,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 semantic_label=cls.name,
                 type_label="class",
             )
+        # TODO(parallel): Fix these
         return VisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod

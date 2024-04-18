@@ -165,7 +165,7 @@ class PointNavigationTask(BaseTask):
         """
         if self._visualize_goal:
             self._initial_pos_marker = PrimitiveObject(
-                prim_path="/World/task_initial_pos_marker",
+                relative_prim_path="/task_initial_pos_marker",
                 primitive_type="Cylinder",
                 name="task_initial_pos_marker",
                 radius=self._goal_tolerance,
@@ -174,7 +174,7 @@ class PointNavigationTask(BaseTask):
                 rgba=np.array([1, 0, 0, 0.3]),
             )
             self._goal_pos_marker = PrimitiveObject(
-                prim_path="/World/task_goal_pos_marker",
+                relative_prim_path="/task_goal_pos_marker",
                 primitive_type="Cylinder",
                 name="task_goal_pos_marker",
                 radius=self._goal_tolerance,
@@ -192,7 +192,7 @@ class PointNavigationTask(BaseTask):
             waypoints = []
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
-                    prim_path=f"/World/task_waypoint_marker{i}",
+                    relative_prim_path=f"/task_waypoint_marker{i}",
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
                     radius=self._waypoint_width,

@@ -54,7 +54,7 @@ def benchmark_scene(sim):
         for j in range(NUM_OBJS_PER_ITER):
             obj_idx = i * NUM_OBJS_PER_ITER + j
             obj = PrimitiveObject(
-                prim_path=f"/World/obj{obj_idx}",
+                relative_prim_path=f"/obj{obj_idx}",
                 primitive_type="Sphere",
                 name=f"obj{obj_idx}",
                 scale=OBJ_SCALE,

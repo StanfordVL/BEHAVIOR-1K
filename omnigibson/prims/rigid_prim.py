@@ -201,7 +201,7 @@ class RigidPrim(XFormPrim):
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
-                    "relative_prim_path": self.scene.absolute_prim_path_to_relative(mesh_path),
+                    "relative_prim_path": self.absolute_prim_path_to_scene_relative(mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                 }
                 if is_collision:

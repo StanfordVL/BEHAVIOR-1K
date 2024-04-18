@@ -252,11 +252,11 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": (
                     self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
                 ),
-                "is_part_of_articulation": self.articulation_view is not None,
+                "is_part_of_articulation": self._articulation_view is not None,
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
-                relative_prim_path=self.scene.absolute_prim_path_to_relative(prim.GetPrimPath().__str__()),
+                relative_prim_path=self.absolute_prim_path_to_scene_relative(prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
@@ -289,7 +289,7 @@ class EntityPrim(XFormPrim):
                         joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
                         joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
-                            relative_prim_path=self.scene.absolute_prim_path_to_relative(joint_path),
+                            relative_prim_path=self.absolute_prim_path_to_scene_relative(joint_path),
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
@@ -1512,7 +1512,7 @@ class EntityPrim(XFormPrim):
 
         # Create a attachment point link
         link = RigidPrim(
-            prim_path=link_prim.GetPrimPath().__str__(),
+            relative_prim_path=self.absolute_prim_path_to_scene_relative(link_prim.GetPrimPath().pathString),
             name=f"{self._name}:{link_name}",
         )
         link.disable_collisions()
