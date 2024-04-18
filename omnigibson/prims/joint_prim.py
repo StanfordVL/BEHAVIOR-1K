@@ -886,7 +886,3 @@ class JointPrim(BasePrim):
             ),
             5 * self.n_dof,
         )
-
-    def duplicate(self, relative_prim_path):
-        # Cannot directly duplicate a joint prim
-        raise NotImplementedError("Cannot directly duplicate a joint prim!")

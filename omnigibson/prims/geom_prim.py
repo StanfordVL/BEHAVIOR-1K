@@ -50,10 +50,6 @@ class GeomPrim(XFormPrim):
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
 
-    def duplicate(self, relative_prim_path):
-        # Cannot directly duplicate a mesh prim
-        raise NotImplementedError("Cannot directly duplicate a geom prim!")
-
     @property
     def purpose(self):
         """

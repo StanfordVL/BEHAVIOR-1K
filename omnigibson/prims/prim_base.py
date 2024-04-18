@@ -289,30 +289,3 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             name=name,
             load_config=load_config,
         )
-
-    def duplicate(self, relative_prim_path):
-        """
-        Duplicates this object, and generates a new instance at @relative_prim_path.
-        Note that the created object is automatically loaded into the simulator, but is NOT initialized
-        until a sim step occurs!
-
-        Args:
-            relative_prim_path (str): Absolute path to the newly generated prim
-
-        Returns:
-            BasePrim: Generated prim object
-        """
-        new_prim = self._create_prim_with_same_kwargs(
-            relative_prim_path=relative_prim_path,
-            name=f"{self.name}_copy{self._n_duplicates}",
-            load_config=self._load_config,
-        )
-        self.scene.add_object(new_prim, register=False)
-
-        # Increment duplicate count
-        self._n_duplicates += 1
-
-        # Set visibility
-        new_prim.visible = self.visible
-
-        return new_prim
