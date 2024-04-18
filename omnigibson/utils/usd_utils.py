@@ -482,7 +482,7 @@ class CollisionAPI:
     ACTIVE_COLLISION_GROUPS = dict()
 
     @classmethod
-    def create_collision_group(cls, stage, col_group, filter_self_collisions=False):
+    def create_collision_group(cls, col_group, filter_self_collisions=False):
         """
         Creates a new collision group with name @col_group
 

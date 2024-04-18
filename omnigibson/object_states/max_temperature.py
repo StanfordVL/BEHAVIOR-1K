@@ -20,9 +20,9 @@ class MaxTemperature(TensorizedValueState):
         return deps
 
     @classmethod
-    def global_initialize(cls, sim):
+    def global_initialize(cls):
         # Call super first
-        super().global_initialize(sim)
+        super().global_initialize()
 
         # Initialize other global variables
         cls.TEMPERATURE_IDXS = np.array([], dtype=int)

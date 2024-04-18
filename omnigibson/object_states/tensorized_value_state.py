@@ -23,9 +23,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     CALLBACKS_ON_REMOVE = None
 
     @classmethod
-    def global_initialize(cls, sim):
+    def global_initialize(cls):
         # Call super first
-        super().global_initialize(sim)
+        super().global_initialize()
 
         # Initialize the global variables
         cls.VALUES = np.array([], dtype=cls.value_type).reshape(0, *cls.value_shape)

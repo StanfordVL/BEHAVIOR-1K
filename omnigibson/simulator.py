@@ -252,6 +252,12 @@ def launch_simulator(*args, **kwargs):
             use_skybox=True,
             device=None,
         ):
+            # Here we assign self as the Simulator instance and as og.sim, because certain functions
+            # called downstream during the initialization of this object will try to access og.sim.
+            # This makes that possible (and also introduces possible issues around circular dependencies)
+            Simulator._instance = self
+            og.sim = self
+
             # Store vars needed for initialization
             self.gravity = gravity
             self._use_floor_plane = use_floor_plane
@@ -343,7 +349,8 @@ def launch_simulator(*args, **kwargs):
         ):
             # Overwrite since we have different kwargs
             if Simulator._instance is None:
-                Simulator._instance = object.__new__(cls)
+                # The init function assigns itself as Simulator._instance as soon as it starts.
+                object.__new__(cls)
             else:
                 lazy.carb.log_info("Simulator is defined already, returning the previously defined one")
             return Simulator._instance
@@ -1198,7 +1205,7 @@ def launch_simulator(*args, **kwargs):
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
                 if issubclass(state, GlobalUpdateStateMixin):
-                    state.global_initialize(self)
+                    state.global_initialize()
 
             # Clear all materials
             MaterialPrim.clear()
@@ -1442,15 +1449,11 @@ def launch_simulator(*args, **kwargs):
 
             # Import and configure the floor plane and the skybox
             # Create collision group for fixed base objects' non root links, root links, and building structures
-            CollisionAPI.create_collision_group(
-                self.stage, col_group="fixed_base_nonroot_links", filter_self_collisions=False
-            )
+            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
             # Disable collision between root links of fixed base objects
-            CollisionAPI.create_collision_group(
-                self.stage, col_group="fixed_base_root_links", filter_self_collisions=True
-            )
+            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
             # Disable collision between building structures
-            CollisionAPI.create_collision_group(self.stage, col_group="structures", filter_self_collisions=True)
+            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
 
             # Disable collision between building structures and fixed base objects
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
@@ -1589,7 +1592,8 @@ def launch_simulator(*args, **kwargs):
             return dicts, total_state_size
 
     if not og.sim:
-        og.sim = Simulator(*args, **kwargs)
+        # The simulator init function saves itself as og.sim.
+        Simulator(*args, **kwargs)
 
         print()
         print_icon()
