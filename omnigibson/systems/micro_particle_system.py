@@ -6,7 +6,6 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-import pymeshlab
 import trimesh
 
 import omnigibson as og
@@ -1688,6 +1687,8 @@ class Cloth(MicroParticleSystem):
             )
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
+            import pymeshlab  # We import this here because it takes a few seconds to load.
+
             for _ in range(10):
                 ms = pymeshlab.MeshSet()
                 ms.load_new_mesh(tmp_fpath)
