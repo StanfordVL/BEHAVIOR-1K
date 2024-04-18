@@ -260,7 +260,7 @@ class EntityPrim(XFormPrim):
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
-            self._links[link_name].load(self.scene)
+            self._links[link_name].load(self._scene)
 
     def update_joints(self):
         """
@@ -293,7 +293,7 @@ class EntityPrim(XFormPrim):
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
-                        joint.load(self.scene)
+                        joint.load(self._scene)
                         joint.initialize()
                         self._joints[joint_name] = joint
         else:

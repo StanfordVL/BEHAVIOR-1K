@@ -305,7 +305,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name=f"scene_{self.idx}",
+            name=f"scene_registry_{self.idx}",
             class_types=SerializableRegistry,
         )
 
@@ -315,7 +315,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add registry for objects
         registry.add(
             obj=SerializableRegistry(
-                name="object_registry_{self.idx}",
+                name=f"object_registry_{self.idx}",
                 class_types=BaseObject,
                 default_key="name",
                 unique_keys=self.object_registry_unique_keys,
@@ -388,8 +388,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
                 (in that case, the object is stored to be loaded together with the scene)
         """
-        assert self.loaded, "Scene must be loaded before adding objects!"
-
         # Load the object.
         prim = obj.load(self)
 

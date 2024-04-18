@@ -206,6 +206,7 @@ class RigidPrim(XFormPrim):
                 }
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
+                    mesh.load(self._scene)
                     # We also modify the collision mesh's contact and rest offsets, since omni's default values result
                     # in lightweight objects sometimes not triggering contacts correctly
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
@@ -224,6 +225,7 @@ class RigidPrim(XFormPrim):
                         mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+                    self._visual_meshes[mesh_name].load(self._scene)
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
