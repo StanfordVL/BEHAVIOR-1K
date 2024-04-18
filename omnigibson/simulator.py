@@ -62,6 +62,8 @@ def print_save_usd_warning(_):
 
 
 def _launch_app():
+    log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
+
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
@@ -1467,6 +1469,10 @@ def launch_simulator(*args, **kwargs):
             return self._scene.deserialize(state=state), self._scene.state_size
 
     if not og.sim:
+        from omnigibson.systems.system_base import import_og_systems
+
+        # Import all OG systems from dataset
+        import_og_systems()
         og.sim = Simulator(*args, **kwargs)
 
         print()

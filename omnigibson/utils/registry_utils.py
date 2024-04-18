@@ -55,7 +55,7 @@ class Registry(UniquelyNamed):
         default_key="name",
         unique_keys=None,
         group_keys=None,
-        default_value=m.DOES_NOT_EXIST,
+        default_value=None,
     ):
         """
         Args:
@@ -259,7 +259,7 @@ class Registry(UniquelyNamed):
             val = getattr(obj, attr)
 
         except:
-            val = self.default_value
+            val = self.default_value if self.default_value is not None else m.DOES_NOT_EXIST
 
         return val
 

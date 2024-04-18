@@ -51,7 +51,6 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
-        debug_object_sampling (bool): whether to debug placement functionality
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -70,7 +69,6 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        debug_object_sampling=False,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -105,7 +103,6 @@ class BehaviorTask(BaseTask):
         self.sampler = None  # BDDLSampler
 
         # Object info
-        self.debug_object_sampling = debug_object_sampling  # bool
         self.online_object_sampling = online_object_sampling  # bool
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to BDDLEntity
@@ -315,7 +312,6 @@ class BehaviorTask(BaseTask):
             activity_conditions=self.activity_conditions,
             object_scope=self.object_scope,
             backend=self.backend,
-            debug=self.debug_object_sampling,
         )
 
         # Compose future objects
