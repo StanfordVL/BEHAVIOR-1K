@@ -521,7 +521,10 @@ class StatefulObject(BaseObject):
         # Also add non-kinematic states
         non_kin_states = dict()
         for state_type, state_instance in self._states.items():
-            non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
+            try:
+                non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
+            except NotImplementedError:
+                pass
 
         state["non_kin"] = non_kin_states
 
@@ -539,9 +542,12 @@ class StatefulObject(BaseObject):
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if state_name in state["non_kin"]:
-                state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
+                try:
+                    state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
+                except NotImplementedError:
+                    pass
             else:
-                log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
+                log.debug(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
