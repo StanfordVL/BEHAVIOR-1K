@@ -328,7 +328,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             ]
         )
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         goal_is_valid = bool(state[0])
         if goal_is_valid:
             # Un-flatten all the keys
@@ -374,11 +374,6 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Check if input is an Iterable, if so, we simply convert the input to np.array and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
         return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
-
-    @property
-    def state_size(self):
-        # Default is goal dim + 1 (for whether the goal is valid or not)
-        return self.goal_dim + 1
 
     @property
     def goal(self):

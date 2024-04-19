@@ -143,11 +143,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         return self._initialized
 
     @property
-    def state_size(self):
-        # This is the cached value
-        return self._state_size
-
-    @property
     def scene(self):
         """
         Returns:

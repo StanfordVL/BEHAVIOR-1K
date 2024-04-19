@@ -824,7 +824,7 @@ class RigidPrim(XFormPrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Call supermethod first
         state_dic, idx = super()._deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel

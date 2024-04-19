@@ -434,7 +434,8 @@ class XFormPrim(BasePrim):
     def _serialize(self, state):
         return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
+        # TODO(cremebrule): Make all code OK with accepting different state sizes.
         # We deserialize deterministically by knowing the order of values -- pos, ori
         pos = state[0:3]
         ori = state[3:7]

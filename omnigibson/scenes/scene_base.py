@@ -587,11 +587,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self._objects_info
 
-    @property
-    def state_size(self):
-        # Total state size is the state size of our registry
-        return self._registry.state_size
-
     def _dump_state(self):
         # Default state for the scene is from the registry alone
         return self._registry.dump_state(serialized=False)
@@ -604,12 +599,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default state for the scene is from the registry alone
         return self._registry.serialize(state=state)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Default state for the scene is from the registry alone
-        # We split this into two explicit steps, because the actual registry state size might dynamically change
-        # as we're deserializing
-        state_dict = self._registry.deserialize(state=state)
-        return state_dict, self._registry.state_size
+        return self._registry._deserialize(state=state)
 
     @classproperty
     def _cls_registry(cls):

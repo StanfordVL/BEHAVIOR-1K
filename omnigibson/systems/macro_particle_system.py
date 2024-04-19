@@ -158,12 +158,6 @@ class MacroParticleSystem(BaseSystem):
         """
         return f"{cls.name}Particle"
 
-    @classproperty
-    def state_size(cls):
-        # In additon to super, we have:
-        # scale (3*n), and particle counter (1)
-        return super().state_size + 3 * cls.n_particles + 1
-
     @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
@@ -201,7 +195,7 @@ class MacroParticleSystem(BaseSystem):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
@@ -1153,7 +1147,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         return np.concatenate([*state_group_flat, state_flat]).astype(float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Synchronize the particle groups
         n_groups = int(state[0])
         groups_dict = dict()
@@ -1568,12 +1562,6 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Remove excess particles
             cls.remove_particles(idxs=np.arange(-n_particles_to_generate))
 
-    @classproperty
-    def state_size(cls):
-        # In additon to super, we have:
-        # velocities (6*n)
-        return super().state_size + 6 * cls.n_particles
-
     @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
@@ -1607,7 +1595,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Sync the number of particles first
         cls._sync_particles(n_particles=int(state[0]))
 

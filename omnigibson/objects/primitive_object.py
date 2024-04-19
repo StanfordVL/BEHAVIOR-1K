@@ -363,7 +363,7 @@ class PrimitiveObject(StatefulObject):
         if self._primitive_type in VALID_SIZE_OBJECTS:
             self.size = state["size"]
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         state_dict, idx = super()._deserialize(state=state)
         # state_dict["extents"] = state[idx: idx + 3]
         state_dict["radius"] = state[idx]

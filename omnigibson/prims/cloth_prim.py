@@ -582,7 +582,7 @@ class ClothPrim(GeomPrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 

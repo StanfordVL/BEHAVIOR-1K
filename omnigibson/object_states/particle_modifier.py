@@ -742,11 +742,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         """
         raise NotImplementedError()
 
-    @property
-    def state_size(self):
-        # Only store the current_step
-        return 1
-
     def _dump_state(self):
         return dict(current_step=int(self._current_step))
 
@@ -756,7 +751,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def _serialize(self, state):
         return np.array([state["current_step"]], dtype=float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         current_step = int(state[0])
         state_dict = dict(current_step=current_step)
 

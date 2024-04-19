@@ -616,16 +616,15 @@ class ControllableObject(BaseObject):
         # Concatenate and return
         return np.concatenate([state_flat, controller_states_flat]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            state_size = c.state_size
-            controller_states[c_name] = c.deserialize(state=state[idx : idx + state_size])
-            idx += state_size
+            controller_states[c_name], deserialized_items = c._deserialize(state=state[idx:])
+            idx += deserialized_items
         state_dict["controllers"] = controller_states
 
         return state_dict, idx

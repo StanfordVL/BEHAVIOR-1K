@@ -26,11 +26,6 @@ class Filter(Serializable):
         """
         pass
 
-    @property
-    def state_size(self):
-        # No state by default
-        return 0
-
     def _dump_state(self):
         # Default is no state (empty dict)
         return dict()
@@ -43,7 +38,7 @@ class Filter(Serializable):
         # Default is no state, so do nothing
         return np.array([])
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Default is no state, so do nothing
         return dict(), 0
 
@@ -103,10 +98,6 @@ class MovingAverageFilter(Filter):
         self.current_idx = 0
         self.fully_filled = False
 
-    @property
-    def state_size(self):
-        return super().state_size + self.filter_width * self.obs_dim + 2
-
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
@@ -141,7 +132,7 @@ class MovingAverageFilter(Filter):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
@@ -194,10 +185,6 @@ class ExponentialAverageFilter(Filter):
         self.avg *= 0.0
         self.num_samples = 0
 
-    @property
-    def state_size(self):
-        return super().state_size + self.obs_dim + 1
-
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
@@ -229,7 +216,7 @@ class ExponentialAverageFilter(Filter):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 

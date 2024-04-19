@@ -874,7 +874,7 @@ class JointPrim(BasePrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort
         return (
             dict(

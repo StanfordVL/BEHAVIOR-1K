@@ -172,10 +172,6 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         diffuse_tint = (1.0, 1.0, 1.0)
         return albedo_add, diffuse_tint
 
-    @property
-    def state_size(self):
-        return 2
-
     # For this state, we simply store its value and the robot_can_toggle steps.
     def _dump_state(self):
         return dict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)
@@ -188,5 +184,5 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     def _serialize(self, state):
         return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

@@ -322,10 +322,6 @@ class SerializableRegistry(Registry, Serializable):
         # Run super like normal
         super().add(obj=obj)
 
-    @property
-    def state_size(self):
-        return sum(obj.state_size for obj in self.objects)
-
     def _dump_state(self):
         # Iterate over all objects and grab their states
         state = dict()
@@ -352,17 +348,15 @@ class SerializableRegistry(Registry, Serializable):
             else np.array([])
         )
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         state_dict = dict()
         # Iterate over all the objects and deserialize their individual states, incrementing the index counter
         # along the way
         idx = 0
         for obj in self.objects:
-            log.debug(
-                f"obj: {obj.name}, state size: {obj.state_size}, idx: {idx}, passing in state length: {len(state[idx:])}"
-            )
+            log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
-            state_dict[obj.name] = obj.deserialize(state[idx:])
-            idx += obj.state_size
+            state_dict[obj.name], deserialized_items = obj._deserialize(state[idx:])
+            idx += deserialized_items
         return state_dict, idx

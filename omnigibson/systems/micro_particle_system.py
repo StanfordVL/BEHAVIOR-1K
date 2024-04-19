@@ -309,12 +309,6 @@ class PhysxParticleInstancer(BasePrim):
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
-    @property
-    def state_size(self):
-        # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
-        # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
-        return 3 + self.n_particles * 14
-
     def _dump_state(self):
         return dict(
             idn=self._idn,
@@ -365,7 +359,7 @@ class PhysxParticleInstancer(BasePrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Sanity check the identification number
         assert self._idn == state[0], (
             f"Got mismatch in identification number for this particle instancer when "
@@ -708,13 +702,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     @classproperty
     def default_instancer_idn(cls):
         return 0
-
-    @classproperty
-    def state_size(cls):
-        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
-        # number of particles in each instancer (3n),
-        # and the corresponding states in each instancer (X)
-        return 1 + 3 * len(cls.particle_instancers) + sum(inst.state_size for inst in cls.particle_instancers.values())
 
     @classproperty
     def default_particle_instancer(cls):
@@ -1217,7 +1204,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         ).astype(float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Synchronize the particle instancers
         n_instancers = int(state[0])
         instancer_info = dict()
@@ -1238,9 +1225,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = cls.particle_instancer_idn_to_name(idn=idn)
-            state_size = cls.particle_instancers[name].state_size
-            particle_states[name] = cls.particle_instancers[name].deserialize(state[idx : idx + state_size])
-            idx += state_size
+            particle_states[name], deserialized_items = cls.particle_instancers[name]._deserialize(state[idx:])
+            idx += deserialized_items
 
         return (
             dict(
@@ -1791,11 +1777,6 @@ class Cloth(MicroParticleSystem):
     def particle_contact_offset(cls):
         return m.CLOTH_PARTICLE_CONTACT_OFFSET
 
-    @classproperty
-    def state_size(cls):
-        # Default is no state
-        return 0
-
     @classmethod
     def _dump_state(cls):
         # Empty by default
@@ -1812,6 +1793,6 @@ class Cloth(MicroParticleSystem):
         return np.array([], dtype=float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Nothing by default
         return dict(), 0

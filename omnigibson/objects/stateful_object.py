@@ -521,8 +521,7 @@ class StatefulObject(BaseObject):
         # Also add non-kinematic states
         non_kin_states = dict()
         for state_type, state_instance in self._states.items():
-            if state_instance.stateful:
-                non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
+            non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
 
         state["non_kin"] = non_kin_states
 
@@ -539,11 +538,10 @@ class StatefulObject(BaseObject):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.stateful:
-                if state_name in state["non_kin"]:
-                    state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
-                else:
-                    log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
+            if state_name in state["non_kin"]:
+                state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
+            else:
+                log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
@@ -567,7 +565,7 @@ class StatefulObject(BaseObject):
         # Combine these two arrays
         return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Call super method first
         state_dic, idx = super()._deserialize(state=state)
 
@@ -575,9 +573,8 @@ class StatefulObject(BaseObject):
         non_kin_state_dic = dict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.stateful:
-                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx : idx + state_instance.state_size])
-                idx += state_instance.state_size
+            non_kin_state_dic[state_name], deserialized_items = state_instance._deserialize(state[idx:])
+            idx += deserialized_items
         state_dic["non_kin"] = non_kin_state_dic
 
         return state_dic, idx

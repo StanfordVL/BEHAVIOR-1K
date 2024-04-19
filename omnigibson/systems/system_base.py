@@ -426,11 +426,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     def __init__(self):
         raise ValueError("System classes should not be created!")
 
-    @classproperty
-    def state_size(cls):
-        # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
-        return 7 + 7 * cls.n_particles
-
     @classmethod
     def _dump_state(cls):
         positions, orientations = (
@@ -475,7 +470,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # First index is number of particles, then min_scale and max_scale, then the individual particle poses
         state_dict = dict()
         n_particles = int(state[0])
@@ -557,20 +552,6 @@ class VisualParticleSystem(BaseSystem):
                 this will OVERRIDE cls.min_scale and cls.max_scale when sampling particles!
         """
         return False
-
-    @classproperty
-    def state_size(cls):
-        # Get super size first
-        state_size = super().state_size
-
-        # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
-        # particle ids, particle indices, and corresponding link info for each particle (m * 3)
-        return (
-            state_size
-            + 1
-            + 2 * len(cls._group_particles)
-            + sum(3 * cls.num_group_particles(group) for group in cls.groups)
-        )
 
     @classmethod
     def _clear(cls):

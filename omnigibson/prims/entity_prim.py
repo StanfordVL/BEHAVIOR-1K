@@ -1567,15 +1567,15 @@ class EntityPrim(XFormPrim):
 
         return np.concatenate(state_flat).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
-        idx = self.root_link.state_size
-        state_dict = dict(root_link=self.root_link.deserialize(state=state[:idx]))
+        root_link_state, idx = self.root_link._deserialize(state=state)
+        state_dict = dict(root_link=root_link_state)
         joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name] = prim.deserialize(state=state[idx : idx + prim.state_size])
-            idx += prim.state_size
+            joint_state_dict[prim_name], deserialized_items = prim._deserialize(state=state[idx:])
+            idx += prim.deserialized_items
         state_dict["joints"] = joint_state_dict
 
         return state_dict, idx

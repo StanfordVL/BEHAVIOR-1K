@@ -1493,7 +1493,7 @@ class ManipulationRobot(BaseRobot):
         # TODO AG
         return state_flat
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Call super first
         state_dict, idx = super()._deserialize(state=state)
 

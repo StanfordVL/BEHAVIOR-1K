@@ -1447,11 +1447,6 @@ def launch_simulator(*args, **kwargs):
                 device_id = self._settings.get_as_int("/physics/cudaDevice")
                 self._device = f"cuda:{device_id}"
 
-        @property
-        def state_size(self):
-            # Total state size is the state size of our scene
-            return sum([scene.state_size for scene in self.scenes])
-
         def _dump_state(self):
             # Default state is from the scene
             return {i: scene.dump_state(serialized=False) for i, scene in enumerate(self.scenes)}
@@ -1484,14 +1479,14 @@ def launch_simulator(*args, **kwargs):
             # Default state is from the scene
             return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
 
-        def _deserialize(self, state):
+        def deserialize(self, state):
             # Default state is from the scene
             dicts = {}
             total_state_size = 0
             for i, scene in enumerate(self.scenes):
-                scene_dict, scene_state_size = scene.deserialize(state=state[total_state_size:])
+                scene_dict, deserialized_items = scene.deserialize(state=state[total_state_size:])
                 dicts[i] = scene_dict
-                total_state_size += scene_state_size
+                total_state_size += deserialized_items
             return dicts, total_state_size
 
     if not og.sim:

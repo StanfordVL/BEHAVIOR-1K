@@ -53,11 +53,6 @@ class ModifiedParticles(RelativeObjectState):
         """
         self.particle_counts = {system: -1 for system in systems}
 
-    @property
-    def state_size(self):
-        # Two entries per system (name + count) + number of systems
-        return len(self.particle_counts) * 2 + 1
-
     def _dump_state(self):
         state = dict(n_systems=len(self.particle_counts))
         for system, val in self.particle_counts.items():
@@ -83,7 +78,7 @@ class ModifiedParticles(RelativeObjectState):
             ).astype(float)
         return state_flat
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         n_systems = int(state[0])
         state_shaped = state[1 : 1 + n_systems * 2].reshape(-1, 2)
         state_dict = dict(n_systems=n_systems)
@@ -199,11 +194,6 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         """
         self._limits = {system: m.DEFAULT_SATURATION_LIMIT for system in systems}
 
-    @property
-    def state_size(self):
-        # Limit per entry * 2 (UUID, value) + default limit + n limits
-        return len(self._limits) * 2 + 2
-
     def _dump_state(self):
         state = dict(n_systems=len(self._limits), default_limit=self._default_limit)
         for system, limit in self._limits.items():
@@ -233,7 +223,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             ).astype(float)
         return state_flat
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         n_systems = int(state[0])
         state_dict = dict(n_systems=n_systems, default_limit=int(state[1]))
         state_shaped = state[2 : 2 + n_systems * 2].reshape(-1, 2)
