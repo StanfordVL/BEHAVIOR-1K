@@ -384,8 +384,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     bimodal_stdev_fraction,
     axis_probabilities,
     aabb_offset=None,
-    aabb_offset_fraction=m.DEFAULT_AABB_OFFSET_FRACTION,
-    max_sampling_attempts=m.DEFAULT_MAX_SAMPLING_ATTEMPTS,
+    aabb_offset_fraction=None,
+    max_sampling_attempts=None,
 ):
     """
     Sample the start points and end points around a given object by a symmetric bimodal distribution
@@ -409,6 +409,10 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
             - (n, s, 3)-array: (num_samples, max_sampling_attempts, 3) shaped array representing the end points for
                 raycasting defined in the world frame
     """
+    aabb_offset_fraction = aabb_offset_fraction if aabb_offset_fraction is not None else m.DEFAULT_AABB_OFFSET_FRACTION
+    max_sampling_attempts = (
+        max_sampling_attempts if max_sampling_attempts is not None else m.DEFAULT_MAX_SAMPLING_ATTEMPTS
+    )
     bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True)
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
@@ -454,7 +458,7 @@ def sample_raytest_start_end_full_grid_topdown(
     obj,
     ray_spacing,
     aabb_offset=None,
-    aabb_offset_fraction=m.DEFAULT_AABB_OFFSET_FRACTION,
+    aabb_offset_fraction=None,
 ):
     """
     Sample the start points and end points around a given object by a dense grid from top down.
@@ -473,6 +477,7 @@ def sample_raytest_start_end_full_grid_topdown(
             - (n, s, 3)-array: (num_samples, max_sampling_attempts, 3) shaped array representing the end points for
                 raycasting defined in the world frame
     """
+    aabb_offset_fraction = aabb_offset_fraction if aabb_offset_fraction is not None else m.DEFAULT_AABB_OFFSET_FRACTION
     bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True)
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
 
@@ -514,15 +519,15 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
     bimodal_mean_fraction,
     bimodal_stdev_fraction,
     axis_probabilities,
-    new_ray_per_horizontal_distance=m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE,
-    hit_proportion=m.DEFAULT_HIT_PROPORTION,
+    new_ray_per_horizontal_distance=None,
+    hit_proportion=None,
     aabb_offset=None,
-    aabb_offset_fraction=m.DEFAULT_AABB_OFFSET_FRACTION,
-    max_sampling_attempts=m.DEFAULT_MAX_SAMPLING_ATTEMPTS,
-    max_angle_with_z_axis=m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
-    parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
-    hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
-    cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
+    aabb_offset_fraction=None,
+    max_sampling_attempts=None,
+    max_angle_with_z_axis=None,
+    parallel_ray_normal_angle_tolerance=None,
+    hit_to_plane_threshold=None,
+    cuboid_bottom_padding=None,
     undo_cuboid_bottom_padding=True,
     verify_cuboid_empty=True,
     refuse_downwards=False,
@@ -576,6 +581,30 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
             filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
+    new_ray_per_horizontal_distance = (
+        new_ray_per_horizontal_distance
+        if new_ray_per_horizontal_distance is not None
+        else m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE
+    )
+    hit_proportion = hit_proportion if hit_proportion is not None else m.DEFAULT_HIT_PROPORTION
+    aabb_offset_fraction = aabb_offset_fraction if aabb_offset_fraction is not None else m.DEFAULT_AABB_OFFSET_FRACTION
+    max_sampling_attempts = (
+        max_sampling_attempts if max_sampling_attempts is not None else m.DEFAULT_MAX_SAMPLING_ATTEMPTS
+    )
+    max_angle_with_z_axis = (
+        max_angle_with_z_axis if max_angle_with_z_axis is not None else m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS
+    )
+    parallel_ray_normal_angle_tolerance = (
+        parallel_ray_normal_angle_tolerance
+        if parallel_ray_normal_angle_tolerance is not None
+        else m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE
+    )
+    hit_to_plane_threshold = (
+        hit_to_plane_threshold if hit_to_plane_threshold is not None else m.DEFAULT_HIT_TO_PLANE_THRESHOLD
+    )
+    cuboid_bottom_padding = (
+        cuboid_bottom_padding if cuboid_bottom_padding is not None else m.DEFAULT_CUBOID_BOTTOM_PADDING
+    )
     start_points, end_points = sample_raytest_start_end_symmetric_bimodal_distribution(
         obj,
         num_samples,
@@ -608,14 +637,14 @@ def sample_cuboid_on_object_full_grid_topdown(
     obj,
     ray_spacing,
     cuboid_dimensions,
-    new_ray_per_horizontal_distance=m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE,
-    hit_proportion=m.DEFAULT_HIT_PROPORTION,
+    new_ray_per_horizontal_distance=None,
+    hit_proportion=None,
     aabb_offset=None,
-    aabb_offset_fraction=m.DEFAULT_AABB_OFFSET_FRACTION,
-    max_angle_with_z_axis=m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
-    parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
-    hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
-    cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
+    aabb_offset_fraction=None,
+    max_angle_with_z_axis=None,
+    parallel_ray_normal_angle_tolerance=None,
+    hit_to_plane_threshold=None,
+    cuboid_bottom_padding=None,
     undo_cuboid_bottom_padding=True,
     verify_cuboid_empty=True,
     refuse_downwards=False,
@@ -664,6 +693,27 @@ def sample_cuboid_on_object_full_grid_topdown(
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
             filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
+    new_ray_per_horizontal_distance = (
+        new_ray_per_horizontal_distance
+        if new_ray_per_horizontal_distance is not None
+        else m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE
+    )
+    hit_proportion = hit_proportion if hit_proportion is not None else m.DEFAULT_HIT_PROPORTION
+    aabb_offset_fraction = aabb_offset_fraction if aabb_offset_fraction is not None else m.DEFAULT_AABB_OFFSET_FRACTION
+    max_angle_with_z_axis = (
+        max_angle_with_z_axis if max_angle_with_z_axis is not None else m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS
+    )
+    parallel_ray_normal_angle_tolerance = (
+        parallel_ray_normal_angle_tolerance
+        if parallel_ray_normal_angle_tolerance is not None
+        else m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE
+    )
+    hit_to_plane_threshold = (
+        hit_to_plane_threshold if hit_to_plane_threshold is not None else m.DEFAULT_HIT_TO_PLANE_THRESHOLD
+    )
+    cuboid_bottom_padding = (
+        cuboid_bottom_padding if cuboid_bottom_padding is not None else m.DEFAULT_CUBOID_BOTTOM_PADDING
+    )
     start_points, end_points = sample_raytest_start_end_full_grid_topdown(
         obj,
         ray_spacing,
@@ -693,12 +743,12 @@ def sample_cuboid_on_object(
     end_points,
     cuboid_dimensions,
     ignore_objs=None,
-    new_ray_per_horizontal_distance=m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE,
-    hit_proportion=m.DEFAULT_HIT_PROPORTION,
-    max_angle_with_z_axis=m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
-    parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
-    hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
-    cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
+    new_ray_per_horizontal_distance=None,
+    hit_proportion=None,
+    max_angle_with_z_axis=None,
+    parallel_ray_normal_angle_tolerance=None,
+    hit_to_plane_threshold=None,
+    cuboid_bottom_padding=None,
     undo_cuboid_bottom_padding=True,
     verify_cuboid_empty=True,
     refuse_downwards=False,
@@ -748,6 +798,26 @@ def sample_cuboid_on_object(
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
             filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
+    new_ray_per_horizontal_distance = (
+        new_ray_per_horizontal_distance
+        if new_ray_per_horizontal_distance is not None
+        else m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE
+    )
+    hit_proportion = hit_proportion if hit_proportion is not None else m.DEFAULT_HIT_PROPORTION
+    max_angle_with_z_axis = (
+        max_angle_with_z_axis if max_angle_with_z_axis is not None else m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS
+    )
+    parallel_ray_normal_angle_tolerance = (
+        parallel_ray_normal_angle_tolerance
+        if parallel_ray_normal_angle_tolerance is not None
+        else m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE
+    )
+    hit_to_plane_threshold = (
+        hit_to_plane_threshold if hit_to_plane_threshold is not None else m.DEFAULT_HIT_TO_PLANE_THRESHOLD
+    )
+    cuboid_bottom_padding = (
+        cuboid_bottom_padding if cuboid_bottom_padding is not None else m.DEFAULT_CUBOID_BOTTOM_PADDING
+    )
 
     assert (
         start_points.shape == end_points.shape

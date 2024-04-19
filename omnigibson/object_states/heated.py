@@ -16,9 +16,9 @@ m.HEATED_SAMPLING_RANGE_MAX = 20.0
 
 
 class Heated(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj, heat_temperature=m.DEFAULT_HEAT_TEMPERATURE):
+    def __init__(self, obj, heat_temperature=None):
         super(Heated, self).__init__(obj)
-        self.heat_temperature = heat_temperature
+        self.heat_temperature = heat_temperature if heat_temperature is not None else m.DEFAULT_HEAT_TEMPERATURE
 
     @classmethod
     def get_dependencies(cls):

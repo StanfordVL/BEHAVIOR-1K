@@ -38,9 +38,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
     def __init__(
         self,
         obj,
-        temperature=m.DEFAULT_TEMPERATURE,
-        heating_rate=m.DEFAULT_HEATING_RATE,
-        distance_threshold=m.DEFAULT_DISTANCE_THRESHOLD,
+        temperature=None,
+        heating_rate=None,
+        distance_threshold=None,
         requires_toggled_on=False,
         requires_closed=False,
         requires_inside=False,
@@ -64,9 +64,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 ignored.
         """
         super(HeatSourceOrSink, self).__init__(obj)
-        self._temperature = temperature
-        self._heating_rate = heating_rate
-        self.distance_threshold = distance_threshold
+        self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
+        self._heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
+        self.distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
 
         # If the heat source needs to be toggled on, we assert the presence
         # of that ability.

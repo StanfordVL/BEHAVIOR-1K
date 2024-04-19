@@ -177,14 +177,14 @@ def assert_test_env():
             ],
         }
 
-        # Make sure sim is stopped
-        if og.sim is not None:
+        if og.sim is None:
+            # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = False
+        else:
+            # Make sure sim is stopped
             og.sim.stop()
-
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
 
         # Create the environment
         global env

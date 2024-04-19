@@ -9,9 +9,9 @@ m.DEFAULT_COOK_TEMPERATURE = 70
 
 
 class Cooked(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj, cook_temperature=m.DEFAULT_COOK_TEMPERATURE):
+    def __init__(self, obj, cook_temperature=None):
         super(Cooked, self).__init__(obj)
-        self.cook_temperature = cook_temperature
+        self.cook_temperature = cook_temperature if cook_temperature is not None else m.DEFAULT_COOK_TEMPERATURE
 
     @classmethod
     def get_dependencies(cls):

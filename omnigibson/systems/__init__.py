@@ -12,6 +12,3 @@ from omnigibson.systems.system_base import (
     remove_callback_on_system_clear,
     remove_callback_on_system_init,
 )
-
-# Import all OG systems from dataset
-import_og_systems()

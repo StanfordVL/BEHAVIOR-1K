@@ -632,8 +632,8 @@ class BaseTransitionRule(Registerable):
                 len(cls.candidate_filters) > 0
             ), "At least one of individual_filters or group_filters must be specified!"
 
-            # Store conditions
-            cls.conditions = cls._generate_conditions()
+            # Delay condition generation until the first time it's accessed
+            cls.conditions = None
 
     @classproperty
     def candidate_filters(cls):
@@ -704,6 +704,8 @@ class BaseTransitionRule(Registerable):
         cls.candidates = object_candidates
 
         # Refresh all conditions
+        if cls.conditions is None:
+            cls.conditions = cls._generate_conditions()
         for condition in cls.conditions:
             condition.refresh(object_candidates=object_candidates)
 
@@ -732,6 +734,8 @@ class BaseTransitionRule(Registerable):
         """
         # Copy the candidates dictionary since it may be mutated in place by @conditions
         object_candidates = {filter_name: candidates.copy() for filter_name, candidates in cls.candidates.items()}
+        if cls.conditions is None:
+            cls.conditions = cls._generate_conditions()
         for condition in cls.conditions:
             if not condition(object_candidates=object_candidates):
                 # Condition was not met, so immediately terminate

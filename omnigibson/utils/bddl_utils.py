@@ -566,22 +566,13 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(
-        self,
-        env,
-        activity_conditions,
-        object_scope,
-        backend,
-        debug=False,
-    ):
+    def __init__(self, env, activity_conditions, object_scope, backend):
         # Store internal variables from inputs
         self._env = env
         self._scene_model = (
             self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
         )
         self._agent = self._env.robots[0]
-        if debug:
-            gm.DEBUG = True
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope

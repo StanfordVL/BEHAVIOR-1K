@@ -191,8 +191,8 @@ class AttachedTo(
         self,
         other,
         bypass_alignment_checking=False,
-        pos_thresh=m.DEFAULT_POSITION_THRESHOLD,
-        orn_thresh=m.DEFAULT_ORIENTATION_THRESHOLD,
+        pos_thresh=None,
+        orn_thresh=None,
     ):
         """
         Args:
@@ -209,6 +209,10 @@ class AttachedTo(
                 - RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
                 - RigidPrim or None: the corresponding link of @other
         """
+        if pos_thresh is None:
+            pos_thresh = m.DEFAULT_POSITION_THRESHOLD
+        if orn_thresh is None:
+            orn_thresh = m.DEFAULT_ORIENTATION_THRESHOLD
         parent_candidates = self._get_parent_candidates(other)
         if not parent_candidates:
             return None, None
@@ -261,7 +265,7 @@ class AttachedTo(
             f"{self.parent_link.prim_path}/{self.obj.name}_attachment_joint" if self.parent_link is not None else None
         )
 
-    def _attach(self, other, child_link, parent_link, joint_type=m.DEFAULT_JOINT_TYPE, can_joint_break=True):
+    def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
         """
         Creates a fixed or spherical joint between a male meta link of self.obj (@child_link) and a female meta link of
          @other (@parent_link) with a given @joint_type, @break_force and @break_torque
@@ -273,6 +277,8 @@ class AttachedTo(
             joint_type (JointType): joint type of the attachment, {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}
             can_joint_break (bool): whether the joint can break or not.
         """
+        if joint_type is None:
+            joint_type = m.DEFAULT_JOINT_TYPE
         assert joint_type in {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}, f"Unsupported joint type {joint_type}"
 
         # Set pose for self.obj so that child_link and parent_link align (6dof alignment for FixedJoint and 3dof alignment for SphericalJoint)
