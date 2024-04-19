@@ -6,6 +6,7 @@ import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.objects.light_object import LightObject
@@ -31,6 +32,9 @@ log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
+
+# TODO(parallel): Make this get dynamically computed based on scene AABB
+m.SCENE_MARGIN = 10.0
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
@@ -242,6 +246,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene_relative_path = f"/scene_{self.idx}"
         self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
         self._scene_prim.load(None)
+
+        # Position the scene prim based on its index in the simulator.
+        x, y = T.integer_spiral_coordinates(self.idx)
+        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
+
+        # Go through whatever else loading the scene needs to do.
         self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
