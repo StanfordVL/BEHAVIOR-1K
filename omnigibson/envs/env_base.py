@@ -51,7 +51,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.metadata = {"render.modes": ["rgb_array"]}
 
         # Launch Isaac Sim
-        launch_simulator()
+        launch_simulator(
+            physics_dt=(1.0 / self.physics_frequency),
+            rendering_dt=(1.0 / self.action_frequency),
+            use_floor_plane=self.use_floor_plane,
+            floor_plane_visible=self.floor_plane_visible,
+            floor_plane_color=self.floor_plane_color,
+            device=self.device,
+            viewer_width=self.render_config["viewer_width"],
+            viewer_height=self.render_config["viewer_height"],
+        )
 
         # Initialize other placeholders that will be filled in later
         self._task = None
@@ -79,6 +88,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.physics_frequency = self.env_config["physics_frequency"]
         self.action_frequency = self.env_config["action_frequency"]
+        self.use_floor_plane = self.env_config["use_floor_plane"]
+        self.floor_plane_visible = self.env_config["floor_plane_visible"]
+        self.floor_plane_color = self.env_config["floor_plane_color"]
         self.device = self.env_config["device"]
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
@@ -206,10 +218,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.stop()
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
-        # Set the simulator settings
-        # NOTE: This must be done BEFORE the scene is loaded, or else all vision sensors can't retrieve observations
-        og.sim.set_simulation_dt(physics_dt=(1.0 / self.physics_frequency), rendering_dt=(1.0 / self.action_frequency))
-
         # Create the scene from our scene config
         self._scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
@@ -218,13 +226,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="scene",
         )
         og.sim.import_scene(self._scene)
-
-        # Set the rendering settings
-        if gm.RENDER_VIEWER_CAMERA:
-            og.sim.viewer_width = self.render_config["viewer_width"]
-            og.sim.viewer_height = self.render_config["viewer_height"]
-        og.sim.device = self.device
-
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
     def _load_robots(self):
@@ -781,6 +782,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             "env": {
                 "action_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
+                "use_floor_plane": False,
+                "floor_plane_visible": True,
+                "floor_plane_color": (1.0, 1.0, 1.0),
                 "device": None,
                 "automatic_reset": False,
                 "flatten_action_space": False,
