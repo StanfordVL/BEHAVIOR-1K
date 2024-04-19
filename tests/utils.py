@@ -68,7 +68,8 @@ env = None
 
 
 def assert_test_env():
-    if og.sim is None or len(og.sim.scenes) == 0:
+    global env
+    if env is None:
         cfg = {
             "scene": {
                 "type": "Scene",
@@ -187,7 +188,6 @@ def assert_test_env():
             og.sim.stop()
 
         # Create the environment
-        global env
         env = og.Environment(configs=cfg)
 
         # Additional processing for the tests to pass more deterministically
