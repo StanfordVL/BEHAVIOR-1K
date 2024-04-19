@@ -416,20 +416,29 @@ class XFormPrim(BasePrim):
 
     def _dump_state(self):
         local_pos, local_ori = self.get_local_pose()
+        pos, ori = self.get_position_orientation()
+
+        # If we are in a scene, compute the scene-local transform (and save this as the world transform
+        # for legacy compatibility)
+        if self.scene is not None:
+            pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
+
+        # TODO(parallel): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
         # We return a dict that contains -1s for the original format that used global pos/orn.
-        return dict(local_pos=local_pos, local_ori=local_ori, pos=[-1, -1, -1], ori=[-1, -1, -1, -1])
+        return dict(local_pos=local_pos, local_ori=local_ori, pos=pos, ori=ori)
 
     def _load_state(self, state):
         # If we have the local pose info, we can directly use them
-        if "local_pos" in state and "local_ori" in state:
+        # TODO(parallel): The below logic doesn't quite work because the intermediate prims don't move.
+        if False:  # "local_pos" in state and "local_ori" in state:
             self.set_local_pose(state["local_pos"], state["local_ori"])
         else:
             # Otherwise, we use the legacy global pose as the scene-local pose.
-            scene_local_pos, scene_local_orn = np.array(state["pos"]), np.array(state["ori"])
-            world_pos, world_orn = T.pose_transform(
-                *self.scene.prim.get_position_orientation(), scene_local_pos, scene_local_orn
-            )
-            self.set_position_orientation(world_pos, world_orn)
+            pos, orn = np.array(state["pos"]), np.array(state["ori"])
+            if self.scene is not None:
+                pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+            print("Moving", self.name, "to", pos, orn)
+            self.set_position_orientation(pos, orn)
 
     def _serialize(self, state):
         return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
