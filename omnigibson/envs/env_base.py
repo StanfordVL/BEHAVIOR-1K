@@ -50,28 +50,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.render_mode = "rgb_array"
         self.metadata = {"render.modes": ["rgb_array"]}
 
-        # Launch Isaac Sim
-        launch_simulator(
-            physics_dt=(1.0 / self.physics_frequency),
-            rendering_dt=(1.0 / self.action_frequency),
-            use_floor_plane=self.use_floor_plane,
-            floor_plane_visible=self.floor_plane_visible,
-            floor_plane_color=self.floor_plane_color,
-            device=self.device,
-            viewer_width=self.render_config["viewer_width"],
-            viewer_height=self.render_config["viewer_height"],
-        )
-
-        # Initialize other placeholders that will be filled in later
-        self._task = None
-        self._external_sensors = None
-        self._external_sensors_include_in_obs = None
-        self._loaded = None
-        self._current_episode = 0
-
-        # Variables reset at the beginning of each episode
-        self._current_step = 0
-
         # Convert config file(s) into a single parsed dict
         configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
 
@@ -95,6 +73,28 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
         ]  # how high to offset object placement to account for one action step of dropping
+
+        # Launch Isaac Sim
+        launch_simulator(
+            physics_dt=(1.0 / self.physics_frequency),
+            rendering_dt=(1.0 / self.action_frequency),
+            use_floor_plane=self.use_floor_plane,
+            floor_plane_visible=self.floor_plane_visible,
+            floor_plane_color=self.floor_plane_color,
+            device=self.device,
+            viewer_width=self.render_config["viewer_width"],
+            viewer_height=self.render_config["viewer_height"],
+        )
+
+        # Initialize other placeholders that will be filled in later
+        self._task = None
+        self._external_sensors = None
+        self._external_sensors_include_in_obs = None
+        self._loaded = None
+        self._current_episode = 0
+
+        # Variables reset at the beginning of each episode
+        self._current_step = 0
 
         # Create the scene graph builder
         self._scene_graph_builder = None
