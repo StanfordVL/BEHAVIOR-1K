@@ -160,9 +160,6 @@ class InteractiveTraversableScene(TraversableScene):
             self.load_room_instances = None
 
     def _load(self):
-        # Run super first
-        super()._load()
-
         # Load the traversability map if we have the connectivity graph
         maps_path = os.path.join(self.scene_dir, "layout")
         self._trav_map.load_map(maps_path)
