@@ -176,7 +176,7 @@ class GraspTask(BaseTask):
         return joint_positions, joint_control_idx
 
     def _get_obs(self, env):
-        obj = env.scene.object_registry("name", f"{self.obj_name}_{env.id}")
+        obj = env.scene.object_registry("name", self.obj_name)
         robot = env.robots[0]
         relative_pos, _ = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
 

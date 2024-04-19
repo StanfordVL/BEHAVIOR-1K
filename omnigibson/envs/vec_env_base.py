@@ -8,7 +8,7 @@ class VectorEnvironment:
 
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
-        self.envs = [og.Environment(configs=copy.deepcopy(config), num_env=i) for i in range(num_envs)]
+        self.envs = [og.Environment(configs=copy.deepcopy(config)) for _ in range(num_envs)]
 
     def step(self, actions):
         try:
