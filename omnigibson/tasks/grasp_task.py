@@ -75,8 +75,8 @@ class GraspTask(BaseTask):
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = np.array(robot_pose["base_pos"]) + np.array(env.origin_offset)
-            robot.set_position_orientation(robot_pos, robot_pose["base_ori"])
+            robot_pos = np.array(robot_pose["base_pos"])
+            robot.set_local_pose(robot_pos, robot_pose["base_ori"])
 
         # Otherwise, reset using the primitive controller.
         else:
