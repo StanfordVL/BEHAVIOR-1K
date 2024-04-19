@@ -437,7 +437,6 @@ class XFormPrim(BasePrim):
             pos, orn = np.array(state["pos"]), np.array(state["ori"])
             if self.scene is not None:
                 pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
-            print("Moving", self.name, "to", pos, orn)
             self.set_position_orientation(pos, orn)
 
     def _serialize(self, state):
