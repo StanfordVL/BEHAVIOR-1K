@@ -8,7 +8,7 @@ from inspect import isclass
 import numpy as np
 
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
+from omnigibson.utils.python_utils import Serializable, SerializableNonInstance
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -21,7 +21,7 @@ m = create_module_macros(module_path=__file__)
 m.DOES_NOT_EXIST = "DOES_NOT_EXIST"
 
 
-class Registry(UniquelyNamed):
+class Registry:
     """
     Simple class for easily registering and tracking arbitrary objects of the same (or very similar) class types.
 

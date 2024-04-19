@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.python_utils import Recreatable, Serializable, UniquelyNamed
+from omnigibson.utils.python_utils import Recreatable, Serializable
 from omnigibson.utils.sim_utils import check_deletable_prim
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
@@ -11,7 +11,7 @@ from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 log = create_module_logger(module_name=__name__)
 
 
-class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
+class BasePrim(Serializable, Recreatable, ABC):
     """
     Provides high level functions to deal with a basic prim and its attributes/ properties.
     If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at

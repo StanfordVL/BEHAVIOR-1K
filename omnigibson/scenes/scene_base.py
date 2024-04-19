@@ -77,7 +77,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value=f"object_registry_{self.idx}")
+        return self._registry(key="name", value=f"object_registry")
 
     @property
     def system_registry(self):
@@ -317,7 +317,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add registry for objects
         registry.add(
             obj=SerializableRegistry(
-                name=f"object_registry_{self.idx}",
+                name=f"object_registry",
                 class_types=BaseObject,
                 default_key="name",
                 unique_keys=self.object_registry_unique_keys,
