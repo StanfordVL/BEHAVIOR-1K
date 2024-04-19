@@ -42,7 +42,7 @@ class GraspTask(BaseTask):
         self._reset_poses = None
         if precached_reset_pose_path is not None:
             with open(precached_reset_pose_path) as f:
-                self.reset_poses = json.load(f)
+                self._reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
     def _load(self, env):
@@ -71,9 +71,9 @@ class GraspTask(BaseTask):
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
-        if self.reset_poses is not None:
+        if self._reset_poses is not None:
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            robot_pose = random.choice(self.reset_poses)
+            robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = np.array(robot_pose["base_pos"]) + np.array(env.origin_offset)
             robot.set_position_orientation(robot_pos, robot_pose["base_ori"])
