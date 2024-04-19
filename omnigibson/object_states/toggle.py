@@ -70,7 +70,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         if len(touching_bodies_idxs) > 0:
             for idx in touching_bodies_idxs:
                 body_prim_path = RigidContactAPI.get_row_idx_prim_path(0, idx=idx)
-                obj = og.sim._find_object_in_all_envs("/".join(body_prim_path.split("/")[:-1]))
+                obj = og.sim.find_object_in_scenes("/".join(body_prim_path.split("/")[:-1]))
                 if obj is not None:
                     cls._finger_contact_objs.add(obj)
 
