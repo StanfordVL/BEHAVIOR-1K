@@ -16,7 +16,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
 
-    # Dictionary mapping object name to index in VALUES
+    # Dictionary mapping object to index in VALUES
     OBJ_IDXS = None
 
     # Dict of callbacks that can be added to when an object is removed
@@ -66,11 +66,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             obj (StatefulObject): Object to add
         """
         assert (
-            obj.name not in cls.OBJ_IDXS
+            obj not in cls.OBJ_IDXS
         ), f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
 
         # Add this object to the tracked global state
-        cls.OBJ_IDXS[obj.name] = len(cls.VALUES)
+        cls.OBJ_IDXS[obj] = len(cls.VALUES)
         cls.VALUES = np.concatenate([cls.VALUES, np.zeros((1, *cls.value_shape), dtype=cls.value_type)], axis=0)
 
     @classmethod
@@ -84,13 +84,13 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         """
         # Removes this tracked object from the global value array
         assert (
-            obj.name in cls.OBJ_IDXS
+            obj in cls.OBJ_IDXS
         ), f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
-        deleted_idx = cls.OBJ_IDXS.pop(obj.name)
+        deleted_idx = cls.OBJ_IDXS.pop(obj)
 
         # Re-standardize the indices
-        for i, name in enumerate(cls.OBJ_IDXS.keys()):
-            cls.OBJ_IDXS[name] = i
+        for i, o in enumerate(cls.OBJ_IDXS.keys()):
+            cls.OBJ_IDXS[o] = i
         cls.VALUES = np.delete(cls.VALUES, [deleted_idx])
 
     @classmethod
@@ -155,11 +155,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _get_value(self):
         # Directly access value from global register
-        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj.name]])
+        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj]])
 
     def _set_value(self, new_value):
         # Directly set value in global register
-        self.VALUES[self.OBJ_IDXS[self.obj.name]] = new_value
+        self.VALUES[self.OBJ_IDXS[self.obj]] = new_value
         return True
 
     # For this state, we simply store its value.

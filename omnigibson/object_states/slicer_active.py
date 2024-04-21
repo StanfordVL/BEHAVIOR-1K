@@ -58,7 +58,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _remove_obj(cls, obj):
         # Grab idx we'll delete before the object is deleted
-        deleted_idx = cls.OBJ_IDXS[obj.name]
+        deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from all internal tracked arrays
         cls.DELAY_COUNTER = np.delete(cls.DELAY_COUNTER, [deleted_idx])
@@ -153,15 +153,15 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # For this state, we simply store its value.
     def _dump_state(self):
         state = super()._dump_state()
-        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]])
-        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]])
+        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]])
+        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]])
 
         return state
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]] = state["previously_touching"]
-        self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]] = state["delay_counter"]
+        self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]] = state["previously_touching"]
+        self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]] = state["delay_counter"]
 
     def _serialize(self, state):
         state_flat = super()._serialize(state=state)
