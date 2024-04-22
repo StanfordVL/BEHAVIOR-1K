@@ -506,8 +506,9 @@ class VisionSensor(BaseSensor):
         # Remove from global sensors dictionary
         self.SENSORS.pop(self.prim_path)
 
-        # Remove viewport
-        self._viewport.destroy()
+        # Remove the viewport if it's not the main viewport
+        if self._viewport.name != "Viewport":
+            self._viewport.destroy()
 
         # Run super
         super().remove()
@@ -746,17 +747,8 @@ class VisionSensor(BaseSensor):
     @classmethod
     def clear(cls):
         """
-        Clears all cached sensors that have been generated. Should be used when the simulator is completely reset; i.e.:
-        all objects on the stage are destroyed
+        Clear all the class-wide variables.
         """
-        for sensor in cls.SENSORS.values():
-            # Destroy any sensor that is not attached to the main viewport window
-            if sensor._viewport.name != "Viewport":
-                sensor._viewport.destroy()
-
-        # Render to update
-        render()
-
         cls.SEMANTIC_REMAPPER = Remapper()
         cls.INSTANCE_REMAPPER = Remapper()
         cls.INSTANCE_ID_REMAPPER = Remapper()

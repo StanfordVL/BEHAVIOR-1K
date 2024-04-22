@@ -4,6 +4,7 @@ import itertools
 import json
 import logging
 import os
+import re
 import shutil
 import signal
 import socket
@@ -64,6 +65,16 @@ m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
+# List of prim paths that should still be on the stage after clearing the simulator.
+CLEAR_ALLOWED_PRIM_PATH_REGEXES = [
+    "/physicsScene",
+    "/World",
+    "/Render(/.*)?",
+    "/OmniverseKit_.*",
+    "/Orchestrator(/.*)?",
+]
+CLEAR_ALLOWED_PRIM_PATH_PATTERNS = [re.compile(pattern) for pattern in CLEAR_ALLOWED_PRIM_PATH_REGEXES]
 
 
 # Helper functions for starting omnigibson
@@ -280,12 +291,22 @@ def launch_simulator(*args, **kwargs):
 
             # Store other references to variables that will be initialized later
             self._scenes = []
-            self._physx_interface = None
-            self._physx_simulation_interface = None
-            self._physx_scene_query_interface = None
-            self._contact_callback = None
-            self._physics_step_callback = None
-            self._simulation_event_callback = None
+            self._physx_interface = lazy.omni.physx.get_physx_interface()
+            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
+            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
+            self._physx_fabric_interface = None
+            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
+                self._on_contact
+            )
+            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
+                lambda _: self._on_physics_step()
+            )
+            self._simulation_event_callback = (
+                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
+                    self._on_simulation_event
+                )
+            )
+
             # List of objects that need to be initialized during whenever the next sim step occurs
             self._objects_to_initialize = []
             self._objects_require_contact_callback = False
@@ -296,6 +317,13 @@ def launch_simulator(*args, **kwargs):
             self._callbacks_on_stop = dict()
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
+
+            # Update internal settings
+            self._set_physics_engine_settings()
+            self._set_renderer_settings()
+
+            # Set the lighting mode to be stage by default
+            self.set_lighting_mode(mode=LightingMode.STAGE)
 
             # Mapping from link IDs assigned from omni to the object that they reference
             self._link_id_to_objects = dict()
@@ -314,9 +342,6 @@ def launch_simulator(*args, **kwargs):
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
 
-            # Clear physics context
-            self._physx_fabric_interface = None
-
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
@@ -332,12 +357,6 @@ def launch_simulator(*args, **kwargs):
             # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
             self.play()
             self.stop()
-
-            # Update the physics settings
-            # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
-            # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
-            # and crashes
-            self._set_physics_engine_settings()
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -924,7 +943,7 @@ def launch_simulator(*args, **kwargs):
                         )
                     )
                     obj = None
-                    # TODO: recursively try to find the parent object of this joint
+
                     tokens = joint_path.split("/")
                     for i in range(2, len(tokens) + 1):
                         obj = self.find_object_in_scenes("/".join(tokens[:i]))
@@ -1176,14 +1195,25 @@ def launch_simulator(*args, **kwargs):
                 scene.clear()
             self._scenes = []
 
-            # TODO(parallel): Clear scene prims
+            # Remove the skybox, floor plane and viewer camera
+            if self._skybox is not None:
+                self._skybox.remove()
+                self._skybox = None
 
-            # Clear all vision sensors and remove viewer camera reference and camera mover reference
-            VisionSensor.clear()
-            self._viewer_camera = None
+            if self._floor_plane is not None:
+                self._floor_plane.remove()
+                self._floor_plane = None
+
+            if self._viewer_camera is not None:
+                self._viewer_camera.remove()
+                self._viewer_camera = None
+
             if self._camera_mover is not None:
                 self._camera_mover.clear()
                 self._camera_mover = None
+
+            # Clear the vision sensor cache
+            VisionSensor.clear()
 
             # Clear all global update states
             for state in self.object_state_types_requiring_update:
@@ -1199,44 +1229,25 @@ def launch_simulator(*args, **kwargs):
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
+
+            # Clear some internals here.
             self._objects_to_initialize = []
             self._objects_require_contact_callback = False
             self._objects_require_joint_break_callback = False
             self._link_id_to_objects = dict()
-
             self._callbacks_on_play = dict()
             self._callbacks_on_stop = dict()
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
 
+            # Assert now that the stage is clear except for the World prim, the PhysicsScene, and the viewport render target.
+            for prim in self.stage.Traverse():
+                assert any(
+                    allowed_path_pattern.fullmatch(prim.GetPath().pathString) is not None
+                    for allowed_path_pattern in CLEAR_ALLOWED_PRIM_PATH_PATTERNS
+                ), f"Found unexpected prim {prim.GetPath().pathString} after clearing."
+
             # Now start rebuilding everything
-            # Update internal vars
-            self._physx_interface = lazy.omni.physx.get_physx_interface()
-            self._physx_simulation_interface = lazy.omni.physx.get_physx_simulation_interface()
-            self._physx_scene_query_interface = lazy.omni.physx.get_physx_scene_query_interface()
-
-            # Update internal settings
-            # TODO: Is this needed?
-            self._set_physics_engine_settings()
-            self._set_renderer_settings()
-
-            # Update internal callbacks
-            self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
-                self._on_contact
-            )
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
-                lambda _: self._on_physics_step()
-            )
-            self._simulation_event_callback = (
-                self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
-                    self._on_simulation_event
-                )
-            )
-
-            # Set the lighting mode to be stage by default
-            self.set_lighting_mode(mode=LightingMode.STAGE)
-
-            # Import and configure the floor plane and the skybox
             # Create collision group for fixed base objects' non root links, root links, and building structures
             CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
             # Disable collision between root links of fixed base objects

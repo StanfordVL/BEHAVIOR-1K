@@ -271,8 +271,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Clears any internal state before the scene is destroyed
         """
-        # Clears systems so they can be re-initialized
+        # Clears systems so they can be re-initialized.
         clear_all_systems()
+
+        # Remove all of the scene's objects.
+        og.sim.remove_object(list(self.objects))
+
+        # Remove the scene prim.
+        self._scene_prim.remove()
 
     def _initialize(self):
         """
