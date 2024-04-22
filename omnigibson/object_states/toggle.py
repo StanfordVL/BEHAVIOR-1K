@@ -21,7 +21,7 @@ m.CAN_TOGGLE_STEPS = 5
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin, GlobalUpdateStateMixin):
 
-    # Set of prim paths defining robot finger links belonging to any manipulation robots
+    # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
     # Set of objects that are contacting any manipulation robots
@@ -46,33 +46,38 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # Clear finger contact objects since it will be refreshed now
         cls._finger_contact_objs = set()
 
-        robots = [robot for scene in og.sim.scenes for robot in scene.robots]
         # detect marker and hand interaction
-        robot_finger_links = set(
-            link
-            for robot in robots
-            if isinstance(robot, ManipulationRobot)
-            for finger_links in robot.finger_links.values()
-            for link in finger_links
-        )
-        cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
+        cls._robot_finger_paths = [
+            {
+                link.prim_path
+                for robot in scene.robots
+                if isinstance(robot, ManipulationRobot)
+                for finger_links in robot.finger_links.values()
+                for link in finger_links
+            }
+            for scene in og.sim.scenes
+        ]
 
         # If there aren't any valid robot link paths, immediately return
-        if len(cls._robot_finger_paths) == 0:
+        if not any(len(robot_finger_paths) > 0 for robot_finger_paths in cls._robot_finger_paths):
             return
 
-        # TODO(parallel): Fix this - it uses scene 0 always
-        finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in cls._robot_finger_paths]
-        finger_impulses = RigidContactAPI.get_all_impulses(0)[:, finger_idxs, :]
-        n_bodies = len(finger_impulses)
-        touching_bodies = np.any(finger_impulses.reshape(n_bodies, -1), axis=-1)
-        touching_bodies_idxs = np.where(touching_bodies)[0]
-        if len(touching_bodies_idxs) > 0:
-            for idx in touching_bodies_idxs:
-                body_prim_path = RigidContactAPI.get_row_idx_prim_path(0, idx=idx)
-                obj = og.sim.find_object_in_scenes("/".join(body_prim_path.split("/")[:-1]))
-                if obj is not None:
-                    cls._finger_contact_objs.add(obj)
+        for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
+            if len(scene_robot_finger_paths) == 0:
+                continue
+            finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
+            finger_impulses = [
+                RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idx, :] for finger_idx in finger_idxs
+            ]
+            n_bodies = len(finger_impulses)
+            touching_bodies = np.any(finger_impulses.reshape(n_bodies, -1), axis=-1)
+            touching_bodies_idxs = np.where(touching_bodies)[0]
+            if len(touching_bodies_idxs) > 0:
+                for idx in touching_bodies_idxs:
+                    body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
+                    obj = scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
+                    if obj is not None:
+                        cls._finger_contact_objs.add(obj)
 
     @classproperty
     def metalink_prefix(cls):

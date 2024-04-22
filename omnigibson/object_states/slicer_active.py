@@ -107,7 +107,6 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
-        # TODO(parallel): Check this
         for scene_idx, scene in enumerate(og.sim.scenes):
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 
@@ -127,6 +126,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             ]
             impulses = RigidContactAPI.get_all_impulses(scene_idx)
 
+            # TODO: This can be vectorized. No point in doing this tensorized state to then compute this in a loop.
             # Batch check each slicer against all sliceables
             for i, slicer_idxs in enumerate(all_slicer_idxs):
                 if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
