@@ -388,11 +388,11 @@ class TouchingAnyCondition(RuleCondition):
         if self._optimized:
             # Register idx mappings
             self._filter_1_idxs = {
-                obj: [RigidContactAPI.get_body_row_idx(link.prim_path) for link in obj.links.values()]
+                obj: [RigidContactAPI.get_body_row_idx(link.prim_path)[1] for link in obj.links.values()]
                 for obj in object_candidates[self._filter_1_name]
             }
             self._filter_2_idxs = {
-                obj: [RigidContactAPI.get_body_col_idx(link.prim_path) for link in obj.links.values()]
+                obj: [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()]
                 for obj in object_candidates[self._filter_2_name]
             }
         else:
@@ -404,15 +404,17 @@ class TouchingAnyCondition(RuleCondition):
         objs = []
 
         if self._optimized:
-            # Get all impulses
-            idxs_to_check = np.concatenate([self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]])
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
-                if np.any(
-                    RigidContactAPI.get_all_impulses(self._filter_1_scene_idxs[obj])[self._filter_1_idxs[obj]][
-                        :, idxs_to_check
+                # Get all impulses
+                idxs_to_check = np.concatenate(
+                    [
+                        self._filter_2_idxs[obj2]
+                        for obj2 in object_candidates[self._filter_2_name]
+                        if obj2.scene == obj.scene
                     ]
-                ):
+                )
+                if np.any(RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check]):
                     objs.append(obj)
         else:
             # Manually check contact

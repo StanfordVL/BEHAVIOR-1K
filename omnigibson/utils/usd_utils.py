@@ -1352,6 +1352,10 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     Returns:
         str: Absolute prim path in the stage
     """
+    # Special case for OmniGraph prims
+    if relative_prim_path.startswith("/OmniGraph"):
+        return relative_prim_path
+
     # Make sure the relative path is actually relative
     assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
 
@@ -1374,6 +1378,10 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     Returns:
         str: Relative prim path in the scene
     """
+    # Special case for OmniGraph prims
+    if absolute_prim_path.startswith("/OmniGraph"):
+        return absolute_prim_path
+
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"
 
     # When the scene is set to None, this prim is not in a scene but is global e.g. like the
