@@ -30,8 +30,6 @@ nest_asyncio.apply()
 
 __version__ = "1.0.0"
 
-log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
-
 root_path = os.path.dirname(os.path.realpath(__file__))
 
 # Store paths to example configs

@@ -25,10 +25,10 @@ class OnFire(HeatSourceOrSink):
     def __init__(
         self,
         obj,
-        ignition_temperature=m.DEFAULT_IGNITION_TEMPERATURE,
-        fire_temperature=m.DEFAULT_FIRE_TEMPERATURE,
-        heating_rate=m.DEFAULT_HEATING_RATE,
-        distance_threshold=m.DEFAULT_DISTANCE_THRESHOLD,
+        ignition_temperature=None,
+        fire_temperature=None,
+        heating_rate=None,
+        distance_threshold=None,
     ):
         """
         Args:
@@ -40,6 +40,12 @@ class OnFire(HeatSourceOrSink):
             distance_threshold (float): The distance threshold which an object needs
                 to be closer than in order to receive heat from this heat source.
         """
+        ignition_temperature = (
+            ignition_temperature if ignition_temperature is not None else m.DEFAULT_IGNITION_TEMPERATURE
+        )
+        fire_temperature = fire_temperature if fire_temperature is not None else m.DEFAULT_FIRE_TEMPERATURE
+        heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
+        distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
         assert fire_temperature > ignition_temperature, "fire temperature should be higher than ignition temperature."
 
         super().__init__(

@@ -566,22 +566,13 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(
-        self,
-        env,
-        activity_conditions,
-        object_scope,
-        backend,
-        debug=False,
-    ):
+    def __init__(self, env, activity_conditions, object_scope, backend):
         # Store internal variables from inputs
         self._env = env
         self._scene_model = (
             self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
         )
         self._agent = self._env.robots[0]
-        if debug:
-            gm.DEBUG = True
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
@@ -1286,9 +1277,7 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                # TODO(parallel): This whole class needs to track an env or a scene.
-                assert len(og.sim.scenes) == 1, "Scene is not loaded"
-                og.sim.scenes[0].add_object(simulator_obj)
+                self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)

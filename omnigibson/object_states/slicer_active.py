@@ -58,7 +58,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _remove_obj(cls, obj):
         # Grab idx we'll delete before the object is deleted
-        deleted_idx = cls.OBJ_IDXS[obj.name]
+        deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from all internal tracked arrays
         cls.DELAY_COUNTER = np.delete(cls.DELAY_COUNTER, [deleted_idx])
@@ -107,7 +107,6 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
-        # TODO(parallel): Check this
         for scene_idx, scene in enumerate(og.sim.scenes):
             sliceable_objs = scene.object_registry("abilities", "sliceable", [])
 
@@ -127,6 +126,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             ]
             impulses = RigidContactAPI.get_all_impulses(scene_idx)
 
+            # TODO: This can be vectorized. No point in doing this tensorized state to then compute this in a loop.
             # Batch check each slicer against all sliceables
             for i, slicer_idxs in enumerate(all_slicer_idxs):
                 if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
@@ -153,15 +153,15 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # For this state, we simply store its value.
     def _dump_state(self):
         state = super()._dump_state()
-        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]])
-        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]])
+        state["previously_touching"] = bool(self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]])
+        state["delay_counter"] = int(self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]])
 
         return state
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj.name]] = state["previously_touching"]
-        self.DELAY_COUNTER[self.OBJ_IDXS[self.obj.name]] = state["delay_counter"]
+        self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]] = state["previously_touching"]
+        self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]] = state["delay_counter"]
 
     def _serialize(self, state):
         state_flat = super()._serialize(state=state)

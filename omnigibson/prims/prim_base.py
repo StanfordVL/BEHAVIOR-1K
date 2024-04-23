@@ -125,9 +125,6 @@ class BasePrim(Serializable, Recreatable, ABC):
         if check_deletable_prim(self.prim_path):
             lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
 
-        # Also clear the name so we can reuse this later
-        self.remove_names()
-
     def _load(self):
         """
         Loads the raw prim into the simulator. Any post-processing should be done in @self._post_load()

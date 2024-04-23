@@ -31,7 +31,7 @@ class MaxTemperature(TensorizedValueState):
         def _update_temperature_idxs(obj):
             # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
             # subtract 1 from all downstream indices
-            deleted_idx = Temperature.OBJ_IDXS[obj.name]
+            deleted_idx = Temperature.OBJ_IDXS[obj]
             cls.TEMPERATURE_IDXS = np.where(
                 cls.TEMPERATURE_IDXS >= deleted_idx, cls.TEMPERATURE_IDXS - 1, cls.TEMPERATURE_IDXS
             )
@@ -46,12 +46,12 @@ class MaxTemperature(TensorizedValueState):
         super()._add_obj(obj=obj)
 
         # Add to temperature index
-        cls.TEMPERATURE_IDXS = np.concatenate([cls.TEMPERATURE_IDXS, [Temperature.OBJ_IDXS[obj.name]]])
+        cls.TEMPERATURE_IDXS = np.concatenate([cls.TEMPERATURE_IDXS, [Temperature.OBJ_IDXS[obj]]])
 
     @classmethod
     def _remove_obj(cls, obj):
         # Grab idx we'll delete before the object is deleted
-        deleted_idx = cls.OBJ_IDXS[obj.name]
+        deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from temperature index
         cls.TEMPERATURE_IDXS = np.delete(cls.TEMPERATURE_IDXS, [deleted_idx])

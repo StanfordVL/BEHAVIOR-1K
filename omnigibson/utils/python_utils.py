@@ -344,63 +344,6 @@ def meets_minimum_version(test_version, minimum_version):
     return True
 
 
-class UniquelyNamed:
-    """
-    Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
-    entity must be UNIQUE!
-    """
-
-    def __init__(self, *args, **kwargs):
-        global NAMES
-        # Register this object, making sure it's name is unique
-        assert self.name not in NAMES, f"UniquelyNamed object with name {self.name} already exists!"
-        NAMES.add(self.name)
-
-    def remove_names(self):
-        """
-        Checks if self.name exists in the global NAMES registry, and deletes it if so. Possibly also iterates through
-        all owned member variables and checks for their corresponding names if @include_all_owned is True.
-
-        Args:
-            include_all_owned (bool): If True, will iterate through all owned members of this instance and remove their
-                names as well, if they are UniquelyNamed
-
-            skip_ids (None or set of int): If specified, will skip over any ids in the specified set that are matched
-                to any attributes found (this compares id(attr) to @skip_ids).
-        """
-        # Check for this name, possibly remove it if it exists
-        if self.name in NAMES:
-            NAMES.remove(self.name)
-
-    @property
-    def name(self):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
-
-
-class UniquelyNamedNonInstance:
-    """
-    Identical to UniquelyNamed, but intended for non-instanceable classes
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        global CLASS_NAMES
-        # Register this object, making sure it's name is unique
-        assert cls.name not in CLASS_NAMES, f"UniquelyNamed class with name {cls.name} already exists!"
-        CLASS_NAMES.add(cls.name)
-
-    @classproperty
-    def name(cls):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
-
-
 class Registerable:
     """
     Simple class template that provides an abstract interface for registering classes.

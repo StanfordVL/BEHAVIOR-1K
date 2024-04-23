@@ -10,7 +10,6 @@ from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import (
     SerializableNonInstance,
-    UniquelyNamedNonInstance,
     assert_valid_key,
     camel_case_to_snake_case,
     classproperty,
@@ -45,7 +44,7 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
-class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
+class BaseSystem(SerializableNonInstance):
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
     This is useful for items in a scene that are non-discrete / cannot be distinguished into individual instances,

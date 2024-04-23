@@ -199,11 +199,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        # Make sure to clean up all pre-existing names for all links
-        if self._links is not None:
-            for link in self._links.values():
-                link.remove_names()
-
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         joint_children = set()
@@ -267,11 +262,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        # Make sure to clean up all pre-existing names for all joints
-        if self._joints is not None:
-            for joint in self._joints.values():
-                joint.remove_names()
-
         # Initialize joints dictionary
         self._joints = dict()
         self.update_handles()

@@ -9,9 +9,9 @@ m.DEFAULT_BURN_TEMPERATURE = 200
 
 
 class Burnt(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj, burn_temperature=m.DEFAULT_BURN_TEMPERATURE):
+    def __init__(self, obj, burn_temperature=None):
         super(Burnt, self).__init__(obj)
-        self.burn_temperature = burn_temperature
+        self.burn_temperature = burn_temperature if burn_temperature is not None else m.DEFAULT_BURN_TEMPERATURE
 
     @classmethod
     def get_dependencies(cls):

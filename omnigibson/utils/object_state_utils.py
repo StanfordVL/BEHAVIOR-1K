@@ -94,7 +94,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    max_trials=m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS,
+    max_trials=None,
     z_offset=0.05,
     skip_falling=False,
 ):
@@ -114,6 +114,8 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
+    if max_trials is None:
+        max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (
         z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
     ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"

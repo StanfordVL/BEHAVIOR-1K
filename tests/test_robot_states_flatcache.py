@@ -3,25 +3,23 @@ import numpy as np
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.object_states import ObjectsInFOVOfRobot
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.constants import semantic_class_name_to_id
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
 
-def setup_environment(flatcache=True):
+def setup_environment(flatcache):
     """
     Sets up the environment with or without flatcache based on the flatcache parameter.
     """
-    # Ensure any existing simulation is stopped
-    if og.sim is not None:
+    if og.sim is None:
+        # Set global flags
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
+        gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
+    else:
+        # Make sure sim is stopped
         og.sim.stop()
-
-    # Set global flags
-    gm.ENABLE_OBJECT_STATES = True
-    gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
 
     # Define the environment configuration
     config = {
@@ -121,40 +119,3 @@ def camera_pose_test(flatcache):
 
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
-
-
-def test_camera_pose_flatcache_off():
-    camera_pose_test(False)
-
-
-def test_camera_semantic_segmentation():
-    env = setup_environment(False)
-    robot = env.robots[0]
-    env.reset()
-    sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
-    assert len(sensors) > 0
-    vision_sensor = sensors[0]
-    env.reset()
-    all_observation, all_info = vision_sensor.get_obs()
-    seg_semantic = all_observation["seg_semantic"]
-    seg_semantic_info = all_info["seg_semantic"]
-    agent_label = semantic_class_name_to_id()["agent"]
-    background_label = semantic_class_name_to_id()["background"]
-    assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
-    assert set(seg_semantic_info.keys()) == {agent_label, background_label}
-    og.sim.clear()
-
-
-def test_object_in_FOV_of_robot():
-    env = setup_environment(False)
-    robot = env.robots[0]
-    env.reset()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
-    sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
-    assert len(sensors) > 0
-    vision_sensor = sensors[0]
-    vision_sensor.set_position_orientation(position=[100, 150, 100])
-    og.sim.step()
-    og.sim.step()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == []
-    og.sim.clear()

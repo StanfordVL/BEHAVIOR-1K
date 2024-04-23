@@ -24,7 +24,8 @@ jobs:
           - test_object_removal
           - test_object_states
           - test_primitives
-          - test_robot_states
+          - test_robot_states_flatcache
+          - test_robot_states_no_flatcache
           - test_robot_teleoperation
           - test_sensors
           - test_symbolic_primitives

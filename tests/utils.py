@@ -68,8 +68,12 @@ env = None
 
 
 def assert_test_env():
-    if og.sim is None or len(og.sim.scenes) == 0:
+    global env
+    if env is None:
         cfg = {
+            "env": {
+                "use_floor_plane": True,
+            },
             "scene": {
                 "type": "Scene",
             },
@@ -177,17 +181,16 @@ def assert_test_env():
             ],
         }
 
-        # Make sure sim is stopped
-        if og.sim is not None:
+        if og.sim is None:
+            # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = False
+        else:
+            # Make sure sim is stopped
             og.sim.stop()
 
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
-
         # Create the environment
-        global env
         env = og.Environment(configs=cfg)
 
         # Additional processing for the tests to pass more deterministically

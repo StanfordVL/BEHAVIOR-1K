@@ -549,6 +549,14 @@ class CollisionAPI:
         """
         Clears the internal state of this CollisionAPI
         """
+        # Remove all the collision group prims
+        for col_group_prim in cls.ACTIVE_COLLISION_GROUPS.values():
+            og.sim.stage.RemovePrim(col_group_prim.GetPath().pathString)
+
+        # Remove the collision groups tree
+        og.sim.stage.RemovePrim("/World/collision_groups")
+
+        # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
 
 
