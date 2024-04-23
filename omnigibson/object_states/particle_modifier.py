@@ -23,7 +23,6 @@ from omnigibson.systems.system_base import (
     BaseSystem,
     PhysicalParticleSystem,
     VisualParticleSystem,
-    get_system,
     is_fluid_system,
     is_physical_particle_system,
     is_system_active,
@@ -475,7 +474,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
         for system_name in self.conditions.keys():
-            system = get_system(system_name, force_active=False)
+            system = self.obj.scene.get_system(system_name, force_active=False)
             limit = (
                 self.visual_particle_modification_limit
                 if is_visual_particle_system(system_name=system.name)
@@ -509,7 +508,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if condition_type == ParticleModifyCondition.FUNCTION:
             cond = value
         elif condition_type == ParticleModifyCondition.SATURATED:
-            cond = lambda obj: is_system_active(value) and obj.states[Saturated].get_value(get_system(value))
+            cond = lambda obj: is_system_active(value) and obj.states[Saturated].get_value(
+                self.obj.scene.get_system(value)
+            )
         elif condition_type == ParticleModifyCondition.TOGGLEDON:
             cond = lambda obj: obj.states[ToggledOn].get_value() == value
         elif condition_type == ParticleModifyCondition.GRAVITY:
@@ -605,7 +606,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        system = get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_active=False)
 
         def condition(obj):
             return not self.obj.states[Saturated].get_value(system=system)
@@ -661,7 +662,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if system_name in self.conditions:
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
-                        system = get_system(system_name)
+                        system = self.obj.scene.get_system(system_name)
                         # Sanity check to see if the modifier has reached its limit for this system
                         if self.obj.states[Saturated].get_value(system=system):
                             continue
@@ -917,7 +918,7 @@ class ParticleRemover(ParticleModifier):
             function: Generated condition function with signature fcn(obj) --> bool, returning True if there is at least
                 one particle in the given system @system_name
         """
-        system = get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_active=False)
         return lambda obj: system.initialized and system.n_particles > 0
 
     @property
@@ -1024,8 +1025,8 @@ class ParticleApplier(ParticleModifier):
 
         system_name = list(self.conditions.keys())[0]
 
-        # get_system will initialize the system if it's not initialized already.
-        system = get_system(system_name)
+        # This will initialize the system if it's not initialized already.
+        system = self.obj.scene.system_registry("name", system_name)
 
         if self.visualize:
             assert self._projection_mesh_params["type"] in {

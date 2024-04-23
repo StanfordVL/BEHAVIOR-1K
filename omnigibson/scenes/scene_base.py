@@ -1,4 +1,5 @@
 import json
+import os
 from abc import ABC
 from itertools import combinations
 
@@ -14,7 +15,13 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
-from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
+from omnigibson.systems.micro_particle_system import FluidSystem
+from omnigibson.systems.system_base import (
+    BaseSystem,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    create_system_from_metadata,
+)
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -161,6 +168,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # We simply check that the simulator has a floor plane.
         assert og.sim.floor_plane, "Simulator must have a floor plane if using an empty Scene!"
 
+    def _load_systems(self):
+        system_dir = os.path.join(gm.DATASET_PATH, "systems")
+
+        if os.path.exists(system_dir):
+            system_names = os.listdir(system_dir)
+            for system_name in system_names:
+                self.system_registry.add(create_system_from_metadata(system_name=system_name))
+
     def _load_objects_from_scene_file(self):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
@@ -181,7 +196,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Create desired systems
         for system_name in init_systems:
             if gm.USE_GPU_DYNAMICS:
-                get_system(system_name)
+                self.get_system(system_name)
             else:
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
@@ -232,10 +247,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
+        # Do not override this function. Override _load instead.
+
         # Make sure simulator is stopped
         assert og.sim.is_stopped(), "Simulator should be stopped when loading this scene!"
 
-        # Do not override this function. Override _load instead.
+        # Check if scene is already loaded
         if self._loaded:
             raise ValueError("This scene is already loaded.")
 
@@ -250,6 +267,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Position the scene prim based on its index in the simulator.
         x, y = T.integer_spiral_coordinates(self.idx)
         self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
+
+        # Go through and load all systems.
+        self._load_systems()
 
         # Go through whatever else loading the scene needs to do.
         self._load()
@@ -328,7 +348,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         )
 
         # Add registry for systems -- this is already created externally, so we just update it and pull it directly
-        registry.add(obj=SYSTEM_REGISTRY)
+        registry.add(
+            obj=SerializableRegistry(
+                name="system_registry",
+                class_types=BaseSystem,
+                default_key="name",
+                unique_keys=["name", "prim_path", "uuid"],
+            )
+        )
 
         # Add registry for objects
         registry.add(
@@ -506,6 +533,41 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for obj in self.object_registry("fixed_base", True, default_val=[])
             if obj.category != robot_macros.ROBOT_CATEGORY
         }
+
+    def is_system_active(self, system_name):
+        system = self.system_registry("name", system_name)
+        if system is None:
+            return False
+        return system.initialized
+
+    def is_visual_particle_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return issubclass(system, VisualParticleSystem)
+
+    def is_physical_particle_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return issubclass(system, PhysicalParticleSystem)
+
+    def is_fluid_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return issubclass(system, FluidSystem)
+
+    def get_system(self, system_name, force_active=True):
+        # Make sure scene exists
+        assert self.loaded, "Cannot get systems until scene is imported!"
+        # If system_name is not in REGISTERED_SYSTEMS, create from metadata
+        # TODO(system): Unbreak this
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        if not system.initialized and force_active:
+            system.initialize()
+        return system
+
+    def get_active_systems(self):
+        return [system for system in self.systems if system.initialized]
 
     def get_random_floor(self):
         """

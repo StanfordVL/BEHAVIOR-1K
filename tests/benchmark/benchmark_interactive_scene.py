@@ -12,7 +12,6 @@ from omnigibson.objects import DatasetObject
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.simulator import launch_simulator
-from omnigibson.systems import get_system
 from omnigibson.utils.asset_utils import get_og_assets_version
 from omnigibson.utils.constants import PrimType
 
@@ -64,7 +63,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         )
         scene.add_object(cloth)
         og.sim.step()
-        water_system = get_system("water")
+        water_system = scene.system_registry("name", "water")
         for i in range(100):
             water_system.generate_particles(positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
         og.sim.step()

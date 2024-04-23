@@ -6,7 +6,7 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
-from omnigibson.systems import VisualParticleSystem, get_system, is_physical_particle_system, is_visual_particle_system
+from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 
@@ -756,7 +756,7 @@ def test_particle_source(env):
         og.sim.step()
 
     assert not sink.states[ToggledOn].get_value()
-    water_system = get_system("water")
+    water_system = env.scene.system_registry("name", "water")
     # Sink is toggled off, no water should be present
     assert water_system.n_particles == 0
 
@@ -782,7 +782,7 @@ def test_particle_sink(env):
     for _ in range(3):
         og.sim.step()
 
-    water_system = get_system("water")
+    water_system = env.scene.system_registry("name", "water")
     # There should be no water particles.
     assert water_system.n_particles == 0
 
@@ -819,7 +819,7 @@ def test_particle_applier(env):
         og.sim.step()
 
     assert not spray_bottle.states[ToggledOn].get_value()
-    water_system = get_system("water")
+    water_system = env.scene.system_registry("name", "water")
     # Spray bottle is toggled off, no water should be present
     assert water_system.n_particles == 0
 
@@ -879,7 +879,7 @@ def test_particle_remover(env):
         og.sim.step()
 
     assert not vacuum.states[ToggledOn].get_value()
-    water_system = get_system("water")
+    water_system = env.scene.system_registry("name", "water")
     # Place single particle of water on middle of table
     water_system.generate_particles(
         positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
@@ -939,7 +939,7 @@ def test_saturated(env):
     for _ in range(5):
         og.sim.step()
 
-    water_system = get_system("water")
+    water_system = env.scene.system_registry("name", "water")
 
     # Place single row of water above dishtowel
     n_particles = 5
@@ -1085,7 +1085,7 @@ def test_draped(env):
 def test_filled(env):
     stockpot = env.scene.object_registry("name", "stockpot")
     systems = [
-        get_system(system_name)
+        env.scene.system_registry("name", system_name)
         for system_name, system_class in SYSTEM_EXAMPLES.items()
         if not issubclass(system_class, VisualParticleSystem)
     ]
@@ -1111,7 +1111,7 @@ def test_filled(env):
 @og_test
 def test_contains(env):
     stockpot = env.scene.object_registry("name", "stockpot")
-    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
+    systems = [env.scene.system_registry("name", system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
@@ -1151,7 +1151,7 @@ def test_covered(env):
     bracelet = env.scene.object_registry("name", "bracelet")
     bowl = env.scene.object_registry("name", "bowl")
     microwave = env.scene.object_registry("name", "microwave")
-    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
+    systems = [env.scene.system_registry("name", system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, bowl, microwave):
         for system in systems:
             # bracelet is too small to sample physical particles on it
