@@ -405,7 +405,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_objects()
         self._load_task()
         # TODO(undorl): Do not merge this
-        # self._load_external_sensors()
+        self._load_external_sensors()
 
         og.sim.play()
 
@@ -550,9 +550,24 @@ class Environment(gym.Env, GymObservable, Recreatable):
             info["last_observation"] = obs
             obs = self.reset()
 
+        # Hacky way to check for time limit info to split terminated and truncated
+        terminated = False
+        truncated = False
+        for tc, tc_data in info["done"]["termination_conditions"].items():
+            if tc_data["done"]:
+                if tc == "timeout":
+                    truncated = True
+                else:
+                    terminated = True
+        assert (terminated or truncated) == done, "Terminated and truncated must match done!"
+
         # Increment step
         self._current_step += 1
-        return obs, reward, done, info
+
+        # Hacky way of getting the success condition
+        info["is_success"] = info["reward"]["grasp"]["grasp_success"]
+
+        return obs, reward, terminated, truncated, info
 
     def step(self, action):
         """
@@ -663,7 +678,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
                 raise ValueError("Observation space does not match returned observations!")
 
-        return obs
+        return obs, {}
 
     @property
     def episode_steps(self):

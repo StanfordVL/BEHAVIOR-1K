@@ -53,7 +53,7 @@ def main():
     config["scene"]["load_object_categories"] = ["floors", "walls", "coffee_table"]
 
     # Load the environment
-    vec_env = og.VectorEnvironment(40, config)
+    vec_env = og.VectorEnvironment(10, config)
     import time
 
     while True:

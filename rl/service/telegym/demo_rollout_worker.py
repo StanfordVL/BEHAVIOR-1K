@@ -1,7 +1,7 @@
 import asyncio
 
 import gymnasium as gym
-from telegym.grpc_server import serve_env_over_grpc
+from .grpc_server import serve_env_over_grpc
 
 
 async def main(local_addr, learner_addr):

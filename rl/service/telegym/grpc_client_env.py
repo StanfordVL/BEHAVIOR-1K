@@ -5,7 +5,7 @@ import time
 import grpc
 import gymnasium as gym
 import wandb
-from telegym.protos import environment_pb2, environment_pb2_grpc
+from .protos import environment_pb2, environment_pb2_grpc
 
 
 class GRPCClientEnv(gym.Env):

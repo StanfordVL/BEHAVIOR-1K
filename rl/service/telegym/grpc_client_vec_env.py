@@ -9,8 +9,8 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
-from telegym.grpc_client_env import GRPCClientEnv
-from telegym.protos import environment_pb2, environment_pb2_grpc
+from .grpc_client_env import GRPCClientEnv
+from .protos import environment_pb2, environment_pb2_grpc
 
 
 class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrationService):
