@@ -40,9 +40,7 @@ class XFormPrim(BasePrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._binding_api = None
         self._material = None
-        self._collision_filter_api = None
         self.original_scale = None
 
         # Run super method
@@ -59,26 +57,15 @@ class XFormPrim(BasePrim):
         # run super first
         super()._post_load()
 
-        # Make sure all xforms have pose and scaling info
-        self._set_xform_properties()
+        # These only need to be done if we are creating this prim from scratch.
+        # Pre-created OG objects' prims always have these things set up ahead of time.
+        if self._created_manually:
+            # Make sure all xforms have pose and scaling info
+            self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
         self.original_scale = np.array(self.get_attribute("xformOp:scale"))
-
-        # Create collision filter API
-        self._collision_filter_api = (
-            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
-            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
-        )
-
-        # Create binding API
-        self._binding_api = (
-            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
-            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
-        )
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -155,11 +142,29 @@ class XFormPrim(BasePrim):
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )
 
+    @property
+    def _collision_filter_api(self):
+        return (
+            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
+            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        )
+
+    @property
+    def _binding_api(self):
+        return (
+            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
+            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+        )
+
     def has_material(self):
         """
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
+        if not self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+            return False
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return False if material_path == "" else True
 

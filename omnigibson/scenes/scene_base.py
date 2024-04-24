@@ -214,7 +214,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         print("Done loading prebuilt scene.")
 
         # Store world prim and load the scene into the simulator
-        self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
+        self._scene_prim = XFormPrim(
+            relative_prim_path=scene_relative_path,
+            name=f"scene_{self.idx}",
+            load_config={"created_manually": True},
+        )
         self._scene_prim.load(None)
         assert self._scene_prim.prim_path == scene_prim_obj.GetPath().pathString, "Scene prim path mismatch!"
 

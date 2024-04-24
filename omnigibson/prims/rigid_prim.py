@@ -209,7 +209,7 @@ class RigidPrim(XFormPrim):
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                     # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                     # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                    if not check_extent_radius_ratio(mesh_prim):
+                    if not check_extent_radius_ratio(mesh, com):
                         log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                         mesh.set_collision_approximation("boundingCube")
                 else:
