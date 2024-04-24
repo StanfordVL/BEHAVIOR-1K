@@ -209,9 +209,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add the prebuilt scene USD to the stage
         scene_relative_path = f"/scene_{self.idx}"
         scene_absolute_path = f"/World{scene_relative_path}"
-        print("Loading prebuilt scene.")
         scene_prim_obj = add_asset_to_stage(asset_path=PREBUILT_USDS[self.scene_file], prim_path=scene_absolute_path)
-        print("Done loading prebuilt scene.")
 
         # Store world prim and load the scene into the simulator
         self._scene_prim = XFormPrim(
@@ -249,7 +247,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Create a new stage inside the tempdir, named after this scene's file.
         usd_path = os.path.join(og.tempdir, os.path.basename(self.scene_file) + ".usd")
-        print("Prebuilding", usd_path)
         stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
 
         # Create the world prim and make it the default
@@ -258,13 +255,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Iterate through all objects and add them to the stage
         for obj_name, obj in objects.items():
-            print("Loading", obj_name)
             obj.prebuild(stage)
 
         stage.Save()
         del stage
 
-        print("Prebuild complete")
         return usd_path
 
     def _load_metadata_from_scene_file(self):
