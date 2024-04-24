@@ -63,6 +63,7 @@ class RigidPrim(XFormPrim):
     ):
         # Other values that will be filled in at runtime
         self._rigid_prim_view_direct = None
+        self._is_part_of_articulation = None
         self._cs = None  # Contact sensor interface
         self._body_name = None
 
@@ -93,6 +94,11 @@ class RigidPrim(XFormPrim):
         kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
         self.set_attribute("physics:kinematicEnabled", kinematic_only)
         self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
+
+        # Check if it's part of an articulation view
+        self._is_part_of_articulation = (
+            "is_part_of_articulation" in self._load_config and self._load_config["is_part_of_articulation"]
+        )
 
         # run super first
         super()._post_load()
@@ -795,6 +801,11 @@ class RigidPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self._is_part_of_articulation:
+            return
+
         # Call super first
         super()._load_state(state=state)
 

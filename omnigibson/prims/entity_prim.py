@@ -247,7 +247,7 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": (
                     self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
                 ),
-                "is_part_of_articulation": self._articulation_view is not None,
+                "is_part_of_articulation": self._articulation_view is not None and link_name != self._root_link_name,
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
