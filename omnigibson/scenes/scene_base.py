@@ -1,4 +1,5 @@
 import json
+import os
 from abc import ABC
 from itertools import combinations
 
@@ -25,7 +26,7 @@ from omnigibson.utils.python_utils import (
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import CollisionAPI
+from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -38,6 +39,9 @@ m.SCENE_MARGIN = 10.0
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
+
+# Prebuilt USDs that are cached per scene file to speed things up.
+PREBUILT_USDS = dict()
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -187,12 +191,39 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly
+        objs = {}
         for obj_name, obj_info in init_info.items():
             # Check whether we should load the object or not
             if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
                 continue
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
+            objs[obj_name] = obj
+
+        # Prebuild the scene USD using the OBJs
+        if self.scene_file not in PREBUILT_USDS:
+            # Prebuild the scene USD
+            log.info(f"Prebuilding scene file {self.scene_file}...")
+            PREBUILT_USDS[self.scene_file] = self.prebuild_scene_usd(objects=objs)
+
+        # Add the prebuilt scene USD to the stage
+        scene_relative_path = f"/scene_{self.idx}"
+        scene_absolute_path = f"/World{scene_relative_path}"
+        print("Loading prebuilt scene.")
+        scene_prim_obj = add_asset_to_stage(asset_path=PREBUILT_USDS[self.scene_file], prim_path=scene_absolute_path)
+        print("Done loading prebuilt scene.")
+
+        # Store world prim and load the scene into the simulator
+        self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
+        self._scene_prim.load(None)
+        assert self._scene_prim.prim_path == scene_prim_obj.GetPath().pathString, "Scene prim path mismatch!"
+
+        # Position the scene prim based on its index in the simulator.
+        x, y = T.integer_spiral_coordinates(self.idx)
+        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
+
+        # Now load the objects with their own logic
+        for obj_name, obj in objs.items():
             # Import into the simulator
             self.add_object(obj)
             # Set the init pose accordingly
@@ -200,6 +231,37 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
+
+    def prebuild_scene_usd(self, objects):
+        """
+        Prebuild the scene USD using the given objects. This is useful for caching the scene USD for faster loading
+        times.
+
+        Args:
+            objects (dict): Dictionary of objects to prebuild the scene with. Maps object name to object instance
+
+        Returns:
+            str: Path to the prebuilt USD file
+        """
+        # Create a new stage inside the tempdir, named after this scene's file.
+        usd_path = os.path.join(og.tempdir, os.path.basename(self.scene_file) + ".usd")
+        print("Prebuilding", usd_path)
+        stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+
+        # Create the world prim and make it the default
+        world_prim = stage.DefinePrim("/World", "Xform")
+        stage.SetDefaultPrim(world_prim)
+
+        # Iterate through all objects and add them to the stage
+        for obj_name, obj in objects.items():
+            print("Loading", obj_name)
+            obj.prebuild(stage)
+
+        stage.Save()
+        del stage
+
+        print("Prebuild complete")
+        return usd_path
 
     def _load_metadata_from_scene_file(self):
         """
@@ -241,15 +303,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
-
-        # Store world prim and load the scene into the simulator
-        scene_relative_path = f"/scene_{self.idx}"
-        self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
-        self._scene_prim.load(None)
-
-        # Position the scene prim based on its index in the simulator.
-        x, y = T.integer_spiral_coordinates(self.idx)
-        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
 
         # Go through whatever else loading the scene needs to do.
         self._load()

@@ -1393,3 +1393,43 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
         return absolute_prim_path[len("/World") :]
 
     return absolute_prim_path[len(scene.prim_path) :]
+
+
+def deep_copy_prim(source_root_prim, dest_stage, dest_root_path):
+    queue = [(source_root_prim, dest_root_path)]
+
+    while queue:
+        source_prim, dest_path = queue.pop(0)
+
+        # Create a new prim in the destination stage with the same type as the source
+        if source_prim.GetTypeName():
+            dest_prim = dest_stage.DefinePrim(dest_path, source_prim.GetTypeName())
+        else:
+            dest_prim = dest_stage.OverridePrim(dest_path)
+
+        # Copy attributes
+        for attr in source_prim.GetAttributes():
+            # Create a new attribute with the same specifications
+            dest_attr = dest_prim.CreateAttribute(
+                attr.GetName(), attr.GetTypeName(), attr.IsCustom(), attr.GetVariability()
+            )
+
+            # Check if the source attribute has a value
+            if attr.HasValue():
+                # Copy the value
+                dest_attr.Set(attr.Get())
+
+        # Copy relationships
+        for rel in source_prim.GetRelationships():
+            dest_rel = dest_prim.CreateRelationship(rel.GetName(), rel.IsCustom())
+            targets = rel.GetTargets()
+            updated_targets = [
+                x.ReplacePrefix(source_root_prim.GetPath(), lazy.pxr.Sdf.Path(dest_root_path)) for x in targets
+            ]
+            if targets:
+                dest_rel.SetTargets(updated_targets)
+
+        # Copy child prims breadth-first
+        for child in source_prim.GetAllChildren():
+            new_dest_path = dest_path + "/" + child.GetName()
+            queue.append((child, new_dest_path))
