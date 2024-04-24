@@ -288,16 +288,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
         )
 
-    def _initialize(self):
-        # Run super method first
-        super()._initialize()
-
-        # Set the joint friction for EEF to be higher
-        for arm in self.arm_names:
-            for joint in self.finger_joints[arm]:
-                if joint.joint_type != JointType.JOINT_FIXED:
-                    joint.friction = 500
-
     # Name of the actual root link that we are interested in. Note that this is different from self.root_link_name,
     # which is "base_footprint_x", corresponding to the first of the 6 1DoF joints to control the base.
     @property
