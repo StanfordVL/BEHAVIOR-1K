@@ -69,8 +69,6 @@ class VectorEnvironment(DummyVecEnv):
             self.buf_dones[env_idx] = done
             self.buf_infos[env_idx] = info
             self.reset_infos[env_idx] = reset_infos
-        
-        # from IPython import embed; embed()
 
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones), deepcopy(self.buf_infos))
 

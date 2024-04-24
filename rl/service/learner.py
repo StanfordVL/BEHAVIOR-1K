@@ -92,7 +92,7 @@ def instantiate_envs():
         eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
         eval_env = VecFrameStack(eval_env, n_stack=5)
         eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
-        env = og.VectorEnvironment(2, config)
+        env = og.VectorEnvironment(n_envs, config)
 
     else:
         import omnigibson as og
@@ -289,7 +289,7 @@ def train(env, eval_env):
         log.debug(model.policy)
         log.info(f"model: {model}")
         log.info("Starting training...")
-        # wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
+        wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
             total_timesteps=4_000_000,
             callback=callback,

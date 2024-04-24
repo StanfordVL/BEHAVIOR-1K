@@ -309,7 +309,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     sensor_config["name"] = f"external_sensor{i}"
                 # Determine prim path if not specified
                 if "prim_path" not in sensor_config:
-                    sensor_config["prim_path"] = f"/World/{sensor_config['name']}"
+                    sensor_config["relative_prim_path"] = f"/{sensor_config['name']}"
                 # Pop the desired position and orientation
                 local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop(
                     "local_orientation", None
@@ -615,7 +615,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.render()
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
-        rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
+        #TODO: get_obs is a tuple, should it be?
+        rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
         return np.concatenate(rgb_images, axis=1)[:, :, :3]
 
     def _reset_variables(self):
