@@ -1,5 +1,7 @@
 import copy
 
+from tqdm import trange
+
 import omnigibson as og
 
 
@@ -8,7 +10,9 @@ class VectorEnvironment:
 
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
-        self.envs = [og.Environment(configs=copy.deepcopy(config)) for _ in range(num_envs)]
+        self.envs = [
+            og.Environment(configs=copy.deepcopy(config)) for _ in trange(num_envs, desc="Loading environments")
+        ]
 
     def step(self, actions):
         try:
