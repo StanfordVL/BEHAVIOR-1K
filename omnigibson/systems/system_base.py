@@ -13,7 +13,6 @@ from omnigibson.utils.python_utils import (
     assert_valid_key,
     camel_case_to_snake_case,
     get_uuid,
-    property,
     snake_case_to_camel_case,
     subclass_factory,
 )

@@ -77,7 +77,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 unit_z = np.zeros((len(raw_positions), 3, 1))
                 unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
                 checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
-            elif is_physical_particle_system(system_name=system.name):
+            elif self.obj.scene.is_physical_particle_system(system_name=system.name):
                 raw_positions = system.get_particles_position_orientation()[0]
                 checked_positions = raw_positions
             else:
