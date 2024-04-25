@@ -2,7 +2,6 @@ import numpy as np
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS, UUID_TO_SYSTEMS
 from omnigibson.utils.python_utils import get_uuid
 
 # Create settings for this module
@@ -61,7 +60,7 @@ class ModifiedParticles(RelativeObjectState):
 
     def _load_state(self, state):
         self.particle_counts = {
-            REGISTERED_SYSTEMS[system_name]: val
+            self.obj.scene.system_registry("name", system_name): val
             for system_name, val in state.items()
             if system_name != "n_systems" and val > 0
         }
@@ -208,8 +207,8 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             elif k == "default_limit":
                 self._default_limit = v
             # TODO: Make this an else once fresh round of sampling occurs (i.e.: no more outdated systems stored)
-            elif k in REGISTERED_SYSTEMS:
-                self._limits[REGISTERED_SYSTEMS[k]] = v
+            elif k in self.obj.scene.system_registrey.all_keys():
+                self._limits[self.obj.scene.system_registrey("name", k)] = v
 
     def _serialize(self, state):
         state_flat = np.array([state["n_systems"], state["default_limit"]], dtype=float)

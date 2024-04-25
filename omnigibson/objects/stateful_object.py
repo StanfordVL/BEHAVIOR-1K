@@ -236,7 +236,7 @@ class StatefulObject(BaseObject):
                     for state_type in get_states_for_ability(ability):
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params),
+                            "params": state_type.postprocess_ability_params(params, self.scene),
                         }
 
         # Add the dependencies into the list, too, and sort based on the dependency chain

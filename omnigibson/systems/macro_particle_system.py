@@ -11,7 +11,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem, VisualParticleSystem
+from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
@@ -52,12 +52,15 @@ class MacroParticleSystem(BaseSystem):
     # Color associated with this system (NOTE: external queries should call self.color)
     _color = None
 
+    def __init__(self, name, **kwargs):
+        self.particles = dict()
+        return super().__init__(name=name, **kwargs)
+
     def initialize(self):
         # Run super method first
         super().initialize()
 
         # Initialize mutable class variables so they don't automatically get overridden by children classes
-        self.particles = dict()
         self._particle_counter = 0
 
         # Create the system prim -- this is merely a scope prim
@@ -133,7 +136,7 @@ class MacroParticleSystem(BaseSystem):
         super()._clear()
 
         self._particle_template = None
-        self.particles = None
+        self.particles = dict()
         self._color = None
 
     @property
@@ -381,7 +384,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         z_extent = self.particle_object.aabb_extent[2]
         # Iterate over all objects, and update all particles belonging to any cloth objects
         for name, obj in self._group_objects.items():
-            group = self.get_group_name(obj=obj)
+            group = VisualParticleSystem.get_group_name(obj=obj)
             if obj.prim_type == PrimType.CLOTH and self.num_group_particles(group=group) > 0:
                 # Update the transforms
                 cloth = obj.root_link
@@ -454,7 +457,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Remove this particle from its respective group as well
         parent_obj = self._particles_info[name]["obj"]
-        group = self.get_group_name(obj=parent_obj)
+        group = VisualParticleSystem.get_group_name(obj=parent_obj)
         self._group_particles[group].pop(name)
         self._particles_local_mat.pop(name)
         particle_info = self._particles_info.pop(name)
@@ -949,7 +952,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             # Also store the cloth face IDs as a vector
             if is_cloth:
-                self._cloth_face_ids[self.get_group_name(obj)] = np.array(
+                self._cloth_face_ids[VisualParticleSystem.get_group_name(obj)] = np.array(
                     [self._particles_info[particle_name]["face_id"] for particle_name in self._group_particles[name]]
                 )
 

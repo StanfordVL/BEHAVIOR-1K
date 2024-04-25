@@ -14,7 +14,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem
+from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.python_utils import assert_valid_key, snake_case_to_camel_case, subclass_factory
@@ -635,10 +635,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self._particle_density = particle_density
 
         # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
-        particle_prototypes = None
+        self.particle_prototypes = None
 
         # Particle instancers -- maps name to particle instancer prims (dict)
-        particle_instancers = None
+        self.particle_instancers = dict()
 
         # Run super
         return super().__init__(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
@@ -693,9 +693,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         if m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY is not None:
             self.system_prim.GetProperty("maxVelocity").Set(m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY)
 
-        # Initialize class variables that are mutable so they don't get overridden by children classes
-        self.particle_instancers = dict()
-
         # TODO: remove this hack once omniverse fixes the issue (now we assume prototype IDs are all 0 always)
         og.sim.add_callback_on_stop(
             name=f"{self.name}_sync_particle_prototype_ids", callback=self._sync_particle_prototype_ids
@@ -708,7 +705,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         super()._clear()
 
         self.particle_prototypes = None
-        self.particle_instancers = None
+        self.particle_instancers = dict()
 
     @property
     def next_available_instancer_idn(self):

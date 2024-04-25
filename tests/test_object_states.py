@@ -1120,7 +1120,7 @@ def test_contains(env):
             og.sim.step()
 
         # Sample single particle
-        if is_physical_particle_system(system_name=system.name):
+        if env.scene.is_physical_particle_system(system_name=system.name):
             system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:

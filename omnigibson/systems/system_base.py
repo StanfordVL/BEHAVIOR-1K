@@ -64,7 +64,7 @@ class BaseSystem(Serializable):
         self.min_scale = np.ones(3)
         self.max_scale = np.ones(3)
 
-        self._uuid = get_uuid(self._snake_case_name)
+        self._uuid = get_uuid(self._name)
 
     @property
     def name(self):
@@ -397,13 +397,17 @@ class VisualParticleSystem(BaseSystem):
     # Maps group name to tuple (min_scale, max_scale) to apply to sampled particles for that group
     _group_scales = None
 
-    def initialize(self):
-        # Run super method first
-        super().initialize()
+    def __init__(self, name, **kwargs):
+        # Run super
+        super().__init__(name=name, **kwargs)
 
         # Maps group name to the particles associated with it
         # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
         self._group_particles = {}
+
+    def initialize(self):
+        # Run super method first
+        super().initialize()
 
         # Maps group name to the parent object (the object with particles attached to it) of the group
         self._group_objects = {}
@@ -477,7 +481,8 @@ class VisualParticleSystem(BaseSystem):
         self._validate_group(group=group)
         return len(self._group_particles[group])
 
-    def get_group_name(self, obj):
+    @classmethod
+    def get_group_name(cls, obj):
         """
         Grabs the corresponding group name for object @obj
 
@@ -502,7 +507,7 @@ class VisualParticleSystem(BaseSystem):
             str: Name of the attachment group to use when executing commands from this class on
                 that specific attachment group
         """
-        group = self.get_group_name(obj=obj)
+        group = VisualParticleSystem.get_group_name(obj=obj)
         # This should only happen once for a single attachment group, so we explicitly check to make sure the object
         # doesn't already exist
         assert (
