@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import tempfile
 from abc import ABC
 from itertools import combinations
 
@@ -70,6 +72,38 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Call super init
         super().__init__()
+
+        # Prepare the initialization dicts
+        self._init_info = {}
+        self._init_state = {}
+        self._init_systems = []
+        self._task_metadata = None
+        self._init_objs = {}
+
+        # If we have any scene file specified, use it to create the objects within it
+        if self.scene_file is not None:
+            # Grab objects info from the scene file
+            with open(self.scene_file, "r") as f:
+                scene_info = json.load(f)
+            self._init_info = scene_info["objects_info"]["init_info"]
+            self._init_state = scene_info["state"]["object_registry"]
+            self._init_systems = list(scene_info["state"]["system_registry"].keys())
+            self._task_metadata = {}
+            try:
+                self._task_metadata = scene_info["metadata"]["task"]
+            except:
+                pass
+
+            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
+            # accordingly
+            self._init_objs = {}
+            for obj_name, obj_info in self._init_info.items():
+                # Check whether we should load the object or not
+                if not self._should_load_object(obj_info=obj_info, task_metadata=self._task_metadata):
+                    continue
+                # Create object class instance
+                obj = create_object_from_init_info(obj_info)
+                self._init_objs[obj_name] = obj
 
     @property
     def registry(self):
@@ -156,6 +190,43 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def initialized(self):
         return self._initialized
 
+    def prebuild(self):
+        """
+        Prebuild the scene before loading it into the simulator. This is useful for caching the scene USD for faster
+        loading times.
+
+        Returns:
+            str: Path to the prebuilt USD file
+        """
+        # Prebuild and cache the scene USD using the objects
+        if self.scene_file not in PREBUILT_USDS:
+            # Prebuild the scene USD
+            log.info(f"Prebuilding scene file {self.scene_file}...")
+
+            # Create a new stage inside the tempdir, named after this scene's file.
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+            os.close(decrypted_fd)
+            stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+
+            # Create the world prim and make it the default
+            world_prim = stage.DefinePrim("/World", "Xform")
+            stage.SetDefaultPrim(world_prim)
+
+            # Iterate through all objects and add them to the stage
+            for obj_name, obj in self._init_objs.items():
+                obj.prebuild(stage)
+
+            stage.Save()
+            del stage
+
+            PREBUILT_USDS[self.scene_file] = usd_path
+
+        # Copy the prebuilt USD to a new path
+        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+        os.close(decrypted_fd)
+        shutil.copyfile(PREBUILT_USDS[self.scene_file], instance_usd_path)
+        return instance_usd_path
+
     def _load(self):
         """
         Load the scene into simulator
@@ -170,46 +241,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
         """
-        # Grab objects info from the scene file
-        with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
-        init_info = scene_info["objects_info"]["init_info"]
-        init_state = scene_info["state"]["object_registry"]
-        init_systems = scene_info["state"]["system_registry"].keys()
-        task_metadata = {}
-        try:
-            task_metadata = scene_info["metadata"]["task"]
-        except:
-            pass
-
         # Create desired systems
-        for system_name in init_systems:
+        for system_name in self._init_systems:
             if gm.USE_GPU_DYNAMICS:
                 get_system(system_name)
             else:
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
-        # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
-        # accordingly
-        objs = {}
-        for obj_name, obj_info in init_info.items():
-            # Check whether we should load the object or not
-            if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
-                continue
-            # Create object class instance
-            obj = create_object_from_init_info(obj_info)
-            objs[obj_name] = obj
-
-        # Prebuild the scene USD using the OBJs
-        if self.scene_file not in PREBUILT_USDS:
-            # Prebuild the scene USD
-            log.info(f"Prebuilding scene file {self.scene_file}...")
-            PREBUILT_USDS[self.scene_file] = self.prebuild_scene_usd(objects=objs)
-
         # Add the prebuilt scene USD to the stage
         scene_relative_path = f"/scene_{self.idx}"
         scene_absolute_path = f"/World{scene_relative_path}"
-        scene_prim_obj = add_asset_to_stage(asset_path=PREBUILT_USDS[self.scene_file], prim_path=scene_absolute_path)
+
+        # If there is already a prim at the absolute path, the scene has been loaded. If not, load the prebuilt scene USD now.
+        scene_prim_obj = og.sim.stage.GetPrimAtPath(scene_absolute_path)
+        if not scene_prim_obj:
+            scene_prim_obj = add_asset_to_stage(asset_path=self.prebuild(), prim_path=scene_absolute_path)
 
         # Store world prim and load the scene into the simulator
         self._scene_prim = XFormPrim(
@@ -225,42 +271,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
 
         # Now load the objects with their own logic
-        for obj_name, obj in objs.items():
+        for obj_name, obj in self._init_objs.items():
             # Import into the simulator
             self.add_object(obj)
             # Set the init pose accordingly
             obj.set_local_pose(
-                position=init_state[obj_name]["root_link"]["pos"],
-                orientation=init_state[obj_name]["root_link"]["ori"],
+                position=self._init_state[obj_name]["root_link"]["pos"],
+                orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
-
-    def prebuild_scene_usd(self, objects):
-        """
-        Prebuild the scene USD using the given objects. This is useful for caching the scene USD for faster loading
-        times.
-
-        Args:
-            objects (dict): Dictionary of objects to prebuild the scene with. Maps object name to object instance
-
-        Returns:
-            str: Path to the prebuilt USD file
-        """
-        # Create a new stage inside the tempdir, named after this scene's file.
-        usd_path = os.path.join(og.tempdir, os.path.basename(self.scene_file) + ".usd")
-        stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
-
-        # Create the world prim and make it the default
-        world_prim = stage.DefinePrim("/World", "Xform")
-        stage.SetDefaultPrim(world_prim)
-
-        # Iterate through all objects and add them to the stage
-        for obj_name, obj in objects.items():
-            obj.prebuild(stage)
-
-        stage.Save()
-        del stage
-
-        return usd_path
 
     def _load_metadata_from_scene_file(self):
         """

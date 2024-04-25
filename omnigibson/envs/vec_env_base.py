@@ -1,4 +1,5 @@
 import copy
+import time
 
 from tqdm import trange
 
@@ -10,9 +11,12 @@ class VectorEnvironment:
 
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
+        start_time = time.time()
         self.envs = [
             og.Environment(configs=copy.deepcopy(config)) for _ in trange(num_envs, desc="Loading environments")
         ]
+        end_time = time.time()
+        print(f"Loaded {num_envs} environments in {end_time - start_time} seconds")
 
     def step(self, actions):
         try:

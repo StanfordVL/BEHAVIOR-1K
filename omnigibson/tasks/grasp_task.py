@@ -112,28 +112,30 @@ class GraspTask(BaseTask):
             robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
 
-        # Settle robot
-        for _ in range(10):
-            og.sim.step()
+        # This is temporarily disabled because we don't want to spend time resetting.
 
-        # Wait for the robot to fully stabilize.
-        for _ in range(100):
-            og.sim.step()
-            if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-                continue
-            if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
-                continue
-            break
-        else:
-            raise ValueError("Robot could not settle")
+        # # Settle robot
+        # for _ in range(10):
+        #     og.sim.step()
 
-        # Check if the robot has toppled
-        rotation = R.from_quat(robot.get_orientation())
-        robot_up = rotation.apply(np.array([0, 0, 1]))
-        if robot_up[2] < 0.75:
-            raise ValueError("Robot has toppled over")
+        # # Wait for the robot to fully stabilize.
+        # for _ in range(100):
+        #     og.sim.step()
+        #     if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+        #         continue
+        #     if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+        #         continue
+        #     break
+        # else:
+        #     raise ValueError("Robot could not settle")
 
-        print("Reset robot pose to: ", robot_pose)
+        # # Check if the robot has toppled
+        # rotation = R.from_quat(robot.get_orientation())
+        # robot_up = rotation.apply(np.array([0, 0, 1]))
+        # if robot_up[2] < 0.75:
+        #     raise ValueError("Robot has toppled over")
+
+        # print("Reset robot pose to: ", robot_pose)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):
