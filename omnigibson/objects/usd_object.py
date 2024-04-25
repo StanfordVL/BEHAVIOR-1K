@@ -2,10 +2,11 @@ import os
 import tempfile
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.usd_utils import add_asset_to_stage, deep_copy_prim
 
 
 class USDObject(StatefulObject):
@@ -85,6 +86,33 @@ class USDObject(StatefulObject):
             abilities=abilities,
             **kwargs,
         )
+
+    def prebuild(self, stage):
+        # Load the object into the given USD stage
+        usd_path = self._usd_path
+        if self._encrypted:
+            # Create a temporary file to store the decrytped asset, load it, and then delete it
+            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self._usd_path), dir=og.tempdir)
+            os.close(decrypted_fd)
+            decrypt_file(encrypted_filename, usd_path)
+
+        # object_stage = lazy.pxr.Usd.Stage.Open(usd_path)
+        # root_prim = object_stage.GetDefaultPrim()
+
+        # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
+        prim_path = "/World" + self._relative_prim_path
+
+        # TODO(parallel): Deep copy the prim tree EXCEPT the visual meshes. How?
+        prim = stage.GetPrimAtPath(prim_path)
+        if not prim.IsValid():
+            prim = stage.DefinePrim(prim_path, "Xform")
+        assert prim.GetReferences().AddReference(usd_path)
+
+        # TODO(parallel): Fix this. How can I release the file handle?
+        # del object_stage
+        # if self._encrypted:
+        #     os.remove(usd_path)
 
     def _load(self):
         """

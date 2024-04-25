@@ -1277,6 +1277,7 @@ def launch_simulator(*args, **kwargs):
                 self._floor_plane = XFormPrim(
                     relative_prim_path="/ground_plane",
                     name=plane.name,
+                    load_config={"created_manually": True},
                 )
                 self._floor_plane.load(None)
 
