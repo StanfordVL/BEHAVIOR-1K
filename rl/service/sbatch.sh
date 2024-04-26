@@ -6,7 +6,7 @@
 #SBATCH --mem=60G
 #SBATCH --gres=gpu:titanrtx:2
 
-IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
+IMAGE_PATH="/cvgl2/u/garlanka/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
@@ -79,7 +79,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --eval_port $2" > "output_learner.txt" 2>&1 &
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/learner.py --n_envs $1 --eval_port $2" > "output_learner.txt" 2>&1 &
     else
         enroot start \
         --root \
@@ -87,7 +87,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$2 --render" > "output_eval.txt" 2>&1 &
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/service/omni_grpc_worker.py 0.0.0.0:$2 --render" > "output_eval.txt" 2>&1 &
     fi
     
 done

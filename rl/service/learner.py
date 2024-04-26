@@ -27,9 +27,11 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from service.telegym import GRPCClientEnv
+from service.telegym import GRPCClientVecEnv
 from wandb import AlertLevel
 from wandb.integration.sb3 import WandbCallback
+import omnigibson as og
+from omnigibson.macros import gm
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -95,9 +97,6 @@ def instantiate_envs():
         env = og.VectorEnvironment(n_envs, config)
 
     else:
-        import omnigibson as og
-        from omnigibson.macros import gm
-
         config = _get_env_config()
         config['task']['precached_reset_pose_path'] = reset_poses_path
         env = og.VectorEnvironment(1, config)
