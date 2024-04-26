@@ -368,15 +368,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         ori = T.quat2euler(quat)
 
-        # Compute ori2d
-        # TODO(parallel-hang): Dedupe this code that is also used in get_2d_orientation
-        # Copy this to a util function in transform_utils.py and use it in both places
-        ori_2d = 0.0
-        fwd = R.from_quat(quat).apply([1, 0, 0])
-        fwd[2] = 0.0
-        if np.linalg.norm(fwd) > 1e-4:
-            fwd /= np.linalg.norm(fwd)
-            ori_2d = np.arctan2(fwd[1], fwd[0])
+        ori_2d = T.compute_2d_orientation(quat)
 
         # Pack everything together
         return dict(

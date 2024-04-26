@@ -1164,3 +1164,26 @@ def integer_spiral_coordinates(n):
     x = ((-1) ** m) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n)) % 2) - np.ceil(m / 2))
     y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n) + 1) % 2) + np.ceil(m / 2))
     return int(x), int(y)
+
+
+def compute_2d_orientation(quaternion):
+    """
+    Compute the 2D orientation angle from a quaternion assuming the initial forward vector is along the x-axis.
+
+    Parameters:
+    quaternion : array_like
+        The quaternion (w, x, y, z) representing the rotation.
+
+    Returns:
+    float
+        The angle (in radians) of the projection of the forward vector onto the XY plane.
+        Returns 0.0 if the projected vector's magnitude is negligibly small.
+    """
+    fwd = R.from_quat(quaternion).apply([1, 0, 0])
+    fwd[2] = 0.0
+
+    if np.linalg.norm(fwd) < 1e-4:
+        return 0.0
+
+    fwd /= np.linalg.norm(fwd)
+    return np.arctan2(fwd[1], fwd[0])
