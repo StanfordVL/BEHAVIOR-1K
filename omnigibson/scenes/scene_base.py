@@ -42,7 +42,7 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# TODO(parallel): Make this get dynamically computed based on scene AABB
+# Margin between the AABBs of two different scenes.
 m.SCENE_MARGIN = 10.0
 
 # Global dicts that will contain mappings
@@ -296,6 +296,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=self._init_state[obj_name]["root_link"]["pos"],
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
+
+        # TODO(parallel-hang): Compute the scene AABB use it for scene placement.
+        # aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
 
     def _load_metadata_from_scene_file(self):
         """
@@ -628,7 +631,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
         # If system_name is not in REGISTERED_SYSTEMS, create from metadata
-        # TODO(system): Unbreak this
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
         if not system.initialized and force_active:

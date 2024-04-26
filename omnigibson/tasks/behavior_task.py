@@ -216,7 +216,7 @@ class BehaviorTask(BaseTask):
         og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
-        # TODO(system): Implement these on scene somehow?
+        # TODO(parallel-cem): Implement these on scene somehow?
         add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
         add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
 

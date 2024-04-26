@@ -7,10 +7,16 @@ from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_scene_path
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.usd_utils import add_asset_to_stage, scene_relative_prim_path_to_absolute
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create macros
+m = og.create_module_macros(module_path=__file__)
+
+# Additional elevation for the floor plane
+m.ADDITIONAL_ELEVATION = 0.02
 
 
 class StaticTraversableScene(TraversableScene):
@@ -64,16 +70,19 @@ class StaticTraversableScene(TraversableScene):
         if not os.path.isfile(filename):
             filename = os.path.join(get_scene_path(self.scene_model), "mesh_z_up.obj")
 
-        scene_prim = add_asset_to_stage(
+        scene_mesh_relative_path = "/scene"
+        scene_mesh_absolute_path = scene_relative_prim_path_to_absolute(self, scene_mesh_relative_path)
+        scene_mesh_prim = add_asset_to_stage(
             asset_path=filename,
-            prim_path=f"/World/scene_{self.scene_model}",
+            prim_path=scene_mesh_absolute_path,
         )
 
         # Grab the actual mesh prim
         self._scene_mesh = CollisionVisualGeomPrim(
-            prim_path=f"/World/scene_{self.scene_model}/mesh_z_up/{self.scene_model}_mesh_texture",
+            relative_prim_path=f"/scene/mesh_z_up/{self.scene_model}_mesh_texture",
             name=f"{self.scene_model}_mesh",
         )
+        self._scene_mesh.load(self)
 
         # Load floor metadata
         floor_height_path = os.path.join(get_scene_path(self.scene_model), "floors.txt")
@@ -83,27 +92,17 @@ class StaticTraversableScene(TraversableScene):
             log.debug("Floors {}".format(self.floor_heights))
 
         # Move the floor plane to the first floor by default
-        self.move_floor_plane(floor=0)
+        default_floor = 0
+        floor_height = self.floor_heights[default_floor] + m.ADDITIONAL_ELEVATION
+        scene_position = self._scene_prim.get_position()
+        scene_position[2] = floor_height
+        self._scene_prim.set_position(scene_position)
 
         # Filter the collision between the scene mesh and the floor plane
         self._scene_mesh.add_filtered_collision_pair(prim=og.sim.floor_plane)
 
         # Load the traversability map
         self._trav_map.load_map(get_scene_path(self.scene_model))
-
-    def move_floor_plane(self, floor=0, additional_elevation=0.02, height=None):
-        """
-        Resets the floor plane to a new floor
-
-        Args:
-            floor (int): Integer identifying the floor to move the floor plane to
-            additional_elevation (float): Additional elevation with respect to the height of the floor
-            height (None or float): If specified, alternative parameter to directly control the height of the ground
-                plane. Note that this will override @additional_elevation and @floor!
-        """
-        height = height if height is not None else self.floor_heights[floor] + additional_elevation
-        # TODO(parallel): Have the simulator manage the position of this & make sure there are no conflicting requests.
-        og.sim.floor_plane.set_position(np.array([0, 0, height]))
 
     def get_floor_height(self, floor=0):
         """

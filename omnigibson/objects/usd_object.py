@@ -103,13 +103,13 @@ class USDObject(StatefulObject):
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
         prim_path = "/World" + self._relative_prim_path
 
-        # TODO(parallel): Deep copy the prim tree EXCEPT the visual meshes. How?
+        # TODO(parallel-cem): Deep copy the prim tree EXCEPT the visual meshes. How?
         prim = stage.GetPrimAtPath(prim_path)
         if not prim.IsValid():
             prim = stage.DefinePrim(prim_path, "Xform")
         assert prim.GetReferences().AddReference(usd_path)
 
-        # TODO(parallel): Fix this. How can I release the file handle?
+        # TODO(parallel-cem): Fix this. How can I release the file handle?
         # del object_stage
         # if self._encrypted:
         #     os.remove(usd_path)

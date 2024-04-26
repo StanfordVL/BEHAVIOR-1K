@@ -44,7 +44,7 @@ SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
 class BaseSystem(Serializable):
-    # TODO(system): Fix this comment
+    # TODO(parallel-hang): Fix this comment
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
     This is useful for items in a scene that are non-discrete / cannot be distinguished into individual instances,
@@ -75,7 +75,7 @@ class BaseSystem(Serializable):
     def uuid(self):
         return self._uuid
 
-    # TODO(parallel): Fix this. It needs to be loaded in.
+    # TODO(parallel-hang): Fix this. It needs to be loaded in. Take a look at how this is done in BasePrim
     @property
     def prim_path(self):
         """

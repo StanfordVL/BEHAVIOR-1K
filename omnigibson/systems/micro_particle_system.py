@@ -403,6 +403,7 @@ class MicroParticleSystem(BaseSystem):
     Omniverse's native physx particle systems
     """
 
+    # TODO(parallel-hang): Make sure we remove all these mutable class variables, make them instance variables instead.
     # Particle system prim in the scene, should be generated at runtime
     system_prim = None
 
@@ -1394,7 +1395,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
             FluidSystem: Generated system class
         """
 
-        # TODO(system): Finish converting this
+        # TODO(parallel-hang): Finish converting this
         @property
         def cp_particle_contact_offset(self):
             return particle_contact_offset

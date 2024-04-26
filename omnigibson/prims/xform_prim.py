@@ -428,13 +428,13 @@ class XFormPrim(BasePrim):
         if self.scene is not None:
             pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
 
-        # TODO(parallel): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
+        # TODO(parallel-cem): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
         # We return a dict that contains -1s for the original format that used global pos/orn.
         return dict(local_pos=local_pos, local_ori=local_ori, pos=pos, ori=ori)
 
     def _load_state(self, state):
         # If we have the local pose info, we can directly use them
-        # TODO(parallel): The below logic doesn't quite work because the intermediate prims don't move.
+        # TODO(parallel-cem): The below logic doesn't quite work because the intermediate prims don't move.
         if False:  # "local_pos" in state and "local_ori" in state:
             self.set_local_pose(state["local_pos"], state["local_ori"])
         else:

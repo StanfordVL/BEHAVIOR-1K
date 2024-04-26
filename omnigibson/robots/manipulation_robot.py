@@ -425,12 +425,12 @@ class ManipulationRobot(BaseRobot):
         fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
             self.articulation_root_path, self.eef_link_names[arm]
         )
-        # TODO(parallel): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
+        # TODO(parallel-hang): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
         # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        # TODO(parallel): Replace this with a ControllableObjectViewAPI call too.
+        # TODO(parallel-hang): Replace this with a ControllableObjectViewAPI call too. Ask Josiah for help.
         # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
         #     eef_link_idx, :, -self.n_joints :
         # ]

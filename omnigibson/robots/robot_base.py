@@ -175,7 +175,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         needs_dummy = False
         if not self.fixed_base:
             # TODO: Make this work after controllers get updated post-load.
-            # TODO(parallel): Make this work - for now this feature is disabled because we can't check the config
+            # TODO(parallel-cem): Make this work - for now this feature is disabled because we can't check the config
             # at this time.
             # Check if we have any operational space controllers or joint controllers with use_impedances on.
             # for cfg in self._controller_config.values():
@@ -369,7 +369,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         ori = T.quat2euler(quat)
 
         # Compute ori2d
-        # TODO(parallel): Dedupe this code that is also used in get_2d_orientation
+        # TODO(parallel-hang): Dedupe this code that is also used in get_2d_orientation
+        # Copy this to a util function in transform_utils.py and use it in both places
         ori_2d = 0.0
         fwd = R.from_quat(quat).apply([1, 0, 0])
         fwd[2] = 0.0
