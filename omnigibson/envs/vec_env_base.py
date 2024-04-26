@@ -1,6 +1,4 @@
 import copy
-
-import omnigibson as og
 import warnings
 from copy import deepcopy
 from typing import Any, List, Type
@@ -9,6 +7,9 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
+from tqdm import trange
+
+import omnigibson as og
 
 
 # TODO: Figure out if there is a good interface to implement in Gymnasium
@@ -35,14 +36,14 @@ class VectorEnvironment(DummyVecEnv):
     #     except Exception as e:
     #         print(e)
 
-
     def __init__(self, num_envs, config):
         self.waiting = False
         self.render_mode = "rgb_array"
 
         self.num_envs = num_envs
-        self.envs = [og.Environment(configs=copy.deepcopy(config)) for _ in range(num_envs)]
-
+        self.envs = [
+            og.Environment(configs=copy.deepcopy(config)) for _ in trange(num_envs, desc="Loading environments")
+        ]
         super().__init__([(lambda x=x: x) for x in self.envs])
 
     def step_wait(self) -> VecEnvStepReturn:
@@ -63,7 +64,7 @@ class VectorEnvironment(DummyVecEnv):
             if done:
                 info["terminal_observation"] = obs
                 obs, reset_infos = self.envs[env_idx].reset()
-            
+
             self._save_obs(env_idx, obs)
             self.buf_rews[env_idx] = reward
             self.buf_dones[env_idx] = done
