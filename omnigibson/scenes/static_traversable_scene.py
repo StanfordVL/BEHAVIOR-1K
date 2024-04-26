@@ -3,6 +3,7 @@ import os
 import numpy as np
 
 import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_scene_path
@@ -13,7 +14,7 @@ from omnigibson.utils.usd_utils import add_asset_to_stage, scene_relative_prim_p
 log = create_module_logger(module_name=__name__)
 
 # Create macros
-m = og.create_module_macros(module_path=__file__)
+m = create_module_macros(module_path=__file__)
 
 # Additional elevation for the floor plane
 m.ADDITIONAL_ELEVATION = 0.02

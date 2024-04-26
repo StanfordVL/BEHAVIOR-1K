@@ -39,14 +39,13 @@ class MacroParticleSystem(BaseSystem):
     """
 
     def __init__(self, name, **kwargs):
-        self.particles = dict()
         # Template object to use -- class particle objet is assumed to be the first and only visual mesh belonging to the
         # root link of this template object, which symbolizes a single particle, and will be duplicated to generate the
         # particle system. Note that this object is NOT part of the actual particle system itself!
         self._particle_template = None
 
         # dict, array of particle objects, mapped by their prim names
-        self.particles = None
+        self.particles = dict()
 
         # Counter to increment monotonically as we add more particles
         self._particle_counter = None
@@ -927,8 +926,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Create any groups we don't already have
         for name in groups_to_create:
-            # TODO(parallel-hang): Which scene
-            obj = og.sim.scenes[0].object_registry("name", name)
+            obj = self._scene.object_registry("name", name)
             info = name_to_info_mapping[name]
             self.create_attachment_group(obj=obj)
             is_cloth = self._is_cloth_obj(obj=obj)
@@ -1060,8 +1058,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         indices_to_remove = np.array([], dtype=int)
         for info in state["groups"].values():
-            # TODO(parallel-hang): Which scene
-            obj = og.sim.scenes[0].object_registry("uuid", info["particle_attached_obj_uuid"])
+            obj = self._scene.object_registry("uuid", info["particle_attached_obj_uuid"])
             # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
             if obj is not None:
                 group_objects.append(obj)
@@ -1115,8 +1112,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         idx = 1
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
-            # TODO(parallel-hang): Which scene
-            obj = og.sim.scenes[0].object_registry("uuid", obj_uuid)
+            obj = self._scene.object_registry("uuid", obj_uuid)
             assert obj is not None, f"Object with UUID {obj_uuid} not found in the scene"
             is_cloth = self._is_cloth_obj(obj=obj)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}

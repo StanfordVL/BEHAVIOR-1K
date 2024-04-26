@@ -19,6 +19,7 @@ from omnigibson.utils.python_utils import (
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -66,6 +67,8 @@ class BaseSystem(Serializable):
 
         self._uuid = get_uuid(self._name)
 
+        self._scene = None
+
     @property
     def name(self):
         # Class name is the unique name assigned
@@ -75,14 +78,13 @@ class BaseSystem(Serializable):
     def uuid(self):
         return self._uuid
 
-    # TODO(parallel-hang): Fix this. It needs to be loaded in. Take a look at how this is done in BasePrim
     @property
     def prim_path(self):
         """
         Returns:
             str: Path to this system's prim in the scene stage
         """
-        return "/World" + self.relative_prim_path
+        return scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)
 
     @property
     def relative_prim_path(self):
@@ -126,10 +128,11 @@ class BaseSystem(Serializable):
         """
         return False
 
-    def initialize(self):
+    def initialize(self, scene):
         """
         Initializes this system
         """
+        self._scene = scene
         assert not self.initialized, f"Already initialized system {self.name}!"
         og.sim.stage.DefinePrim(self.prim_path, "Scope")
 
