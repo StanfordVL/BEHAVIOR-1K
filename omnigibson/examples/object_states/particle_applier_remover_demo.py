@@ -4,7 +4,6 @@ import omnigibson as og
 from omnigibson.macros import gm, macros
 from omnigibson.object_states import Covered
 from omnigibson.objects import DatasetObject
-from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.usd_utils import create_joint
@@ -168,7 +167,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
-        table.states[Covered].set_value(get_system(particle_type), True)
+        table.states[Covered].set_value(env.scene.get_system(particle_type), True)
 
         # Take a few steps to let particles settle
         for _ in range(25):

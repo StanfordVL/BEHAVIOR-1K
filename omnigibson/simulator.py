@@ -671,7 +671,7 @@ def launch_simulator(*args, **kwargs):
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
                             obj.update_handles()
-                    for system in scene.systems:
+                    for system in scene.get_active_systems():
                         if issubclass(system, MacroPhysicalParticleSystem):
                             system.refresh_particles_view()
 
@@ -720,7 +720,7 @@ def launch_simulator(*args, **kwargs):
 
                 # Update any system-related state
                 for scene in self.scenes:
-                    for system in scene.systems:
+                    for system in scene.get_active_systems():
                         system.update()
 
                 # Propagate states if the feature is enabled
@@ -1504,11 +1504,6 @@ def launch_simulator(*args, **kwargs):
             return dicts, total_state_size
 
     if not og.sim:
-        from omnigibson.systems.system_base import import_og_systems
-
-        # Import all OG systems from dataset
-        import_og_systems()
-
         # The simulator init function saves itself as og.sim.
         Simulator(*args, **kwargs)
 

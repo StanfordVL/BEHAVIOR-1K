@@ -16,8 +16,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
-from omnigibson.systems import get_system
-from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
 
@@ -146,9 +144,9 @@ class ClothPrim(GeomPrim):
     def visual_aabb_center(self):
         return self.aabb_center
 
-    @classproperty
-    def cloth_system(cls):
-        return get_system("cloth")
+    @property
+    def cloth_system(self):
+        return self.scene.get_system("cloth")
 
     @property
     def n_particles(self):

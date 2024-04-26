@@ -7,7 +7,6 @@ import numpy as np
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS
 from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
@@ -328,8 +327,12 @@ class VisionSensor(BaseSensor):
             if "," in replicator_mapping[key]:
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
-                categories = [cat for cat in replicator_mapping[key].split(",") if cat in REGISTERED_SYSTEMS]
-                assert len(categories) == 1, "There should be exactly one category that belongs to REGISTERED_SYSTEMS"
+                categories = [
+                    cat for cat in replicator_mapping[key].split(",") if cat in self.scene.system_registry.all_keys
+                ]
+                assert (
+                    len(categories) == 1
+                ), "There should be exactly one category that belongs to scene.system_registry"
                 replicator_mapping[key] = categories[0]
 
             assert (
@@ -377,7 +380,7 @@ class VisionSensor(BaseSensor):
                 if "Particle" in prim_name:
                     category_name = prim_name.split("Particle")[0]
                     assert (
-                        category_name in REGISTERED_SYSTEMS
+                        category_name in self.scene.system_registry.all_keys
                     ), f"System name {category_name} is not in the registered systems!"
                     value = category_name
                 else:
@@ -410,7 +413,7 @@ class VisionSensor(BaseSensor):
                     semantic_label in semantic_labels
                 ), f"Semantic map value {semantic_label} is not in the semantic labels!"
                 category_name = semantic_labels[semantic_label]
-                if category_name in REGISTERED_SYSTEMS:
+                if category_name in self.scene.system_registry.all_keys:
                     value = category_name
                     self._register_instance(value, id=id)
                 # If the category name is not in the registered systems,

@@ -322,7 +322,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
-    og.sim.load_state(state, serialized=False)
+    obj.scene.load_state(state, serialized=False)
 
     # Valid if there are no collisions
     return not in_collision

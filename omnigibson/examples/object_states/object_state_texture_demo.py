@@ -3,7 +3,6 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm, macros
-from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 
 # Make sure object states are enabled, we're using GPU dynamics, and HQ rendering is enabled
@@ -82,7 +81,7 @@ def main():
         print("obj is frozen:", obj.states[object_states.Frozen].get_value())
         print("obj is cooked:", obj.states[object_states.Cooked].get_value())
         print("obj is burnt:", obj.states[object_states.Burnt].get_value())
-        print("obj is soaked:", obj.states[object_states.Saturated].get_value(get_system("water")))
+        print("obj is soaked:", obj.states[object_states.Saturated].get_value(env.scene.get_system("water")))
         print("obj textures:", obj.get_textures())
 
     # Report default states
@@ -112,12 +111,12 @@ def main():
 
     # Notify user that we're about to soak the object, and then soak the object
     input("\nObject will be saturated with water. Press ENTER to continue.")
-    obj.states[object_states.Saturated].set_value(get_system("water"), True)
+    obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), True)
     report_states()
 
     # Notify user that we're about to unsoak the object, and then unsoak the object
     input("\nObject will be unsaturated with water. Press ENTER to continue.")
-    obj.states[object_states.Saturated].set_value(get_system("water"), False)
+    obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), False)
     report_states()
 
     # Close environment at the end

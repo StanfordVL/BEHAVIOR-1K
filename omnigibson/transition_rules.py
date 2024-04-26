@@ -17,14 +17,7 @@ from omnigibson.object_states import *
 from omnigibson.object_states.factory import get_system_states
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.systems import (
-    REGISTERED_SYSTEMS,
-    PhysicalParticleSystem,
-    VisualParticleSystem,
-    get_system,
-    is_system_active,
-)
-from omnigibson.systems.system_base import SYSTEM_REGISTRY
+from omnigibson.systems import PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 from omnigibson.utils.constants import PrimType
@@ -1234,6 +1227,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
+        # TODO(system): Get system registry from scene. How?
         for system in SYSTEM_REGISTRY.objects:
             # Skip cloth system
             if system.name == "cloth":
