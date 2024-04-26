@@ -403,16 +403,18 @@ class MicroParticleSystem(BaseSystem):
     Omniverse's native physx particle systems
     """
 
-    # TODO(parallel-hang): Make sure we remove all these mutable class variables, make them instance variables instead.
-    # Particle system prim in the scene, should be generated at runtime
-    system_prim = None
+    def __init__(self, name, **kwargs):
+        super().__init__(name=name, **kwargs)
 
-    # Material -- MaterialPrim associated with this particle system
-    _material = None
+        # Particle system prim in the scene, should be generated at runtime
+        self.system_prim = None
 
-    # Color of the generated material. Default is white [1.0, 1.0, 1.0]
-    # (NOTE: external queries should call self.color)
-    _color = np.array([1.0, 1.0, 1.0])
+        # Material -- MaterialPrim associated with this particle system
+        self._material = None
+
+        # Color of the generated material. Default is white [1.0, 1.0, 1.0]
+        # (NOTE: external queries should call self.color)
+        self._color = np.array([1.0, 1.0, 1.0])
 
     def initialize(self):
         # Run super first
@@ -1438,10 +1440,24 @@ class GranularSystem(MicroPhysicalParticleSystem):
     Particle system class simulating granular materials. Individual particles are composed of custom USD objects.
     """
 
-    # Cached particle contact offset determined from loaded prototype
-    _particle_contact_offset = None
-
-    _particle_template = None
+    def __init__(
+        self,
+        name,
+        particle_density,
+        min_scale=None,
+        max_scale=None,
+        **kwargs,
+    ):
+        # Cached particle contact offset determined from loaded prototype
+        self._particle_contact_offset = None
+        self._particle_template = None
+        return super().__init__(
+            name=name,
+            particle_density=particle_density,
+            min_scale=min_scale,
+            max_scale=max_scale,
+            **kwargs,
+        )
 
     @property
     def self_collision(self):

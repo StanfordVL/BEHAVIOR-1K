@@ -38,22 +38,21 @@ class MacroParticleSystem(BaseSystem):
     Global system for modeling "macro" level particles, e.g.: dirt, dust, etc.
     """
 
-    # Template object to use -- class particle objet is assumed to be the first and only visual mesh belonging to the
-    # root link of this template object, which symbolizes a single particle, and will be duplicated to generate the
-    # particle system. Note that this object is NOT part of the actual particle system itself!
-    _particle_template = None
-
-    # dict, array of particle objects, mapped by their prim names
-    particles = None
-
-    # Counter to increment monotonically as we add more particles
-    _particle_counter = None
-
-    # Color associated with this system (NOTE: external queries should call self.color)
-    _color = None
-
     def __init__(self, name, **kwargs):
         self.particles = dict()
+        # Template object to use -- class particle objet is assumed to be the first and only visual mesh belonging to the
+        # root link of this template object, which symbolizes a single particle, and will be duplicated to generate the
+        # particle system. Note that this object is NOT part of the actual particle system itself!
+        self._particle_template = None
+
+        # dict, array of particle objects, mapped by their prim names
+        self.particles = None
+
+        # Counter to increment monotonically as we add more particles
+        self._particle_counter = None
+
+        # Color associated with this system (NOTE: external queries should call self.color)
+        self._color = None
         return super().__init__(name=name, **kwargs)
 
     def initialize(self):
@@ -342,31 +341,33 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     Particle system class that procedurally generates individual particles that are not subject to physics
     """
 
-    # Maps particle name to dict of {obj, link, face_id}
-    # NOTE: link will only exist for particles on rigid bodies
-    # NOTE: face_id will only exist for particles on cloths
-    _particles_info = None
+    def __init__(self, name, **kwargs):
+        # Maps particle name to dict of {obj, link, face_id}
+        # NOTE: link will only exist for particles on rigid bodies
+        # NOTE: face_id will only exist for particles on cloths
+        self._particles_info = None
 
-    # Pre-cached information about visual particles so that we have efficient runtime computations
-    # Maps particle name to local pose matrix for computing global poses for the particle
-    _particles_local_mat = None
+        # Pre-cached information about visual particles so that we have efficient runtime computations
+        # Maps particle name to local pose matrix for computing global poses for the particle
+        self._particles_local_mat = None
 
-    # Maps group name to array of face_ids where particles are located if the group object is a cloth type
-    # Maps group name to np.array of face IDs (int) that particles are attached to
-    _cloth_face_ids = None
+        # Maps group name to array of face_ids where particles are located if the group object is a cloth type
+        # Maps group name to np.array of face IDs (int) that particles are attached to
+        self._cloth_face_ids = None
 
-    # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
-    # their locations on the surface of the given object
-    _CLIP_INTO_OBJECTS = False
+        # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
+        # their locations on the surface of the given object
+        self._CLIP_INTO_OBJECTS = False
 
-    # Default parameters for sampling particle locations
-    # See omnigibson/utils/sampling_utils.py for how they are used.
-    _SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
-    _SAMPLING_AABB_OFFSET = 0.01
-    _SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
-    _SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
-    _SAMPLING_MAX_ATTEMPTS = 20
-    _SAMPLING_HIT_PROPORTION = 0.4
+        # Default parameters for sampling particle locations
+        # See omnigibson/utils/sampling_utils.py for how they are used.
+        self._SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
+        self._SAMPLING_AABB_OFFSET = 0.01
+        self._SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
+        self._SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
+        self._SAMPLING_MAX_ATTEMPTS = 20
+        self._SAMPLING_HIT_PROPORTION = 0.4
+        return super().__init__(name=name, **kwargs)
 
     def initialize(self):
         # Run super method first
@@ -1160,12 +1161,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
     Particle system class that procedurally generates individual particles that are subject to physics
     """
 
-    # Physics rigid body view for keeping track of all particles' state
-    particles_view = None
+    def __init__(self, name, **kwargs):
+        # Run super
+        super().__init__(name=name, **kwargs)
 
-    # Approximate radius of the macro particle, and distance from particle frame to approximate center
-    _particle_radius = None
-    _particle_offset = None
+        # Physics rigid body view for keeping track of all particles' state
+        self.particles_view = None
+
+        # Approximate radius of the macro particle, and distance from particle frame to approximate center
+        self._particle_radius = None
+        self._particle_offset = None
 
     def initialize(self):
         # Run super method first
