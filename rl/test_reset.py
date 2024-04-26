@@ -140,7 +140,7 @@ def main(iterations):
     #     ]
     # }
 
-    cfg = yaml.load(open('./service/omni_grpc.yaml', "r"), Loader=yaml.FullLoader)
+    cfg = yaml.load(open('./service/omni_grpc_offline.yaml', "r"), Loader=yaml.FullLoader)
     gm.USE_GPU_DYNAMICS = True
     env = og.Environment(configs=cfg)
         
@@ -174,11 +174,11 @@ def main(iterations):
         try:
             done = False
             env.reset()
-            while not done:
+            for i in range(100):
                 action = env.action_space.sample()
                 obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
-                break
+                # break
         except Exception as e:
             print("Error in iteration: ", i)
             print(e)
