@@ -257,7 +257,7 @@ class RigidContactAPIImpl:
                     continue
 
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
-                    pattern=self.get_row_filter(),  # TODO (parallel): This can easily be made per-scene too.
+                    pattern=self.get_row_filter(),  # TODO (parallel-cem): Make the pattern per-scene to avoid lots of empty rows / columns
                     filter_patterns=column_filters[scene_idx],
                     max_contact_data_count=self.get_max_contact_data_count(),
                 )

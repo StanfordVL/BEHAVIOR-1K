@@ -1480,6 +1480,8 @@ class ManipulationRobot(BaseRobot):
                 data = state["ag_obj_constraint_params"][arm]
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
+                # TODO(parallel-hang): Convert this position, and every other global position saved
+                # or loaded in every other load/save_state, into scene-local poses.
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 
     def _serialize(self, state):
