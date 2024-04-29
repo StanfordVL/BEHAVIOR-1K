@@ -299,6 +299,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # TODO(parallel-hang): Compute the scene AABB use it for scene placement.
         # aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
+        # place with a z offset initially; after load, find aabb and then reposition (note: origin is not necessarily at the center)
 
     def _load_metadata_from_scene_file(self):
         """
