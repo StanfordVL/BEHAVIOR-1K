@@ -254,7 +254,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for system_name in system_names:
                 self.system_registry.add(create_system_from_metadata(system_name=system_name))
 
-    def _load_objects_from_scene_file(self):
+    def _load_scene_prim_with_objects(self):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
@@ -271,9 +271,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene_absolute_path = f"/World{scene_relative_path}"
 
         # If there is already a prim at the absolute path, the scene has been loaded. If not, load the prebuilt scene USD now.
-        scene_prim_obj = og.sim.stage.GetPrimAtPath(scene_absolute_path)
-        if not scene_prim_obj:
-            scene_prim_obj = add_asset_to_stage(asset_path=self.prebuild(), prim_path=scene_absolute_path)
+        if self.scene_file is not None:
+            scene_prim_obj = og.sim.stage.GetPrimAtPath(scene_absolute_path)
+            if not scene_prim_obj:
+                scene_prim_obj = add_asset_to_stage(asset_path=self.prebuild(), prim_path=scene_absolute_path)
 
         # Store world prim and load the scene into the simulator
         self._scene_prim = XFormPrim(
@@ -282,7 +283,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             load_config={"created_manually": True},
         )
         self._scene_prim.load(None)
-        assert self._scene_prim.prim_path == scene_prim_obj.GetPath().pathString, "Scene prim path mismatch!"
+        if self.scene_file is not None:
+            assert self._scene_prim.prim_path == scene_prim_obj.GetPath().pathString, "Scene prim path mismatch!"
 
         # Go through and load all systems.
         self._load_systems()
@@ -359,8 +361,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         # and metadata
+        self._load_scene_prim_with_objects()
         if self.scene_file is not None:
-            self._load_objects_from_scene_file()
             self._load_metadata_from_scene_file()
 
         # We're now loaded
