@@ -44,12 +44,16 @@ m = create_module_macros(module_path=__file__)
 
 # Margin between the AABBs of two different scenes.
 m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
 
 # Prebuilt USDs that are cached per scene file to speed things up.
 PREBUILT_USDS = dict()
+
+# Right edge position of the last scene loaded.
+LAST_RIGHT_EDGE_POS = np.nan
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -283,9 +287,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Go through and load all systems.
         self._load_systems()
 
-        # Position the scene prim based on its index in the simulator.
-        x, y = T.integer_spiral_coordinates(self.idx)
-        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
+        # Position the scene prim initially at a z offset to avoid collision
+        self._scene_prim.set_position([0, 0, m.INITIAL_SCENE_PRIM_Z_OFFSET if self.idx != 0 else 0])
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
@@ -297,9 +300,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
 
-        # TODO(parallel-hang): Compute the scene AABB use it for scene placement.
-        # aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-        # place with a z offset initially; after load, find aabb and then reposition (note: origin is not necessarily at the center)
+        # Position the scene prim based on the last scene's right edge
+        global LAST_RIGHT_EDGE_POS
+        if self.idx != 0:
+            aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
+            left_edge_to_center = -aabb_min[0]
+            self._scene_prim.set_position([LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + left_edge_to_center, 0, 0])
+            LAST_RIGHT_EDGE_POS = LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + (aabb_max[0] - aabb_min[0])
+        else:
+            aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
+            LAST_RIGHT_EDGE_POS = aabb_max[0]
 
     def _load_metadata_from_scene_file(self):
         """
