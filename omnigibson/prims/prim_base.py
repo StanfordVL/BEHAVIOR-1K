@@ -76,7 +76,8 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._initialize()
 
         # Cache state size
-        self._state_size = len(self.dump_state(serialized=True))
+        # TODO(parallel-hang): figure out this
+        # self._state_size = len(self.dump_state(serialized=True))
 
         self._initialized = True
 

@@ -274,6 +274,16 @@ class Registry:
         return list(self.get_dict(self.default_key).values())
 
     @property
+    def object_names(self):
+        """
+        Get the names of the objects in this registry
+
+        Returns:
+            list of str: Names of the instances owned by this registry
+        """
+        return [obj.name for obj in self.objects]
+
+    @property
     def all_keys(self):
         """
         Returns:

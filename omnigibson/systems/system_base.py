@@ -747,9 +747,9 @@ class PhysicalParticleSystem(BaseSystem):
     System whose generated particles are subject to physics
     """
 
-    def initialize(self):
+    def initialize(self, **kwargs):
         # Run super first
-        super().initialize()
+        super().initialize(**kwargs)
 
         # Make sure min and max scale are identical
         assert np.all(

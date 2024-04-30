@@ -370,7 +370,7 @@ class BehaviorTask(BaseTask):
                     f"from loaded scene, but could not be found!"
                 )
                 name = inst_to_name[obj_inst]
-                is_system = name in env.scene.system_registry.all_keys
+                is_system = name in env.scene.system_registry.object_names
                 entity = (
                     env.scene.system_registry("name", name) if is_system else env.scene.object_registry("name", name)
                 )

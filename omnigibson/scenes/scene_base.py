@@ -628,17 +628,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def is_visual_particle_system(self, system_name):
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
-        return issubclass(system, VisualParticleSystem)
+        return isinstance(system, VisualParticleSystem)
 
     def is_physical_particle_system(self, system_name):
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
-        return issubclass(system, PhysicalParticleSystem)
+        return isinstance(system, PhysicalParticleSystem)
 
     def is_fluid_system(self, system_name):
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
-        return issubclass(system, FluidSystem)
+        return isinstance(system, FluidSystem)
 
     def get_system(self, system_name, force_active=True):
         # Make sure scene exists
@@ -647,7 +647,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
         if not system.initialized and force_active:
-            system.initialize()
+            system.initialize(scene=self)
         return system
 
     def get_active_systems(self):

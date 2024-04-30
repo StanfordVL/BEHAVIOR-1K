@@ -81,10 +81,10 @@ class PhysxParticleInstancer(BasePrim):
     particle access
     """
 
-    def __init__(self, prim_path, name, idn):
+    def __init__(self, relative_prim_path, name, idn):
         """
         Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
+            relative_prim_path (str): relative prim path of the Prim to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             idn (int): Unique identification number to assign to this particle instancer. This is used to
                 deterministically reproduce individual particle instancer states dynamically, even if we
@@ -94,9 +94,7 @@ class PhysxParticleInstancer(BasePrim):
         self._idn = idn
 
         # Run super method directly
-        super().__init__(prim_path=prim_path, name=name)
-
-        self._parent_prim = BasePrim(prim_path=self.prim.GetParent().GetPath().pathString, name=f"{name}_parent")
+        super().__init__(relative_prim_path=relative_prim_path, name=name)
 
     def _load(self):
         # We raise an error, this should NOT be created from scratch
@@ -104,6 +102,7 @@ class PhysxParticleInstancer(BasePrim):
 
     def remove(self):
         super().remove()
+        self._parent_prim = BasePrim(prim_path=self.prim.GetParent().GetPath().pathString, name=f"{self._name}_parent")
         self._parent_prim.remove()
 
     def add_particles(
@@ -416,9 +415,9 @@ class MicroParticleSystem(BaseSystem):
         # (NOTE: external queries should call self.color)
         self._color = np.array([1.0, 1.0, 1.0])
 
-    def initialize(self):
+    def initialize(self, **kwargs):
         # Run super first
-        super().initialize()
+        super().initialize(**kwargs)
 
         # Run sanity checks
         if not gm.USE_GPU_DYNAMICS:
@@ -447,7 +446,7 @@ class MicroParticleSystem(BaseSystem):
         # Force populate inputs and outputs of the shader
         self._material.shader_force_populate()
         # Potentially modify the material
-        self._customize_particle_material()
+        self._customize_particle_material() if self._customize_particle_material is not None else None
 
     def _clear(self):
         self._material.remove_user(self)
@@ -463,7 +462,7 @@ class MicroParticleSystem(BaseSystem):
         # Magic number from omni tutorials
         # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
         # Also https://nvidia-omniverse.github.io/PhysX/physx/5.1.3/docs/ParticleSystem.html#particle-system-configuration
-        return 0.99 * self.particle_contact_offset
+        return 0.99 * self._particle_contact_offset
 
     @property
     def color(self):
@@ -595,7 +594,7 @@ class MicroParticleSystem(BaseSystem):
         return create_physx_particle_system(
             prim_path=self.system_prim_path,
             physics_scene_path=og.sim.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
-            particle_contact_offset=self.particle_contact_offset,
+            particle_contact_offset=self._particle_contact_offset,
             visual_only=self.visual_only,
             smoothing=self.use_smoothing and gm.ENABLE_HQ_RENDERING,
             anisotropy=self.use_anisotropy and gm.ENABLE_HQ_RENDERING,
@@ -613,10 +612,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self,
         name,
         particle_density,
+        particle_contact_offset=None,
+        is_viscous=None,
+        material_mtl_name=None,
+        _customize_particle_material=None,
         min_scale=None,
         max_scale=None,
         **kwargs,
     ):
+        # TODO(parallel-hang): fix this comment
         """
         Utility function to programmatically generate monolithic fluid system classes.
 
@@ -642,6 +646,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Particle instancers -- maps name to particle instancer prims (dict)
         self.particle_instancers = dict()
+
+        self._particle_contact_offset = particle_contact_offset
+
+        self.is_viscous = is_viscous
+
+        # Material mdl preset name to use for generating this fluid material. NOTE: Should be an entry from
+        # OmniSurfacePresets.mdl, minus the "OmniSurface_" string. If None if specified, will default to the generic
+        # OmniSurface material
+        self._material_mtl_name = material_mtl_name
+
+        self._customize_particle_material = _customize_particle_material
 
         # Run super
         return super().__init__(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
@@ -685,12 +700,12 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             for instancer in self.particle_instancers.values():
                 instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=np.int32)
 
-    def initialize(self):
+    def initialize(self, **kwargs):
         # Create prototype before running super!
         self.particle_prototypes = self._create_particle_prototypes()
 
         # Run super
-        super().initialize()
+        super().initialize(**kwargs)
 
         # Potentially set system prim's max velocity value
         if m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY is not None:
@@ -744,7 +759,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     @property
     def particle_contact_radius(self):
         # This is simply the contact offset
-        return self.particle_contact_offset
+        return self._particle_contact_offset
 
     @property
     def particle_density(self):
@@ -954,11 +969,12 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         # Create the instancer object that wraps the raw prim
         instancer = PhysxParticleInstancer(
-            prim_path=instance.GetPrimPath().pathString,
+            relative_prim_path=absolute_prim_path_to_scene_relative(self._scene, instance.GetPrimPath().pathString),
             name=name,
             idn=idn,
         )
         instancer.initialize()
+        instancer.load(self._scene)
         self.particle_instancers[name] = instancer
 
         return instancer
@@ -1256,9 +1272,63 @@ class FluidSystem(MicroPhysicalParticleSystem):
     texture. Individual particles are composed of spheres.
     """
 
-    def initialize(self):
+    def __init__(
+        self,
+        name,
+        particle_contact_offset,
+        particle_density,
+        is_viscous=False,
+        material_mtl_name=None,
+        customize_particle_material=None,
+        **kwargs,
+    ):
+        """
+        Utility function to programmatically generate monolithic fluid system classes.
+
+        Args:
+            name (str): Name of the system
+            particle_contact_offset (float): Contact offset for the generated system
+            particle_density (float): Particle density for the generated system
+            is_viscous (bool): Whether or not the generated fluid system should be viscous
+            material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
+                NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
+                If None if specified, will default to the generic OmniSurface material
+            customize_particle_material (None or function): Method for customizing the particle material for the fluid
+                after it has been loaded. Default is None, which will produce a no-op.
+                If specified, expected signature:
+
+                _customize_particle_material(mat: MaterialPrim) --> None
+
+                where @MaterialPrim is the material to modify in-place
+
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @property or @classmethod decorators!)
+
+        Returns:
+            FluidSystem: Generated system class
+        """
+
+        # TODO(parallel-hang): Finish converting this
+
+        def cm_customize_particle_material():
+            if customize_particle_material is not None:
+                customize_particle_material(self._material)
+
+        # Create and return the class
+        return super().__init__(
+            name=name,
+            particle_density=particle_density,
+            particle_contact_offset=particle_contact_offset,
+            is_viscous=is_viscous,
+            material_mtl_name=material_mtl_name,
+            customize_particle_material=cm_customize_particle_material,
+            **kwargs,
+        )
+
+    def initialize(self, **kwargs):
         # Run super first
-        super().initialize()
+        super().initialize(**kwargs)
 
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
@@ -1304,33 +1374,15 @@ class FluidSystem(MicroPhysicalParticleSystem):
         return True
 
     @property
-    def is_viscous(self):
-        """
-        Returns:
-            bool: True if this material is viscous or not. Default is False
-        """
-        raise NotImplementedError()
-
-    @property
     def particle_radius(self):
         # Magic number from omni tutorials
         # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
-        return 0.99 * 0.6 * self.particle_contact_offset
+        return 0.99 * 0.6 * self._particle_contact_offset
 
     @property
     def particle_particle_rest_distance(self):
         # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
         return self.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
-
-    @property
-    def _material_mtl_name(self):
-        """
-        Returns:
-            None or str: Material mdl preset name to use for generating this fluid material. NOTE: Should be an
-                entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string. If None if specified, will default
-                to the generic OmniSurface material
-        """
-        return None
 
     def _create_particle_prototypes(self):
         # Simulate particles with simple spheres
@@ -1338,7 +1390,10 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(None, prototype_prim_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
+        load_config = {"created_manually": True}
+        prototype = VisualGeomPrim(
+            relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0", load_config=load_config
+        )
         prototype.load(None)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
@@ -1351,80 +1406,13 @@ class FluidSystem(MicroPhysicalParticleSystem):
     def _get_particle_material_template(self):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
         return MaterialPrim.get_material(
-            scene=None,
+            scene=self._scene,
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
                 "mdl_name": f"OmniSurface{'' if self._material_mtl_name is None else 'Presets'}.mdl",
                 "mtl_name": f"OmniSurface{'' if self._material_mtl_name is None else ('_' + self._material_mtl_name)}",
             },
-        )
-
-    def __init__(
-        self,
-        name,
-        particle_contact_offset,
-        particle_density,
-        is_viscous=False,
-        material_mtl_name=None,
-        customize_particle_material=None,
-        **kwargs,
-    ):
-        """
-        Utility function to programmatically generate monolithic fluid system classes.
-
-        Args:
-            name (str): Name of the system
-            particle_contact_offset (float): Contact offset for the generated system
-            particle_density (float): Particle density for the generated system
-            is_viscous (bool): Whether or not the generated fluid system should be viscous
-            material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
-                NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
-                If None if specified, will default to the generic OmniSurface material
-            customize_particle_material (None or function): Method for customizing the particle material for the fluid
-                after it has been loaded. Default is None, which will produce a no-op.
-                If specified, expected signature:
-
-                _customize_particle_material(mat: MaterialPrim) --> None
-
-                where @MaterialPrim is the material to modify in-place
-
-            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
-                the class attribute to modify and the values represent the functions / value to set
-                (Note: These values should have either @property or @classmethod decorators!)
-
-        Returns:
-            FluidSystem: Generated system class
-        """
-
-        # TODO(parallel-hang): Finish converting this
-        @property
-        def cp_particle_contact_offset(self):
-            return particle_contact_offset
-
-        @property
-        def cp_material_mtl_name(self):
-            return material_mtl_name
-
-        @property
-        def cp_is_viscous(self):
-            return is_viscous
-
-        def cm_customize_particle_material(self):
-            if customize_particle_material is not None:
-                customize_particle_material(mat=self._material)
-
-        # Add to any other params specified
-        kwargs["particle_contact_offset"] = cp_particle_contact_offset
-        kwargs["_material_mtl_name"] = cp_material_mtl_name
-        kwargs["is_viscous"] = cp_is_viscous
-        kwargs["_customize_particle_material"] = cm_customize_particle_material
-
-        # Create and return the class
-        return super().__init__(
-            name=name,
-            particle_density=particle_density,
-            **kwargs,
         )
 
 
@@ -1448,12 +1436,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
         max_scale=None,
         **kwargs,
     ):
-        # Cached particle contact offset determined from loaded prototype
-        self._particle_contact_offset = None
         self._particle_template = None
         return super().__init__(
             name=name,
             particle_density=particle_density,
+            # Cached particle contact offset determined from loaded prototype
+            particle_contact_offset=None,
             min_scale=min_scale,
             max_scale=max_scale,
             **kwargs,
@@ -1507,7 +1495,10 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(None, prototype_path)
-        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
+        load_config = {"created_manually": True}
+        prototype = VisualGeomPrim(
+            relative_prim_path=relative_prototype_path, name=prototype_path, load_config=load_config
+        )
         prototype.load(None)
         prototype.scale *= self.max_scale
         prototype.visible = False
@@ -1613,7 +1604,7 @@ class Cloth(MicroParticleSystem):
             remesh (bool): If True, will remesh the input mesh before converting it into a cloth
             particle_distance (None or float): If set and @remesh is True, specifies the absolute target distance
                 between generated cloth particles. If None, a value is automatically chosen such that the generated
-                cloth particles are roughly touching each other, given self.particle_contact_offset and
+                cloth particles are roughly touching each other, given self._particle_contact_offset and
                 @mesh_prim's scale
         """
         has_uv_mapping = mesh_prim.GetAttribute("primvars:st").Get() is not None
@@ -1641,7 +1632,7 @@ class Cloth(MicroParticleSystem):
 
             # Start with the default particle distance
             particle_distance = (
-                self.particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
+                self._particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
             )
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices

@@ -244,7 +244,7 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
 
 
-def remove_all_systems():
-    for system in ParticleRemover.supported_active_systems.values():
+def remove_all_systems(scene):
+    for system in scene.get_active_systems():
         system.remove_all_particles()
     og.sim.step()
