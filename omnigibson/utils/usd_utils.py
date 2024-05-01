@@ -347,16 +347,22 @@ class RigidContactAPIImpl:
         idxs_b = [self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths_b]
         return self.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
 
-    def get_contact_data(self, prim_path):
-        scene_idx, row_idx = self.get_body_row_idx(prim_path)
+    def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         # First check if the object has any contacts
         impulses = self.get_all_impulses(scene_idx)
-        if not np.any(impulses[row_idx] > 0):
+        row_idx = (
+            list(range(impulses.shape[0]))
+            if row_prim_paths is None
+            else [self.get_body_row_idx(path)[1] for path in row_prim_paths]
+        )
+        col_idx = (
+            list(range(impulses.shape[1]))
+            if column_prim_paths is None
+            else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
+        )
+        relevant_impulses = impulses[row_idx][:, col_idx]
+        if not np.any(relevant_impulses > 0):
             return []
-
-        # Get the contact targets' prim paths
-        col_idxs = np.nonzero(impulses[row_idx] > 0)[0]
-        col_paths = [self.get_col_idx_prim_path(scene_idx, idx) for idx in col_idxs]
 
         # Get the contact data
         if scene_idx not in self._CONTACT_DATA:
@@ -364,59 +370,44 @@ class RigidContactAPIImpl:
 
         # Get the contact data for this prim
         forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_DATA[scene_idx]
-        start_idx = start_indices[row_idx]
-        contact_count = contact_counts[row_idx]
-        end_idx = start_idx + contact_count
 
         # Assert that one of two things is true: either the prim count and contact count are equal,
         # in which case we can zip them together, or the prim count is 1, in which case we can just
         # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
         # happening between which two objects, so we return no contacts while printing an error.
-        if len(col_paths) == contact_count:
-            return list(
-                zip(
-                    col_paths,
-                    forces[start_idx:end_idx],
-                    points[start_idx:end_idx],
-                    normals[start_idx:end_idx],
-                    separations[start_idx:end_idx],
+        contacts = []
+        for row in row_idx:
+            row_prim_path = self.get_row_idx_prim_path(scene_idx, row)
+            for col in col_idx:
+                if contact_counts[row, col] == 0:
+                    continue
+                col_prim_path = self.get_col_idx_prim_path(scene_idx, col)
+                start_idx = start_indices[row, col]
+                end_idx = start_idx + contact_counts[row, col]
+                if start_idx >= len(forces):
+                    log.warning(
+                        f"Contact data for prim {row_prim_path} and "
+                        f"{col_prim_path} is missing because there are too many contacts!"
+                    )
+                    continue
+                if end_idx > len(forces):
+                    log.warning(
+                        f"Contact data for prim {row_prim_path} and "
+                        f"{col_prim_path} is partial because there are too many contacts!"
+                    )
+                    continue
+                contacts.extend(
+                    zip(
+                        row_prim_path,
+                        col_prim_path,
+                        forces[start_idx:end_idx],
+                        points[start_idx:end_idx],
+                        normals[start_idx:end_idx],
+                        separations[start_idx:end_idx],
+                    )
                 )
-            )
-        elif len(col_paths) == 1:
-            return [
-                (col_paths[0], force, point, normal, separation)
-                for force, point, normal, separation in zip(
-                    forces[start_idx:end_idx],
-                    points[start_idx:end_idx],
-                    normals[start_idx:end_idx],
-                    separations[start_idx:end_idx],
-                )
-            ]
 
-        log.warning(
-            f"Could not disambiguate which contacts are happening with which object for prim {prim_path}! Returning no contacts."
-        )
-        return []
-
-    def get_contact_data_from_columns(self, scene_idx, col_paths):
-        # First, find all of the rows that the prim is in contact with
-        impulses = self.get_all_impulses(scene_idx)
-        col_idx = [self.get_body_col_idx(prim_path) for prim_path in col_paths]
-        if not np.any(impulses[:, col_idx] > 0):
-            return []
-
-        # Get the contact targets' prim paths
-        row_idxs = np.nonzero(np.any(impulses[:, col_idx] > 0, axis=1))[0]
-        row_paths = [self.get_row_idx_prim_path(scene_idx, idx) for idx in row_idxs]
-
-        # Accumulate contacts for each row
-        return [
-            # TODO: Is it true that only the normal needs to be negated?
-            (row_path, col_path, force, point, -normal, separation)
-            for row_path in row_paths
-            for col_path, force, point, normal, separation in self.get_contact_data(row_path)
-            if col_path in col_paths
-        ]
+        return contacts
 
     def in_contact(self, prim_paths_a, prim_paths_b):
         """
