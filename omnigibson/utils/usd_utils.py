@@ -233,7 +233,7 @@ class RigidContactAPIImpl:
         # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
         # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
         # mapping aligns with omni's ordering!
-        column_filters = self.get_column_filters()
+        column_filters = RigidContactAPIImpl.get_column_filters()
         for scene_idx, filters in column_filters.items():
             self._PATH_TO_COL_IDX[scene_idx] = dict()
             for i, link_path in enumerate(filters):
@@ -369,10 +369,10 @@ class RigidContactAPIImpl:
         end_idx = start_idx + contact_count
 
         # Assert that one of two things is true: either the prim count and contact count are equal,
-        # in which case we can zip them together, or the prim count is 1, in which case we can just
+        # in which case we can zip them to gether, or the prim count is 1, in which case we can just
         # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
         # happening between which two objects, so we return no contacts while printing an error.
-        if len(col_paths) == contact_count:
+        if len(col_paths) == np.sum(contact_count):
             return list(
                 zip(
                     col_paths,

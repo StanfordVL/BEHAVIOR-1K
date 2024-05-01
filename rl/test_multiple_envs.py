@@ -44,16 +44,18 @@ def replay_controller(env, filename):
 
 def main():
     # Load the config
-    gm.RENDER_VIEWER_CAMERA = False
+    gm.RENDER_VIEWER_CAMERA = True
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
     config_filename = "rl.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
+    reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
     config["scene"]["load_object_categories"] = ["floors", "walls", "coffee_table"]
+    config['task']['precached_reset_pose_path'] = reset_poses_path
 
     # Load the environment
-    vec_env = og.VectorEnvironment(10, config)
+    vec_env = og.VectorEnvironment(1, config)
     import time
 
     while True:

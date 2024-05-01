@@ -53,7 +53,7 @@ args = parser.parse_args()
 
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.normpath(os.path.join(script_dir, "rl.yaml"))
+    config_path = os.path.normpath(os.path.join(script_dir, "omni_grpc.yaml"))
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
 
