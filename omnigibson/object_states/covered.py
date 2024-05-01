@@ -43,7 +43,7 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         """
         Utility function to destroy all corresponding attachment groups for this object
         """
-        for system in VisualParticleSystem.get_active_systems().values():
+        for system in self.obj.scene.get_active_systems():
             if self._visual_particle_group in system.groups:
                 system.remove_attachment_group(self._visual_particle_group)
 

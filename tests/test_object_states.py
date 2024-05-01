@@ -1087,7 +1087,7 @@ def test_filled(env):
     systems = [
         env.scene.system_registry("name", system_name)
         for system_name, system_class in SYSTEM_EXAMPLES.items()
-        if not issubclass(system_class, VisualParticleSystem)
+        if not isinstance(system_class, VisualParticleSystem)
     ]
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])

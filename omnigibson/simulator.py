@@ -672,7 +672,7 @@ def launch_simulator(*args, **kwargs):
                         if obj.initialized:
                             obj.update_handles()
                     for system in scene.get_active_systems():
-                        if issubclass(system, MacroPhysicalParticleSystem):
+                        if isinstance(system, MacroPhysicalParticleSystem):
                             system.refresh_particles_view()
 
             # Finally update any unified views

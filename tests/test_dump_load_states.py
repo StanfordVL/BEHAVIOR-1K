@@ -11,8 +11,8 @@ def test_dump_load(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.system_registry("name", system_name)
-        assert issubclass(system, system_class)
-        if issubclass(system_class, VisualParticleSystem):
+        assert isinstance(system, system_class)
+        if isinstance(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
             system.generate_particles(positions=[[0, 0, 1]])
@@ -32,8 +32,8 @@ def test_dump_load_serialized(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.system_registry("name", system_name)
-        assert issubclass(system, system_class)
-        if issubclass(system_class, VisualParticleSystem):
+        assert isinstance(system, system_class)
+        if isinstance(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
             system.generate_particles(positions=[[0, 0, 1]])

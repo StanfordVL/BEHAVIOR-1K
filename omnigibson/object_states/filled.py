@@ -58,7 +58,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
                     check_contact=True,
                     max_samples=(
                         m.N_MAX_MACRO_PARTICLE_SAMPLES
-                        if issubclass(system, MacroParticleSystem)
+                        if isinstance(system, MacroParticleSystem)
                         else m.N_MAX_MICRO_PARTICLE_SAMPLES
                     ),
                 )

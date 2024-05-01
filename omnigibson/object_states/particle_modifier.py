@@ -1104,7 +1104,7 @@ class ParticleApplier(ParticleModifier):
                 raise ValueError(f"Unsupported ParticleModifyMethod: {self.method}!")
         else:
             # Make sure we're only using a physical particle system and the projection method
-            assert issubclass(
+            assert isinstance(
                 system, PhysicalParticleSystem
             ), "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
             assert (

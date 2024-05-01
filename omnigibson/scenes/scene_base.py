@@ -254,18 +254,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for system_name in system_names:
                 self.system_registry.add(create_system_from_metadata(system_name=system_name))
 
+        from omnigibson import systems
+
+        cloth_system = systems.Cloth(name="cloth")
+        self.system_registry.add(cloth_system)
+
     def _load_scene_prim_with_objects(self):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
         """
-        # Create desired systems
-        for system_name in self._init_systems:
-            if gm.USE_GPU_DYNAMICS:
-                self.get_system(system_name)
-            else:
-                log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
-
         # Add the prebuilt scene USD to the stage
         scene_relative_path = f"/scene_{self.idx}"
         scene_absolute_path = f"/World{scene_relative_path}"
@@ -288,6 +286,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Go through and load all systems.
         self._load_systems()
+
+        # Create desired systems
+        for system_name in self._init_systems:
+            if gm.USE_GPU_DYNAMICS:
+                self.get_system(system_name)
+            else:
+                log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
         self._scene_prim.set_position([0, 0, m.INITIAL_SCENE_PRIM_Z_OFFSET if self.idx != 0 else 0])
@@ -359,14 +364,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Go through whatever else loading the scene needs to do.
         self._load()
 
+        # We're now loaded
+        self._loaded = True
+
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         # and metadata
         self._load_scene_prim_with_objects()
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
-
-        # We're now loaded
-        self._loaded = True
 
         # Always stop the sim if we started it internally
         if not og.sim.is_stopped():
@@ -377,7 +382,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Clears any internal state before the scene is destroyed
         """
         # Clears systems so they can be re-initialized.
-        clear_all_systems()
+        for system in self.get_active_systems():
+            system.clear()
 
         # Remove all of the scene's objects.
         og.sim.remove_object(list(self.objects))

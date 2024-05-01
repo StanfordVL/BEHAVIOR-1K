@@ -12,8 +12,8 @@ def test_system_clear(env):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):
             system = env.scene.system_registry("name", system_name)
-            assert issubclass(system, system_class)
-            if issubclass(system_class, VisualParticleSystem):
+            assert isinstance(system, system_class)
+            if isinstance(system_class, VisualParticleSystem):
                 assert breakfast_table.states[Covered].set_value(system, True)
             else:
                 system.generate_particles(positions=[[0, 0, 1]])

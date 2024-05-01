@@ -516,7 +516,7 @@ class MicroParticleSystem(BaseSystem):
         """
         # Default is PBR material
         return MaterialPrim.get_material(
-            scene=None,
+            scene=self._scene,
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
@@ -1309,8 +1309,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
             FluidSystem: Generated system class
         """
 
-        # TODO(parallel-hang): Finish converting this
-
         def cm_customize_particle_material():
             if customize_particle_material is not None:
                 customize_particle_material(self._material)
@@ -1589,6 +1587,14 @@ class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
+
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        self._particle_contact_offset = m.CLOTH_PARTICLE_CONTACT_OFFSET
+        return super().__init__(name=name, **kwargs)
 
     def remove_all_particles(self):
         # Override base method since there are no particles to be deleted
