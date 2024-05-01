@@ -1,4 +1,5 @@
 import collections
+import itertools
 import math
 import os
 from collections.abc import Iterable
@@ -398,8 +399,8 @@ class RigidContactAPIImpl:
                     continue
                 contacts.extend(
                     zip(
-                        row_prim_path,
-                        col_prim_path,
+                        itertools.repeat(row_prim_path),
+                        itertools.repeat(col_prim_path),
                         forces[start_idx:end_idx],
                         points[start_idx:end_idx],
                         normals[start_idx:end_idx],
