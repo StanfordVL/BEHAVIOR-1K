@@ -49,8 +49,8 @@ robots:
         command_output_limits: null
         use_impedances: false
       gripper_0:
-        name: MultiFingerGripperController
-        mode: binary
+        name: JointController
+        use_delta_commands: true
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null

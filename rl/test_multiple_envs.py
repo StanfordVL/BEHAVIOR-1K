@@ -50,7 +50,7 @@ def main():
     config_filename = "rl.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
+    reset_poses_path =  os.path.dirname(__file__) + "/reset_poses.json"
     config["scene"]["load_object_categories"] = ["floors", "walls", "coffee_table"]
     config['task']['precached_reset_pose_path'] = reset_poses_path
 
