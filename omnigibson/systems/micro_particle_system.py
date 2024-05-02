@@ -101,8 +101,11 @@ class PhysxParticleInstancer(BasePrim):
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
     def remove(self):
+        parent_absolute_path = self.prim.GetParent().GetPath().pathString
+        parent_relative_path = absolute_prim_path_to_scene_relative(self._scene, parent_absolute_path)
+        self._parent_prim = BasePrim(relative_prim_path=parent_relative_path, name=f"{self._name}_parent")
+        self._parent_prim.load(self._scene)
         super().remove()
-        self._parent_prim = BasePrim(prim_path=self.prim.GetParent().GetPath().pathString, name=f"{self._name}_parent")
         self._parent_prim.remove()
 
     def add_particles(
@@ -1430,11 +1433,13 @@ class GranularSystem(MicroPhysicalParticleSystem):
         self,
         name,
         particle_density,
+        create_particle_template,
         min_scale=None,
         max_scale=None,
         **kwargs,
     ):
         self._particle_template = None
+        self._create_particle_template_fcn = create_particle_template
         return super().__init__(
             name=name,
             particle_density=particle_density,
@@ -1528,59 +1533,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         Returns:
             EntityPrim: Particle template that will be duplicated when generating future particle groups
         """
-        raise NotImplementedError()
-
-    def create(
-        self,
-        name,
-        particle_density,
-        create_particle_template,
-        scale=None,
-        **kwargs,
-    ):
-        """
-        Utility function to programmatically generate monolithic fluid system classes.
-
-        Args:
-            name (str): Name of the system
-            particle_density (float): Particle density for the generated system
-            material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
-                NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
-                If None if specified, will default to the generic OmniSurface material
-            create_particle_template (function): Method for generating the visual particle template that will be duplicated
-                when generating groups of particles.
-                Expected signature:
-
-                create_particle_template(prim_path: str, name: str) --> EntityPrim
-
-                where @prim_path and @name are the parameters to assign to the generated EntityPrim.
-                NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
-                    visual mesh attached to its root link, since this will be the actual visual mesh used
-            scale (None or 3-array): If specified, sets the scaling factor for the particles' relative scale.
-                Else, defaults to 1
-
-            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
-                the class attribute to modify and the values represent the functions / value to set
-                (Note: These values should have either @property or @classmethod decorators!)
-
-        Returns:
-            GranularSystem: Generated granular system class
-        """
-
-        def cm_create_particle_template(self):
-            return create_particle_template(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
-
-        # Add to any other params specified
-        kwargs["_create_particle_template"] = cm_create_particle_template
-
-        # Create and return the class
-        return super().create(
-            name=name,
-            particle_density=particle_density,
-            min_scale=scale,
-            max_scale=scale,
-            **kwargs,
-        )
+        return self._create_particle_template_fcn(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
 
 
 class Cloth(MicroParticleSystem):
