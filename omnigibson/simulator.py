@@ -604,8 +604,9 @@ def launch_simulator(*args, **kwargs):
                 # Load the state back
                 self.load_state(state)
 
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
+            if gm.ENABLE_TRANSITION_RULES:
+                # Refresh all current rules
+                TransitionRuleAPI.prune_active_rules()
 
         def _remove_object(self, obj):
             """
@@ -715,8 +716,9 @@ def launch_simulator(*args, **kwargs):
                     # Re-initialize the physics view because the number of objects has changed
                     self.update_handles()
 
-                    # Also refresh the transition rules that are currently active
-                    TransitionRuleAPI.refresh_all_rules()
+                    if gm.ENABLE_TRANSITION_RULES:
+                        # Also refresh the transition rules that are currently active
+                        TransitionRuleAPI.refresh_all_rules()
 
                 # Update any system-related state
                 for scene in self.scenes:
@@ -796,7 +798,8 @@ def launch_simulator(*args, **kwargs):
                             for robot in scene.robots:
                                 if robot.initialized:
                                     robot.update_controller_mode()
-                        TransitionRuleAPI.refresh_all_rules()
+                        if gm.ENABLE_TRANSITION_RULES:
+                            TransitionRuleAPI.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -1223,8 +1226,9 @@ def launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
-            # Clear all transition rules
-            TransitionRuleAPI.clear()
+            if gm.ENABLE_TRANSITION_RULES:
+                # Clear all transition rules
+                TransitionRuleAPI.clear()
 
             # Clear uniquely named items and other internal states
             clear_python_utils()
