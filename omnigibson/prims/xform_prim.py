@@ -164,8 +164,9 @@ class XFormPrim(BasePrim):
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
-        if not self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-            return False
+        # TODO(parallel-hang): look into this later
+        # if not self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
+        #     return False
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return False if material_path == "" else True
 

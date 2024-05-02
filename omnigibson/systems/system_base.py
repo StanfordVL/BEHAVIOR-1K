@@ -56,8 +56,10 @@ class BaseSystem(Serializable):
 
     def __init__(self, name, **kwargs):
         # Make sure prefixes preserve their double underscore
-        for prefix in SYSTEM_PREFIXES:
-            self._name = name.replace(f"{prefix}_", f"{prefix}__")
+        # TODO(parallel-hang): look into this
+        # for prefix in SYSTEM_PREFIXES:
+        #     self._name = name.replace(f"{prefix}_", f"{prefix}__")
+        self._name = name
 
         # Whether this system has been initialized or not
         self.initialized = False

@@ -1440,6 +1440,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         """
         # Call super first
         super().generate_particles(
+            scene=self._scene,
             positions=positions,
             orientations=orientations,
             scales=scales,
