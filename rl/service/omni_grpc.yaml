@@ -48,11 +48,11 @@ robots:
         command_input_limits: default
         command_output_limits: null
       gripper_0:
-        name: MultiFingerGripperController
-        mode: ternary
+        name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
+        use_delta_commands: true
       camera:
         name: NullJointController
         default_command: [0.0, 0.45]
@@ -68,6 +68,7 @@ task:
     eef_position_penalty_coef: 0.1
     eef_orientation_penalty_coef: 0.01
     regularization_coef: 0.01
+    
 objects:
   - type: DatasetObject
     name: cologne

@@ -61,8 +61,8 @@ class GraspTask(BaseTask):
         return rewards
     
     def _reset_agent(self, env):
-        if self._primitive_controller is None:
-            self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+        # if self._primitive_controller is None:
+        #     self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
         # Reset the robot with primitive controller
         ###########################################

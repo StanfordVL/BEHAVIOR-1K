@@ -93,7 +93,6 @@ task:
     eef_orientation_penalty_coef: 0.01
     regularization_coef: 0.01
 
-
 # objects: []
 
 # task:
