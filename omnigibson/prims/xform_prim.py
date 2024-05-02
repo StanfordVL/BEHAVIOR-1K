@@ -59,9 +59,10 @@ class XFormPrim(BasePrim):
 
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-        if self._created_manually:
-            # Make sure all xforms have pose and scaling info
-            self._set_xform_properties()
+        # TODO(parallel-hang): look into this change
+        # if self._created_manually:
+        # Make sure all xforms have pose and scaling info
+        self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
@@ -348,7 +349,9 @@ class XFormPrim(BasePrim):
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
-        return np.array(self.get_attribute("xformOp:scale"))
+        scale = self.get_attribute("xformOp:scale")
+        assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
+        return np.array(scale)
 
     @scale.setter
     def scale(self, scale):

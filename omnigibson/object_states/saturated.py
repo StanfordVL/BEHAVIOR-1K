@@ -207,8 +207,8 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             elif k == "default_limit":
                 self._default_limit = v
             # TODO: Make this an else once fresh round of sampling occurs (i.e.: no more outdated systems stored)
-            elif k in self.obj.scene.system_registrey.all_keys():
-                self._limits[self.obj.scene.system_registrey("name", k)] = v
+            elif k in self.obj.scene.system_registry.object_names:
+                self._limits[self.obj.scene.system_registry("name", k)] = v
 
     def _serialize(self, state):
         state_flat = np.array([state["n_systems"], state["default_limit"]], dtype=float)
