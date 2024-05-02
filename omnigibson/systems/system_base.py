@@ -139,7 +139,7 @@ class BaseSystem(Serializable):
         self.initialized = True
 
         # Avoid circular import
-        if og.sim.is_playing():
+        if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             from omnigibson.transition_rules import TransitionRuleAPI
 
             TransitionRuleAPI.refresh_all_rules()
@@ -205,7 +205,7 @@ class BaseSystem(Serializable):
         self.initialized = False
 
         # Avoid circular import
-        if og.sim.is_playing():
+        if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             from omnigibson.transition_rules import TransitionRuleAPI
 
             TransitionRuleAPI.refresh_all_rules()
