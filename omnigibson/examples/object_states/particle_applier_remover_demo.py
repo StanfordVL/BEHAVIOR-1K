@@ -111,6 +111,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene with a light and table
     cfg = {
+        "env": {"use_floor_plane": True},
         "scene": {
             "type": "Scene",
         },
@@ -143,8 +144,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
-    modifier_root_link_path = f"{modifier.prim_path}/base_link"
+    modifier._scene = env.scene
+    modifier._scene_assigned = True
+    modifier._created_manually = True
     modifier._prim = modifier._load()
+    modifier_root_link_path = f"{modifier.prim_path}/base_link"
     if method_type == "Projection":
         metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
@@ -155,9 +159,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             joint_type="FixedJoint",
             enabled=True,
         )
-    modifier._post_load()
     modifier._loaded = True
-    env.scene.add_object(modifier)
+    modifier._post_load()
+    env.scene.object_registry.add(modifier)
+    og.sim.post_import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle

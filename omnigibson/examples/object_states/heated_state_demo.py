@@ -38,6 +38,7 @@ def main():
 
     # Create the scene config to load -- empty scene with light object and bowls
     cfg = {
+        "env": {"use_floor_plane": True},
         "scene": {
             "type": "Scene",
         },

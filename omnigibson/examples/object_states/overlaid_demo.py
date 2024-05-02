@@ -21,6 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene + custom cloth object + custom rigid object
     cfg = {
+        "env": {"use_floor_plane": True},
         "scene": {
             "type": "Scene",
         },
