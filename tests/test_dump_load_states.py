@@ -10,7 +10,7 @@ from omnigibson.systems import *
 def test_dump_load(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = env.scene.system_registry("name", system_name)
+        system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
         if isinstance(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
