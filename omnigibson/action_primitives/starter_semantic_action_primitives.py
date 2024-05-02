@@ -89,7 +89,7 @@ log = create_module_logger(module_name=__name__)
 
 
 def indented_print(msg, *args, **kwargs):
-    log.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
+    log.warning("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
 
 class RobotCopy:
@@ -1061,11 +1061,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         controller_name = f"arm_{self.arm}"
         use_delta = self.robot._controllers[controller_name].use_delta_commands
 
-        action = self._empty_action()
         controller_name = "arm_{}".format(self.arm)
 
-        action[self.robot.controller_action_idx[controller_name]] = joint_pos
+        # Store the previous eef pose for checking if we got stuck
         prev_eef_pos = np.zeros(3)
+
+        # TODO: This indicates something is wrong with our joint ordering.
+        joints = list(self.robot.joints.values())
 
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
@@ -1079,9 +1081,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand got stuck during execution."
                 )
 
+            action = self._empty_action()
             if use_delta:
-                # Convert actions to delta.
                 action[self.robot.controller_action_idx[controller_name]] = diff_joint_pos
+            else:
+                action[self.robot.controller_action_idx[controller_name]] = joint_pos
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
             yield self._postprocess_action(action)
@@ -1292,6 +1296,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to grasp or None if its done grasping
         """
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
+            joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
+            joint_lower_limit = self.robot.joint_lower_limits[self.robot.gripper_control_idx[self.arm]]
+
+            if np.allclose(joint_position, joint_lower_limit, atol = 0.01):
+                break
+
             action = self._empty_action()
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = -1.0
@@ -1305,12 +1315,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to release or None if its done releasing
         """
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            arm = self.arm
-            joint_postition = self.robot.get_joint_positions()[self.robot.gripper_control_idx[arm]]
-            joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[arm]]
+            joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
+            joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_postition, joint_upper_limit, atol = 0.01):
-                print("Early release")
+            if np.allclose(joint_position, joint_upper_limit, atol = 0.01):
                 break
 
             action = self._empty_action()
