@@ -336,7 +336,7 @@ class VisionSensor(BaseSensor):
                 replicator_mapping[key] = categories[0]
 
             assert (
-                replicator_mapping[key] in semantic_class_id_to_name().values()
+                replicator_mapping[key] in semantic_class_id_to_name(self._scene).values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
         image_keys = np.unique(img)
@@ -344,7 +344,9 @@ class VisionSensor(BaseSensor):
             set(replicator_mapping.keys())
         ), "Semantic segmentation image does not match the original id_to_labels mapping."
 
-        return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
+        return VisionSensor.SEMANTIC_REMAPPER.remap(
+            replicator_mapping, semantic_class_id_to_name(self._scene), img, image_keys
+        )
 
     def _remap_instance_segmentation(self, img, id_to_labels, semantic_img, semantic_labels, id=False):
         """
@@ -457,7 +459,7 @@ class VisionSensor(BaseSensor):
             list of dict: Remapped list of bounding boxes
         """
         for bbox in bboxes:
-            bbox["semanticId"] = VisionSensor.SEMANTIC_REMAPPER.remap_bbox(bbox["semanticId"])
+            bbox["semanticId"] = VisionSensor.SEMANTIC_REMAPPER.remap_bbox(bbox["semanticId"], self._scene)
         return bboxes
 
     def add_modality(self, modality):
