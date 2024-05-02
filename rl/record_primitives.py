@@ -3,6 +3,7 @@ import yaml
 import numpy as np
 
 import omnigibson as og
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 
@@ -72,7 +73,7 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = env.task._primitive_controller
     cologne = scene.object_registry("name", "cologne")
 
     for episode_idx in range(10000):
@@ -80,9 +81,14 @@ def main():
         obs = env.reset()
         
         # Grasp the object
-        print("Executing controller")
-        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, cologne), env)
-        print("Finished executing grasp")
+        try:
+            print("Executing controller")
+            execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, cologne), env)
+            print("Finished executing grasp")
+
+        except ActionPrimitiveError as e:
+            print(e)
+            continue
 
        
 

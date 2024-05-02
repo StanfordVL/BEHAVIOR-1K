@@ -461,7 +461,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
 
-    def apply_ref(self, prim, *args, attempts=3):
+    def apply_ref(self, prim, *args, attempts=1):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
@@ -481,36 +481,41 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         errors = []
         for _ in range(attempts):
-            # Attempt
-            success = False
-            try:
-                yield from ctrl(*args)
-                success = True
-            except ActionPrimitiveError as e:
-                errors.append(e)
+            # # Attempt
+            # success = False
+            # try:
+            #     yield from ctrl(*args)
+            #     success = True
+            # except ActionPrimitiveError as e:
+            #     print(e)
+            #     errors.append(e)
 
-            try:
-                # If we're not holding anything, release the hand so it doesn't stick to anything else.
-                if not self._get_obj_in_hand():
-                    yield from self._execute_release()
-            except ActionPrimitiveError:
-                pass
+            yield from ctrl(*args)
 
-            try:
-                # Make sure we retract the arm after every step
-                yield from self._reset_hand()
-            except ActionPrimitiveError:
-                pass
 
-            try:
-                # Settle before returning.
-                yield from self._settle_robot()
-            except ActionPrimitiveError:
-                pass
+            # try:
+            #     # If we're not holding anything, release the hand so it doesn't stick to anything else.
+            #     if not self._get_obj_in_hand():
+            #         yield from self._execute_release()
+            # except ActionPrimitiveError:
+            #     pass
+
+            # try:
+            #     # Make sure we retract the arm after every step
+            #     yield from self._reset_hand()
+            # except ActionPrimitiveError:
+            #     pass
+
+            # try:
+            #     # Settle before returning.
+            #     yield from self._settle_robot()
+            # except ActionPrimitiveError:
+            #     pass
 
             # Stop on success
-            if success:
-                return
+            # if success:
+            #     return
+            return
 
         raise ActionPrimitiveErrorGroup(errors)
 
@@ -1300,6 +1305,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to release or None if its done releasing
         """
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
+            arm = self.arm
+            joint_postition = self.robot.get_joint_positions()[self.robot.gripper_control_idx[arm]]
+            joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[arm]]
+
+            if np.allclose(joint_postition, joint_upper_limit, atol = 0.01):
+                print("Early release")
+                break
+
             action = self._empty_action()
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = 1.0

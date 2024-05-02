@@ -465,7 +465,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab all observations from each robot
         for robot in self.robots:
             if gym.spaces.utils.flatdim(robot.observation_space) > 0:
-                obs[robot.name] = robot.get_obs()
+                obs[robot.name] = robot.get_obs()[0]
 
         # Add task observations
         if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
