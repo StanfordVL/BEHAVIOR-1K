@@ -1214,13 +1214,16 @@ class ManipulationRobot(BaseRobot):
         if joint_type is None:
             return
 
-        if contact_pos is None:
-            force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
-            for c_link_prim_path, c_contact_pos in force_data:
-                if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = np.array(c_contact_pos)
-                    break
+        # TODO: Sometimes p2p joint rather than a fixed joint exists and this accounts for that
+        # if contact_pos is None:
+        #     force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
+        #     for c_link_prim_path, c_contact_pos in force_data:
+        #         if c_link_prim_path == ag_link.prim_path:
+        #             contact_pos = np.array(c_contact_pos)
+        #             break
+        contact_pos = ag_obj.get_position()
         assert contact_pos is not None
+
 
         # Joint frame set at the contact point
         # Need to find distance between robot and contact point in robot link's local frame and
