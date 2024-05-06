@@ -11,6 +11,8 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_directory)
 sys.path.append(parent_directory)
 
+from omnigibson.macros import gm
+
 import torch as th
 import torch.nn as nn
 import wandb
@@ -96,7 +98,6 @@ def instantiate_envs():
 
     else:
         import omnigibson as og
-        from omnigibson.macros import gm
 
         config = _get_env_config()
         config['task']['precached_reset_pose_path'] = reset_poses_path
