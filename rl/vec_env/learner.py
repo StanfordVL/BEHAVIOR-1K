@@ -11,6 +11,7 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_directory)
 sys.path.append(parent_directory)
 
+import omnigibson as og
 from omnigibson.macros import gm
 
 import torch as th
@@ -73,7 +74,6 @@ NUM_EVAL_EPISODES = 5
 STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
 reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
 
-
 def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs
@@ -88,7 +88,7 @@ def instantiate_envs():
 
         config = _get_env_config()
         del config["env"]["external_sensors"]
-        config['task']['precached_states_path'] = reset_poses_path
+        config['task']['precached_reset_pose_path'] = reset_poses_path
         
         # Manually specify port for eval env
         eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
@@ -97,8 +97,6 @@ def instantiate_envs():
         env = og.VectorEnvironment(n_envs, config)
 
     else:
-        import omnigibson as og
-
         config = _get_env_config()
         config['task']['precached_reset_pose_path'] = reset_poses_path
         env = og.VectorEnvironment(1, config)

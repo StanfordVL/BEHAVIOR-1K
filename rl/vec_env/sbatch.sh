@@ -79,7 +79,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/vec_env/learner.py --n_envs $1 --eval_port $2" > "output_learner.txt" 2>&1 &
+	micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium protobuf==3.20.2 grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/vec_env/learner.py --n_envs $1 --eval_port $2" > "output_learner.txt" 2>&1 &
     else
         enroot start \
         --root \
@@ -87,7 +87,7 @@ for i in {0..1}; do
         ${ENV_KWARGS} \
         ${MOUNT_KWARGS} \
         ${CONTAINER_NAME} \
-        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/vec_env/worker.py 0.0.0.0:$2 --render" > "output_eval.txt" 2>&1 &
+        micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium protobuf==3.20.2 grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$3 python -u /omnigibson-src/rl/vec_env/worker.py 0.0.0.0:$2 --render" > "output_eval.txt" 2>&1 &
     fi
     
 done

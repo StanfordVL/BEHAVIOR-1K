@@ -19,7 +19,7 @@ reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
 
 def main(local_addr, learner_addr, render):
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = os.path.join(script_dir, "omni_grpc.yaml")
+    config_path = os.path.join(script_dir, "rl.yaml")
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     if not render:
