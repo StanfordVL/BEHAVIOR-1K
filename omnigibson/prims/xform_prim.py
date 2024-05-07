@@ -439,7 +439,7 @@ class XFormPrim(BasePrim):
                 pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
             self.set_position_orientation(pos, orn)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
 
     def deserialize(self, state):

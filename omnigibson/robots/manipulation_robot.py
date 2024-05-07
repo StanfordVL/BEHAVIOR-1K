@@ -1484,9 +1484,9 @@ class ManipulationRobot(BaseRobot):
                 # or loaded in every other load/save_state, into scene-local poses.
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Call super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # No additional serialization needed if we're using physical grasping
         if self.grasping_mode == "physical":
@@ -1497,7 +1497,7 @@ class ManipulationRobot(BaseRobot):
 
     def deserialize(self, state):
         # Call super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # No additional deserialization needed if we're using physical grasping
         if self.grasping_mode == "physical":

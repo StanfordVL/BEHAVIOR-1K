@@ -313,7 +313,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
         )
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
             np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])

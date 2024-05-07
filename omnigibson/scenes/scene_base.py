@@ -763,13 +763,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default state for the scene is from the registry alone
         self._registry.load_state(state=state, serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Default state for the scene is from the registry alone
         return self._registry.serialize(state=state)
 
     def deserialize(self, state):
         # Default state for the scene is from the registry alone
-        return self._registry._deserialize(state=state)
+        return self._registry.deserialize(state=state)
 
     @classproperty
     def _cls_registry(cls):

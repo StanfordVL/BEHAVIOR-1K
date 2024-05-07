@@ -813,9 +813,9 @@ class RigidPrim(XFormPrim):
         self.set_linear_velocity(np.array(state["lin_vel"]))
         self.set_angular_velocity(np.array(state["ang_vel"]))
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         return np.concatenate(
             [
@@ -827,7 +827,7 @@ class RigidPrim(XFormPrim):
 
     def deserialize(self, state):
         # Call supermethod first
-        state_dic, idx = super()._deserialize(state=state)
+        state_dic, idx = super().deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
         state_dic["lin_vel"] = state[idx : idx + 3]
         state_dic["ang_vel"] = state[idx + 3 : idx + 6]

@@ -745,7 +745,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def _load_state(self, state):
         self._current_step = state["current_step"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["current_step"]], dtype=float)
 
     def deserialize(self, state):
@@ -1320,6 +1320,7 @@ class ParticleApplier(ParticleModifier):
                     else -self._initial_speed * np.array([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
+                    scene=self.obj.scene,
                     positions=np.array([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
@@ -1340,7 +1341,7 @@ class ParticleApplier(ParticleModifier):
         assert (
             self.method == ParticleModifyMethod.PROJECTION
         ), "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
-        assert is_physical_particle_system(
+        assert self.obj.scene.is_physical_particle_system(
             system_name=system.name
         ), "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
 
@@ -1361,6 +1362,7 @@ class ParticleApplier(ParticleModifier):
         if n_particles > 0:
             velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
             system.generate_particles(
+                scene=self.obj.scene,
                 positions=points[:n_particles],
                 velocities=velocities,
             )

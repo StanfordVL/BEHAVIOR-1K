@@ -169,7 +169,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     def _load_state(self, state):
         self._set_value(state[self.value_name])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # If the state value is not an iterable, wrap it in a numpy array
         val = (
             state[self.value_name]

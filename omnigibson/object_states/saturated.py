@@ -65,7 +65,7 @@ class ModifiedParticles(RelativeObjectState):
             if system_name != "n_systems" and val > 0
         }
 
-    def _serialize(self, state):
+    def serialize(self, state):
         state_flat = np.array([state["n_systems"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
@@ -210,7 +210,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             elif k in self.obj.scene.system_registry.object_names:
                 self._limits[self.obj.scene.system_registry("name", k)] = v
 
-    def _serialize(self, state):
+    def serialize(self, state):
         state_flat = np.array([state["n_systems"], state["default_limit"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]

@@ -1544,7 +1544,7 @@ class EntityPrim(XFormPrim):
         # Make sure this object is awake
         self.wake()
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
         # adding them to the a flattened array
         state_flat = [self.root_link.serialize(state=state["root_link"])]
@@ -1560,12 +1560,12 @@ class EntityPrim(XFormPrim):
     def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
-        root_link_state, idx = self.root_link._deserialize(state=state)
+        root_link_state, idx = self.root_link.deserialize(state=state)
         state_dict = dict(root_link=root_link_state)
         joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name], deserialized_items = prim._deserialize(state=state[idx:])
-            idx += prim.deserialized_items
+            joint_state_dict[prim_name], deserialized_items = prim.deserialize(state=state[idx:])
+            idx += deserialized_items
         state_dict["joints"] = joint_state_dict
 
         return state_dict, idx

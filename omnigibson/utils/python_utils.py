@@ -450,20 +450,6 @@ class Serializable:
             )
         self._load_state(state=state)
 
-    def _serialize(self, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
-
     def serialize(self, state):
         """
         Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
@@ -476,8 +462,7 @@ class Serializable:
         Returns:
             n-array: encoded + serialized, 1D numerical np.array capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return self._serialize(state=state)
+        raise NotImplementedError()
 
     def deserialize(self, state):
         """
@@ -562,21 +547,6 @@ class SerializableNonInstance:
         cls._load_state(state=state)
 
     @classmethod
-    def _serialize(cls, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
-
-    @classmethod
     def serialize(cls, state):
         """
         Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
@@ -589,8 +559,8 @@ class SerializableNonInstance:
         Returns:
             n-array: encoded + serialized, 1D numerical np.array capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return cls._serialize(state=state)
+        # Simply returns self.serialize() for now. this is for future proofing
+        return NotImplementedError()
 
     @classmethod
     def deserialize(cls, state):

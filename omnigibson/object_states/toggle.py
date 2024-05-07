@@ -184,7 +184,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self._set_value(state["value"])
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
 
     def deserialize(self, state):

@@ -604,9 +604,9 @@ class ControllableObject(BaseObject):
         for controller_name, controller in self._controllers.items():
             controller.load_state(state=controller_states[controller_name])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
         controller_states_flat = np.concatenate(
@@ -618,12 +618,12 @@ class ControllableObject(BaseObject):
 
     def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c._deserialize(state=state[idx:])
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 

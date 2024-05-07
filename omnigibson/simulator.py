@@ -1493,7 +1493,7 @@ def launch_simulator(*args, **kwargs):
                 "This should be resolved by the next NVIDIA Isaac Sim release."
             )
 
-        def _serialize(self, state):
+        def serialize(self, state):
             # Default state is from the scene
             return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
 

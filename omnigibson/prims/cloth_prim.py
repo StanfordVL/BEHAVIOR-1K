@@ -567,9 +567,9 @@ class ClothPrim(GeomPrim):
             )
         )
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         return np.concatenate(
             [
@@ -582,7 +582,7 @@ class ClothPrim(GeomPrim):
 
     def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         particle_group = int(state[idx])
         n_particles = int(state[idx + 1])

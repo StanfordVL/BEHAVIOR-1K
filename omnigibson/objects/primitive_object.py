@@ -364,16 +364,16 @@ class PrimitiveObject(StatefulObject):
             self.size = state["size"]
 
     def deserialize(self, state):
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
         # state_dict["extents"] = state[idx: idx + 3]
         state_dict["radius"] = state[idx]
         state_dict["height"] = state[idx + 1]
         state_dict["size"] = state[idx + 2]
         return state_dict, idx + 3
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         return np.concatenate(
             [
