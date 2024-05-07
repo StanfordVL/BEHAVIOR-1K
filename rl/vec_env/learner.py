@@ -94,7 +94,10 @@ def instantiate_envs():
         eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
         eval_env = VecFrameStack(eval_env, n_stack=5)
         eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
+        
         env = og.VectorEnvironment(n_envs, config)
+        env = VecFrameStack(env, n_stack=5)
+        env = VecMonitor(env, info_keywords=("is_success",))
 
     else:
         config = _get_env_config()
