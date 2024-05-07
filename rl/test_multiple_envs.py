@@ -55,7 +55,7 @@ def main():
     config['task']['precached_reset_pose_path'] = reset_poses_path
 
     # Load the environment
-    vec_env = og.VectorEnvironment(1, config)
+    vec_env = og.VectorEnvironment(4, config)
     import time
 
     while True:

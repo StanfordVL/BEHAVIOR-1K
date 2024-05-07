@@ -21,6 +21,7 @@ from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object
+from omnigibson.macros import gm
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
@@ -76,7 +77,11 @@ class GraspTask(BaseTask):
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = np.array(robot_pose["base_pos"])
-            robot.set_local_pose(robot_pos, robot_pose["base_ori"])
+            #TODO: Set local pose should work
+            SCENE_MARGIN = 10.0
+            x, y = T.integer_spiral_coordinates(robot.scene.idx)
+            offset = np.array([x * SCENE_MARGIN, y * SCENE_MARGIN, 0])
+            robot.set_local_pose(robot_pos + offset, robot_pose["base_ori"])
 
         # Otherwise, reset using the primitive controller.
         else:

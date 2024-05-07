@@ -37,7 +37,7 @@ def main(local_addr, learner_addr, render):
     #     env.step(env.action_space.sample())
     #     print("fps", 1/(time.time() - start_time))
 
-    wandb.init(entity="behavior-rl", project="sb3")
+    # wandb.init(entity="behavior-rl", project="sb3")
 
     # Now start servicing!
     serve_env_over_grpc(env, local_addr, learner_addr)
