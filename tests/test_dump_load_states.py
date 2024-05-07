@@ -12,10 +12,10 @@ def test_dump_load(env):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
-        if isinstance(system_class, VisualParticleSystem):
+        if issubclass(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
-            system.generate_particles(positions=[[0, 0, 1]])
+            system.generate_particles(scene=env.scene, positions=[[0, 0, 1]])
         assert system.n_particles > 0
         system.remove_all_particles()
 
@@ -31,12 +31,12 @@ def test_dump_load(env):
 def test_dump_load_serialized(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = env.scene.system_registry("name", system_name)
+        system = env.scene.get_system(system_name)
         assert isinstance(system, system_class)
-        if isinstance(system_class, VisualParticleSystem):
+        if issubclass(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
-            system.generate_particles(positions=[[0, 0, 1]])
+            system.generate_particles(scene=env.scene, positions=[[0, 0, 1]])
         assert system.n_particles > 0
 
     state = og.sim.dump_state(serialized=True)

@@ -86,6 +86,7 @@ class BaseSystem(Serializable):
         Returns:
             str: Path to this system's prim in the scene stage
         """
+        assert self._scene is not None, "Scene not set for system {self.name}!".format(self=self)
         return scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)
 
     @property
@@ -175,6 +176,7 @@ class BaseSystem(Serializable):
 
     def generate_particles(
         self,
+        scene,
         positions,
         orientations=None,
         scales=None,
@@ -359,7 +361,7 @@ class BaseSystem(Serializable):
         setter = self.set_particles_local_pose if self._store_local_poses else self.set_particles_position_orientation
         setter(positions=state["positions"], orientations=state["orientations"])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
         return np.concatenate(
             [
@@ -410,9 +412,9 @@ class VisualParticleSystem(BaseSystem):
         # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
         self._group_particles = {}
 
-    def initialize(self):
+    def initialize(self, scene):
         # Run super method first
-        super().initialize()
+        super().initialize(scene)
 
         # Maps group name to the parent object (the object with particles attached to it) of the group
         self._group_objects = {}
@@ -624,6 +626,7 @@ class VisualParticleSystem(BaseSystem):
 
     def generate_particles(
         self,
+        scene,
         positions,
         orientations=None,
         scales=None,
@@ -749,9 +752,9 @@ class PhysicalParticleSystem(BaseSystem):
     System whose generated particles are subject to physics
     """
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Make sure min and max scale are identical
         assert np.all(
@@ -1047,8 +1050,8 @@ def create_system_from_metadata(system_name):
         if has_asset:
 
             def generate_particle_template_fcn():
-                return lambda prim_path, name: og.objects.USDObject(
-                    prim_path=prim_path,
+                return lambda relative_prim_path, name: og.objects.USDObject(
+                    relative_prim_path=relative_prim_path,
                     name=name,
                     usd_path=asset_path,
                     encrypted=True,
@@ -1064,8 +1067,8 @@ def create_system_from_metadata(system_name):
         else:
 
             def generate_particle_template_fcn():
-                return lambda prim_path, name: og.objects.PrimitiveObject(
-                    prim_path=prim_path,
+                return lambda relative_prim_path, name: og.objects.PrimitiveObject(
+                    relative_prim_path=relative_prim_path,
                     name=name,
                     primitive_type="Sphere",
                     category=system_name,

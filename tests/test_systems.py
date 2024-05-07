@@ -16,7 +16,7 @@ def test_system_clear(env):
             if isinstance(system_class, VisualParticleSystem):
                 assert breakfast_table.states[Covered].set_value(system, True)
             else:
-                system.generate_particles(positions=[[0, 0, 1]])
+                system.generate_particles(scene=env.scene, positions=[[0, 0, 1]])
             assert system.n_particles > 0
             og.sim.step()
             system.clear()

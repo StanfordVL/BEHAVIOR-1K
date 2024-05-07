@@ -20,7 +20,12 @@ from omnigibson.utils.physx_utils import create_physx_particle_system, create_ph
 from omnigibson.utils.python_utils import assert_valid_key, snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
-from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative, mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import (
+    PoseAPI,
+    absolute_prim_path_to_scene_relative,
+    mesh_prim_to_trimesh_mesh,
+    scene_relative_prim_path_to_absolute,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -348,7 +353,7 @@ class PhysxParticleInstancer(BasePrim):
             val = np.array(state[key]) if not isinstance(state[key], np.ndarray) else state[key]
             setattr(self, key, val)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Compress into a 1D array
         return np.concatenate(
             [
@@ -418,9 +423,9 @@ class MicroParticleSystem(BaseSystem):
         # (NOTE: external queries should call self.color)
         self._color = np.array([1.0, 1.0, 1.0])
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Run sanity checks
         if not gm.USE_GPU_DYNAMICS:
@@ -703,12 +708,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             for instancer in self.particle_instancers.values():
                 instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=np.int32)
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
+        self._scene = scene
+
+        # TODO(parallel-hang): clean up this scene passing
         # Create prototype before running super!
-        self.particle_prototypes = self._create_particle_prototypes()
+        self.particle_prototypes = self._create_particle_prototypes(scene=scene)
 
         # Run super
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Potentially set system prim's max velocity value
         if m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY is not None:
@@ -780,7 +788,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         raise NotImplementedError()
 
-    def _create_particle_prototypes(self):
+    def _create_particle_prototypes(self, scene):
         """
         Creates any relevant particle prototypes to be used by this particle system.
 
@@ -815,6 +823,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     def generate_particles(
         self,
+        scene,
         positions,
         instancer_idn=None,
         particle_group=0,
@@ -1217,7 +1226,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         for name, inst_state in state["particle_states"].items():
             self.particle_instancers[name].load_state(inst_state, serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
         return np.concatenate(
             [
@@ -1253,7 +1262,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = self.particle_instancer_idn_to_name(idn=idn)
-            particle_states[name], deserialized_items = self.particle_instancers[name]._deserialize(state[idx:])
+            particle_states[name], deserialized_items = self.particle_instancers[name].deserialize(state[idx:])
             idx += deserialized_items
 
         return (
@@ -1327,9 +1336,9 @@ class FluidSystem(MicroPhysicalParticleSystem):
             **kwargs,
         )
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
@@ -1385,17 +1394,17 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
         return self.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
 
-    def _create_particle_prototypes(self):
+    def _create_particle_prototypes(self, scene):
         # Simulate particles with simple spheres
-        prototype_prim_path = f"{self.prim_path}/prototype0"
+        prototype_prim_path = f"{scene_relative_prim_path_to_absolute(scene, self.relative_prim_path)}/prototype0"
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
-        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(None, prototype_prim_path)
+        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(scene, prototype_prim_path)
         load_config = {"created_manually": True}
         prototype = VisualGeomPrim(
             relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0", load_config=load_config
         )
-        prototype.load(None)
+        prototype.load(scene)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
@@ -1474,12 +1483,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def is_fluid(self):
         return False
 
-    def _create_particle_prototypes(self):
+    def _create_particle_prototypes(self, scene):
         # Load the particle template
         particle_template = self._create_particle_template()
-        particle_template.load(None)
+        particle_template.load(scene)
+        og.sim.post_import_object(particle_template)
         self._particle_template = particle_template
-
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"
         assert (
@@ -1497,12 +1506,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
         lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with VisualGeomPrim with the correct scale
-        relative_prototype_path = absolute_prim_path_to_scene_relative(None, prototype_path)
+        relative_prototype_path = absolute_prim_path_to_scene_relative(scene, prototype_path)
         load_config = {"created_manually": True}
         prototype = VisualGeomPrim(
             relative_prim_path=relative_prototype_path, name=prototype_path, load_config=load_config
         )
-        prototype.load(None)
+        prototype.load(scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
@@ -1533,7 +1542,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
         Returns:
             EntityPrim: Particle template that will be duplicated when generating future particle groups
         """
-        return self._create_particle_template_fcn(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
+        return self._create_particle_template_fcn(
+            relative_prim_path=f"/{self.name}/template", name=f"{self.name}_template"
+        )
 
 
 class Cloth(MicroParticleSystem):
@@ -1702,7 +1713,7 @@ class Cloth(MicroParticleSystem):
         # Nothing by default
         pass
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Nothing by default
         return np.array([], dtype=float)
 

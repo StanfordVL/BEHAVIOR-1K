@@ -142,9 +142,14 @@ class Registry:
                 if k in self.unique_keys:
                     # Handle unique case
                     if attr in mapping:
-                        log.warning(
-                            f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}"
-                        )
+                        # TODO(parallel-hang): deal with this later;
+                        # 1) see if it's possible to get prim_path attr after scene is set for systems
+                        # 2) use relative path instead of absolute to make this work
+                        # if attr == "DOES_NOT_EXIST":
+                        #     breakpoint()
+                        # log.warning(
+                        #     f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}"
+                        # )
                         # Special case for "name" attribute, which should ALWAYS be unique
                         assert k != "name", "For name attribute, objects MUST be unique."
                     mapping[attr] = obj
@@ -350,7 +355,7 @@ class SerializableRegistry(Registry, Serializable):
                 continue
             obj.load_state(state[obj.name], serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Iterate over the entire dict and flatten
         return (
             np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects])
@@ -367,6 +372,6 @@ class SerializableRegistry(Registry, Serializable):
             log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
-            state_dict[obj.name], deserialized_items = obj._deserialize(state[idx:])
+            state_dict[obj.name], deserialized_items = obj.deserialize(state[idx:])
             idx += deserialized_items
         return state_dict, idx

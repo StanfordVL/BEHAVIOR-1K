@@ -48,25 +48,26 @@ class MacroParticleSystem(BaseSystem):
         self.particles = dict()
 
         # Counter to increment monotonically as we add more particles
-        self._particle_counter = None
+        self._particle_counter = 0
 
         # Color associated with this system (NOTE: external queries should call self.color)
         self._color = None
         return super().__init__(name=name, **kwargs)
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super method first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Initialize mutable class variables so they don't automatically get overridden by children classes
         self._particle_counter = 0
 
         # Create the system prim -- this is merely a scope prim
-        og.sim.stage.DefinePrim(f"/World/{self.name}", "Scope")
+        og.sim.stage.DefinePrim(f"/World/scene_{self._scene.idx}/{self.name}", "Scope")
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = self._create_particle_template()
-        particle_template.load(None)
+        particle_template.load(scene)
+        og.sim.post_import_object(particle_template)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via self.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -156,10 +157,8 @@ class MacroParticleSystem(BaseSystem):
 
     def _dump_state(self):
         state = super()._dump_state()
-
         state["scales"] = np.array([particle.scale for particle in self.particles.values()])
         state["particle_counter"] = self._particle_counter
-
         return state
 
     def _load_state(self, state):
@@ -173,9 +172,9 @@ class MacroParticleSystem(BaseSystem):
         # Set particle counter
         self._particle_counter = state["particle_counter"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        states_flat = super()._serialize(state=state)
+        states_flat = super().serialize(state=state)
 
         # Add particle scales, then the template info
         return np.concatenate(
@@ -189,7 +188,7 @@ class MacroParticleSystem(BaseSystem):
 
     def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Infer how many scales we have, then deserialize
         n_particles = state_dict["n_particles"]
@@ -285,7 +284,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Add particles
         for scale in scales:
-            self.add_particle(scene=None, relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
+            self.add_particle(scene=scene, relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
@@ -383,9 +382,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         self._SAMPLING_HIT_PROPORTION = 0.4
         return super().__init__(name=name, **kwargs)
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super method first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Initialize mutable class variables so they don't automatically get overridden by children classes
         self._particles_info = dict()
@@ -975,7 +974,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         return True
 
     def _create_particle_template(self):
-        return self._create_particle_template_fcn(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
+        return self._create_particle_template_fcn(
+            relative_prim_path=f"/{self.name}/template", name=f"{self.name}_template"
+        )
 
     # TODO(parallel-hang): deal with max and min scales
     # def create(
@@ -1102,9 +1103,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # Run super
         super()._load_state(state=state)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         groups_dict = state["groups"]
         state_group_flat = [[state["n_groups"]]]
@@ -1168,7 +1169,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         )
 
         # Get super method
-        state_dict, idx_super = super()._deserialize(state=state[idx:])
+        state_dict, idx_super = super().deserialize(state=state[idx:])
         state_dict["n_groups"] = n_groups
         state_dict["groups"] = groups_dict
 
@@ -1195,9 +1196,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_radius = None
         self._particle_offset = None
 
-    def initialize(self, **kwargs):
+    def initialize(self, scene):
         # Run super method first
-        super().initialize(**kwargs)
+        super().initialize(scene)
 
         # Create the particles head prim -- this is merely a scope prim
         og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
@@ -1416,6 +1417,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
     def generate_particles(
         self,
+        scene,
         positions,
         orientations=None,
         velocities=None,
@@ -1467,7 +1469,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         return True
 
     def _create_particle_template(self):
-        return self._create_particle_template_fcn(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
+        return self._create_particle_template_fcn(
+            relative_prim_path=f"/{self.name}/template", name=f"{self.name}_template"
+        )
 
     # TODO(parallel-hang): clean this up
     # def create(self, name, create_particle_template, particle_density, scale=None, **kwargs):
@@ -1558,15 +1562,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         super()._load_state(state=state)
 
-        # Make sure view is refreshed
-        self.refresh_particles_view()
+        if self.initialized:
+            # Make sure view is refreshed
+            self.refresh_particles_view()
 
         # Make sure we update all the velocities
         self.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Add velocities
         return np.concatenate(
@@ -1578,7 +1583,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._sync_particles(n_particles=int(state[0]))
 
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize velocities
         len_velocities = 3 * state_dict["n_particles"]
