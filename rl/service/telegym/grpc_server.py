@@ -55,7 +55,7 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
         action = pickle.loads(request.action)
         assert self.env.action_space.contains(action), "Action must be contained in action space."
         observation, reward, terminated, truncated, info = self.env.step(action)
-        wandb.log({"step_time": time.time() - start_time})
+        # wandb.log({"step_time": time.time() - start_time})
         return environment_pb2.StepResponse(
             observation=pickle.dumps(observation),
             reward=reward,
