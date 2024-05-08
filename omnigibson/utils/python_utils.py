@@ -291,6 +291,42 @@ def get_uuid(name, n_digits=8):
     return abs(hash(name)) % (10**n_digits)
 
 
+class StringIntegerMapper:
+    def __init__(self):
+        self._string_to_int = {}
+        self._int_to_string = {}
+        self.next_integer = 0
+
+    def string_to_int(self, s):
+        """
+        Adds a string to the mapping system if not already added and returns the assigned integer.
+
+        Args:
+            s (str): The string to map to an integer.
+
+        Returns:
+            int: The integer assigned to the string.
+        """
+        if s not in self._string_to_int:
+            # Assign a new integer to the string
+            self._string_to_int[s] = self.next_integer
+            self._int_to_string[self.next_integer] = s
+            self.next_integer += 1
+        return self._string_to_int[s]
+
+    def int_to_string(self, i):
+        """
+        Retrieves the string associated with the given integer.
+
+        Args:
+            i (int): The integer to look up in the mapping.
+
+        Returns:
+            str or None: The string associated with the integer, or None if not found.
+        """
+        return self._int_to_string.get(i, None)
+
+
 def camel_case_to_snake_case(camel_case_text):
     """
     Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
