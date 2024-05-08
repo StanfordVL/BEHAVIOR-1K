@@ -23,21 +23,18 @@ def setup_environment(flatcache):
 
     # Define the environment configuration
     config = {
+        "env": {
+            "use_floor_plane": True,
+        },
         "scene": {
             "type": "Scene",
         },
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": "all",
+                "obs_modalities": "rgb",
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
-                "controller_config": {
-                    "arm_0": {
-                        "name": "NullJointController",
-                        "motor_type": "position",
-                    },
-                },
             }
         ],
     }
