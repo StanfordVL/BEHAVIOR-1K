@@ -577,30 +577,13 @@ class StatefulObject(BaseObject):
 
         # Iterate over all states and deserialize their states if they're stateful
         non_kin_state_dic = dict()
-        classes_to_include = [
-            # og.object_states.aabb.AABB,
-            # og.object_states.pose.Pose,
-            # og.object_states.contact_bodies.ContactBodies,
-            # og.object_states.adjacency.HorizontalAdjacency,
-            # og.object_states.adjacency.VerticalAdjacency,
-            og.object_states.attached_to.AttachedTo,
-            og.object_states.particle_modifier.ParticleModifier,
-            og.object_states.saturated.Saturated,
-            og.object_states.slicer_active.SlicerActive,
-            og.object_states.toggle.ToggledOn,
-            og.object_states.max_temperature.MaxTemperature,
-            og.object_states.temperature.Temperature,
-        ]
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if (
-                not [isinstance(state_instance, excluded_state) for excluded_state in classes_to_include].count(True)
-                > 0
-            ):
-                continue
-            # TODO(parallel-hang): fix this later
-            non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
-            idx += deserialized_items
+            try:
+                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
+                idx += deserialized_items
+            except NotImplementedError:
+                pass
         state_dic["non_kin"] = non_kin_state_dic
 
         return state_dic, idx
