@@ -17,7 +17,7 @@ def test_seg(env):
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
     robot.reset()
 
-    systems = [env.scene.system_registry("name", system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
+    systems = [env.scene.get_system(system_name) for system_name in SYSTEM_EXAMPLES.keys()]
     for i, system in enumerate(systems):
         # Sample two particles for each system
         pos = np.array([-0.2 + i * 0.2, 0, 0.55])
