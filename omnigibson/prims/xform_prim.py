@@ -415,7 +415,6 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        local_pos, local_ori = self.get_local_pose()
         pos, ori = self.get_position_orientation()
 
         # If we are in a scene, compute the scene-local transform (and save this as the world transform
@@ -425,35 +424,18 @@ class XFormPrim(BasePrim):
 
         # TODO(parallel-cem): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
         # We return a dict that contains -1s for the original format that used global pos/orn.
-        return dict(local_pos=local_pos, local_ori=local_ori, pos=pos, ori=ori)
+        return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        # If we have the local pose info, we can directly use them
-        # TODO(parallel-cem): The below logic doesn't quite work because the intermediate prims don't move.
-        if False:  # "local_pos" in state and "local_ori" in state:
-            self.set_local_pose(state["local_pos"], state["local_ori"])
-        else:
-            # Otherwise, we use the legacy global pose as the scene-local pose.
-            pos, orn = np.array(state["pos"]), np.array(state["ori"])
-            if self.scene is not None:
-                pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
-            self.set_position_orientation(pos, orn)
+        pos, orn = np.array(state["pos"]), np.array(state["ori"])
+        if self.scene is not None:
+            pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+        self.set_position_orientation(pos, orn)
 
     def serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
+        return np.concatenate([state["pos"], state["ori"]]).astype(float)
 
     def deserialize(self, state):
         # TODO(cremebrule): Make all code OK with accepting different state sizes.
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        pos = state[0:3]
-        ori = state[3:7]
-        is_new_format = np.all(pos == -1) and np.all(ori == -1)
-
-        # For legacy format, we return the global pose. We do not have local pose.
-        if not is_new_format:
-            return {"pos": pos, "ori": ori}, 7
-
-        # For new format, we return the local pose AND the global pose.
-        local_pos = state[7:10]
-        local_ori = state[10:14]
-        return {"local_pos": local_pos, "local_ori": local_ori, "pos": pos, "ori": ori}, 14
+        return dict(pos=state[0:3], ori=state[3:7]), 7
