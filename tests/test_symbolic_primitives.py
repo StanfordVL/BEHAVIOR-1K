@@ -311,7 +311,7 @@ class TestSymbolicPrimitives:
     #    pass
 
     def teardown_class(cls):
-        og.sim.clear()
+        og.clear()
 
 
 def main():

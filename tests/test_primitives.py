@@ -93,7 +93,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
                 return False
     finally:
         # Clear the sim
-        og.sim.clear()
+        og.clear()
 
     return True
 

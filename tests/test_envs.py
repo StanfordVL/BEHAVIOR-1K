@@ -41,7 +41,7 @@ def task_tester(task_type):
         env.step(env.robots[0].action_space.sample())
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()
 
 
 def test_dummy_task():
@@ -90,4 +90,4 @@ def test_rs_int_full_load():
         env.step(env.robots[0].action_space.sample())
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()

@@ -111,7 +111,7 @@ def camera_pose_test(flatcache):
     new_camera_world_pose = vision_sensor.get_position_orientation()
     assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
 
-    og.sim.clear()
+    og.clear()
 
 
 def test_camera_pose_flatcache_on():

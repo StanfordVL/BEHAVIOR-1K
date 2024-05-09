@@ -93,4 +93,4 @@ def test_seg(env):
 
 
 def test_clear_sim():
-    og.sim.clear()
+    og.clear()

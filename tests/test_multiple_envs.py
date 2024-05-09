@@ -46,7 +46,7 @@ def test_multi_scene_dump_and_load():
     robot_new_pos = scene_three_robot.get_position() + robot_displacement
     scene_three_robot.set_position(robot_new_pos)
     scene_three_state = vec_env.envs[2].scene._dump_state()
-    og.sim.clear()
+    og.clear()
 
     vec_env = setup_multi_environment(3)
     initial_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
@@ -54,7 +54,7 @@ def test_multi_scene_dump_and_load():
     new_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
     assert np.allclose(new_robot_pos_scene_one - initial_robot_pos_scene_one, robot_displacement, atol=1e-3)
 
-    og.sim.clear()
+    og.clear()
 
 
 def test_multi_scene_displacement():
@@ -66,7 +66,7 @@ def test_multi_scene_displacement():
     dist_0_1 = robot_1_pos - robot_0_pos
     dist_1_2 = robot_2_pos - robot_1_pos
     assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
-    og.sim.clear()
+    og.clear()
 
 
 def test_multi_scene_scene_prim():
