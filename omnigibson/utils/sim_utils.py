@@ -110,6 +110,22 @@ def prims_to_rigid_prim_set(inp_prims):
     return out
 
 
+def prim_paths_to_rigid_prims(prim_paths, scene):
+    """
+    Given a set of rigid body prim paths @body_prim_paths, return a list of (BaseObject, RigidPrim) tuples.
+    """
+    rigid_prims = set()
+    for body in prim_paths:
+        tokens = body.split("/")
+        obj_prim_path = "/".join(tokens[:-1])
+        link_name = tokens[-1]
+        obj = scene.object_registry("prim_path", obj_prim_path)
+        if obj is not None:
+            rigid_prims.add((obj, obj.links[link_name]))
+
+    return rigid_prims
+
+
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
     Grab collisions that occurred during the most recent physics timestep associated with prims @prims

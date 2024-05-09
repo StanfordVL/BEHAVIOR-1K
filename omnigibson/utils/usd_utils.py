@@ -204,8 +204,8 @@ class RigidContactAPIImpl:
         self._CONTACT_CACHE = None
 
     @classmethod
-    def get_row_filter(cls):
-        return "/World/scene_*/*/*"
+    def get_row_filters(cls):
+        return [f"/World/scene_{i}/*/*" for i in range(len(og.sim.scenes))]
 
     @classmethod
     def get_column_filters(cls):
@@ -246,6 +246,9 @@ class RigidContactAPIImpl:
             self._CONTACT_VIEW = dict()
             return
 
+        # Get the row filters too
+        row_filters = self.get_row_filters()
+
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
         # We also suppress the omni tensor plugin from giving warnings we expect
@@ -258,7 +261,7 @@ class RigidContactAPIImpl:
                     continue
 
                 self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
-                    pattern=self.get_row_filter(),  # TODO (parallel): This can easily be made per-scene too.
+                    pattern=row_filters[scene_idx],
                     filter_patterns=column_filters[scene_idx],
                     max_contact_data_count=self.get_max_contact_data_count(),
                 )
@@ -347,6 +350,46 @@ class RigidContactAPIImpl:
         idxs_a = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths_a]
         idxs_b = [self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths_b]
         return self.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
+
+    def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
+        """Get pairs of prim paths that are in contact."""
+        impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
+        interesting_col_paths = [
+            p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
+        ]
+        interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+
+        # Get the interesting-columns from the impulse matrix
+        interesting_impulse_columns = impulses[:, interesting_columns]
+        assert (
+            interesting_impulse_columns.ndim == 2
+        ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
+        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
+        interesting_row_paths = [
+            GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
+        ]
+
+        # Filter out idxes by whether or not the row path is in the row prim paths list
+        if row_prim_paths is not None:
+            interesting_row_idxes, interesting_row_paths = zip(
+                *[(i, p) for i, p in zip(interesting_row_idxes, interesting_row_paths) if p in row_prim_paths]
+            )
+            interesting_row_idxes = np.array(list(interesting_row_idxes))
+
+        # Get the full interesting section of the impulse matrix
+        interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
+        assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
+
+        # Early return if not in contact.
+        if not np.any(interesting_impulses > 0):
+            return set()
+
+        # Get all of the (row, col) pairs where the impulse is greater than 0
+        return {
+            (interesting_row_paths[row], interesting_col_paths[col])
+            for row, col in np.argwhere(interesting_impulses > 0)
+        }
 
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         # First check if the object has any contacts

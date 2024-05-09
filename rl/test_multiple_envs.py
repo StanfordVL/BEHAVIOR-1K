@@ -11,6 +11,7 @@ import yaml
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision, set_base_and_detect_collision
@@ -50,21 +51,21 @@ def main():
     config_filename = "rl.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    reset_poses_path =  os.path.dirname(__file__) + "/reset_poses.json"
-    config["scene"]["load_object_categories"] = ["floors", "walls", "coffee_table"]
-    config['task']['precached_reset_pose_path'] = reset_poses_path
+    reset_poses_path = os.path.dirname(__file__) + "/reset_poses.json"
+    config["task"]["precached_reset_pose_path"] = reset_poses_path
 
     # Load the environment
-    vec_env = og.VectorEnvironment(4, config)
-    import time
+    n_envs = 10
+    vec_env = SB3VectorEnvironment(n_envs, config)
 
     while True:
-        actions = []
         start_time = time.time()
-        for e in vec_env.envs:
-            actions.append(e.action_space.sample())
-        vec_env.step(actions)
-        print("fps", 1 / (time.time() - start_time))
+        for _ in range(100):
+            a = vec_env.action_space.sample()
+            vec_env.step([a for _ in range(n_envs)])
+        fps = 100 / (time.time() - start_time)
+        print("fps", fps)
+        print("effective fps", fps * n_envs)
 
 
 if __name__ == "__main__":

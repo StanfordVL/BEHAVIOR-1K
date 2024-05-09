@@ -11,6 +11,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     PlanningContext,
     StarterSemanticActionPrimitives,
 )
+from omnigibson.macros import gm
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
@@ -21,7 +22,6 @@ from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object
-from omnigibson.macros import gm
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
@@ -77,14 +77,14 @@ class GraspTask(BaseTask):
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = np.array(robot_pose["base_pos"])
-            #TODO: Set local pose should work
-            SCENE_MARGIN = 10.0
-            x, y = T.integer_spiral_coordinates(robot.scene.idx)
-            offset = np.array([x * SCENE_MARGIN, y * SCENE_MARGIN, 0])
-            robot.set_local_pose(robot_pos + offset, robot_pose["base_ori"])
+            robot_orn = np.array(robot_pose["base_ori"])
+            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            robot.set_position_orientation(robot_pos, robot_orn)
 
         # Otherwise, reset using the primitive controller.
         else:
+            raise ValueError("Dont do a slow reset.")
             # Randomize the robots joint positions
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             dim = len(joint_control_idx)
@@ -118,27 +118,27 @@ class GraspTask(BaseTask):
             robot.set_position_orientation(*robot_pose)
 
         # Settle robot
-        for _ in range(10):
-            og.sim.step()
+        # # for _ in range(10):
+        #     og.sim.step()
 
-        # Wait for the robot to fully stabilize.
-        for _ in range(100):
-            og.sim.step()
-            if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-                continue
-            if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
-                continue
-            break
-        else:
-            raise ValueError("Robot could not settle")
+        # # Wait for the robot to fully stabilize.
+        # for _ in range(100):
+        #     og.sim.step()
+        #     if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+        #         continue
+        #     if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+        #         continue
+        #     break
+        # else:
+        #     raise ValueError("Robot could not settle")
 
         # Check if the robot has toppled
-        rotation = R.from_quat(robot.get_orientation())
-        robot_up = rotation.apply(np.array([0, 0, 1]))
-        if robot_up[2] < 0.75:
-            raise ValueError("Robot has toppled over")
+        # rotation = R.from_quat(robot.get_orientation())
+        # robot_up = rotation.apply(np.array([0, 0, 1]))
+        # if robot_up[2] < 0.75:
+        #     raise ValueError("Robot has toppled over")
 
-        print("Reset robot pose to: ", robot_pose)
+        # print("Reset robot pose to: ", robot_pose)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):

@@ -9,6 +9,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
+from omnigibson.utils.usd_utils import GripperRigidContactAPI
 
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
@@ -545,15 +547,18 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
     if obj_in_hand is not None and ignore_obj_in_hand:
         filter_objs.append(obj_in_hand)
 
-    collision_prims = list(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs)))
+    # Use the RigidCollisionAPI to get the things this robot is colliding with
+    scene_idx = robot.scene.idx
+    link_paths = set(robot.link_prim_paths)
+    collision_body_paths = {
+        row
+        for row, _ in GripperRigidContactAPI.get_contact_pairs(scene_idx, column_prim_paths=link_paths)
+        if row not in link_paths
+    }
 
-    for col_prim in collision_prims:
-        tokens = col_prim.prim_path.split("/")
-        obj_prim_path = "/".join(tokens[:-1])
-        col_obj = robot.scene.object_registry("prim_path", obj_prim_path)
-        if col_obj.category in filter_categories:
-            collision_prims.remove(col_prim)
-    return len(collision_prims) > 0
+    # Convert to prim objects and filter out the necessary objects.
+    rigid_prims = prim_paths_to_rigid_prims(collision_body_paths, robot.scene)
+    return any(o not in filter_objs and o.category not in filter_categories for o, p in rigid_prims)
 
 
 def astar(search_map, start, goal, eight_connected=True):

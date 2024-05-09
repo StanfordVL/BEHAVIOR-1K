@@ -11,8 +11,19 @@ from omnigibson.envs.env_base import Environment
 class SB3VectorEnvironment(DummyVecEnv):
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
-        self.env_fns = [lambda: Environment(configs=copy.deepcopy(config), num_env=i) for i in range(num_envs)]
-        super().__init__(self.env_fns)
+
+        # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
+        # needing to happen before spaces are available for it to read things from.
+        tmp_envs = [Environment(configs=copy.deepcopy(config), in_vec_env=True) for _ in range(num_envs)]
+
+        # Play, and finish loading all the envs
+        og.sim.play()
+        for env in tmp_envs:
+            env.post_play_load()
+
+        # Now produce some functions that will make DummyVecEnv think it's creating these envs itself
+        env_fns = [lambda k=i: tmp_envs[k] for i in range(num_envs)]
+        super().__init__(env_fns)
 
     def step_async(self, actions: np.ndarray) -> None:
         self.actions = actions
@@ -39,3 +50,24 @@ class SB3VectorEnvironment(DummyVecEnv):
                 obs, self.reset_infos[env_idx] = self.envs[env_idx].reset()
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones), copy.deepcopy(self.buf_infos))
+
+    def reset(self):
+        for env_idx in range(self.num_envs):
+            maybe_options = {"options": self._options[env_idx]} if self._options[env_idx] else {}
+            obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(
+                get_obs=False, seed=self._seeds[env_idx], **maybe_options
+            )
+
+        # Settle the robots
+        for _ in range(30):
+            og.sim.step()
+
+        # Get the new obs
+        for env_idx in range(self.num_envs):
+            obs, info = self.envs[env_idx].get_obs()
+            self._save_obs(env_idx, obs)
+
+        # Seeds and options are only used once
+        self._reset_seeds()
+        self._reset_options()
+        return self._obs_from_buf()
