@@ -6,17 +6,17 @@ import sys
 
 import yaml
 
+from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
+
 log = logging.getLogger(__name__)
 current_directory = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_directory)
 sys.path.append(parent_directory)
 
-import omnigibson as og
-from omnigibson.macros import gm
-
 import torch as th
 import torch.nn as nn
 import wandb
+from service.telegym import GRPCClientVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import (
     BaseCallback,
@@ -30,9 +30,11 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from service.telegym import GRPCClientVecEnv
 from wandb import AlertLevel
 from wandb.integration.sb3 import WandbCallback
+
+import omnigibson as og
+from omnigibson.macros import gm
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -72,7 +74,8 @@ def get_open_port():
 EVAL_EVERY_N_EPISODES = 10
 NUM_EVAL_EPISODES = 5
 STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
-reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
+reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
+
 
 def instantiate_envs():
     # Decide whether to use a local environment or remote
@@ -82,27 +85,28 @@ def instantiate_envs():
             local_port = int(args.port)
         else:
             local_port = get_open_port()
-        
+
         gm.RENDER_VIEWER_CAMERA = False
         gm.ENABLE_RENDERING = False
 
         config = _get_env_config()
         del config["env"]["external_sensors"]
-        config['task']['precached_reset_pose_path'] = reset_poses_path
-        
+        config["task"]["precached_reset_pose_path"] = reset_poses_path
+
         # Manually specify port for eval env
-        eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
-        eval_env = VecFrameStack(eval_env, n_stack=5)
-        eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
-        
-        env = og.VectorEnvironment(n_envs, config)
+        # eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
+        # eval_env = VecFrameStack(eval_env, n_stack=5)
+        # eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
+        eval_env = None
+
+        env = SB3VectorEnvironment(n_envs, config)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
 
     else:
         config = _get_env_config()
-        config['task']['precached_reset_pose_path'] = reset_poses_path
-        env = og.VectorEnvironment(1, config)
+        config["task"]["precached_reset_pose_path"] = reset_poses_path
+        env = og.SB3VectorEnvironment(1, config)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
         eval_env = env
@@ -199,7 +203,7 @@ def train(env, eval_env):
         )
         task_config["reward_config"]["regularization_coef"] = wandb.config.regularization_coef
         env.env_method("update_task", task_config)
-        eval_env.env_method("update_task", task_config)
+        # eval_env.env_method("update_task", task_config)
     else:
         run = wandb.init(
             entity="behavior-rl",
@@ -209,12 +213,12 @@ def train(env, eval_env):
             # save_code=True,  # optional
         )
 
-    eval_env = VecVideoRecorder(
-        eval_env,
-        f"videos/{run.id}",
-        record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
-        video_length=STEPS_PER_EPISODE,
-    )
+    # eval_env = VecVideoRecorder(
+    #     eval_env,
+    #     f"videos/{run.id}",
+    #     record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
+    #     video_length=STEPS_PER_EPISODE,
+    # )
     # Set the set
     set_random_seed(seed)
     # policy_kwargs = dict(
@@ -269,21 +273,21 @@ def train(env, eval_env):
             verbose=2,
         )
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
-        eval_callback = EvalCallback(
-            eval_env,
-            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
-            callback_after_eval=None,
-            verbose=1,
-            best_model_save_path="logs/best_model",
-            n_eval_episodes=NUM_EVAL_EPISODES,
-            deterministic=True,
-            render=False,
-        )
+        # eval_callback = EvalCallback(
+        #     eval_env,
+        #     eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
+        #     callback_after_eval=None,
+        #     verbose=1,
+        #     best_model_save_path="logs/best_model",
+        #     n_eval_episodes=NUM_EVAL_EPISODES,
+        #     deterministic=True,
+        #     render=False,
+        # )
         callback = CallbackList(
             [
                 wandb_callback,
                 checkpoint_callback,
-                eval_callback,
+                # eval_callback,
             ]
         )
         print(callback.callbacks)
