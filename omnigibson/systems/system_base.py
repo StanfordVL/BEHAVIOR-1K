@@ -526,7 +526,7 @@ class VisualParticleSystem(BaseSystem):
         self._group_objects[group] = obj
 
         # Compute the group scale if we're scaling relative to parent
-        if self.scale_relative_to_parent:
+        if self._scale_relative_to_parent:
             self._group_scales[group] = self._compute_relative_group_scales(group=group)
 
         return group
@@ -552,14 +552,14 @@ class VisualParticleSystem(BaseSystem):
         # Remove the actual groups
         self._group_particles.pop(group)
         self._group_objects.pop(group)
-        if self.scale_relative_to_parent:
+        if self._scale_relative_to_parent:
             self._group_scales.pop(group)
 
         return group
 
     def _compute_relative_group_scales(self, group):
         """
-        Computes relative particle scaling for group @group required when @self.scale_relative_to_parent is True
+        Computes relative particle scaling for group @group required when @self._scale_relative_to_parent is True
 
         Args:
             group (str): Specific group for which to compute the relative particle scaling
@@ -612,7 +612,7 @@ class VisualParticleSystem(BaseSystem):
         # Sample based on whether we're scaling relative to parent or not
         scales = (
             np.random.uniform(*self._group_scales[group], (n, 3))
-            if self.scale_relative_to_parent
+            if self._scale_relative_to_parent
             else self.sample_scales(n=n)
         )
 
@@ -892,6 +892,7 @@ class PhysicalParticleSystem(BaseSystem):
             ]
 
         return self.generate_particles(
+            scene=self._scene,
             positions=particle_positions,
             **kwargs,
         )
@@ -950,6 +951,7 @@ class PhysicalParticleSystem(BaseSystem):
         # If we generated a sufficient number of points, generate them in the simulator
         if success:
             self.generate_particles(
+                scene=self._scene,
                 positions=particle_positions,
                 **kwargs,
             )

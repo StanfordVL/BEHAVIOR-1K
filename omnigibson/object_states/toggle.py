@@ -134,7 +134,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         def overlap_callback(hit):
             nonlocal valid_hit
-            valid_hit = hit.rigid_body in self._robot_finger_paths
+            all_finger_paths = {path for path_set in self._robot_finger_paths for path in path_set}
+            valid_hit = hit.rigid_body in all_finger_paths
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
