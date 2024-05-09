@@ -81,7 +81,7 @@ m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
 m.TIAGO_TORSO_FIXED = False
-m.JOINT_POS_DIFF_THRESHOLD = 0.005
+m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
 
@@ -89,7 +89,7 @@ log = create_module_logger(module_name=__name__)
 
 
 def indented_print(msg, *args, **kwargs):
-    log.warning("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
+    print("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
 
 class RobotCopy:
@@ -492,7 +492,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             yield from ctrl(*args)
 
-
             # try:
             #     # If we're not holding anything, release the hand so it doesn't stick to anything else.
             #     if not self._get_obj_in_hand():
@@ -700,9 +699,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
 
         # Open the hand first
+        indented_print("Opening hand before grasping")
         yield from self._execute_release()
 
         # Allow grasping from suboptimal extents if we've tried enough times.
+        indented_print("Sampling grasp pose")
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
         grasp_pose, object_direction = random.choice(grasp_poses)
 
@@ -711,10 +712,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         approach_pose = (approach_pos, grasp_pose[1])
 
         # If the grasp pose is too far, navigate.
+        indented_print("Navigating to grasp pose if needed")
         yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+
+        indented_print("Moving hand to grasp pose")
         yield from self._move_hand(grasp_pose)
 
         # We can pre-grasp in sticky grasping mode.
+        indented_print("Pregrasp squeeze")
         yield from self._execute_grasp()
 
         # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
@@ -726,6 +731,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         empty_action = self._empty_action()
         yield self._postprocess_action(empty_action)
 
+        indented_print("Checking grasp")
         if self._get_obj_in_hand() is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
@@ -733,7 +739,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name},
             )
 
+        indented_print("Moving hand back")
         yield from self._reset_hand()
+
+        indented_print("Done with grasp")
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
@@ -985,6 +994,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Plan has %d steps", len(plan))
         for i, joint_pos in enumerate(plan):
             indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+            # indented_print("target: %r", joint_pos)
             yield from self._move_hand_direct_joint(joint_pos, ignore_failure=True)
 
     def _move_hand_ik(self, eef_pose, stop_if_stuck=False):
@@ -1061,8 +1071,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         controller_name = f"arm_{self.arm}"
         use_delta = self.robot._controllers[controller_name].use_delta_commands
 
-        controller_name = "arm_{}".format(self.arm)
-
         # Store the previous eef pose for checking if we got stuck
         prev_eef_pos = np.zeros(3)
 
@@ -1071,15 +1079,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
-            diff_joint_pos = np.array(current_joint_pos) - np.array(joint_pos)
+            diff_joint_pos = np.array(joint_pos) - np.array(current_joint_pos)
             if np.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             if np.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand got stuck during execution."
-                )
+                # We're stuck!
+                break
 
             action = self._empty_action()
             if use_delta:
@@ -1088,7 +1095,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action[self.robot.controller_action_idx[controller_name]] = joint_pos
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
-            yield self._postprocess_action(action)
+            postproc = self._postprocess_action(action)
+            # indented_print("action: %r", postproc)
+            yield postproc
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -1299,7 +1308,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_lower_limit = self.robot.joint_lower_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_lower_limit, atol = 0.01):
+            if np.allclose(joint_position, joint_lower_limit, atol=0.01):
                 break
 
             action = self._empty_action()
@@ -1318,7 +1327,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_upper_limit, atol = 0.01):
+            if np.allclose(joint_position, joint_upper_limit, atol=0.01):
                 break
 
             action = self._empty_action()
