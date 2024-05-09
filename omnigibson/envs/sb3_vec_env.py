@@ -3,6 +3,7 @@ import copy
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn
+from tqdm import trange
 
 import omnigibson as og
 from omnigibson.envs.env_base import Environment
@@ -14,7 +15,10 @@ class SB3VectorEnvironment(DummyVecEnv):
 
         # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
         # needing to happen before spaces are available for it to read things from.
-        tmp_envs = [Environment(configs=copy.deepcopy(config), in_vec_env=True) for _ in range(num_envs)]
+        tmp_envs = [
+            Environment(configs=copy.deepcopy(config), in_vec_env=True)
+            for _ in trange(num_envs, desc="Loading environments")
+        ]
 
         # Play, and finish loading all the envs
         og.sim.play()
@@ -22,7 +26,7 @@ class SB3VectorEnvironment(DummyVecEnv):
             env.post_play_load()
 
         # Now produce some functions that will make DummyVecEnv think it's creating these envs itself
-        env_fns = [lambda k=i: tmp_envs[k] for i in range(num_envs)]
+        env_fns = [lambda env_=env: env_ for env in tmp_envs]
         super().__init__(env_fns)
 
     def step_async(self, actions: np.ndarray) -> None:
