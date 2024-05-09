@@ -52,7 +52,7 @@ robots:
       arm_0:
         name: JointController
         motor_type: position
-        # use_delta_commands: true
+        use_delta_commands: true
         command_input_limits: null
         command_output_limits: null
       # arm_0:
