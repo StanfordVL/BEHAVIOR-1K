@@ -5,27 +5,22 @@ import numpy as np
 import omnigibson as og
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
 # gm.ENABLE_FLATCACHE = True
 
+
 def execute_controller(ctrl_gen, env):
-    cnt = 0
     for action in ctrl_gen:
-        cnt += 1
         obs, rew, terminated, truncated, info = env.step(action)
-        if cnt % 10 == 0:
-            print("action:", action)
-            print("obs:", obs)
-            print("rew:", rew)
-            print(terminated, truncated, info)
 
         if terminated or truncated:
             print("Episode Finished:")
-            print("action:", action)
-            print("obs:", obs)
             print("rew:", rew)
             print(terminated, truncated, info)
 
@@ -79,7 +74,7 @@ def main():
     for episode_idx in range(10000):
 
         obs = env.reset()
-        
+
         # Grasp the object
         try:
             print("Executing controller")
@@ -90,10 +85,6 @@ def main():
             print(e)
             continue
 
-       
-
-
 
 if __name__ == "__main__":
     main()
-    
