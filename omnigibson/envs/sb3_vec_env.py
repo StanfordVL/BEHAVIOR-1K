@@ -58,9 +58,7 @@ class SB3VectorEnvironment(DummyVecEnv):
     def reset(self):
         for env_idx in range(self.num_envs):
             maybe_options = {"options": self._options[env_idx]} if self._options[env_idx] else {}
-            obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(
-                get_obs=False, seed=self._seeds[env_idx], **maybe_options
-            )
+            self.envs[env_idx].reset(get_obs=False, seed=self._seeds[env_idx], **maybe_options)
 
         # Settle the robots
         for _ in range(30):

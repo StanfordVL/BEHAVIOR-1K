@@ -45,7 +45,8 @@ def replay_controller(env, filename):
 
 def main():
     # Load the config
-    gm.RENDER_VIEWER_CAMERA = True
+    gm.RENDER_VIEWER_CAMERA = False
+    gm.ENABLE_RENDERING = False
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
     config_filename = "rl.yaml"
@@ -55,7 +56,7 @@ def main():
     config["task"]["precached_reset_pose_path"] = reset_poses_path
 
     # Load the environment
-    n_envs = 10
+    n_envs = 20
     vec_env = SB3VectorEnvironment(n_envs, config)
 
     while True:
