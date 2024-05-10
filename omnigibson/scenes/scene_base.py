@@ -523,6 +523,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
                 (in that case, the object is stored to be loaded together with the scene)
         """
+        # Make sure all objects in this scene are uniquely named
+        assert (
+            obj.name not in self.object_registry.object_names
+        ), f"Object with name {obj.name} already exists in scene!"
+
         # Load the object.
         prim = obj.load(self)
 
