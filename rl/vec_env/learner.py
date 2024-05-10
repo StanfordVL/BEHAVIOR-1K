@@ -15,7 +15,6 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
-import wandb
 from service.telegym import GRPCClientVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import (
@@ -30,11 +29,12 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from wandb import AlertLevel
 from wandb.integration.sb3 import WandbCallback
 
 import omnigibson as og
+import wandb
 from omnigibson.macros import gm
+from wandb import AlertLevel
 
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -86,9 +86,6 @@ def instantiate_envs():
         else:
             local_port = get_open_port()
 
-        gm.RENDER_VIEWER_CAMERA = False
-        gm.ENABLE_RENDERING = False
-
         config = _get_env_config()
         del config["env"]["external_sensors"]
         config["task"]["precached_reset_pose_path"] = reset_poses_path
@@ -99,19 +96,17 @@ def instantiate_envs():
         # eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
         eval_env = None
 
-        env = SB3VectorEnvironment(n_envs, config)
+        env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
 
     else:
-        gm.RENDER_VIEWER_CAMERA = False
-        gm.ENABLE_RENDERING = False
         gm.ENABLE_FLATCACHE = True
         gm.USE_GPU_DYNAMICS = False
         config = _get_env_config()
         del config["env"]["external_sensors"]
         config["task"]["precached_reset_pose_path"] = reset_poses_path
-        env = SB3VectorEnvironment(5, config)
+        env = SB3VectorEnvironment(5, config, render_on_step=False)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
         eval_env = env

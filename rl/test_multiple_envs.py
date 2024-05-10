@@ -45,8 +45,6 @@ def replay_controller(env, filename):
 
 def main():
     # Load the config
-    gm.RENDER_VIEWER_CAMERA = False
-    gm.ENABLE_RENDERING = False
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
     config_filename = "rl.yaml"
@@ -57,7 +55,7 @@ def main():
 
     # Load the environment
     n_envs = 5
-    vec_env = SB3VectorEnvironment(n_envs, config)
+    vec_env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
 
     while True:
         start_time = time.time()
