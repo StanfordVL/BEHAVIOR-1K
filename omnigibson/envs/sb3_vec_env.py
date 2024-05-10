@@ -7,6 +7,7 @@ from tqdm import trange
 
 import omnigibson as og
 from omnigibson.envs.env_base import Environment
+import time
 
 
 class SB3VectorEnvironment(DummyVecEnv):
@@ -35,8 +36,11 @@ class SB3VectorEnvironment(DummyVecEnv):
             self.envs[i]._pre_step(action)
 
     def step_wait(self) -> VecEnvStepReturn:
+        start_time = time.time()
         # Step the entire simulation
         og.sim.step()
+        fps = 1 / (time.time() - start_time)
+        print("internal fps:", fps)
 
         for env_idx in range(self.num_envs):
             obs, self.buf_rews[env_idx], terminated, truncated, self.buf_infos[env_idx] = self.envs[env_idx]._post_step(
@@ -53,6 +57,7 @@ class SB3VectorEnvironment(DummyVecEnv):
                 self.buf_infos[env_idx]["terminal_observation"] = obs
                 obs, self.reset_infos[env_idx] = self.envs[env_idx].reset()
             self._save_obs(env_idx, obs)
+        
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones), copy.deepcopy(self.buf_infos))
 
     def reset(self):

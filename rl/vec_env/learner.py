@@ -104,13 +104,18 @@ def instantiate_envs():
         env = VecMonitor(env, info_keywords=("is_success",))
 
     else:
+        gm.RENDER_VIEWER_CAMERA = False
+        gm.ENABLE_RENDERING = False
+        gm.ENABLE_FLATCACHE = True
+        gm.USE_GPU_DYNAMICS = False
         config = _get_env_config()
+        del config["env"]["external_sensors"]
         config["task"]["precached_reset_pose_path"] = reset_poses_path
-        env = og.SB3VectorEnvironment(1, config)
+        env = SB3VectorEnvironment(5, config)
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env, info_keywords=("is_success",))
         eval_env = env
-        args.n_envs = 1
+        args.n_envs = 5
     return env, eval_env
 
 
@@ -285,8 +290,8 @@ def train(env, eval_env):
         # )
         callback = CallbackList(
             [
-                wandb_callback,
-                checkpoint_callback,
+                # wandb_callback,
+                # checkpoint_callback,
                 # eval_callback,
             ]
         )

@@ -56,7 +56,7 @@ def main():
     config["task"]["precached_reset_pose_path"] = reset_poses_path
 
     # Load the environment
-    n_envs = 20
+    n_envs = 5
     vec_env = SB3VectorEnvironment(n_envs, config)
 
     while True:
