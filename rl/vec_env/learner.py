@@ -36,6 +36,9 @@ import wandb
 from omnigibson.macros import gm
 from wandb import AlertLevel
 
+gm.ENABLE_FLATCACHE = True
+gm.USE_GPU_DYNAMICS = False
+
 # Parse args
 parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 parser.add_argument(
@@ -79,38 +82,16 @@ reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
 
 def instantiate_envs():
     # Decide whether to use a local environment or remote
-    n_envs = args.n_envs
-    if n_envs > 0:
-        if args.port is not None:
-            local_port = int(args.port)
-        else:
-            local_port = get_open_port()
-
-        config = _get_env_config()
-        del config["env"]["external_sensors"]
-        config["task"]["precached_reset_pose_path"] = reset_poses_path
-
-        # Manually specify port for eval env
-        # eval_env = GRPCClientVecEnv(f"0.0.0.0:{args.eval_port}", 1)
-        # eval_env = VecFrameStack(eval_env, n_stack=5)
-        # eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
-        eval_env = None
-
-        env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
-        env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env, info_keywords=("is_success",))
-
-    else:
-        gm.ENABLE_FLATCACHE = True
-        gm.USE_GPU_DYNAMICS = False
-        config = _get_env_config()
-        del config["env"]["external_sensors"]
-        config["task"]["precached_reset_pose_path"] = reset_poses_path
-        env = SB3VectorEnvironment(5, config, render_on_step=False)
-        env = VecFrameStack(env, n_stack=5)
-        env = VecMonitor(env, info_keywords=("is_success",))
-        eval_env = env
-        args.n_envs = 5
+    n_envs = args.n_envs if args.n_envs else 5
+    config = _get_env_config()
+    del config["env"]["external_sensors"]
+    config["task"]["precached_reset_pose_path"] = reset_poses_path
+    env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
+    env = VecFrameStack(env, n_stack=5)
+    env = VecMonitor(env, info_keywords=("is_success",))
+    eval_env = SB3VectorEnvironment(1, config, render_on_step=True)
+    eval_env = VecFrameStack(eval_env, n_stack=5)
+    eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
     return env, eval_env
 
 
