@@ -19,7 +19,8 @@ class SB3VectorEnvironment(DummyVecEnv):
         self.num_envs = num_envs
         self.render_on_step = render_on_step
 
-        og.sim.stop()
+        if og.sim is not None:
+            og.sim.stop()
 
         # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
         # needing to happen before spaces are available for it to read things from.
