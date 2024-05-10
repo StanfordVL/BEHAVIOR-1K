@@ -410,7 +410,7 @@ class MicroParticleSystem(BaseSystem):
     Omniverse's native physx particle systems
     """
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, customize_particle_material=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
         # Particle system prim in the scene, should be generated at runtime
@@ -418,6 +418,8 @@ class MicroParticleSystem(BaseSystem):
 
         # Material -- MaterialPrim associated with this particle system
         self._material = None
+
+        self._customize_particle_material = customize_particle_material
 
         # Color of the generated material. Default is white [1.0, 1.0, 1.0]
         # (NOTE: external queries should call self.color)
@@ -711,9 +713,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def initialize(self, scene):
         self._scene = scene
 
-        # TODO(parallel-hang): clean up this scene passing
         # Create prototype before running super!
-        self.particle_prototypes = self._create_particle_prototypes(scene=scene)
+        self.particle_prototypes = self._create_particle_prototypes()
 
         # Run super
         super().initialize(scene)
@@ -788,7 +789,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         raise NotImplementedError()
 
-    def _create_particle_prototypes(self, scene):
+    def _create_particle_prototypes(self):
         """
         Creates any relevant particle prototypes to be used by this particle system.
 
@@ -1394,17 +1395,17 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
         return self.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
 
-    def _create_particle_prototypes(self, scene):
+    def _create_particle_prototypes(self):
         # Simulate particles with simple spheres
-        prototype_prim_path = f"{scene_relative_prim_path_to_absolute(scene, self.relative_prim_path)}/prototype0"
+        prototype_prim_path = f"{scene_relative_prim_path_to_absolute(self._scene, self.relative_prim_path)}/prototype0"
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
-        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(scene, prototype_prim_path)
+        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
         load_config = {"created_manually": True}
         prototype = VisualGeomPrim(
             relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0", load_config=load_config
         )
-        prototype.load(scene)
+        prototype.load(self._scene)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
@@ -1483,10 +1484,10 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def is_fluid(self):
         return False
 
-    def _create_particle_prototypes(self, scene):
+    def _create_particle_prototypes(self):
         # Load the particle template
         particle_template = self._create_particle_template()
-        particle_template.load(scene)
+        particle_template.load(self._scene)
         og.sim.post_import_object(particle_template)
         self._particle_template = particle_template
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
@@ -1506,12 +1507,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
         lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with VisualGeomPrim with the correct scale
-        relative_prototype_path = absolute_prim_path_to_scene_relative(scene, prototype_path)
+        relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
         load_config = {"created_manually": True}
         prototype = VisualGeomPrim(
             relative_prim_path=relative_prototype_path, name=prototype_path, load_config=load_config
         )
-        prototype.load(scene)
+        prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(

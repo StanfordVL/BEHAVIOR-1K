@@ -210,8 +210,6 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 continue
             elif k == "default_limit":
                 self._default_limit = v
-            # TODO: Make this an else once fresh round of sampling occurs (i.e.: no more outdated systems stored)
-            # TODO(parallel-hang): make sure this change make sense; maybe check with Josiah
             else:
                 self._limits[k] = v
 

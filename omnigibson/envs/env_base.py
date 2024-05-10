@@ -253,6 +253,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 robot.set_local_pose(position=position, orientation=orientation)
+                robot._dummy.load(self.scene)
 
             if len(self.robots_config) > 0:
                 # Auto-initialize all robots

@@ -252,7 +252,7 @@ class RigidContactAPIImpl:
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
-                # TODO(parallel-cem): How to make this work with the floor plane?
+                # TODO: How to make this work with the floor plane?
                 # If there are no collidable objects in the scene, skip.
                 if len(column_filters[scene_idx]) == 0:
                     continue

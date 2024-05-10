@@ -46,7 +46,6 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._loaded = False  # Whether this prim exists in the stage or not
         self._initialized = False  # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._prim = None
-        self._state_size = None
         self._n_duplicates = 0  # Simple counter for keeping track of duplicates for unique name indexing
 
         # Check if this prim was created manually. This member will be automatically set for prims
@@ -74,10 +73,6 @@ class BasePrim(Serializable, Recreatable, ABC):
             not self._initialized
         ), f"Prim {self.name} at prim_path {self.prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
-
-        # Cache state size
-        # TODO(parallel-hang): figure out this
-        # self._state_size = len(self.dump_state(serialized=True))
 
         self._initialized = True
 

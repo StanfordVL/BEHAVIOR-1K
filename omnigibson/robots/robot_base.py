@@ -172,10 +172,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Also import dummy object if this robot is not fixed base AND it has a controller that
         # requires generalized gravity forces. We incur a relatively heavy cost at every step if we
         # have to move the dummy. So we only do this if we absolutely need to.
-        needs_dummy = False
+        needs_dummy = True
         if not self.fixed_base:
             # TODO: Make this work after controllers get updated post-load.
-            # TODO(parallel-cem): Make this work - for now this feature is disabled because we can't check the config
+            # TODO: Make this work - for now this feature is disabled because we can't check the config
             # at this time.
             # Check if we have any operational space controllers or joint controllers with use_impedances on.
             # for cfg in self._controller_config.values():
@@ -197,6 +197,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 visible=False,
                 fixed_base=True,
                 visual_only=True,
+                load_config={"created_manually": True},
             )
 
         return prim

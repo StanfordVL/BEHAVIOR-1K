@@ -59,7 +59,8 @@ class XFormPrim(BasePrim):
 
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-        # TODO(parallel-hang): look into this change
+
+        # TODO(parallel-hang): look into this change; ask Cem
         # if self._created_manually:
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
@@ -164,7 +165,7 @@ class XFormPrim(BasePrim):
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
-        # TODO(parallel-hang): look into this later
+        # TODO(parallel-hang): look at og-develop to see how this is used; this is binding material api onto every prim now, which is really slow; try to make this work
         # if not self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
         #     return False
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
@@ -422,8 +423,6 @@ class XFormPrim(BasePrim):
         if self.scene is not None:
             pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
 
-        # TODO(parallel-cem): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
-        # We return a dict that contains -1s for the original format that used global pos/orn.
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):

@@ -40,10 +40,6 @@ _CALLBACKS_ON_SYSTEM_INIT = dict()
 _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
-# Modifiers denoting a semantic difference in the system
-SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
-
-
 class BaseSystem(Serializable):
     # TODO(parallel-hang): Fix this comment
     """
@@ -54,18 +50,14 @@ class BaseSystem(Serializable):
     For example, scene.system_registry("name", "strawberry_smoothie") will return the StrawberrySmoothie class.
     """
 
-    def __init__(self, name, **kwargs):
-        # Make sure prefixes preserve their double underscore
-        # TODO(parallel-hang): look into this
-        # for prefix in SYSTEM_PREFIXES:
-        #     self._name = name.replace(f"{prefix}_", f"{prefix}__")
+    def __init__(self, name, min_scale=None, max_scale=None):
         self._name = name
 
         # Whether this system has been initialized or not
         self.initialized = False
 
-        self.min_scale = np.ones(3)
-        self.max_scale = np.ones(3)
+        self.min_scale = min_scale if min_scale is not None else np.ones(3)
+        self.max_scale = max_scale if max_scale is not None else np.ones(3)
 
         self._uuid = get_uuid(self._name)
 

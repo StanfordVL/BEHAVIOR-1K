@@ -978,65 +978,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             relative_prim_path=f"/{self.name}/template", name=f"{self.name}_template"
         )
 
-    # TODO(parallel-hang): deal with max and min scales
-    # def create(
-    #     self, name, create_particle_template, min_scale=None, max_scale=None, scale_relative_to_parent=False, **kwargs
-    # ):
-    #     """
-    #     Utility function to programmatically generate monolithic visual particle system classes.
-
-    #     Note: If using super() calls in any functions, we have to use slightly esoteric syntax in order to
-    #     accommodate this procedural method for using super calls
-    #     cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
-    #         Use: super(self).__get__(self).<METHOD_NAME>(<KWARGS>)
-
-    #     Args:
-    #         name (str): Name of the visual particles, in snake case.
-    #         min_scale (None or 3-array): If specified, sets the minumum bound for the visual particles' relative scale.
-    #             Else, defaults to 1
-    #         max_scale (None or 3-array): If specified, sets the maximum bound for the visual particles' relative scale.
-    #             Else, defaults to 1
-    #         scale_relative_to_parent (bool): If True, will scale generated particles relative to the corresponding
-    #             group's object
-    #         create_particle_template (function): Method for generating the visual particle template that will be duplicated
-    #             when generating groups of particles.
-    #             Expected signature:
-
-    #             create_particle_template(prim_path: str, name: str) --> EntityPrim
-
-    #             where @prim_path and @name are the parameters to assign to the generated EntityPrim.
-    #             NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
-    #                 visual mesh attached to its root link, since this will be the actual visual mesh used
-
-    #         **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
-    #             the class attribute to modify and the values represent the functions / value to set
-    #             (Note: These values should have either @property or @classmethod decorators!)
-
-    #     Returns:
-    #         VisualParticleSystem: Generated visual particle system class
-    #     """
-
-    #     # Override the necessary parameters
-    #     @property
-    #     def cp_register_system(self):
-    #         # We should register this system since it's an "actual" system (not an intermediate class)
-    #         return True
-
-    #     @property
-    #     def cp_scale_relative_to_parent(self):
-    #         return scale_relative_to_parent
-
-    #     def cm_create_particle_template(self):
-    #         return create_particle_template(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
-
-    #     # Add to any other params specified
-    #     kwargs["_register_system"] = cp_register_system
-    #     kwargs["scale_relative_to_parent"] = cp_scale_relative_to_parent
-    #     kwargs["_create_particle_template"] = cm_create_particle_template
-
-    #     # Run super
-    #     return super().create(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
-
     def _dump_state(self):
         state = super()._dump_state()
         particle_names = list(self.particles.keys())
@@ -1472,60 +1413,6 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         return self._create_particle_template_fcn(
             relative_prim_path=f"/{self.name}/template", name=f"{self.name}_template"
         )
-
-    # TODO(parallel-hang): clean this up
-    # def create(self, name, create_particle_template, particle_density, scale=None, **kwargs):
-    #     """
-    #     Utility function to programmatically generate monolithic visual particle system classes.
-
-    #     Note: If using super() calls in any functions, we have to use slightly esoteric syntax in order to
-    #     accommodate this procedural method for using super calls
-    #     cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
-    #         Use: super(self).__get__(self).<METHOD_NAME>(<KWARGS>)
-
-    #     Args:
-    #         name (str): Name of the macro physical particles, in snake case.
-    #         particle_density (float): Particle density for the generated system
-    #         create_particle_template (function): Method for generating the visual particle template that will be duplicated
-    #             when generating groups of particles.
-    #             Expected signature:
-
-    #             create_particle_template(prim_path: str, name: str) --> EntityPrim
-
-    #             where @prim_path and @name are the parameters to assign to the generated EntityPrim.
-    #             NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
-    #                 visual mesh attached to its root link, since this will be the actual mesh used for duplication
-    #         scale (None or 3-array): If specified, sets the scaling factor for the particles' relative scale.
-    #             Else, defaults to 1
-
-    #         **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
-    #             the class attribute to modify and the values represent the functions / value to set
-    #             (Note: These values should have either @property or @classmethod decorators!)
-
-    #     Returns:
-    #         VisualParticleSystem: Generated visual particle system class
-    #     """
-
-    #     # Override the necessary parameters
-    #     @property
-    #     def cp_register_system(self):
-    #         # We should register this system since it's an "actual" system (not an intermediate class)
-    #         return True
-
-    #     @property
-    #     def cp_particle_density(self):
-    #         return particle_density
-
-    #     def cm_create_particle_template(self):
-    #         return create_particle_template(prim_path=f"{self.prim_path}/template", name=f"{self.name}_template")
-
-    #     # Add to any other params specified
-    #     kwargs["_register_system"] = cp_register_system
-    #     kwargs["particle_density"] = cp_particle_density
-    #     kwargs["_create_particle_template"] = cm_create_particle_template
-
-    #     # Run super
-    #     return super().create(name=name, min_scale=scale, max_scale=scale, **kwargs)
 
     def _sync_particles(self, n_particles):
         """

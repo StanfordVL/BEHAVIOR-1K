@@ -1,4 +1,3 @@
-# TODO(parallel-hang): Add unit tests for parallel execution of multiple environments.
 import numpy as np
 
 import omnigibson as og
@@ -30,7 +29,7 @@ def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = False
-        gm.ENABLE_TRANSITION_RULES = False  # TODO(parallel-hang): get rid of this when transition rules are fixed
+        gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()

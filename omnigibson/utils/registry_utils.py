@@ -131,6 +131,11 @@ class Registry:
                 None is default, which corresponds to all keys
         """
         keys = self.all_keys if keys is None else keys
+        # If this is a system object, we don't need to store its prim_path
+        from omnigibson.systems.system_base import BaseSystem
+
+        if isinstance(obj, BaseSystem):
+            keys = [k for k in keys if k != "prim_path"]
         for k in keys:
             obj_attr = self._get_obj_attr(obj=obj, attr=k)
             # Standardize input as a list
@@ -142,14 +147,9 @@ class Registry:
                 if k in self.unique_keys:
                     # Handle unique case
                     if attr in mapping:
-                        # TODO(parallel-hang): deal with this later;
-                        # 1) see if it's possible to get prim_path attr after scene is set for systems
-                        # 2) use relative path instead of absolute to make this work
-                        # if attr == "DOES_NOT_EXIST":
-                        #     breakpoint()
-                        # log.warning(
-                        #     f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}"
-                        # )
+                        log.warning(
+                            f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}"
+                        )
                         # Special case for "name" attribute, which should ALWAYS be unique
                         assert k != "name", "For name attribute, objects MUST be unique."
                     mapping[attr] = obj
