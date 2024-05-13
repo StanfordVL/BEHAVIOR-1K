@@ -185,7 +185,7 @@ class TransitionRuleAPI:
             state = og.sim.dump_state()
             for added_obj_attr in added_obj_attrs:
                 new_obj = added_obj_attr.obj
-                # TODO(parallel-hang): How do we tell what scene to add these objects to?
+                # TODO(parallel-Eric): How do we tell what scene to add these objects to?
                 og.sim.scenes[0].add_object(new_obj)
                 # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
                 # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
@@ -1210,6 +1210,7 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input systems are contained
         """
         for system_name in recipe["input_systems"]:
+            # TODO(parallel-Eric): Get system from scene. How?
             system = get_system(system_name=system_name)
             if not container.states[Contains].get_value(system=system):
                 return False
@@ -1227,7 +1228,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        # TODO(parallel-hang): Get system registry from scene. How?
+        # TODO(parallel-Eric): Get system registry from scene. How?
         for system in SYSTEM_REGISTRY.objects:
             # Skip cloth system
             if system.name == "cloth":
