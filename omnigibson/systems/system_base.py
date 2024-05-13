@@ -139,6 +139,10 @@ class BaseSystem(Serializable):
 
             TransitionRuleAPI.refresh_all_rules()
 
+        # Run any callbacks
+        for callback in og.sim.get_callbacks_on_system_init():
+            callback(self)
+
     def update(self):
         """
         Executes any necessary system updates, once per og.sim._non_physics_step
@@ -196,6 +200,10 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
+
+        for callback in og.sim.get_callbacks_on_system_clear():
+            callback(self)
+
         self.reset()
         lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
         self.initialized = False

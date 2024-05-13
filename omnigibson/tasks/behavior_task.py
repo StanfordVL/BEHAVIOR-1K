@@ -216,9 +216,9 @@ class BehaviorTask(BaseTask):
         og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
-        # TODO(parallel-cem): Implement these on scene somehow?
-        add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
-        add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
+        # TODO(parallel-hang): Implement these on sim somehow?
+        og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
+        og.sim.add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -371,9 +371,7 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in env.scene.system_registry.object_names
-                entity = (
-                    env.scene.system_registry("name", name) if is_system else env.scene.object_registry("name", name)
-                )
+                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,

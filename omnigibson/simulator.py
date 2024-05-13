@@ -317,6 +317,8 @@ def launch_simulator(*args, **kwargs):
             self._callbacks_on_stop = dict()
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
+            self._callbacks_on_system_init = dict()
+            self._callbacks_on_system_clear = dict()
 
             # Update internal settings
             self._set_physics_engine_settings()
@@ -1143,6 +1145,18 @@ def launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_remove_obj[name] = callback
 
+        def add_callback_on_system_init(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed every time a system is initialized
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback(system: System) --> None
+            """
+            self._callbacks_on_system_init[name] = callback
+
         def remove_callback_on_play(self, name):
             """
             Remove play callback whose reference is @name
@@ -1178,6 +1192,18 @@ def launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
             """
             self._callbacks_on_remove_obj.pop(name, None)
+
+        def add_callback_on_system_clear(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed every time a system is cleared
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback(system: System) --> None
+            """
+            self._callbacks_on_system_clear[name] = callback
 
         @property
         def pi(self):
@@ -1242,6 +1268,12 @@ def launch_simulator(*args, **kwargs):
         @property
         def skybox(self):
             return self._skybox
+
+        def get_callbacks_on_system_init(self):
+            return self._callbacks_on_system_init
+
+        def get_callbacks_on_system_clear(self):
+            return self._callbacks_on_system_clear
 
         def write_metadata(self, key, data):
             """
