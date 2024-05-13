@@ -29,6 +29,7 @@ def task_tester(task_type):
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = True
+        gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()

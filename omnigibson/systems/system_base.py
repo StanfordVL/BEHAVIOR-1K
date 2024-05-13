@@ -41,13 +41,10 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
 class BaseSystem(Serializable):
-    # TODO(parallel-hang): Fix this comment
     """
-    Base class for all systems. These are non-instance objects that should be used globally for a given environment.
+    Base class for all systems. These are instanced objects that should be used globally for a given environment/scene.
     This is useful for items in a scene that are non-discrete / cannot be distinguished into individual instances,
-    e.g.: water, particles, etc. While we keep the python convention of the system class name being camel case
-    (e.g. StrawberrySmoothie), we adopt the snake case for the system registry to unify with the category of BaseObject.
-    For example, scene.system_registry("name", "strawberry_smoothie") will return the StrawberrySmoothie class.
+    e.g.: water, particles, etc.
     """
 
     def __init__(self, name, min_scale=None, max_scale=None):

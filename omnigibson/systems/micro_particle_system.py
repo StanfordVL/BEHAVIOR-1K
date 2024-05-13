@@ -625,18 +625,27 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         particle_contact_offset=None,
         is_viscous=None,
         material_mtl_name=None,
-        _customize_particle_material=None,
+        customize_particle_material=None,
         min_scale=None,
         max_scale=None,
         **kwargs,
     ):
-        # TODO(parallel-hang): fix this comment
         """
-        Utility function to programmatically generate monolithic fluid system classes.
-
         Args:
             name (str): Name of the system, in snake case.
             particle_density (float): Particle density for the generated system
+            particle_contact_offset (float): Contact offset for the generated system
+            is_viscous (bool): Whether or not the generated system should be viscous
+            material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
+                    NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
+                    If None if specified, will default to the generic OmniSurface material
+                customize_particle_material (None or function): Method for customizing the particle material for the fluid
+                    after it has been loaded. Default is None, which will produce a no-op.
+                    If specified, expected signature:
+
+                    _customize_particle_material(mat: MaterialPrim) --> None
+
+                    where @MaterialPrim is the material to modify in-place
             min_scale (None or 3-array): If specified, sets the minumum bound for particles' relative scale.
                 Else, defaults to 1
             max_scale (None or 3-array): If specified, sets the maximum bound for particles' relative scale.
@@ -644,10 +653,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @property or @classmethod decorators!)
-
-        Returns:
-            MicroPhysicalParticleSystem: Generated system class
         """
+
         # Store the particle density
         self._particle_density = particle_density
 
@@ -666,7 +673,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # OmniSurface material
         self._material_mtl_name = material_mtl_name
 
-        self._customize_particle_material = _customize_particle_material
+        self._customize_particle_material = customize_particle_material
 
         # Run super
         return super().__init__(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
@@ -1296,8 +1303,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
         **kwargs,
     ):
         """
-        Utility function to programmatically generate monolithic fluid system classes.
-
         Args:
             name (str): Name of the system
             particle_contact_offset (float): Contact offset for the generated system
@@ -1317,9 +1322,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @property or @classmethod decorators!)
-
-        Returns:
-            FluidSystem: Generated system class
         """
 
         def cm_customize_particle_material():
@@ -1444,10 +1446,28 @@ class GranularSystem(MicroPhysicalParticleSystem):
         name,
         particle_density,
         create_particle_template,
-        min_scale=None,
-        max_scale=None,
+        scale=None,
         **kwargs,
     ):
+        """
+        Args:
+            name (str): Name of the system
+            particle_density (float): Particle density for the generated system
+            create_particle_template (function): Method for generating the visual particle template that will be duplicated
+                when generating groups of particles.
+                Expected signature:
+
+                create_particle_template(prim_path: str, name: str) --> EntityPrim
+
+                where @prim_path and @name are the parameters to assign to the generated EntityPrim.
+                NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
+                    visual mesh attached to its root link, since this will be the actual visual mesh used
+            scale (None or 3-array): If specified, sets the scaling factor for the particles' relative scale.
+                Else, defaults to 1
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @property or @classmethod decorators!)
+        """
         self._particle_template = None
         self._create_particle_template_fcn = create_particle_template
         return super().__init__(
@@ -1455,8 +1475,8 @@ class GranularSystem(MicroPhysicalParticleSystem):
             particle_density=particle_density,
             # Cached particle contact offset determined from loaded prototype
             particle_contact_offset=None,
-            min_scale=min_scale,
-            max_scale=max_scale,
+            min_scale=scale,
+            max_scale=scale,
             **kwargs,
         )
 
@@ -1558,6 +1578,10 @@ class Cloth(MicroParticleSystem):
         name,
         **kwargs,
     ):
+        """
+        Args:
+            name (str): Name of the system
+        """
         self._particle_contact_offset = m.CLOTH_PARTICLE_CONTACT_OFFSET
         return super().__init__(name=name, **kwargs)
 
