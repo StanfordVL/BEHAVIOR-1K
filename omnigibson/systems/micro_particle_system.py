@@ -10,6 +10,7 @@ import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -317,13 +318,19 @@ class PhysxParticleInstancer(BasePrim):
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
     def _dump_state(self):
+        local_positions, local_orientations = zip(
+            *[
+                T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
+                for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
+            ]
+        )
         return dict(
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self.n_particles,
-            particle_positions=self.particle_positions,
+            particle_positions=np.array(local_positions),
             particle_velocities=self.particle_velocities,
-            particle_orientations=self.particle_orientations,
+            particle_orientations=np.array(local_orientations),
             particle_scales=self.particle_scales,
             particle_prototype_ids=self.particle_prototype_ids,
         )
@@ -339,11 +346,20 @@ class PhysxParticleInstancer(BasePrim):
             f"instancer when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
         )
 
+        local_positions = np.array(state["particle_positions"])
+        local_orientations = np.array(state["particle_orientations"])
+        global_positions, global_orientations = zip(
+            *[
+                T.pose_transform(*self.scene.prim.get_position_orientation(), local_pos, local_ori)
+                for local_pos, local_ori in zip(local_positions, local_orientations)
+            ]
+        )
+        setattr(self, "particle_positions", np.array(global_positions))
+        setattr(self, "particle_orientations", np.array(global_orientations))
+
         # Set values appropriately
         keys = (
-            "particle_positions",
             "particle_velocities",
-            "particle_orientations",
             "particle_scales",
             "particle_prototype_ids",
         )

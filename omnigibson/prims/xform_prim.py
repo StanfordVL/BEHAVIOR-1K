@@ -60,7 +60,7 @@ class XFormPrim(BasePrim):
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
 
-        # TODO(parallel-hang): look into this change; ask Cem
+        # TODO(parallel-hang): look into this
         # if self._created_manually:
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
@@ -165,11 +165,8 @@ class XFormPrim(BasePrim):
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
-        # TODO(parallel-hang): look at og-develop to see how this is used; this is binding material api onto every prim now, which is really slow; try to make this work
-        # if not self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-        #     return False
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return False if material_path == "" else True
+        return material_path != ""
 
     def set_position_orientation(self, position=None, orientation=None):
         """
