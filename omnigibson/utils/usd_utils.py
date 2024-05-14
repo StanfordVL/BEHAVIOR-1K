@@ -972,6 +972,24 @@ class ControllableObjectViewAPI:
         # Compute the relative position and orientation
         return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
 
+    @classmethod
+    def get_jacobian(cls, prim_path, link_name):
+        if "jacobians" not in cls._READ_CACHE:
+            cls._READ_CACHE["jacobians"] = cls._VIEW.get_jacobians()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        return cls._READ_CACHE["jacobians"][idx][link_idx]
+
+    @classmethod
+    def get_relative_jacobian(cls, prim_path, link_name):
+        jacobian = cls.get_jacobian(prim_path, link_name)
+        ori_t = T.quat2mat(cls.get_position_orientation(prim_path)[1]).T.astype(np.float32)
+        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        tf[:, :3, :3] = ori_t
+        tf[:, 3:, 3:] = ori_t
+        return tf @ jacobian
+
 
 def clear():
     """

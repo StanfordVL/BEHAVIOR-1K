@@ -429,12 +429,15 @@ class ManipulationRobot(BaseRobot):
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
-        # start_idx = 6 if self.fixed_base else 0
-        # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        start_idx = 6 if self.fixed_base else 0
+        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
         # TODO(parallel-hang): Replace this with a ControllableObjectViewAPI call too. Ask Josiah for help.
         # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
         #     eef_link_idx, :, start_idx : start_idx + self.n_joints
         # ]
+        fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
+            self.articulation_root_path, self.eef_link_names[arm]
+        )[eef_link_idx, :, start_idx : start_idx + self.n_joints]
 
         # shape: (1, 6, n_joints) --> (eef_link, [vx,vy,vz,wx,wy,wz], n_joints)
 
@@ -1491,8 +1494,6 @@ class ManipulationRobot(BaseRobot):
                 data = state["ag_obj_constraint_params"][arm]
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                # TODO(parallel-hang): Convert this position, and every other global position saved
-                # or loaded in every other load/save_state, into scene-local poses.
                 contact_pos_global = data["contact_pos"]
                 if self.scene is not None:
                     contact_pos_global, _ = T.pose_transform(

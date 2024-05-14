@@ -60,7 +60,7 @@ class XFormPrim(BasePrim):
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
 
-        # TODO(parallel-hang): look into this
+        # TODO: In the future, fix this for speed
         # if self._created_manually:
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
