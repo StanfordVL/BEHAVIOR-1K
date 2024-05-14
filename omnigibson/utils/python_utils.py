@@ -634,7 +634,6 @@ class CachedFunctions:
     def __setitem__(self, key, value):
         self.add_fcn(name=key, fcn=value)
 
-    @cache
     def get(self, name, *args, **kwargs):
         """
         Computes the function referenced by @name with the corresponding @args and @kwargs. Note that for a unique
