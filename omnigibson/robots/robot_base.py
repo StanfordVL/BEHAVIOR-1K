@@ -188,7 +188,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             pass
 
         if needs_dummy:
-            dummy_path = f"{self.prim_path}_dummy"
+            dummy_path = self.prim_path.replace("controllable_", "dummy_")
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",

@@ -48,6 +48,7 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
+    DummyObjectViewAPI,
     FlatcacheAPI,
     GripperRigidContactAPI,
     PoseAPI,
@@ -745,6 +746,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+            DummyObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -822,6 +824,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
             ControllableObjectViewAPI.clear()
+            DummyObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -943,6 +946,7 @@ def launch_simulator(*args, **kwargs):
         def _on_physics_step(self):
             # Make the controllable object view API refresh
             ControllableObjectViewAPI.clear()
+            DummyObjectViewAPI.clear()
 
             # Run the controller step on every controllable object
             for scene in self.scenes:
@@ -952,6 +956,7 @@ def launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
+            DummyObjectViewAPI.flush_control()
 
         def _on_contact(self, contact_headers, contact_data):
             """
