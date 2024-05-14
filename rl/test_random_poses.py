@@ -20,6 +20,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 from omnigibson.macros import gm
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
+from omnigibson import object_states
 
 def pause_step(time):
     for _ in range(int(time*100)):
@@ -37,7 +38,9 @@ def get_random_joint_position(robot):
 
 
 def main(iterations):
-    MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
+    place_categories = ["coffee_table", "breakfast_table", "countertop"]
+
+    all_categories = ["floors", "walls"] + place_categories
 
     cfg = {
         "env": {
@@ -58,7 +61,7 @@ def main(iterations):
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
-            "load_object_categories": ["floors", "coffee_table"],
+            "load_object_categories": all_categories,
         },
         "robots": [
             {
@@ -128,65 +131,31 @@ def main(iterations):
     }
 
     gm.USE_GPU_DYNAMICS = False
-
     env = og.Environment(configs=cfg)
-    # primitive_controller = env.task._primitive_controller
-    primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
     robot = env.robots[0]
-    # Randomize the robots joint positions
+    obj = env.scene.object_registry("name", "cologne")
+    
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-    dim = len(joint_control_idx)
-    # For Tiago
-    if "combined" in robot.robot_arm_descriptor_yamls:
-        joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-        initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-        control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
-    # For Fetch
-    else:
-        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-        control_idx_in_joint_pos = np.arange(dim)
 
-    saved_poses = []
+    # Open the file and load the data
+    with open('reset_poses_varied.json', 'r') as file:
+        reset_poses = json.load(file)  
+
     for i in tqdm(range(iterations)):
-        selected_joint_pos = None
-        selected_base_pose = None
-        try:
-            with PlanningContext(env, primitive_controller.robot, primitive_controller.robot_copy, "original") as context:
-                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-                    joint_pos, joint_control_idx = get_random_joint_position(robot)
-                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-                    if not set_arm_and_detect_collision(context, initial_joint_pos):
-                        selected_joint_pos = joint_pos
-                        # robot.set_joint_positions(joint_pos, joint_control_idx)
-                        # og.sim.step()
-                        break
 
-            # Randomize the robot's 2d pose
-            obj = env.scene.object_registry("name", "cologne")
-            grasp_poses = get_grasp_poses_for_object_sticky(obj)
-            grasp_pose, _ = random.choice(grasp_poses)
-            sampled_pose_2d = primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
-            # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
-            robot_pose = primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
-            # robot.set_position_orientation(*robot_pose)
-            selected_base_pose = robot_pose
+        reset = random.choice(reset_poses)
 
-            pose = {
-                "joint_pos": selected_joint_pos,
-                "base_pos": selected_base_pose[0].tolist(),
-                "base_ori": selected_base_pose[1].tolist(),
-            }
-            saved_poses.append(pose)
-            pause_step(2)
+        robot_joint_pos = reset["joint_pos"]
+        robot_base_pos = reset["base_pos"]
+        robot_base_ori = reset["base_ori"]
+        obj_pos = reset["obj_pos"]
+        obj_ori = reset["obj_ori"]
 
-        except Exception as e:
-            print("Error in iteration: ", i)
-            print(e)
-            print("--------------------")
-
-    # with open("reset_poses.json", "w") as f:
-    #     json.dump(saved_poses, f)
+        robot.set_joint_positions(robot_joint_pos, joint_control_idx)
+        robot.set_position_orientation(robot_base_pos, robot_base_ori)
+        obj.set_position_orientation(obj_pos, obj_ori)
+        pause_step(1)
 
 
 if __name__ == "__main__":

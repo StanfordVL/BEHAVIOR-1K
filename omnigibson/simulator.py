@@ -218,7 +218,7 @@ def _launch_app():
     sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
 
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
-    signal.signal(signal.SIGINT, og.shutdown_handler)
+    # signal.signal(signal.SIGINT, og.shutdown_handler)
 
     return app
 

@@ -42,19 +42,25 @@ def replay_controller(env, filename):
     for action in actions:
         env.step(action)
 
+def _get_env_config():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.normpath(os.path.join(script_dir, "rl.yaml"))
+    config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
+    return config
+
 
 def main():
     # Load the config
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
-    config_filename = "rl.yaml"
-    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    gm.HEADLESS = True
+    config = _get_env_config()
 
     reset_poses_path = os.path.dirname(__file__) + "/reset_poses.json"
     config["task"]["precached_reset_pose_path"] = reset_poses_path
 
     # Load the environment
-    n_envs = 5
+    n_envs = 2
     vec_env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
 
     while True:

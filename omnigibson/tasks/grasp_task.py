@@ -3,6 +3,7 @@ import os
 import random
 
 import numpy as np
+from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
@@ -20,7 +21,7 @@ from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, create_class_from_registry_and_config
 from omnigibson.utils.sim_utils import land_object
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
@@ -37,17 +38,35 @@ class GraspTask(BaseTask):
         termination_config=None,
         reward_config=None,
         precached_reset_pose_path=None,
+        objects_config=None
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
         self._reset_poses = None
+        self._objects_config = objects_config
         if precached_reset_pose_path is not None:
             with open(precached_reset_pose_path) as f:
                 self._reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
     def _load(self, env):
-        pass
+        for obj_config in self._objects_config:
+            obj = env.scene.object_registry("name", obj_config["name"])
+            # Create object
+            if obj is None:
+                obj = create_class_from_registry_and_config(
+                    cls_name=obj_config["type"],
+                    cls_registry=REGISTERED_OBJECTS,
+                    cfg=obj_config,
+                    cls_type_descriptor="object",
+                )
+                # Import the object into the simulator and set the pose
+                env.scene.add_object(obj)
+            
+            obj_pos = [0.0, 0.0, 0.0] if 'position' not in obj_config else obj_config['position']
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if 'orientation' not in obj_config else obj_config['orientation']
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     def _create_termination_conditions(self):
         terminations = dict()
@@ -118,27 +137,45 @@ class GraspTask(BaseTask):
             robot.set_position_orientation(*robot_pose)
 
         # Settle robot
-        # # for _ in range(10):
-        #     og.sim.step()
+        for _ in range(10):
+            og.sim.step()
 
-        # # Wait for the robot to fully stabilize.
-        # for _ in range(100):
-        #     og.sim.step()
-        #     if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-        #         continue
-        #     if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
-        #         continue
-        #     break
-        # else:
-        #     raise ValueError("Robot could not settle")
+        # Wait for the robot to fully stabilize.
+        for _ in range(100):
+            og.sim.step()
+            if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+                continue
+            if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+                continue
+            break
+        else:
+            raise ValueError("Robot could not settle")
 
         # Check if the robot has toppled
-        # rotation = R.from_quat(robot.get_orientation())
-        # robot_up = rotation.apply(np.array([0, 0, 1]))
-        # if robot_up[2] < 0.75:
-        #     raise ValueError("Robot has toppled over")
+        rotation = R.from_quat(robot.get_orientation())
+        robot_up = rotation.apply(np.array([0, 0, 1]))
+        if robot_up[2] < 0.75:
+            raise ValueError("Robot has toppled over")
 
         # print("Reset robot pose to: ", robot_pose)
+
+    def _reset_scene(self, env):
+        # Reset the scene
+        super()._reset_scene(env)
+
+        # Reset objects
+        for obj_config in self._objects_config:
+            # Get object in the scene            
+            obj_name = obj_config['name']
+            obj = env.scene.object_registry("name", obj_name)
+            if obj is None:
+                raise ValueError("Object {} not found in scene".format(obj_name))
+            
+            # Set object pose
+            obj_pos = [0.0, 0.0, 0.0] if 'position' not in obj_config else obj_config['position']
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if 'orientation' not in obj_config else obj_config['orientation']
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):

@@ -427,10 +427,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Denote scene as not loaded yet
         self._loaded = False
         # TODO: Does this need to be here?
-        # og.sim.stop()
+        og.sim.stop()
         self._load_task(task_config=task_config)
         # TODO: Does this need to be here?
-        # og.sim.play()
+        og.sim.play()
 
         # Load obs / action spaces
         self.load_observation_space()

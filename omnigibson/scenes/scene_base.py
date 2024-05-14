@@ -310,7 +310,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_info = json.load(f)
             init_state = scene_info["state"]
             self.load_state(init_state, serialized=False)
-
         self._initial_state = init_state
 
     def _create_registry(self):
