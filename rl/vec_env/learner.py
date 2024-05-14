@@ -84,7 +84,7 @@ def instantiate_envs():
     # Decide whether to use a local environment or remote
     n_envs = args.n_envs if args.n_envs else 5
     config = _get_env_config()
-    del config["env"]["external_sensors"]
+    # del config["env"]["external_sensors"]
     config["task"]["precached_reset_pose_path"] = reset_poses_path
     env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
     env = VecFrameStack(env, n_stack=5)
