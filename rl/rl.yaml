@@ -69,9 +69,10 @@ task:
     eef_position_penalty_coef: 0.1
     eef_orientation_penalty_coef: 0.01
     regularization_coef: 0.01
-objects:
-  - type: DatasetObject
-    name: cologne
-    category: bottle_of_cologne
-    model: lyipur
-    position: [-0.3, -0.8, 0.5]
+  objects_config:
+    - type: DatasetObject
+      name: cologne
+      category: bottle_of_cologne
+      model: lyipur
+      position: [-0.3, -0.8, 0.5]
+      
