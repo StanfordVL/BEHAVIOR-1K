@@ -13,8 +13,9 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
+import wandb
 from service.telegym import GRPCClientVecEnv
-from stable_baselines3 import PPO, A2C
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     CallbackList,
@@ -27,11 +28,8 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from wandb.integration.sb3 import WandbCallback
-
-import wandb
 from wandb import AlertLevel
-
+from wandb.integration.sb3 import WandbCallback
 
 # Parse args
 # parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -86,12 +84,12 @@ class AfterEvalCallback(BaseCallback):
 
         return True
 
+
 def train():
 
     import omnigibson as og
-    from omnigibson.macros import gm
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
-
+    from omnigibson.macros import gm
 
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
@@ -101,7 +99,7 @@ def train():
     # n_envs = args.n_envs
     n_envs = 5
     config = _get_env_config()
-    # del config["env"]["external_sensors"]
+    del config["env"]["external_sensors"]
     config["task"]["precached_reset_pose_path"] = reset_poses_path
     env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
     env = VecFrameStack(env, n_stack=5)
@@ -195,13 +193,13 @@ def train():
             device="cuda",
             **config,
         )
-            # model = A2C(
-            #     env=env,
-            #     verbose=1,
-            #     tensorboard_log=tensorboard_log_dir,
-            #     device="cuda",
-            #     **config,
-            # )
+        # model = A2C(
+        #     env=env,
+        #     verbose=1,
+        #     tensorboard_log=tensorboard_log_dir,
+        #     device="cuda",
+        #     **config,
+        # )
         # else:
         #     model = PPO.load(args.checkpoint, env=env)
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
