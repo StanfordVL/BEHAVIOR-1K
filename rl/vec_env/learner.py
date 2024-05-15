@@ -13,6 +13,7 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
+import wandb
 from service.telegym import GRPCClientVecEnv
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.callbacks import (
@@ -27,10 +28,8 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from wandb.integration.sb3 import WandbCallback
-
-import wandb
 from wandb import AlertLevel
+from wandb.integration.sb3 import WandbCallback
 
 # Parse args
 # parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -98,7 +97,7 @@ def train():
 
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
-    n_envs = 2
+    n_envs = 32
     env_config = _get_env_config()
     env_config["task"]["precached_reset_pose_path"] = reset_poses_path
     del env_config["env"]["external_sensors"]
@@ -218,7 +217,7 @@ def train():
         after_eval_callback = AfterEvalCallback(env, eval_env)
         eval_callback = EvalCallback(
             eval_env,
-            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
+            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE * n_envs,
             callback_after_eval=after_eval_callback,
             verbose=1,
             best_model_save_path="logs/best_model",
