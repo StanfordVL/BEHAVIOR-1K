@@ -366,10 +366,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         joint_efforts = ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        try:
-            ori = T.quat2euler(quat)
-        except:
-            from IPython import embed; embed()
+        ori = T.quat2euler(quat)
 
         # Compute ori2d
         # TODO(parallel): Dedupe this code that is also used in get_2d_orientation
