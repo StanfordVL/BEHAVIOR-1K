@@ -97,7 +97,7 @@ def train():
 
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
-    n_envs = 5
+    n_envs = 32
     config = _get_env_config()
     del config["env"]["external_sensors"]
     config["task"]["precached_reset_pose_path"] = reset_poses_path
@@ -165,8 +165,8 @@ def train():
     else:
         config = {
             "policy": "MultiInputPolicy",
-            "n_steps": 512,
-            # "batch_size": 128,
+            "n_steps": STEPS_PER_EPISODE,
+            "batch_size": STEPS_PER_EPISODE,
             "gamma": 0.99,
             "gae_lambda": 0.9,
             # "n_epochs": 20,
@@ -211,7 +211,7 @@ def train():
         after_eval_callback = AfterEvalCallback(env, eval_env)
         eval_callback = EvalCallback(
             eval_env,
-            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE * n_envs,
+            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
             callback_after_eval=after_eval_callback,
             verbose=1,
             best_model_save_path="logs/best_model",
@@ -233,7 +233,7 @@ def train():
         log.info("Starting training...")
         wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
-            total_timesteps=4_000_000,
+            total_timesteps=10_000_000,
             callback=callback,
             # log_interval=4
         )
