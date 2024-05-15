@@ -99,13 +99,16 @@ def train():
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
     n_envs = 2
-    config = _get_env_config()
-    del config["env"]["external_sensors"]
-    config["task"]["precached_reset_pose_path"] = reset_poses_path
-    env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
+    env_config = _get_env_config()
+    env_config["task"]["precached_reset_pose_path"] = reset_poses_path
+    del env_config["env"]["external_sensors"]
+    env = SB3VectorEnvironment(n_envs, env_config, render_on_step=False)
     env = VecFrameStack(env, n_stack=5)
     env = VecMonitor(env, info_keywords=("is_success",))
-    eval_env = SB3VectorEnvironment(1, _get_env_config(), render_on_step=True)
+
+    eval_env_config = _get_env_config()
+    eval_env_config["task"]["precached_reset_pose_path"] = reset_poses_path
+    eval_env = SB3VectorEnvironment(1, eval_env_config, render_on_step=True)
     eval_env = VecFrameStack(eval_env, n_stack=5)
     eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
 
@@ -167,7 +170,7 @@ def train():
         log.info("Finished evaluation!")
         log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
     else:
-        config = {
+        algo_config = {
             "policy": "MultiInputPolicy",
             "n_steps": STEPS_PER_EPISODE,
             "batch_size": STEPS_PER_EPISODE,
@@ -195,7 +198,7 @@ def train():
             verbose=1,
             tensorboard_log=tensorboard_log_dir,
             device="cuda",
-            **config,
+            **algo_config,
         )
         # model = A2C(
         #     env=env,
