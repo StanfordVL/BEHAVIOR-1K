@@ -64,7 +64,7 @@ enroot start \
 ${ENV_KWARGS} \
 ${MOUNT_KWARGS} \
 ${CONTAINER_NAME} \
-micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium protobuf==3.20.2 grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && WANDB_API_KEY=$2 wandb agent behavior-rl/sb3/$1"
+micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install git+https://github.com/StanfordVL/bddl@develop gymnasium protobuf==3.20.2 grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/rl/vec_env && WANDB_API_KEY=$2 wandb agent behavior-rl/sb3/$1"
     
 
 wait
