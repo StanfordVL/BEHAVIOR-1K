@@ -436,7 +436,7 @@ class ManipulationRobot(BaseRobot):
         #     eef_link_idx, :, start_idx : start_idx + self.n_joints
         # ]
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
-            self.articulation_root_path, self.eef_link_names[arm]
+            self.articulation_root_path
         )[eef_link_idx, :, start_idx : start_idx + self.n_joints]
 
         # shape: (1, 6, n_joints) --> (eef_link, [vx,vy,vz,wx,wy,wz], n_joints)

@@ -962,16 +962,15 @@ class BatchControlViewAPIImpl:
         # Compute the relative position and orientation
         return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
 
-    def get_jacobian(self, prim_path, link_name):
+    def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
             self._read_cache["jacobians"] = self._view.get_jacobians()
 
         idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        return self._read_cache["jacobians"][idx][link_idx]
+        return self._read_cache["jacobians"][idx]
 
-    def get_relative_jacobian(self, prim_path, link_name):
-        jacobian = self.get_jacobian(prim_path, link_name)
+    def get_relative_jacobian(self, prim_path):
+        jacobian = self.get_jacobian(prim_path)
         ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.astype(np.float32)
         tf = np.zeros((1, 6, 6), dtype=np.float32)
         tf[:, :3, :3] = ori_t
