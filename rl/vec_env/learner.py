@@ -13,7 +13,6 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
-import wandb
 from service.telegym import GRPCClientVecEnv
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.callbacks import (
@@ -28,8 +27,10 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from wandb import AlertLevel
 from wandb.integration.sb3 import WandbCallback
+
+import wandb
+from wandb import AlertLevel
 
 # Parse args
 # parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -97,14 +98,14 @@ def train():
 
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
-    n_envs = 32
+    n_envs = 2
     config = _get_env_config()
     del config["env"]["external_sensors"]
     config["task"]["precached_reset_pose_path"] = reset_poses_path
     env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
     env = VecFrameStack(env, n_stack=5)
     env = VecMonitor(env, info_keywords=("is_success",))
-    eval_env = SB3VectorEnvironment(1, config, render_on_step=True)
+    eval_env = SB3VectorEnvironment(1, _get_env_config(), render_on_step=True)
     eval_env = VecFrameStack(eval_env, n_stack=5)
     eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
 
@@ -146,6 +147,9 @@ def train():
         record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
         video_length=STEPS_PER_EPISODE,
     )
+
+    eval_env.render()
+
     # Set the set
     set_random_seed(seed)
     # policy_kwargs = dict(
