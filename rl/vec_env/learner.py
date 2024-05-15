@@ -247,7 +247,7 @@ def train():
         after_eval_callback = AfterEvalCallback(env, eval_env)
         eval_callback = EvalCallback(
             eval_env,
-            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE * n_envs,
+            eval_freq=EVAL_EVERY_N_EPISODES * STEPS_PER_EPISODE,
             callback_after_eval=after_eval_callback,
             verbose=1,
             best_model_save_path="logs/best_model",
