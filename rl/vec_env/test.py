@@ -14,7 +14,7 @@ sys.path.append(parent_directory)
 import torch as th
 import torch.nn as nn
 from service.telegym import GRPCClientVecEnv
-from stable_baselines3 import A2C, PPO, SAC
+from stable_baselines3 import PPO, A2C, SAC
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     CallbackList,
@@ -67,8 +67,8 @@ def get_open_port():
     return port
 
 
-EVAL_EVERY_N_EPISODES = 10
-NUM_EVAL_EPISODES = 5
+EVAL_EVERY_N_EPISODES = 1
+NUM_EVAL_EPISODES = 2
 STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
 reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
 
@@ -88,8 +88,8 @@ class AfterEvalCallback(BaseCallback):
 def train():
 
     import omnigibson as og
-    from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
     from omnigibson.macros import gm
+    from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
 
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
@@ -97,23 +97,19 @@ def train():
 
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
-    n_envs = 32
-    env_config = _get_env_config()
-    env_config["task"]["precached_reset_pose_path"] = reset_poses_path
-    del env_config["env"]["external_sensors"]
-    env = SB3VectorEnvironment(n_envs, env_config, render_on_step=False)
+    n_envs = 5
+    config = _get_env_config()
+    # del config["env"]["external_sensors"]
+    config["task"]["precached_reset_pose_path"] = reset_poses_path
+    env = SB3VectorEnvironment(n_envs, config, render_on_step=False)
     env = VecFrameStack(env, n_stack=5)
     env = VecMonitor(env, info_keywords=("is_success",))
-
-    eval_env_config = _get_env_config()
-    eval_env_config["task"]["precached_reset_pose_path"] = reset_poses_path
-    eval_env = SB3VectorEnvironment(1, eval_env_config, render_on_step=True)
+    eval_env = SB3VectorEnvironment(1, config, render_on_step=True)
     eval_env = VecFrameStack(eval_env, n_stack=5)
     eval_env = VecMonitor(eval_env, info_keywords=("is_success",))
 
     prefix = ""
     seed = 0
-    # run = wandb.init(sync_tensorboard=True, monitor_gym=True)
     run = wandb.init(
         entity="behavior-rl",
         project="sb3",
@@ -141,9 +137,6 @@ def train():
         record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
         video_length=STEPS_PER_EPISODE,
     )
-
-    eval_env.render()
-
     # Set the set
     set_random_seed(seed)
     # policy_kwargs = dict(
@@ -161,10 +154,10 @@ def train():
         log.info("Finished evaluation!")
         log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
     else:
-        algo_config = {
+        config = {
             "policy": "MultiInputPolicy",
-            "n_steps": STEPS_PER_EPISODE,
-            "batch_size": STEPS_PER_EPISODE,
+            "n_steps": 512,
+            "batch_size": 128,
             "gamma": 0.99,
             "gae_lambda": 0.9,
             "n_epochs": 20,
@@ -182,61 +175,30 @@ def train():
                 "net_arch": {"pi": [512, 512], "vf": [512, 512]},
             },
         }
-        a2c_config = {
-            "policy": "MultiInputPolicy",
-            "n_steps": STEPS_PER_EPISODE,
-            "gamma": 0.99,
-            "gae_lambda": 0.9,
-            "ent_coef": 0.0,
-            "sde_sample_freq": 4,
-            "max_grad_norm": 0.5,
-            "vf_coef": 0.5,
-            "learning_rate": 3e-5,
-            "use_sde": True,
-            "policy_kwargs": {
-                "log_std_init": -2,
-                "ortho_init": False,
-                "activation_fn": nn.ReLU,
-                "net_arch": {"pi": [512, 512], "vf": [512, 512]},
-            },
-        }
-        sac_config = {
-            "policy": "MultiInputPolicy",
-            "batch_size": STEPS_PER_EPISODE,
-            "gamma": 0.99,
-            "ent_coef": 0.0,
-            "sde_sample_freq": 4,
-            "learning_rate": 3e-5,
-            "use_sde": True,
-            "policy_kwargs": {
-                "n_critics": 1,
-                "net_arch": [128, 64],
-            },
-        }
         tensorboard_log_dir = f"runs/{run.id}"
         # if args.checkpoint is None:
         if True:
-            # model = PPO(
-            #     env=env,
-            #     verbose=1,
-            #     tensorboard_log=tensorboard_log_dir,
-            #     device="cuda",
-            #     **algo_config,
-            # )
+            model = PPO(
+                env=env,
+                verbose=1,
+                tensorboard_log=tensorboard_log_dir,
+                device="cuda",
+                **config,
+            )
             # model = A2C(
             #     env=env,
             #     verbose=1,
             #     tensorboard_log=tensorboard_log_dir,
             #     device="cuda",
-            #     **a2c_config,
+            #     **config,
             # )
-            model = SAC(
-                env=env,
-                verbose=1,
-                tensorboard_log=tensorboard_log_dir,
-                device="cuda",
-                **sac_config,
-            )
+            # model = SAC(
+            #     env=env,
+            #     verbose=1,
+            #     tensorboard_log=tensorboard_log_dir,
+            #     device="cuda",
+            #     **config,
+            # )
         else:
             model = PPO.load(args.checkpoint, env=env)
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
@@ -270,9 +232,9 @@ def train():
         log.info("Starting training...")
         wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(
-            total_timesteps=10_000_000,
+            total_timesteps=4_000_000,
             callback=callback,
-            log_interval=4
+            # log_interval=4
         )
         log.info("Finished training!")
 
