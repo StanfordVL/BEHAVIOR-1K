@@ -63,7 +63,7 @@ enroot start \
 ${ENV_KWARGS} \
 ${MOUNT_KWARGS} \
 ${CONTAINER_NAME} \
-micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/test_fps.py"
+micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /omnigibson-src/workspace && python -u /omnigibson-src/rl/test_multiple_envs.py"
 
 CONTAINER_NAME=omnigibson_${GPU_ID}
 
