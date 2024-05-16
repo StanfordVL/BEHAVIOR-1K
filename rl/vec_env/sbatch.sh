@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:titanrtx:1
 #SBATCH --array=0-1
 
-IMAGE_PATH="/cvgl2/u/garlanka/omnigibson.sqsh"
+IMAGE_PATH="/cvgl2/u/${SLURM_JOB_USER}/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
@@ -24,18 +24,18 @@ for env_var in "${!ENVS[@]}"; do
     ENV_KWARGS="${ENV_KWARGS} --env ${env_var}=${ENVS[${env_var}]}"
 done
 
-mkdir -p /scr-ssd/garlanka/rl-workspace/logs
-mkdir -p /scr-ssd/garlanka/rl-workspace/runs
-mkdir -p /scr-ssd/garlanka/rl-workspace/videos
-mkdir -p /scr-ssd/garlanka/rl-workspace/wandb
+mkdir -p /scr-ssd/${SLURM_JOB_USER}/rl-workspace/logs
+mkdir -p /scr-ssd/${SLURM_JOB_USER}/rl-workspace/runs
+mkdir -p /scr-ssd/${SLURM_JOB_USER}/rl-workspace/videos
+mkdir -p /scr-ssd/${SLURM_JOB_USER}/rl-workspace/wandb
 
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
     [/scr-ssd/og-data-0-2-1]=/data
-    [/scr-ssd/garlanka/rl-workspace/logs]=/omnigibson-src/rl/vec_env/logs
-    [/scr-ssd/garlanka/rl-workspace/runs]=/omnigibson-src/rl/vec_env/runs
-    [/scr-ssd/garlanka/rl-workspace/videos]=/omnigibson-src/rl/vec_env/videos
-    [/scr-ssd/garlanka/rl-workspace/wandb]=/omnigibson-src/rl/vec_env/wandb
+    [/scr-ssd/self/rl-workspace/logs]=/omnigibson-src/rl/vec_env/logs
+    [/scr-ssd/${SLURM_JOB_USER}/rl-workspace/runs]=/omnigibson-src/rl/vec_env/runs
+    [/scr-ssd/${SLURM_JOB_USER}/rl-workspace/videos]=/omnigibson-src/rl/vec_env/videos
+    [/scr-ssd/${SLURM_JOB_USER}/rl-workspace/wandb]=/omnigibson-src/rl/vec_env/wandb
     [${ISAAC_CACHE_PATH}/isaac-sim/kit/cache/Kit]=/isaac-sim/kit/cache/Kit
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/ov]=/root/.cache/ov
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/pip]=/root/.cache/pip
