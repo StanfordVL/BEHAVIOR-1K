@@ -401,6 +401,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_external_sensors()
 
     def post_play_load(self):
+        # Save the state
+        self.scene.update_initial_state()
+
         # Load the obs / action spaces
         self.load_observation_space()
         self._load_action_space()

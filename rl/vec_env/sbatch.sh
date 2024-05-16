@@ -24,9 +24,18 @@ for env_var in "${!ENVS[@]}"; do
     ENV_KWARGS="${ENV_KWARGS} --env ${env_var}=${ENVS[${env_var}]}"
 done
 
+mkdir -p /scr-ssd/garlanka/rl-workspace/logs
+mkdir -p /scr-ssd/garlanka/rl-workspace/runs
+mkdir -p /scr-ssd/garlanka/rl-workspace/videos
+mkdir -p /scr-ssd/garlanka/rl-workspace/wandb
+
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
     [/scr-ssd/og-data-0-2-1]=/data
+    [/scr-ssd/garlanka/rl-workspace/logs]=/omnigibson-src/rl/vec_env/logs
+    [/scr-ssd/garlanka/rl-workspace/runs]=/omnigibson-src/rl/vec_env/runs
+    [/scr-ssd/garlanka/rl-workspace/videos]=/omnigibson-src/rl/vec_env/videos
+    [/scr-ssd/garlanka/rl-workspace/wandb]=/omnigibson-src/rl/vec_env/wandb
     [${ISAAC_CACHE_PATH}/isaac-sim/kit/cache/Kit]=/isaac-sim/kit/cache/Kit
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/ov]=/root/.cache/ov
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/pip]=/root/.cache/pip

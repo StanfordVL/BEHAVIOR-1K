@@ -3,7 +3,6 @@ import os
 import random
 
 import numpy as np
-from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
@@ -13,6 +12,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
 )
 from omnigibson.macros import gm
+from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
@@ -33,12 +33,7 @@ class GraspTask(BaseTask):
     """
 
     def __init__(
-        self,
-        obj_name,
-        termination_config=None,
-        reward_config=None,
-        precached_reset_pose_path=None,
-        objects_config=None
+        self, obj_name, termination_config=None, reward_config=None, precached_reset_pose_path=None, objects_config=None
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
@@ -62,9 +57,9 @@ class GraspTask(BaseTask):
                 )
                 # Import the object into the simulator and set the pose
                 env.scene.add_object(obj)
-            
-            obj_pos = [0.0, 0.0, 0.0] if 'position' not in obj_config else obj_config['position']
-            obj_orn = [0.0, 0.0, 0.0, 1.0] if 'orientation' not in obj_config else obj_config['orientation']
+
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
             obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
             obj.set_position_orientation(obj_pos, obj_orn)
 
@@ -88,6 +83,7 @@ class GraspTask(BaseTask):
         #    self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
         robot = env.robots[0]
+        robot.release_grasp_immediately()
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
@@ -165,15 +161,15 @@ class GraspTask(BaseTask):
 
         # Reset objects
         for obj_config in self._objects_config:
-            # Get object in the scene            
-            obj_name = obj_config['name']
+            # Get object in the scene
+            obj_name = obj_config["name"]
             obj = env.scene.object_registry("name", obj_name)
             if obj is None:
                 raise ValueError("Object {} not found in scene".format(obj_name))
-            
+
             # Set object pose
-            obj_pos = [0.0, 0.0, 0.0] if 'position' not in obj_config else obj_config['position']
-            obj_orn = [0.0, 0.0, 0.0, 1.0] if 'orientation' not in obj_config else obj_config['orientation']
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
             obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
             obj.set_position_orientation(obj_pos, obj_orn)
 
