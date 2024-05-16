@@ -158,7 +158,7 @@ class VisionSensor(BaseSensor):
             self.all_modalities
         ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
-        modalities = set([modalities]) if isinstance(modalities, str) else modalities
+        modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
 
         # 1) seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
         # 2) bounding box observations require seg_semantic to be enabled (for remapping bounding box semantic IDs)
