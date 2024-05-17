@@ -1,9 +1,11 @@
 import argparse
+from collections import defaultdict
 import logging
 import os
 import socket
 import sys
 
+import numpy as np
 import yaml
 
 log = logging.getLogger(__name__)
@@ -72,8 +74,39 @@ STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
 reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
 
 
-class AfterEvalCallback(BaseCallback):
+class ReportInfosCallback(BaseCallback):
+    # Get the monitoring keys. These are reward_ + the keys in the info
+    # dict in grasp_reward.py
+    MONITORING_KEYS = [
+        "reward_regularization_penalty_factor",
+        "reward_position_penalty_factor",
+        "reward_rotation_penalty_factor",
+        "reward_collision_penalty_factor",
+        "reward_grasp_reward_factor",
+        "reward_pregrasp_dist",
+        "reward_pregrasp_dist_reward_factor",
+        "reward_postgrasp_dist",
+        "reward_postgrasp_dist_reward_factor",
+    ]
 
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+
+    def _on_step(self) -> bool:
+        assert "infos" in self.locals, "`infos` variable is not defined, please check your code next to `callback.on_step()`"
+        by_key = defaultdict(list)
+        for info in self.locals["infos"]:
+            for key, value in info.items():
+                if key in self.MONITORING_KEYS:
+                    by_key[key].append(value)
+
+        for key, values in by_key.items():
+            self.logger.record(key.replace("reward_", "reward/"), np.mean(values))
+
+        return True
+
+
+class AfterEvalCallback(BaseCallback):
     def __init__(self, env, eval_env, verbose=0):
         super(AfterEvalCallback, self).__init__(verbose)
         self.env = env
