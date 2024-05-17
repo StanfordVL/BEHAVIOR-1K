@@ -86,12 +86,12 @@ class FrankaPanda(ManipulationRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
-            end_effector (str): type of end effector to use. One of {"gripper", "allegro", "leap_right", "leap_left"}
+            end_effector (str): type of end effector to use. One of {"gripper", "allegro", "leap_right", "leap_left", "inspire"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # store end effector information
-        self._end_effector = end_effector
+        self.end_effector = end_effector
         if end_effector == "gripper":
             self._model_name = "franka_panda"
             self._gripper_control_idx = np.arange(7, 9)
@@ -149,6 +149,29 @@ class FrankaPanda(ManipulationRobot):
                 GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
                 GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
                 GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+            ]
+        elif end_effector == "inspire":
+            self._model_name = f"franka_{end_effector}"
+            # thumb.proximal, ..., thumb.tip, ..., ring.tip
+            self._gripper_control_idx = np.array([7, 12, 17, 18, 8, 13, 9, 14, 10, 15, 11, 16])
+            self._eef_link_names = "palm_center"
+            hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
+            self._finger_link_names = [f"link{i}" for i in hand_part_names]
+            self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
+            # position where the hand is parallel to the ground
+            self.__default_joint_pos = np.concatenate(([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(12)))
+            self._teleop_rotation_offset = np.array([0, 0, 0.707, 0.707])
+            # TODO: add ag support for inspire hand
+            self._ag_start_points = [
+                # GraspingPoint(link_name=f"base_link", position=[0, -0.025, 0.035]),
+                # GraspingPoint(link_name=f"base_link", position=[0, 0.03, 0.035]),
+                # GraspingPoint(link_name=f"link14", position=[-0.0115, -0.07, -0.015]),
+            ]
+            self._ag_end_points = [
+                # GraspingPoint(link_name=f"link22", position=[-0.0115, -0.06, 0.015]),
+                # GraspingPoint(link_name=f"link32", position=[-0.0115, -0.06, 0.015]),
+                # GraspingPoint(link_name=f"link42", position=[-0.0115, -0.06, 0.015]),
+                # GraspingPoint(link_name=f"link52", position=[-0.0115, -0.06, 0.015]),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for FrankaPanda")
@@ -212,7 +235,7 @@ class FrankaPanda(ManipulationRobot):
     def _default_gripper_multi_finger_controller_configs(self):
         conf = super()._default_gripper_multi_finger_controller_configs
         # If the end effector is not a gripper, set the mode to independent
-        if self._end_effector != "gripper":
+        if self.end_effector != "gripper":
             conf[self.default_arm]["mode"] = "independent"
             conf[self.default_arm]["command_input_limits"] = None
         return conf
@@ -283,5 +306,10 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def disabled_collision_pairs(self):
-        # allegro has self collisions
-        return [["link_12_0", "part_studio_link"]] if self._end_effector == "allegro" else []
+        # some dexhand has self collisions that needs to be filtered out
+        if self.end_effector == "allegro":
+            return [["link_12_0", "part_studio_link"]]
+        elif self.end_effector == "inspire":
+            return [["base_link", "link12"]]
+        else:
+            return []
