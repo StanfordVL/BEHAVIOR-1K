@@ -64,7 +64,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     cfg = {
-        "env": {"use_floor_plane": True},
         "scene": {
             "type": "Scene",
         },

@@ -71,9 +71,6 @@ def assert_test_env():
     global env
     if env is None:
         cfg = {
-            "env": {
-                "use_floor_plane": True,
-            },
             "scene": {
                 "type": "Scene",
             },

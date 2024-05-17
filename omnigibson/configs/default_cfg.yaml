@@ -2,7 +2,6 @@ env:
   action_frequency: 60              # (int): environment executes action at the action_frequency rate
   physics_frequency: 60             # (int): physics frequency (1 / physics_timestep for physx)
   device: null                      # (None or str): specifies the device to be used if running on the gpu with torch backend
-  use_floor_plane: True             # (bool): whether to use a floor plane or not
 
 render:
   viewer_width: 1280

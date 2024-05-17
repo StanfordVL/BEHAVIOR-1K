@@ -113,11 +113,9 @@ def clear():
     sim._callbacks_on_import_obj = dict()
     sim._callbacks_on_remove_obj = dict()
 
-    use_floor_plane = sim._use_floor_plane
-
     lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
     sim = None
-    sim = launch(use_floor_plane=use_floor_plane)
+    sim = launch()
 
 
 def cleanup(*args, **kwargs):

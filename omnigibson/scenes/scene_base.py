@@ -65,11 +65,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def __init__(
         self,
         scene_file=None,
+        use_floor_plane=True,
     ):
         """
         Args:
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
+            use_floor_plane (bool): whether to load a flat floor plane into the simulator
         """
         # Store internal variables
         self.scene_file = scene_file
@@ -79,6 +81,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim = None
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
+        self._use_floor_plane = use_floor_plane
 
         # Call super init
         super().__init__()
@@ -199,6 +202,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def initialized(self):
         return self._initialized
+
+    @property
+    def use_floor_plane(self):
+        return self._use_floor_plane
 
     def prebuild(self):
         """

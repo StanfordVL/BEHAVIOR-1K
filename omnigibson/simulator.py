@@ -258,7 +258,6 @@ def launch_simulator(*args, **kwargs):
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            use_floor_plane=False,
             floor_plane_visible=True,
             floor_plane_color=(1.0, 1.0, 1.0),
             use_skybox=True,
@@ -272,7 +271,6 @@ def launch_simulator(*args, **kwargs):
 
             # Store vars needed for initialization
             self.gravity = gravity
-            self._use_floor_plane = use_floor_plane
             self._floor_plane_visible = floor_plane_visible
             self._floor_plane_color = floor_plane_color
             self._use_skybox = use_skybox
@@ -365,35 +363,6 @@ def launch_simulator(*args, **kwargs):
             # Disable collision between building structures and fixed base objects
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
-
-            # We just add a ground plane if requested
-            if self._use_floor_plane:
-                plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-                    prim_path="/World/ground_plane",
-                    name="ground_plane",
-                    z_position=0,
-                    size=None,
-                    color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
-                    visible=self._floor_plane_visible,
-                    # TODO: update with new PhysicsMaterial API
-                    # static_friction=static_friction,
-                    # dynamic_friction=dynamic_friction,
-                    # restitution=restitution,
-                )
-
-                self._floor_plane = XFormPrim(
-                    relative_prim_path="/ground_plane",
-                    name=plane.name,
-                    load_config={"created_manually": True},
-                )
-                self._floor_plane.load(None)
-
-                # Assign floors category to the floor plane
-                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-                    prim=self._floor_plane.prim,
-                    semantic_label="floors",
-                    type_label="class",
-                )
 
             # Also add skybox if requested
             if self._use_skybox:
@@ -567,6 +536,39 @@ def launch_simulator(*args, **kwargs):
                 width (int): viewer width, in pixels
             """
             self._viewer_camera.image_width = width
+
+        def add_ground_plane(self):
+            """
+            Generate a ground plane into the simulator.
+            """
+            if self._floor_plane is not None:
+                return
+            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+                prim_path="/World/ground_plane",
+                name="ground_plane",
+                z_position=0,
+                size=None,
+                color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
+                visible=self._floor_plane_visible,
+                # TODO: update with new PhysicsMaterial API
+                # static_friction=static_friction,
+                # dynamic_friction=dynamic_friction,
+                # restitution=restitution,
+            )
+
+            self._floor_plane = XFormPrim(
+                relative_prim_path="/ground_plane",
+                name=plane.name,
+                load_config={"created_manually": True},
+            )
+            self._floor_plane.load(None)
+
+            # Assign floors category to the floor plane
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=self._floor_plane.prim,
+                semantic_label="floors",
+                type_label="class",
+            )
 
         def set_lighting_mode(self, mode):
             """

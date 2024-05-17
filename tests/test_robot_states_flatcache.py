@@ -24,9 +24,6 @@ def setup_environment(flatcache):
 
     # Define the environment configuration
     config = {
-        "env": {
-            "use_floor_plane": True,
-        },
         "scene": {
             "type": "Scene",
         },
