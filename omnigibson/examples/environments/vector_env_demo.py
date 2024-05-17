@@ -12,6 +12,9 @@ import omnigibson as og
 from omnigibson.macros import gm
 
 
+NUM_STEPS = 100
+
+
 def main():
     # Load the config
     gm.RENDER_VIEWER_CAMERA = False
@@ -27,12 +30,20 @@ def main():
     import time
 
     while True:
-        actions = []
         start_time = time.time()
-        for e in vec_env.envs:
-            actions.append(e.action_space.sample())
-        vec_env.step(actions)
-        print("fps", 1 / (time.time() - start_time))
+        for _ in range(NUM_STEPS):
+            actions = []
+            for e in vec_env.envs:
+                actions.append(e.action_space.sample())
+            vec_env.step(actions)
+
+        step_time = time.time() - start_time
+        fps = NUM_STEPS / step_time
+        effective_fps = NUM_STEPS * len(vec_env.envs) / step_time
+        print("fps", fps)
+        print("effective fps", effective_fps)
+
+        i += 1
 
 
 if __name__ == "__main__":
