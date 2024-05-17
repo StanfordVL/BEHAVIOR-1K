@@ -11,7 +11,6 @@ import yaml
 import omnigibson as og
 from omnigibson.macros import gm
 
-
 NUM_STEPS = 100
 
 
