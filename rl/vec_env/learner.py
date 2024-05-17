@@ -271,6 +271,7 @@ def train():
             )
         else:
             model = PPO.load(args.checkpoint, env=env)
+        report_infos_callback = ReportInfosCallback()
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
@@ -290,6 +291,7 @@ def train():
         )
         callback = CallbackList(
             [
+                report_infos_callback,
                 wandb_callback,
                 checkpoint_callback,
                 eval_callback,
