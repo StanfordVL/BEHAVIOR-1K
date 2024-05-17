@@ -57,38 +57,48 @@ class GraspReward(BaseRewardFunction):
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
         info["regularization_penalty_factor"] = action_mag
+        info["regularization_penalty"] = regularization_penalty
 
         # Penalize based on the magnitude of the action
         eef_pos = robot.get_eef_position(robot.default_arm)
         info["position_penalty_factor"] = 0.0
+        info["position_penalty"] = 0.0
         if self.prev_eef_pos is not None:
             eef_pos_delta = T.l2_distance(self.prev_eef_pos, eef_pos)
             position_penalty = -eef_pos_delta * self.eef_position_penalty_coef
             reward += position_penalty
             info["position_penalty_factor"] = eef_pos_delta
+            info["position_penalty"] = position_penalty
         self.prev_eef_pos = eef_pos
 
         eef_rot = R.from_quat(robot.get_eef_orientation(robot.default_arm))
         info["rotation_penalty_factor"] = 0.0
+        info["rotation_penalty"] = 0.0
         if self.prev_eef_rot is not None:
             delta_rot = (eef_rot * self.prev_eef_rot.inv()).magnitude()
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
             info["rotation_penalty_factor"] = delta_rot
+            info["rotation_penalty"] = rotation_penalty
         self.prev_eef_rot = eef_rot
 
         # Penalize robot for colliding with an object
         info["collision_penalty_factor"] = 0.0
+        info["collision_penalty"] = 0.0
         if detect_robot_collision_in_sim(robot, filter_objs=[self.obj]):
-            reward -= self.collision_penalty
+            reward += -self.collision_penalty
             info["collision_penalty_factor"] = 1.
+            info["collision_penalty"] = -self.collision_penalty
 
         # If we're not currently grasping
         info["grasp_reward_factor"] = 0.0
+        info["grasp_reward"] = 0.0
         info["pregrasp_dist"] = 0.0
         info["pregrasp_dist_reward_factor"] = 0.0
+        info["pregrasp_dist_reward"] = 0.0
         info["postgrasp_dist"] = 0.0
         info["postgrasp_dist_reward_factor"] = 0.0
+        info["postgrasp_dist_reward"] = 0.0
         if not current_grasping:
             # TODO: If we dropped the object recently, penalize for that
             obj_center = self.obj.get_position()
@@ -97,10 +107,12 @@ class GraspReward(BaseRewardFunction):
             reward += dist_reward
             info["pregrasp_dist"] = dist
             info["pregrasp_dist_reward_factor"] = math.exp(-dist)
+            info["pregrasp_dist_reward"] = dist_reward
         else:
             # We are currently grasping - first apply a grasp reward
             reward += self.grasp_reward
             info["grasp_reward_factor"] = 1.
+            info["grasp_reward"] = self.grasp_reward
 
             # Then apply a distance reward to take us to a tucked position
             robot_center = robot.links["torso_lift_link"].get_position()
@@ -110,6 +122,7 @@ class GraspReward(BaseRewardFunction):
             reward += dist_reward
             info["postgrasp_dist"] = dist
             info["postgrasp_dist_reward_factor"] = math.exp(-dist)
+            info["postgrasp_dist_reward"] = dist_reward
 
         self.prev_grasping = current_grasping
 

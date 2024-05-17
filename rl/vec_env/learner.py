@@ -79,14 +79,21 @@ class ReportInfosCallback(BaseCallback):
     # dict in grasp_reward.py
     MONITORING_KEYS = [
         "reward_regularization_penalty_factor",
+        "reward_regularization_penalty",
         "reward_position_penalty_factor",
+        "reward_position_penalty",
         "reward_rotation_penalty_factor",
+        "reward_rotation_penalty",
         "reward_collision_penalty_factor",
+        "reward_collision_penalty",
         "reward_grasp_reward_factor",
+        "reward_grasp_reward",
         "reward_pregrasp_dist",
         "reward_pregrasp_dist_reward_factor",
+        "reward_pregrasp_dist_reward",
         "reward_postgrasp_dist",
         "reward_postgrasp_dist_reward_factor",
+        "reward_postgrasp_dist_reward",
     ]
 
     def __init__(self, verbose=0):
@@ -100,8 +107,10 @@ class ReportInfosCallback(BaseCallback):
                 if key in self.MONITORING_KEYS:
                     by_key[key].append(value)
 
+        assert len(by_key) == len(self.MONITORING_KEYS), "Some keys are missing in the monitoring keys"
         for key, values in by_key.items():
-            self.logger.record(key.replace("reward_", "reward/"), np.mean(values))
+            updated_key = "reward/" + key[len("reward_"):]
+            self.logger.record(updated_key, np.mean(values))
 
         return True
 
