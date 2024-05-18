@@ -1,9 +1,11 @@
 import argparse
+from collections import defaultdict
 import logging
 import os
 import socket
 import sys
 
+import numpy as np
 import yaml
 
 log = logging.getLogger(__name__)
@@ -72,8 +74,48 @@ STEPS_PER_EPISODE = _get_env_config()["task"]["termination_config"]["max_steps"]
 reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
 
 
-class AfterEvalCallback(BaseCallback):
+class ReportInfosCallback(BaseCallback):
+    # Get the monitoring keys. These are reward_ + the keys in the info
+    # dict in grasp_reward.py
+    MONITORING_KEYS = [
+        "reward_regularization_penalty_factor",
+        "reward_regularization_penalty",
+        "reward_position_penalty_factor",
+        "reward_position_penalty",
+        "reward_rotation_penalty_factor",
+        "reward_rotation_penalty",
+        "reward_collision_penalty_factor",
+        "reward_collision_penalty",
+        "reward_grasp_reward_factor",
+        "reward_grasp_reward",
+        "reward_pregrasp_dist",
+        "reward_pregrasp_dist_reward_factor",
+        "reward_pregrasp_dist_reward",
+        "reward_postgrasp_dist",
+        "reward_postgrasp_dist_reward_factor",
+        "reward_postgrasp_dist_reward",
+    ]
 
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+
+    def _on_step(self) -> bool:
+        assert "infos" in self.locals, "`infos` variable is not defined, please check your code next to `callback.on_step()`"
+        by_key = defaultdict(list)
+        for info in self.locals["infos"]:
+            for key, value in info.items():
+                if key in self.MONITORING_KEYS:
+                    by_key[key].append(value)
+
+        assert len(by_key) == len(self.MONITORING_KEYS), "Some keys are missing in the monitoring keys"
+        for key, values in by_key.items():
+            updated_key = "reward/" + key[len("reward_"):]
+            self.logger.record(updated_key, np.mean(values))
+
+        return True
+
+
+class AfterEvalCallback(BaseCallback):
     def __init__(self, env, eval_env, verbose=0):
         super(AfterEvalCallback, self).__init__(verbose)
         self.env = env
@@ -238,6 +280,7 @@ def train():
             )
         else:
             model = PPO.load(args.checkpoint, env=env)
+        report_infos_callback = ReportInfosCallback()
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
@@ -257,6 +300,7 @@ def train():
         )
         callback = CallbackList(
             [
+                report_infos_callback,
                 wandb_callback,
                 checkpoint_callback,
                 eval_callback,

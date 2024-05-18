@@ -563,6 +563,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Hacky way of getting the success condition
         info["is_success"] = info["reward"]["grasp"]["grasp_success"]
+        info.update({("reward_" + k): v for k, v in info["reward"]["grasp"].items()})
 
         return obs, reward, terminated, truncated, info
 
