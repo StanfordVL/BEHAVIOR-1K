@@ -88,14 +88,15 @@ class GraspTask(BaseTask):
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            robot_pose = random.choice(self._reset_poses)
-            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = np.array(robot_pose["base_pos"])
-            robot_orn = np.array(robot_pose["base_ori"])
-            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
-            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
-            robot.set_position_orientation(robot_pos, robot_orn)
+            pass
+            # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            # robot_pose = random.choice(self._reset_poses)
+            # robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            # robot_pos = np.array(robot_pose["base_pos"])
+            # robot_orn = np.array(robot_pose["base_ori"])
+            # # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            # robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            # robot.set_position_orientation(robot_pos, robot_orn)
 
         # Otherwise, reset using the primitive controller.
         else:
