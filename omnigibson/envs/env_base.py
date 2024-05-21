@@ -484,6 +484,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Possibly flatten obs if requested
         if self._flatten_obs_space:
             obs = recursively_generate_flat_dict(dic=obs)
+
         return obs, info
 
     def get_scene_graph(self):

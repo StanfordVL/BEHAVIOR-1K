@@ -457,7 +457,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
 
-    def apply_ref(self, prim, *args, attempts=1):
+    def apply_ref(self, prim, *args, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
@@ -477,40 +477,36 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         errors = []
         for _ in range(attempts):
-            # # Attempt
-            # success = False
-            # try:
-            #     yield from ctrl(*args)
-            #     success = True
-            # except ActionPrimitiveError as e:
-            #     print(e)
-            #     errors.append(e)
+            # Attempt
+            success = False
+            try:
+                yield from ctrl(*args)
+                success = True
+            except ActionPrimitiveError as e:
+                errors.append(e)
 
-            yield from ctrl(*args)
+            try:
+                # If we're not holding anything, release the hand so it doesn't stick to anything else.
+                if not self._get_obj_in_hand():
+                    yield from self._execute_release()
+            except ActionPrimitiveError:
+                pass
 
-            # try:
-            #     # If we're not holding anything, release the hand so it doesn't stick to anything else.
-            #     if not self._get_obj_in_hand():
-            #         yield from self._execute_release()
-            # except ActionPrimitiveError:
-            #     pass
+            try:
+                # Make sure we retract the arm after every step
+                yield from self._reset_hand()
+            except ActionPrimitiveError:
+                pass
 
-            # try:
-            #     # Make sure we retract the arm after every step
-            #     yield from self._reset_hand()
-            # except ActionPrimitiveError:
-            #     pass
-
-            # try:
-            #     # Settle before returning.
-            #     yield from self._settle_robot()
-            # except ActionPrimitiveError:
-            #     pass
+            try:
+                # Settle before returning.
+                yield from self._settle_robot()
+            except ActionPrimitiveError:
+                pass
 
             # Stop on success
-            # if success:
-            #     return
-            return
+            if success:
+                return
 
         raise ActionPrimitiveErrorGroup(errors)
 
@@ -993,7 +989,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Plan has %d steps", len(plan))
         for i, joint_pos in enumerate(plan):
             indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-            # indented_print("target: %r", joint_pos)
             yield from self._move_hand_direct_joint(joint_pos, ignore_failure=True)
 
     def _move_hand_ik(self, eef_pose, stop_if_stuck=False):
@@ -1073,9 +1068,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Store the previous eef pose for checking if we got stuck
         prev_eef_pos = np.zeros(3)
 
-        # TODO: This indicates something is wrong with our joint ordering.
-        joints = list(self.robot.joints.values())
-
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = np.array(joint_pos) - np.array(current_joint_pos)
@@ -1094,9 +1086,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action[self.robot.controller_action_idx[controller_name]] = joint_pos
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
-            postproc = self._postprocess_action(action)
-            # indented_print("action: %r", postproc)
-            yield postproc
+            yield self._postprocess_action(action)
 
         if not ignore_failure:
             raise ActionPrimitiveError(
