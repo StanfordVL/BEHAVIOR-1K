@@ -299,7 +299,7 @@ def plan_arm_motion(
 
     if solved:
         # try to shorten the path
-        # ss.simplifySolution()
+        ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
