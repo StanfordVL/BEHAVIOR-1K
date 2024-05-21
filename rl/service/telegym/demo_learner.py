@@ -2,6 +2,7 @@ import sys
 
 from stable_baselines3 import A2C
 from stable_baselines3.common.vec_env import VecFrameStack, VecMonitor, VecVideoRecorder
+
 from .grpc_client_vec_env import GRPCClientVecEnv
 
 n_envs = int(sys.argv[1])

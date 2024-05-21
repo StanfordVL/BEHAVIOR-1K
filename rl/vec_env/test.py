@@ -13,8 +13,9 @@ sys.path.append(parent_directory)
 
 import torch as th
 import torch.nn as nn
+import wandb
 from service.telegym import GRPCClientVecEnv
-from stable_baselines3 import PPO, A2C, SAC
+from stable_baselines3 import A2C, PPO, SAC
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     CallbackList,
@@ -27,10 +28,8 @@ from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMonitor, VecVideoRecorder
-from wandb.integration.sb3 import WandbCallback
-
-import wandb
 from wandb import AlertLevel
+from wandb.integration.sb3 import WandbCallback
 
 # Parse args
 # parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
@@ -85,11 +84,12 @@ class AfterEvalCallback(BaseCallback):
 
         return True
 
+
 def train():
 
     import omnigibson as og
-    from omnigibson.macros import gm
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
+    from omnigibson.macros import gm
 
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False

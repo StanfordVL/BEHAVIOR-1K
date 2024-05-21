@@ -1,9 +1,9 @@
 import argparse
-from collections import defaultdict
 import logging
 import os
 import socket
 import sys
+from collections import defaultdict
 
 import numpy as np
 import yaml
@@ -100,7 +100,9 @@ class ReportInfosCallback(BaseCallback):
         super().__init__(verbose)
 
     def _on_step(self) -> bool:
-        assert "infos" in self.locals, "`infos` variable is not defined, please check your code next to `callback.on_step()`"
+        assert (
+            "infos" in self.locals
+        ), "`infos` variable is not defined, please check your code next to `callback.on_step()`"
         by_key = defaultdict(list)
         for info in self.locals["infos"]:
             for key, value in info.items():
@@ -109,7 +111,7 @@ class ReportInfosCallback(BaseCallback):
 
         assert len(by_key) == len(self.MONITORING_KEYS), "Some keys are missing in the monitoring keys"
         for key, values in by_key.items():
-            updated_key = "reward/" + key[len("reward_"):]
+            updated_key = "reward/" + key[len("reward_") :]
             self.logger.record(updated_key, np.mean(values))
 
         return True
@@ -125,6 +127,7 @@ class AfterEvalCallback(BaseCallback):
         self.env.reset()
 
         return True
+
 
 def train():
 
@@ -312,11 +315,7 @@ def train():
         log.info(f"model: {model}")
         log.info("Starting training...")
         wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
-        model.learn(
-            total_timesteps=10_000_000,
-            callback=callback,
-            log_interval=4
-        )
+        model.learn(total_timesteps=10_000_000, callback=callback, log_interval=4)
         log.info("Finished training!")
 
 

@@ -12,12 +12,12 @@ from PIL import Image
 from tqdm import tqdm
 
 import omnigibson as og
-from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
+from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.sensors.scan_sensor import ScanSensor
@@ -74,7 +74,7 @@ def main(iterations):
     action_generator = KeyboardRobotController(robot=robot)
     action_generator.print_keyboard_teleop_info()
     # pose = controller._get_robot_pose_from_2d_pose([-0.433881, -0.210183, -2.0118])
-    pose = ([-0.433881, -0.210183,  0.01], [ 0.,  0., -0.8446441, 0.53532825])
+    pose = ([-0.433881, -0.210183, 0.01], [0.0, 0.0, -0.8446441, 0.53532825])
     robot.set_position_orientation(*pose)
     # obj = env.scene.object_registry("name", "cologne")
     while True:

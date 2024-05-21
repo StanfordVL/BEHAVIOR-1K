@@ -21,9 +21,11 @@ from omnigibson.macros import gm
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 
+
 def pause_step(time):
-    for _ in range(int(time*100)):
+    for _ in range(int(time * 100)):
         og.sim.step()
+
 
 def get_random_joint_position(robot):
     joint_positions = []
@@ -64,13 +66,7 @@ def main(iterations):
             {
                 "type": "Fetch",
                 "obs_modalities": ["proprio"],
-                "proprio_obs": [
-                    "joint_qpos",
-                    "joint_qvel",
-                    "eef_0_pos",
-                    "eef_0_quat",
-                    "grasp_0"
-                ],
+                "proprio_obs": ["joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -152,7 +148,9 @@ def main(iterations):
         selected_joint_pos = None
         selected_base_pose = None
         try:
-            with PlanningContext(env, primitive_controller.robot, primitive_controller.robot_copy, "original") as context:
+            with PlanningContext(
+                env, primitive_controller.robot, primitive_controller.robot_copy, "original"
+            ) as context:
                 for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
                     joint_pos, joint_control_idx = get_random_joint_position(robot)
                     initial_joint_pos[control_idx_in_joint_pos] = joint_pos

@@ -42,6 +42,7 @@ def replay_controller(env, filename):
     for action in actions:
         env.step(action)
 
+
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "rl.yaml"))

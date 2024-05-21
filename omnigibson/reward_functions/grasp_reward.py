@@ -87,7 +87,7 @@ class GraspReward(BaseRewardFunction):
         info["collision_penalty"] = 0.0
         if detect_robot_collision_in_sim(robot, filter_objs=[self.obj]):
             reward += -self.collision_penalty
-            info["collision_penalty_factor"] = 1.
+            info["collision_penalty_factor"] = 1.0
             info["collision_penalty"] = -self.collision_penalty
 
         # If we're not currently grasping
@@ -111,7 +111,7 @@ class GraspReward(BaseRewardFunction):
         else:
             # We are currently grasping - first apply a grasp reward
             reward += self.grasp_reward
-            info["grasp_reward_factor"] = 1.
+            info["grasp_reward_factor"] = 1.0
             info["grasp_reward"] = self.grasp_reward
 
             # Then apply a distance reward to take us to a tucked position
