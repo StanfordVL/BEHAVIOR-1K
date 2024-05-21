@@ -9,7 +9,8 @@ VALID_MODES = {
     "binary",
     "ternary",
     "smooth",
-    "smooth_delta" "independent",
+    "smooth_delta",
+    "independent",
 }
 
 

@@ -62,6 +62,7 @@ def setup_environment(load_object_categories):
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = False
         gm.ENABLE_FLATCACHE = False
+        gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()
@@ -93,7 +94,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
                 return False
     finally:
         # Clear the sim
-        og.sim.clear()
+        og.clear()
 
     return True
 

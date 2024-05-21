@@ -431,7 +431,7 @@ class AttachedTo(
                 if self.parent != attached_obj:
                     log.warning(f"parent reference is not updated after attachment")
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["attached_obj_uuid"]], dtype=float)
 
     def deserialize(self, state):

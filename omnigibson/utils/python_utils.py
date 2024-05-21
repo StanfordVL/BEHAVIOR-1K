@@ -291,6 +291,42 @@ def get_uuid(name, n_digits=8):
     return abs(hash(name)) % (10**n_digits)
 
 
+class StringIntegerMapper:
+    def __init__(self):
+        self._string_to_int = {}
+        self._int_to_string = {}
+        self.next_integer = 0
+
+    def string_to_int(self, s):
+        """
+        Adds a string to the mapping system if not already added and returns the assigned integer.
+
+        Args:
+            s (str): The string to map to an integer.
+
+        Returns:
+            int: The integer assigned to the string.
+        """
+        if s not in self._string_to_int:
+            # Assign a new integer to the string
+            self._string_to_int[s] = self.next_integer
+            self._int_to_string[self.next_integer] = s
+            self.next_integer += 1
+        return self._string_to_int[s]
+
+    def int_to_string(self, i):
+        """
+        Retrieves the string associated with the given integer.
+
+        Args:
+            i (int): The integer to look up in the mapping.
+
+        Returns:
+            str or None: The string associated with the integer, or None if not found.
+        """
+        return self._int_to_string.get(i, None)
+
+
 def camel_case_to_snake_case(camel_case_text):
     """
     Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
@@ -450,20 +486,6 @@ class Serializable:
             )
         self._load_state(state=state)
 
-    def _serialize(self, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
-
     def serialize(self, state):
         """
         Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
@@ -476,8 +498,7 @@ class Serializable:
         Returns:
             n-array: encoded + serialized, 1D numerical np.array capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return self._serialize(state=state)
+        raise NotImplementedError()
 
     def deserialize(self, state):
         """
@@ -562,21 +583,6 @@ class SerializableNonInstance:
         cls._load_state(state=state)
 
     @classmethod
-    def _serialize(cls, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
-
-    @classmethod
     def serialize(cls, state):
         """
         Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
@@ -589,8 +595,8 @@ class SerializableNonInstance:
         Returns:
             n-array: encoded + serialized, 1D numerical np.array capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return cls._serialize(state=state)
+        # Simply returns self.serialize() for now. this is for future proofing
+        return NotImplementedError()
 
     @classmethod
     def deserialize(cls, state):

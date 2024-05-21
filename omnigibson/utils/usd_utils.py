@@ -2,6 +2,7 @@ import collections
 import itertools
 import math
 import os
+import re
 from collections.abc import Iterable
 
 import numpy as np
@@ -255,7 +256,7 @@ class RigidContactAPIImpl:
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             for scene_idx, _ in enumerate(og.sim.scenes):
-                # TODO(parallel): How to make this work with the floor plane?
+                # TODO: How to make this work with the floor plane?
                 # If there are no collidable objects in the scene, skip.
                 if len(column_filters[scene_idx]) == 0:
                     continue
@@ -747,54 +748,55 @@ class PoseAPI:
         return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
-class ControllableObjectViewAPI:
+class BatchControlViewAPIImpl:
     """
     A centralized view that allows for reading and writing to an ArticulationView that covers all
     controllable objects in the scene. This is used to avoid the overhead of reading from many views
     for each robot in each physics step, a source of significant overhead.
     """
 
-    # The unified ArticulationView used to access all of the controllable objects in the scene.
-    _VIEW = None
+    def __init__(self, pattern):
+        # The prim path pattern that will be passed into the view
+        self._pattern = pattern
 
-    # Cache for all of the view functions' return values within the same simulation step.
-    # Keyed by function name without get_, the value is the return value of the function.
-    _READ_CACHE = {}
+        # The unified ArticulationView used to access all of the controllable objects in the scene.
+        self._view = None
 
-    # Cache for all of the view functions' write values within the same simulation step.
-    # Keyed by the function name without set_, the value is the set of indices that need to be updated.
-    _WRITE_IDX_CACHE = collections.defaultdict(set)
+        # Cache for all of the view functions' return values within the same simulation step.
+        # Keyed by function name without get_, the value is the return value of the function.
+        self._read_cache = {}
 
-    # Mapping from prim path to index in the view.
-    _IDX = {}
+        # Cache for all of the view functions' write values within the same simulation step.
+        # Keyed by the function name without set_, the value is the set of indices that need to be updated.
+        self._write_idx_cache = collections.defaultdict(set)
 
-    # Mapping from prim idx to a dict that maps link name to link index in the view.
-    _LINK_IDX = {}
+        # Mapping from prim path to index in the view.
+        self._idx = {}
 
-    @classmethod
-    def clear(cls):
-        cls._READ_CACHE = {}
-        cls._WRITE_IDX_CACHE = collections.defaultdict(set)
+        # Mapping from prim idx to a dict that maps link name to link index in the view.
+        self._link_idx = {}
 
-    @classmethod
-    def flush_control(cls):
-        if "dof_position_targets" in cls._WRITE_IDX_CACHE:
-            pos_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_position_targets"]))
-            pos_targets = cls._READ_CACHE["dof_position_targets"]
-            cls._VIEW.set_dof_position_targets(pos_targets, np.array(pos_indices))
+    def clear(self):
+        self._read_cache = {}
+        self._write_idx_cache = collections.defaultdict(set)
 
-        if "dof_velocity_targets" in cls._WRITE_IDX_CACHE:
-            vel_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_velocity_targets"]))
-            vel_targets = cls._READ_CACHE["dof_velocity_targets"]
-            cls._VIEW.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
+    def flush_control(self):
+        if "dof_position_targets" in self._write_idx_cache:
+            pos_indices = np.array(sorted(self._write_idx_cache["dof_position_targets"]))
+            pos_targets = self._read_cache["dof_position_targets"]
+            self._view.set_dof_position_targets(pos_targets, np.array(pos_indices))
 
-        if "dof_actuation_forces" in cls._WRITE_IDX_CACHE:
-            eff_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_actuation_forces"]))
-            eff_targets = cls._READ_CACHE["dof_actuation_forces"]
-            cls._VIEW.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
+        if "dof_velocity_targets" in self._write_idx_cache:
+            vel_indices = np.array(sorted(self._write_idx_cache["dof_velocity_targets"]))
+            vel_targets = self._read_cache["dof_velocity_targets"]
+            self._view.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
 
-    @classmethod
-    def initialize_view(cls):
+        if "dof_actuation_forces" in self._write_idx_cache:
+            eff_indices = np.array(sorted(self._write_idx_cache["dof_actuation_forces"]))
+            eff_targets = self._read_cache["dof_actuation_forces"]
+            self._view.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
+
+    def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.objects.controllable_object import ControllableObject
 
@@ -816,6 +818,11 @@ class ControllableObjectViewAPI:
         }
         expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
 
+        # Apply the pattern
+        expected_prim_paths = {
+            prim_path for prim_path in expected_prim_paths if re.fullmatch(self._pattern.replace("*", ".*"), prim_path)
+        }
+
         # Make sure we have at least one controllable object
         if len(expected_prim_paths) == 0:
             return
@@ -823,197 +830,199 @@ class ControllableObjectViewAPI:
         # Create the actual articulation view. Note that even though we search for base_link here,
         # the returned things will not necessarily be the base_link prim paths, but the appropriate
         # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
-        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/scene_*/controllable_*/base_link")
-        view_prim_paths = cls._VIEW.prim_paths
+        self._view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
+        view_prim_paths = self._view.prim_paths
         assert (
             set(view_prim_paths) == expected_prim_paths
         ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
 
         # Create the mapping from prim path to index
-        cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
-        cls._LINK_IDX = [
+        self._idx = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
+        self._link_idx = [
             {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
-            for articulation_link_paths in cls._VIEW.link_paths
+            for articulation_link_paths in self._view.link_paths
         ]
 
-    @classmethod
-    def set_joint_position_targets(cls, prim_path, positions, indices):
+    def set_joint_position_targets(self, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
-        idx = cls._IDX[prim_path]
+        idx = self._idx[prim_path]
 
         # Load the current targets.
-        if "dof_position_targets" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
+        if "dof_position_targets" not in self._read_cache:
+            self._read_cache["dof_position_targets"] = self._view.get_dof_position_targets()
 
         # Update the target
-        cls._READ_CACHE["dof_position_targets"][idx][indices] = positions
+        self._read_cache["dof_position_targets"][idx][indices] = positions
 
         # Add this index to the write cache
-        cls._WRITE_IDX_CACHE["dof_position_targets"].add(idx)
+        self._write_idx_cache["dof_position_targets"].add(idx)
 
-    @classmethod
-    def set_joint_velocity_targets(cls, prim_path, velocities, indices):
+    def set_joint_velocity_targets(self, prim_path, velocities, indices):
         assert len(indices) == len(velocities), "Indices and values must have the same length"
-        idx = cls._IDX[prim_path]
+        idx = self._idx[prim_path]
 
         # Load the current targets.
-        if "dof_velocity_targets" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
+        if "dof_velocity_targets" not in self._read_cache:
+            self._read_cache["dof_velocity_targets"] = self._view.get_dof_velocity_targets()
 
         # Update the target
-        cls._READ_CACHE["dof_velocity_targets"][idx][indices] = velocities
+        self._read_cache["dof_velocity_targets"][idx][indices] = velocities
 
         # Add this index to the write cache
-        cls._WRITE_IDX_CACHE["dof_velocity_targets"].add(idx)
+        self._write_idx_cache["dof_velocity_targets"].add(idx)
 
-    @classmethod
-    def set_joint_efforts(cls, prim_path, efforts, indices):
+    def set_joint_efforts(self, prim_path, efforts, indices):
         assert len(indices) == len(efforts), "Indices and values must have the same length"
-        idx = cls._IDX[prim_path]
+        idx = self._idx[prim_path]
 
         # Load the current targets.
-        if "dof_actuation_forces" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
+        if "dof_actuation_forces" not in self._read_cache:
+            self._read_cache["dof_actuation_forces"] = self._view.get_dof_actuation_forces()
 
         # Update the target
-        cls._READ_CACHE["dof_actuation_forces"][idx][indices] = efforts
+        self._read_cache["dof_actuation_forces"][idx][indices] = efforts
 
         # Add this index to the write cache
-        cls._WRITE_IDX_CACHE["dof_actuation_forces"].add(idx)
+        self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    @classmethod
-    def get_position_orientation(cls, prim_path):
-        if "root_transforms" not in cls._READ_CACHE:
-            cls._READ_CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
+    def get_position_orientation(self, prim_path):
+        if "root_transforms" not in self._read_cache:
+            self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
-        idx = cls._IDX[prim_path]
-        pose = cls._READ_CACHE["root_transforms"][idx]
+        idx = self._idx[prim_path]
+        pose = self._read_cache["root_transforms"][idx]
         return pose[:3], pose[3:]
 
-    @classmethod
-    def get_linear_velocity(cls, prim_path):
-        if "root_velocities" not in cls._READ_CACHE:
-            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+    def get_linear_velocity(self, prim_path):
+        if "root_velocities" not in self._read_cache:
+            self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["root_velocities"][idx][:3]
+        idx = self._idx[prim_path]
+        return self._read_cache["root_velocities"][idx][:3]
 
-    @classmethod
-    def get_angular_velocity(cls, prim_path):
-        if "root_velocities" not in cls._READ_CACHE:
-            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+    def get_angular_velocity(self, prim_path):
+        if "root_velocities" not in self._read_cache:
+            self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["root_velocities"][idx][3:]
+        idx = self._idx[prim_path]
+        return self._read_cache["root_velocities"][idx][3:]
 
-    @classmethod
-    def get_relative_linear_velocity(cls, prim_path):
-        orn = cls.get_position_orientation(prim_path)[1]
-        linvel = cls.get_linear_velocity(prim_path)
+    def get_relative_linear_velocity(self, prim_path):
+        orn = self.get_position_orientation(prim_path)[1]
+        linvel = self.get_linear_velocity(prim_path)
         return T.quat2mat(orn).T @ linvel
 
-    @classmethod
-    def get_relative_angular_velocity(cls, prim_path):
-        orn = cls.get_position_orientation(prim_path)[1]
-        angvel = cls.get_angular_velocity(prim_path)
+    def get_relative_angular_velocity(self, prim_path):
+        orn = self.get_position_orientation(prim_path)[1]
+        angvel = self.get_angular_velocity(prim_path)
         return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
 
-    @classmethod
-    def get_joint_positions(cls, prim_path):
-        if "dof_positions" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
+    def get_joint_positions(self, prim_path):
+        if "dof_positions" not in self._read_cache:
+            self._read_cache["dof_positions"] = self._view.get_dof_positions()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["dof_positions"][idx]
+        idx = self._idx[prim_path]
+        return self._read_cache["dof_positions"][idx]
 
-    @classmethod
-    def get_joint_velocities(cls, prim_path):
-        if "dof_velocities" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
+    def get_joint_velocities(self, prim_path):
+        if "dof_velocities" not in self._read_cache:
+            self._read_cache["dof_velocities"] = self._view.get_dof_velocities()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["dof_velocities"][idx]
+        idx = self._idx[prim_path]
+        return self._read_cache["dof_velocities"][idx]
 
-    @classmethod
-    def get_joint_efforts(cls, prim_path):
-        if "dof_projected_joint_forces" not in cls._READ_CACHE:
-            cls._READ_CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
+    def get_joint_efforts(self, prim_path):
+        if "dof_projected_joint_forces" not in self._read_cache:
+            self._read_cache["dof_projected_joint_forces"] = self._view.get_dof_projected_joint_forces()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["dof_projected_joint_forces"][idx]
+        idx = self._idx[prim_path]
+        return self._read_cache["dof_projected_joint_forces"][idx]
 
-    @classmethod
-    def get_mass_matrix(cls, prim_path):
-        if "mass_matrices" not in cls._READ_CACHE:
-            cls._READ_CACHE["mass_matrices"] = cls._VIEW.get_mass_matrices()
+    def get_mass_matrix(self, prim_path):
+        if "mass_matrices" not in self._read_cache:
+            self._read_cache["mass_matrices"] = self._view.get_mass_matrices()
 
-        idx = cls._IDX[prim_path]
+        idx = self._idx[prim_path]
         # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
-        return cls._READ_CACHE["mass_matrices"][idx]
+        return self._read_cache["mass_matrices"][idx]
 
-    @classmethod
-    def get_generalized_gravity_forces(cls, prim_path):
-        if "generalized_gravity_forces" not in cls._READ_CACHE:
-            cls._READ_CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
+    def get_generalized_gravity_forces(self, prim_path):
+        if "generalized_gravity_forces" not in self._read_cache:
+            self._read_cache["generalized_gravity_forces"] = self._view.get_generalized_gravity_forces()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["generalized_gravity_forces"][idx]
+        idx = self._idx[prim_path]
+        return self._read_cache["generalized_gravity_forces"][idx]
 
-    @classmethod
-    def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        if "coriolis_and_centrifugal_forces" not in cls._READ_CACHE:
-            cls._READ_CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
+    def get_coriolis_and_centrifugal_forces(self, prim_path):
+        if "coriolis_and_centrifugal_forces" not in self._read_cache:
+            self._read_cache["coriolis_and_centrifugal_forces"] = self._view.get_coriolis_and_centrifugal_forces()
 
-        idx = cls._IDX[prim_path]
-        return cls._READ_CACHE["coriolis_and_centrifugal_forces"][idx]
+        idx = self._idx[prim_path]
+        return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
-    @classmethod
-    def get_link_relative_position_orientation(cls, prim_path, link_name):
-        if "link_transforms" not in cls._READ_CACHE:
-            cls._READ_CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
+    def get_link_relative_position_orientation(self, prim_path, link_name):
+        if "link_transforms" not in self._read_cache:
+            self._read_cache["link_transforms"] = self._view.get_link_transforms()
 
-        idx = cls._IDX[prim_path]
-        link_idx = cls._LINK_IDX[idx][link_name]
-        pose = cls._READ_CACHE["link_transforms"][idx][link_idx]
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        pose = self._read_cache["link_transforms"][idx][link_idx]
         pos, orn = pose[:3], pose[3:]
 
         # Get the root world transform too
-        world_pos, world_orn = cls.get_position_orientation(prim_path)
+        world_pos, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
         return T.relative_pose_transform(pos, orn, world_pos, world_orn)
 
-    @classmethod
-    def get_link_relative_linear_velocity(cls, prim_path, link_name):
-        if "link_velocities" not in cls._READ_CACHE:
-            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+    def get_link_relative_linear_velocity(self, prim_path, link_name):
+        if "link_velocities" not in self._read_cache:
+            self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
-        idx = cls._IDX[prim_path]
-        link_idx = cls._LINK_IDX[idx][link_name]
-        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        vel = self._read_cache["link_velocities"][idx][link_idx]
         linvel = vel[:3]
 
         # Get the root world transform too
-        _, world_orn = cls.get_position_orientation(prim_path)
+        _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
         return T.quat2mat(world_orn).T @ linvel
 
-    @classmethod
-    def get_link_relative_angular_velocity(cls, prim_path, link_name):
-        if "link_velocities" not in cls._READ_CACHE:
-            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+    def get_link_relative_angular_velocity(self, prim_path, link_name):
+        if "link_velocities" not in self._read_cache:
+            self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
-        idx = cls._IDX[prim_path]
-        link_idx = cls._LINK_IDX[idx][link_name]
-        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        vel = self._read_cache["link_velocities"][idx][link_idx]
         angvel = vel[3:]
 
         # Get the root world transform too
-        _, world_orn = cls.get_position_orientation(prim_path)
+        _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
         return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
+
+    def get_jacobian(self, prim_path):
+        if "jacobians" not in self._read_cache:
+            self._read_cache["jacobians"] = self._view.get_jacobians()
+
+        idx = self._idx[prim_path]
+        return self._read_cache["jacobians"][idx]
+
+    def get_relative_jacobian(self, prim_path):
+        jacobian = self.get_jacobian(prim_path)
+        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.astype(np.float32)
+        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        tf[:, :3, :3] = ori_t
+        tf[:, 3:, 3:] = ori_t
+        return tf @ jacobian
+
+
+ControllableObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/controllable_*/base_link")
+DummyObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/dummy_*/base_link")
 
 
 def clear():
@@ -1023,6 +1032,7 @@ def clear():
     PoseAPI.invalidate()
     CollisionAPI.clear()
     ControllableObjectViewAPI.clear()
+    DummyObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
@@ -1257,40 +1267,33 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     return volume, com
 
 
-def check_extent_radius_ratio(mesh_prim):
+def check_extent_radius_ratio(geom_prim, com):
     """
-    Checks if the min extent in world frame and the extent radius ratio in local frame of @mesh_prim is within the
+    Checks if the min extent in world frame and the extent radius ratio in local frame of @geom_prim is within the
     acceptable range for PhysX GPU acceleration (not too thin, and not too oblong)
 
     Ref: https://github.com/NVIDIA-Omniverse/PhysX/blob/561a0df858d7e48879cdf7eeb54cfe208f660f18/physx/source/geomutils/src/convex/GuConvexMeshData.h#L183-L190
 
     Args:
-        mesh_prim (Usd.Prim): Mesh prim to check
+        geom_prim (GeomPrim): Geom prim to check
+        com (np.array): Center of mass of the mesh. Obtained from get_mesh_volume_and_com
 
     Returns:
         bool: True if the min extent (world) and the extent radius ratio (local frame) is acceptable, False otherwise
     """
-    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    mesh_type = geom_prim.prim.GetPrimTypeInfo().GetTypeName()
     # Non-mesh prims are always considered to be within the acceptable range
     if mesh_type != "Mesh":
         return True
 
-    trimesh_mesh_world = mesh_prim_to_trimesh_mesh(
-        mesh_prim, include_normals=False, include_texcoord=False, world_frame=True
-    )
-    min_extent = trimesh_mesh_world.extents.min()
+    extent = geom_prim.extent
+    min_extent = extent.min()
     # If the mesh is too flat in the world frame, omniverse cannot create convex mesh for it
     if min_extent < 1e-5:
         return False
 
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(
-        mesh_prim, include_normals=False, include_texcoord=False, world_frame=False
-    )
-    if not trimesh_mesh.is_volume:
-        trimesh_mesh = trimesh_mesh.convex_hull
-
-    max_radius = trimesh_mesh.extents.max() / 2.0
-    min_radius = trimesh.proximity.closest_point(trimesh_mesh, np.array([trimesh_mesh.center_mass]))[1][0]
+    max_radius = extent.max() / 2.0
+    min_radius = np.min(np.linalg.norm(geom_prim.points - com, axis=-1), axis=0)
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
@@ -1387,6 +1390,10 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     Returns:
         str: Absolute prim path in the stage
     """
+    # Special case for OmniGraph prims
+    if relative_prim_path.startswith("/OmniGraph"):
+        return relative_prim_path
+
     # Make sure the relative path is actually relative
     assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
 
@@ -1409,6 +1416,10 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     Returns:
         str: Relative prim path in the scene
     """
+    # Special case for OmniGraph prims
+    if absolute_prim_path.startswith("/OmniGraph"):
+        return absolute_prim_path
+
     assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"
 
     # When the scene is set to None, this prim is not in a scene but is global e.g. like the
@@ -1420,3 +1431,43 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
         return absolute_prim_path[len("/World") :]
 
     return absolute_prim_path[len(scene.prim_path) :]
+
+
+def deep_copy_prim(source_root_prim, dest_stage, dest_root_path):
+    queue = [(source_root_prim, dest_root_path)]
+
+    while queue:
+        source_prim, dest_path = queue.pop(0)
+
+        # Create a new prim in the destination stage with the same type as the source
+        if source_prim.GetTypeName():
+            dest_prim = dest_stage.DefinePrim(dest_path, source_prim.GetTypeName())
+        else:
+            dest_prim = dest_stage.OverridePrim(dest_path)
+
+        # Copy attributes
+        for attr in source_prim.GetAttributes():
+            # Create a new attribute with the same specifications
+            dest_attr = dest_prim.CreateAttribute(
+                attr.GetName(), attr.GetTypeName(), attr.IsCustom(), attr.GetVariability()
+            )
+
+            # Check if the source attribute has a value
+            if attr.HasValue():
+                # Copy the value
+                dest_attr.Set(attr.Get())
+
+        # Copy relationships
+        for rel in source_prim.GetRelationships():
+            dest_rel = dest_prim.CreateRelationship(rel.GetName(), rel.IsCustom())
+            targets = rel.GetTargets()
+            updated_targets = [
+                x.ReplacePrefix(source_root_prim.GetPath(), lazy.pxr.Sdf.Path(dest_root_path)) for x in targets
+            ]
+            if targets:
+                dest_rel.SetTargets(updated_targets)
+
+        # Copy child prims breadth-first
+        for child in source_prim.GetAllChildren():
+            new_dest_path = dest_path + "/" + child.GetName()
+            queue.append((child, new_dest_path))

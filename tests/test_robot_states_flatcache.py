@@ -17,6 +17,7 @@ def setup_environment(flatcache):
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = flatcache  # Set based on function parameter
+        gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()
@@ -29,15 +30,9 @@ def setup_environment(flatcache):
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": "all",
+                "obs_modalities": ["rgb", "seg_semantic", "seg_instance"],
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
-                "controller_config": {
-                    "arm_0": {
-                        "name": "NullJointController",
-                        "motor_type": "position",
-                    },
-                },
             }
         ],
     }
@@ -114,7 +109,7 @@ def camera_pose_test(flatcache):
     new_camera_world_pose = vision_sensor.get_position_orientation()
     assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
 
-    og.sim.clear()
+    og.clear()
 
 
 def test_camera_pose_flatcache_on():

@@ -71,9 +71,6 @@ def assert_test_env():
     global env
     if env is None:
         cfg = {
-            "env": {
-                "use_floor_plane": True,
-            },
             "scene": {
                 "type": "Scene",
             },
@@ -186,6 +183,8 @@ def assert_test_env():
             gm.ENABLE_OBJECT_STATES = True
             gm.USE_GPU_DYNAMICS = True
             gm.ENABLE_FLATCACHE = False
+            # TODO(parallel-hang): temporarily disable transition rules; fix later
+            gm.ENABLE_TRANSITION_RULES = False
         else:
             # Make sure sim is stopped
             og.sim.stop()
@@ -244,7 +243,7 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
 
 
-def remove_all_systems():
-    for system in ParticleRemover.supported_active_systems.values():
+def remove_all_systems(scene):
+    for system in scene.get_active_systems():
         system.remove_all_particles()
     og.sim.step()

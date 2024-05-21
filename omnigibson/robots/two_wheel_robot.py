@@ -78,8 +78,8 @@ class TwoWheelRobot(LocomotionRobot):
         ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
         # Add info
-        dic["dd_base_lin_vel"] = lin_vel  # lin_vel is already 1D np array of length 1
-        dic["dd_base_ang_vel"] = ang_vel  # lin_vel is already 1D np array of length 1
+        dic["dd_base_lin_vel"] = np.array([lin_vel])
+        dic["dd_base_ang_vel"] = np.array([ang_vel])
 
         return dic
 

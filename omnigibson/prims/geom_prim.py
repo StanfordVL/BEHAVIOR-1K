@@ -396,11 +396,6 @@ class CollisionGeomPrim(GeomPrim):
             weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
                                                       materials, otherwise False. Defaults to False.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if weaker_than_descendants:
             self._binding_api.Bind(
                 physics_material.material,
@@ -423,11 +418,6 @@ class CollisionGeomPrim(GeomPrim):
         Returns:
             PhysicsMaterial: the current applied physics material.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if self._applied_physics_material is not None:
             return self._applied_physics_material
         else:

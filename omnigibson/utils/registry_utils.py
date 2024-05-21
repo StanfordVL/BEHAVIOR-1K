@@ -131,6 +131,11 @@ class Registry:
                 None is default, which corresponds to all keys
         """
         keys = self.all_keys if keys is None else keys
+        # If this is a system object, we don't need to store its prim_path
+        from omnigibson.systems.system_base import BaseSystem
+
+        if isinstance(obj, BaseSystem):
+            keys = [k for k in keys if k != "prim_path"]
         for k in keys:
             obj_attr = self._get_obj_attr(obj=obj, attr=k)
             # Standardize input as a list
@@ -274,6 +279,16 @@ class Registry:
         return list(self.get_dict(self.default_key).values())
 
     @property
+    def object_names(self):
+        """
+        Get the names of the objects in this registry
+
+        Returns:
+            list of str: Names of the instances owned by this registry
+        """
+        return [obj.name for obj in self.objects]
+
+    @property
     def all_keys(self):
         """
         Returns:
@@ -340,7 +355,7 @@ class SerializableRegistry(Registry, Serializable):
                 continue
             obj.load_state(state[obj.name], serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Iterate over the entire dict and flatten
         return (
             np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects])
@@ -357,6 +372,6 @@ class SerializableRegistry(Registry, Serializable):
             log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
-            state_dict[obj.name], deserialized_items = obj._deserialize(state[idx:])
+            state_dict[obj.name], deserialized_items = obj.deserialize(state[idx:])
             idx += deserialized_items
         return state_dict, idx

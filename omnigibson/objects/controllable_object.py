@@ -12,7 +12,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, DummyObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -558,8 +558,10 @@ class ControllableObject(BaseObject):
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
         # TODO: Move gravity force computation dummy to this class instead of BaseRobot
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
-            self.articulation_root_path if not self.fixed_base else self._dummy.articulation_root_path
+        fcns["gravity_force"] = lambda: (
+            ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
+            if not self.fixed_base
+            else DummyObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
             self.articulation_root_path
@@ -604,9 +606,9 @@ class ControllableObject(BaseObject):
         for controller_name, controller in self._controllers.items():
             controller.load_state(state=controller_states[controller_name])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
         controller_states_flat = np.concatenate(
@@ -618,12 +620,12 @@ class ControllableObject(BaseObject):
 
     def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c._deserialize(state=state[idx:])
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 

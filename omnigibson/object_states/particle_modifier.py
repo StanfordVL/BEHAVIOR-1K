@@ -18,17 +18,7 @@ from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.systems.system_base import (
-    REGISTERED_SYSTEMS,
-    BaseSystem,
-    PhysicalParticleSystem,
-    VisualParticleSystem,
-    get_system,
-    is_fluid_system,
-    is_physical_particle_system,
-    is_system_active,
-    is_visual_particle_system,
-)
+from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
@@ -243,10 +233,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._current_step = None
         self._projection_mesh_params = projection_mesh_params
 
-        # Parse conditions
-        self._conditions = self._parse_conditions(conditions=conditions)
         # Run super method
         super().__init__(obj)
+
+        # Parse conditions
+        self._conditions = self._parse_conditions(conditions=conditions)
 
     @property
     def conditions(self):
@@ -292,7 +283,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         return True, None
 
     @classmethod
-    def postprocess_ability_params(cls, params):
+    def postprocess_ability_params(cls, params, scene):
         """
         Post-processes ability parameters to ensure the system names (rather than synsets) are used for conditions.
         """
@@ -301,7 +292,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         for sys in list(params["conditions"].keys()):
             # The original key can be either a system name or a system synset. If it's a synset, we need to convert it.
-            system_name = sys if sys in REGISTERED_SYSTEMS.keys() else get_system_name_by_synset(sys)
+            system_name = sys if sys in scene.system_registry.object_names else get_system_name_by_synset(sys)
             params["conditions"][system_name] = params["conditions"].pop(sys)
             conds = params["conditions"][system_name]
             if conds is None:
@@ -309,7 +300,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             for cond in conds:
                 cond_type, cond_sys = cond
                 if cond_type == ParticleModifyCondition.SATURATED:
-                    cond[1] = cond_sys if cond_sys in REGISTERED_SYSTEMS.keys() else get_system_name_by_synset(cond_sys)
+                    cond[1] = (
+                        cond_sys
+                        if cond_sys in scene.system_registry.object_names
+                        else get_system_name_by_synset(cond_sys)
+                    )
         return params
 
     def _initialize(self):
@@ -475,10 +470,10 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
         for system_name in self.conditions.keys():
-            system = get_system(system_name, force_active=False)
+            system = self.obj.scene.get_system(system_name, force_active=False)
             limit = (
                 self.visual_particle_modification_limit
-                if is_visual_particle_system(system_name=system.name)
+                if self.obj.scene.is_visual_particle_system(system_name=system.name)
                 else self.physical_particle_modification_limit
             )
             self.obj.states[Saturated].set_limit(system=system, limit=limit)
@@ -509,7 +504,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         if condition_type == ParticleModifyCondition.FUNCTION:
             cond = value
         elif condition_type == ParticleModifyCondition.SATURATED:
-            cond = lambda obj: is_system_active(value) and obj.states[Saturated].get_value(get_system(value))
+            cond = lambda obj: self.obj.scene.is_system_active(value) and obj.states[Saturated].get_value(
+                self.obj.scene.get_system(value)
+            )
         elif condition_type == ParticleModifyCondition.TOGGLEDON:
             cond = lambda obj: obj.states[ToggledOn].get_value() == value
         elif condition_type == ParticleModifyCondition.GRAVITY:
@@ -559,7 +556,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # the particle modifier isn't already limited with the specific number of particles)
         for system_name, conds in conditions.items():
             # Make sure the system is supported
-            assert is_visual_particle_system(system_name) or is_physical_particle_system(
+            assert self.obj.scene.is_visual_particle_system(system_name) or self.obj.scene.is_physical_particle_system(
                 system_name
             ), f"Unsupported system for ParticleModifier: {system_name}"
             # Make sure conds isn't empty and is a list
@@ -605,7 +602,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        system = get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_active=False)
 
         def condition(obj):
             return not self.obj.states[Saturated].get_value(system=system)
@@ -661,7 +658,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if system_name in self.conditions:
                     # Check if all conditions are met
                     if self.check_conditions_for_system(system_name):
-                        system = get_system(system_name)
+                        system = self.obj.scene.get_system(system_name)
                         # Sanity check to see if the modifier has reached its limit for this system
                         if self.obj.states[Saturated].get_value(system=system):
                             continue
@@ -691,13 +688,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         """
         raise NotImplementedError()
 
-    @classproperty
-    def supported_active_systems(cls):
+    @property
+    def supported_active_systems(self):
         """
         Returns:
             dict: Maps system names to corresponding systems used in this state that are active, dynamic across time
         """
-        return dict(**VisualParticleSystem.get_active_systems(), **PhysicalParticleSystem.get_active_systems())
+        return {system.name: system for system in self.obj.scene.get_active_systems()}
 
     @property
     def systems_to_check(self):
@@ -748,7 +745,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def _load_state(self, state):
         self._current_step = state["current_step"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["current_step"]], dtype=float)
 
     def deserialize(self, state):
@@ -849,16 +846,16 @@ class ParticleRemover(ParticleModifier):
 
         # Create set of default system to condition mappings based on settings
         all_conditions = dict()
-        for system_name in REGISTERED_SYSTEMS.keys():
+        for system_name in self.obj.scene.system_registry.object_names:
             # If the system is already explicitly specified in conditions, continue
             if system_name in conditions:
                 continue
             # Since fluid system is a subclass of physical system, we need to check for fluid first
-            elif is_fluid_system(system_name):
+            elif self.obj.scene.is_fluid_system(system_name):
                 default_system_conditions = self._default_fluid_conditions
-            elif is_physical_particle_system(system_name):
+            elif self.obj.scene.is_physical_particle_system(system_name):
                 default_system_conditions = self._default_non_fluid_conditions
-            elif is_visual_particle_system(system_name):
+            elif self.obj.scene.is_visual_particle_system(system_name):
                 default_system_conditions = self._default_visual_conditions
             else:
                 # Don't process any other systems, continue
@@ -882,7 +879,7 @@ class ParticleRemover(ParticleModifier):
             return
 
         # Check the system
-        if is_visual_particle_system(system_name=system.name):
+        if self.obj.scene.is_visual_particle_system(system_name=system.name):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             particle_positions = system.get_particles_position_orientation()[0]
             inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
@@ -917,7 +914,7 @@ class ParticleRemover(ParticleModifier):
             function: Generated condition function with signature fcn(obj) --> bool, returning True if there is at least
                 one particle in the given system @system_name
         """
-        system = get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_active=False)
         return lambda obj: system.initialized and system.n_particles > 0
 
     @property
@@ -1024,8 +1021,8 @@ class ParticleApplier(ParticleModifier):
 
         system_name = list(self.conditions.keys())[0]
 
-        # get_system will initialize the system if it's not initialized already.
-        system = get_system(system_name)
+        # This will initialize the system if it's not initialized already.
+        system = self.obj.scene.system_registry("name", system_name)
 
         if self.visualize:
             assert self._projection_mesh_params["type"] in {
@@ -1039,7 +1036,7 @@ class ParticleApplier(ParticleModifier):
             # Generate the projection visualization
             particle_radius = (
                 m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS
-                if is_visual_particle_system(system_name=system.name)
+                if self.obj.scene.is_visual_particle_system(system_name=system.name)
                 else system.particle_radius
             )
 
@@ -1107,7 +1104,7 @@ class ParticleApplier(ParticleModifier):
                 raise ValueError(f"Unsupported ParticleModifyMethod: {self.method}!")
         else:
             # Make sure we're only using a physical particle system and the projection method
-            assert issubclass(
+            assert isinstance(
                 system, PhysicalParticleSystem
             ), "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
             assert (
@@ -1212,7 +1209,7 @@ class ParticleApplier(ParticleModifier):
             # Sample potential locations to apply particles, and then apply them
             start_points, end_points = self._sample_particle_locations(system=system)
             n_samples = len(start_points)
-            is_visual = is_visual_particle_system(system_name=system.name)
+            is_visual = self.obj.scene.is_visual_particle_system(system_name=system.name)
 
             if is_visual:
                 group = system.get_group_name(obj=self.obj)
@@ -1266,7 +1263,7 @@ class ParticleApplier(ParticleModifier):
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         # Check the system
         n_modified_particles = self.obj.states[ModifiedParticles].get_value(system)
-        if is_visual_particle_system(system_name=system.name):
+        if self.obj.scene.is_visual_particle_system(system_name=system.name):
             assert scales is not None, "applying visual particles at raycast hits requires scales."
             assert len(hits) == len(scales), "length of hits and scales are different when spawning visual particles."
             # Sample potential application points
@@ -1323,6 +1320,7 @@ class ParticleApplier(ParticleModifier):
                     else -self._initial_speed * np.array([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
+                    scene=self.obj.scene,
                     positions=np.array([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
@@ -1343,7 +1341,7 @@ class ParticleApplier(ParticleModifier):
         assert (
             self.method == ParticleModifyMethod.PROJECTION
         ), "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
-        assert is_physical_particle_system(
+        assert self.obj.scene.is_physical_particle_system(
             system_name=system.name
         ), "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
 
@@ -1364,6 +1362,7 @@ class ParticleApplier(ParticleModifier):
         if n_particles > 0:
             velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
             system.generate_particles(
+                scene=self.obj.scene,
                 positions=points[:n_particles],
                 velocities=velocities,
             )
@@ -1463,7 +1462,7 @@ class ParticleApplier(ParticleModifier):
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         return (
             m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP
-            if is_visual_particle_system(system_name=system.name)
+            if self.obj.scene.is_visual_particle_system(system_name=system.name)
             else m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
         )
 

@@ -1,4 +1,7 @@
 import json
+import os
+import shutil
+import tempfile
 from abc import ABC
 from itertools import combinations
 
@@ -14,7 +17,13 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
-from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
+from omnigibson.systems.micro_particle_system import FluidSystem
+from omnigibson.systems.system_base import (
+    BaseSystem,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    create_system_from_metadata,
+)
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -25,7 +34,7 @@ from omnigibson.utils.python_utils import (
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import CollisionAPI
+from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -33,11 +42,18 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# TODO(parallel): Make this get dynamically computed based on scene AABB
+# Margin between the AABBs of two different scenes.
 m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
+
+# Prebuilt USDs that are cached per scene file to speed things up.
+PREBUILT_USDS = dict()
+
+# Right edge position of the last scene loaded.
+LAST_RIGHT_EDGE_POS = np.nan
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -49,11 +65,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def __init__(
         self,
         scene_file=None,
+        use_floor_plane=True,
     ):
         """
         Args:
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
+            use_floor_plane (bool): whether to load a flat floor plane into the simulator
         """
         # Store internal variables
         self.scene_file = scene_file
@@ -63,9 +81,42 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim = None
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
+        self._use_floor_plane = use_floor_plane
 
         # Call super init
         super().__init__()
+
+        # Prepare the initialization dicts
+        self._init_info = {}
+        self._init_state = {}
+        self._init_systems = []
+        self._task_metadata = None
+        self._init_objs = {}
+
+        # If we have any scene file specified, use it to create the objects within it
+        if self.scene_file is not None:
+            # Grab objects info from the scene file
+            with open(self.scene_file, "r") as f:
+                scene_info = json.load(f)
+            self._init_info = scene_info["objects_info"]["init_info"]
+            self._init_state = scene_info["state"]["object_registry"]
+            self._init_systems = list(scene_info["state"]["system_registry"].keys())
+            self._task_metadata = {}
+            try:
+                self._task_metadata = scene_info["metadata"]["task"]
+            except:
+                pass
+
+            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
+            # accordingly
+            self._init_objs = {}
+            for obj_name, obj_info in self._init_info.items():
+                # Check whether we should load the object or not
+                if not self._should_load_object(obj_info=obj_info, task_metadata=self._task_metadata):
+                    continue
+                # Create object class instance
+                obj = create_object_from_init_info(obj_info)
+                self._init_objs[obj_name] = obj
 
     @property
     def registry(self):
@@ -152,6 +203,47 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def initialized(self):
         return self._initialized
 
+    @property
+    def use_floor_plane(self):
+        return self._use_floor_plane
+
+    def prebuild(self):
+        """
+        Prebuild the scene before loading it into the simulator. This is useful for caching the scene USD for faster
+        loading times.
+
+        Returns:
+            str: Path to the prebuilt USD file
+        """
+        # Prebuild and cache the scene USD using the objects
+        if self.scene_file not in PREBUILT_USDS:
+            # Prebuild the scene USD
+            log.info(f"Prebuilding scene file {self.scene_file}...")
+
+            # Create a new stage inside the tempdir, named after this scene's file.
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+            os.close(decrypted_fd)
+            stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
+
+            # Create the world prim and make it the default
+            world_prim = stage.DefinePrim("/World", "Xform")
+            stage.SetDefaultPrim(world_prim)
+
+            # Iterate through all objects and add them to the stage
+            for obj_name, obj in self._init_objs.items():
+                obj.prebuild(stage)
+
+            stage.Save()
+            del stage
+
+            PREBUILT_USDS[self.scene_file] = usd_path
+
+        # Copy the prebuilt USD to a new path
+        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+        os.close(decrypted_fd)
+        shutil.copyfile(PREBUILT_USDS[self.scene_file], instance_usd_path)
+        return instance_usd_path
+
     def _load(self):
         """
         Load the scene into simulator
@@ -161,45 +253,77 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # We simply check that the simulator has a floor plane.
         assert og.sim.floor_plane, "Simulator must have a floor plane if using an empty Scene!"
 
-    def _load_objects_from_scene_file(self):
+    def _load_systems(self):
+        system_dir = os.path.join(gm.DATASET_PATH, "systems")
+
+        if os.path.exists(system_dir):
+            system_names = os.listdir(system_dir)
+            for system_name in system_names:
+                self.system_registry.add(create_system_from_metadata(system_name=system_name))
+
+        from omnigibson import systems
+
+        cloth_system = systems.Cloth(name="cloth")
+        self.system_registry.add(cloth_system)
+
+    def _load_scene_prim_with_objects(self):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
         """
-        # Grab objects info from the scene file
-        with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
-        init_info = scene_info["objects_info"]["init_info"]
-        init_state = scene_info["state"]["object_registry"]
-        init_systems = scene_info["state"]["system_registry"].keys()
-        task_metadata = {}
-        try:
-            task_metadata = scene_info["metadata"]["task"]
-        except:
-            pass
+        # Add the prebuilt scene USD to the stage
+        scene_relative_path = f"/scene_{self.idx}"
+        scene_absolute_path = f"/World{scene_relative_path}"
+
+        # If there is already a prim at the absolute path, the scene has been loaded. If not, load the prebuilt scene USD now.
+        if self.scene_file is not None:
+            scene_prim_obj = og.sim.stage.GetPrimAtPath(scene_absolute_path)
+            if not scene_prim_obj:
+                scene_prim_obj = add_asset_to_stage(asset_path=self.prebuild(), prim_path=scene_absolute_path)
+
+        # Store world prim and load the scene into the simulator
+        self._scene_prim = XFormPrim(
+            relative_prim_path=scene_relative_path,
+            name=f"scene_{self.idx}",
+            load_config={"created_manually": True},
+        )
+        self._scene_prim.load(None)
+        if self.scene_file is not None:
+            assert self._scene_prim.prim_path == scene_prim_obj.GetPath().pathString, "Scene prim path mismatch!"
+
+        # Go through and load all systems.
+        self._load_systems()
 
         # Create desired systems
-        for system_name in init_systems:
+        for system_name in self._init_systems:
             if gm.USE_GPU_DYNAMICS:
-                get_system(system_name)
+                self.get_system(system_name)
             else:
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
-        # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
-        # accordingly
-        for obj_name, obj_info in init_info.items():
-            # Check whether we should load the object or not
-            if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
-                continue
-            # Create object class instance
-            obj = create_object_from_init_info(obj_info)
+        # Position the scene prim initially at a z offset to avoid collision
+        self._scene_prim.set_position([0, 0, m.INITIAL_SCENE_PRIM_Z_OFFSET if self.idx != 0 else 0])
+
+        # Now load the objects with their own logic
+        for obj_name, obj in self._init_objs.items():
             # Import into the simulator
             self.add_object(obj)
             # Set the init pose accordingly
             obj.set_local_pose(
-                position=init_state[obj_name]["root_link"]["pos"],
-                orientation=init_state[obj_name]["root_link"]["ori"],
+                position=self._init_state[obj_name]["root_link"]["pos"],
+                orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
+
+        # Position the scene prim based on the last scene's right edge
+        global LAST_RIGHT_EDGE_POS
+        if self.idx != 0:
+            aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
+            left_edge_to_center = -aabb_min[0]
+            self._scene_prim.set_position([LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + left_edge_to_center, 0, 0])
+            LAST_RIGHT_EDGE_POS = LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + (aabb_max[0] - aabb_min[0])
+        else:
+            aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
+            LAST_RIGHT_EDGE_POS = aabb_max[0]
 
     def _load_metadata_from_scene_file(self):
         """
@@ -232,36 +356,29 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
+        # Do not override this function. Override _load instead.
+
         # Make sure simulator is stopped
         assert og.sim.is_stopped(), "Simulator should be stopped when loading this scene!"
 
-        # Do not override this function. Override _load instead.
+        # Check if scene is already loaded
         if self._loaded:
             raise ValueError("This scene is already loaded.")
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
 
-        # Store world prim and load the scene into the simulator
-        scene_relative_path = f"/scene_{self.idx}"
-        self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
-        self._scene_prim.load(None)
-
-        # Position the scene prim based on its index in the simulator.
-        x, y = T.integer_spiral_coordinates(self.idx)
-        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
-
         # Go through whatever else loading the scene needs to do.
         self._load()
 
-        # If we have any scene file specified, use it to load the objects within it and also update the initial state
-        # and metadata
-        if self.scene_file is not None:
-            self._load_objects_from_scene_file()
-            self._load_metadata_from_scene_file()
-
         # We're now loaded
         self._loaded = True
+
+        # If we have any scene file specified, use it to load the objects within it and also update the initial state
+        # and metadata
+        self._load_scene_prim_with_objects()
+        if self.scene_file is not None:
+            self._load_metadata_from_scene_file()
 
         # Always stop the sim if we started it internally
         if not og.sim.is_stopped():
@@ -272,7 +389,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Clears any internal state before the scene is destroyed
         """
         # Clears systems so they can be re-initialized.
-        clear_all_systems()
+        for system in self.get_active_systems():
+            system.clear()
 
         # Remove all of the scene's objects.
         og.sim.remove_object(list(self.objects))
@@ -327,7 +445,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         )
 
         # Add registry for systems -- this is already created externally, so we just update it and pull it directly
-        registry.add(obj=SYSTEM_REGISTRY)
+        registry.add(
+            obj=SerializableRegistry(
+                name="system_registry",
+                class_types=BaseSystem,
+                default_key="name",
+                unique_keys=["name", "prim_path", "uuid"],
+            )
+        )
 
         # Add registry for objects
         registry.add(
@@ -404,6 +529,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
                 (in that case, the object is stored to be loaded together with the scene)
         """
+        # Make sure all objects in this scene are uniquely named
+        assert (
+            obj.name not in self.object_registry.object_names
+        ), f"Object with name {obj.name} already exists in scene!"
+
         # Load the object.
         prim = obj.load(self)
 
@@ -505,6 +635,40 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for obj in self.object_registry("fixed_base", True, default_val=[])
             if obj.category != robot_macros.ROBOT_CATEGORY
         }
+
+    def is_system_active(self, system_name):
+        system = self.system_registry("name", system_name)
+        if system is None:
+            return False
+        return system.initialized
+
+    def is_visual_particle_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return isinstance(system, VisualParticleSystem)
+
+    def is_physical_particle_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return isinstance(system, PhysicalParticleSystem)
+
+    def is_fluid_system(self, system_name):
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        return isinstance(system, FluidSystem)
+
+    def get_system(self, system_name, force_active=True):
+        # Make sure scene exists
+        assert self.loaded, "Cannot get systems until scene is imported!"
+        # If system_name is not in REGISTERED_SYSTEMS, create from metadata
+        system = self.system_registry("name", system_name)
+        assert system is not None, f"System {system_name} not in system registry."
+        if not system.initialized and force_active:
+            system.initialize(scene=self)
+        return system
+
+    def get_active_systems(self):
+        return [system for system in self.systems if system.initialized]
 
     def get_random_floor(self):
         """
@@ -610,13 +774,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default state for the scene is from the registry alone
         self._registry.load_state(state=state, serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Default state for the scene is from the registry alone
         return self._registry.serialize(state=state)
 
     def deserialize(self, state):
         # Default state for the scene is from the registry alone
-        return self._registry._deserialize(state=state)
+        return self._registry.deserialize(state=state)
 
     @classproperty
     def _cls_registry(cls):

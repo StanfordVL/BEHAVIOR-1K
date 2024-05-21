@@ -863,7 +863,7 @@ class JointPrim(BasePrim):
             elif self._control_type == ControlType.VELOCITY:
                 self.set_vel(state["target_vel"], drive=True)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.concatenate(
             [
                 state["pos"],

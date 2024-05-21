@@ -98,6 +98,7 @@ class InteractiveTraversableScene(TraversableScene):
             trav_map_with_objects=trav_map_with_objects,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
+            use_floor_plane=False,
         )
 
     def get_scene_loading_info(self, scene_model, scene_instance=None):

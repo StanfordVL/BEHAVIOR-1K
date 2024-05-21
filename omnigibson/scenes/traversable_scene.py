@@ -21,6 +21,7 @@ class TraversableScene(Scene):
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
+        use_floor_plane=True,
     ):
         """
         Args:
@@ -32,6 +33,7 @@ class TraversableScene(Scene):
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
+            use_floor_plane (bool): whether to load a flat floor plane into the simulator
         """
         log.info("TraversableScene model: {}".format(scene_model))
         self.scene_model = scene_model
@@ -47,6 +49,7 @@ class TraversableScene(Scene):
         # Run super init
         super().__init__(
             scene_file=scene_file,
+            use_floor_plane=use_floor_plane,
         )
 
     @property

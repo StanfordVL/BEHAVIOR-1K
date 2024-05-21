@@ -69,7 +69,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.physics_frequency = self.env_config["physics_frequency"]
         self.action_frequency = self.env_config["action_frequency"]
-        self.use_floor_plane = self.env_config["use_floor_plane"]
         self.floor_plane_visible = self.env_config["floor_plane_visible"]
         self.floor_plane_color = self.env_config["floor_plane_color"]
         self.device = self.env_config["device"]
@@ -81,7 +80,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         launch_simulator(
             physics_dt=(1.0 / self.physics_frequency),
             rendering_dt=(1.0 / self.action_frequency),
-            use_floor_plane=self.use_floor_plane,
             floor_plane_visible=self.floor_plane_visible,
             floor_plane_color=self.floor_plane_color,
             device=self.device,
@@ -232,6 +230,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
+        if og.sim.floor_plane is not None:
+            assert self._scene.use_floor_plane, f"Floor plane exists but scene does not use it!"
+        else:
+            if self._scene.use_floor_plane:
+                og.sim.add_ground_plane()
         og.sim.import_scene(self._scene)
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
@@ -260,6 +263,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 robot.set_local_pose(position=position, orientation=orientation)
+                if robot._dummy is not None:
+                    robot._dummy.load(self.scene)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -797,7 +802,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             "env": {
                 "action_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
-                "use_floor_plane": False,
                 "floor_plane_visible": True,
                 "floor_plane_color": (1.0, 1.0, 1.0),
                 "device": None,

@@ -113,6 +113,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["name"] = self.name
         self._init_info["args"]["uuid"] = self.uuid
 
+    def prebuild(self, stage):
+        """
+        Implement this function to provide pre-building functionality on an USD stage
+        that is not loaded into Isaac Sim. This is useful for pre-compiling scene USDs,
+        speeding up load times especially for parallel envs.
+        """
+        pass
+
     def load(self, scene):
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")

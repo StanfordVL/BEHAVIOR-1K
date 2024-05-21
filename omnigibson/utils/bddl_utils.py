@@ -20,7 +20,6 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState, Rela
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.systems.system_base import get_system, is_system_active
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,
@@ -1212,7 +1211,11 @@ class BDDLSampler:
                 system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(system_name),
+                    entity=(
+                        None
+                        if obj_inst in self._future_obj_instances
+                        else self._env.scene.system_registry("name", system_name)
+                    ),
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))

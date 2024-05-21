@@ -40,9 +40,7 @@ class XFormPrim(BasePrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._binding_api = None
         self._material = None
-        self._collision_filter_api = None
         self.original_scale = None
 
         # Run super method
@@ -59,26 +57,17 @@ class XFormPrim(BasePrim):
         # run super first
         super()._post_load()
 
+        # These only need to be done if we are creating this prim from scratch.
+        # Pre-created OG objects' prims always have these things set up ahead of time.
+
+        # TODO: In the future, fix this for speed
+        # if self._created_manually:
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
         self.original_scale = np.array(self.get_attribute("xformOp:scale"))
-
-        # Create collision filter API
-        self._collision_filter_api = (
-            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
-            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
-        )
-
-        # Create binding API
-        self._binding_api = (
-            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
-            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
-        )
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -156,13 +145,29 @@ class XFormPrim(BasePrim):
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )
 
+    @property
+    def _collision_filter_api(self):
+        return (
+            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
+            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        )
+
+    @property
+    def _binding_api(self):
+        return (
+            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
+            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
+        )
+
     def has_material(self):
         """
         Returns:
             bool: True if there is a visual material bound to this prim. False otherwise
         """
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return False if material_path == "" else True
+        return material_path != ""
 
     def set_position_orientation(self, position=None, orientation=None):
         """
@@ -256,16 +261,7 @@ class XFormPrim(BasePrim):
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.
         """
-        fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
-        fwd[2] = 0.0
-
-        # If the object is facing close to straight up, then we can't compute a 2D orientation
-        # in that case, we return zero.
-        if np.linalg.norm(fwd) < 1e-4:
-            return 0.0
-
-        fwd /= np.linalg.norm(fwd)
-        return np.arctan2(fwd[1], fwd[0])
+        return T.compute_2d_orientation(self.get_orientation())
 
     def get_local_pose(self):
         """
@@ -353,7 +349,9 @@ class XFormPrim(BasePrim):
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
-        return np.array(self.get_attribute("xformOp:scale"))
+        scale = self.get_attribute("xformOp:scale")
+        assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
+        return np.array(scale)
 
     @scale.setter
     def scale(self, scale):
@@ -416,7 +414,6 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        local_pos, local_ori = self.get_local_pose()
         pos, ori = self.get_position_orientation()
 
         # If we are in a scene, compute the scene-local transform (and save this as the world transform
@@ -424,37 +421,18 @@ class XFormPrim(BasePrim):
         if self.scene is not None:
             pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
 
-        # TODO(parallel): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
-        # We return a dict that contains -1s for the original format that used global pos/orn.
-        return dict(local_pos=local_pos, local_ori=local_ori, pos=pos, ori=ori)
+        return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        # If we have the local pose info, we can directly use them
-        # TODO(parallel): The below logic doesn't quite work because the intermediate prims don't move.
-        if False:  # "local_pos" in state and "local_ori" in state:
-            self.set_local_pose(state["local_pos"], state["local_ori"])
-        else:
-            # Otherwise, we use the legacy global pose as the scene-local pose.
-            pos, orn = np.array(state["pos"]), np.array(state["ori"])
-            if self.scene is not None:
-                pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
-            self.set_position_orientation(pos, orn)
+        pos, orn = np.array(state["pos"]), np.array(state["ori"])
+        if self.scene is not None:
+            pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+        self.set_position_orientation(pos, orn)
 
-    def _serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
+    def serialize(self, state):
+        return np.concatenate([state["pos"], state["ori"]]).astype(float)
 
     def deserialize(self, state):
         # TODO(cremebrule): Make all code OK with accepting different state sizes.
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        pos = state[0:3]
-        ori = state[3:7]
-        is_new_format = np.all(pos == -1) and np.all(ori == -1)
-
-        # For legacy format, we return the global pose. We do not have local pose.
-        if not is_new_format:
-            return {"pos": pos, "ori": ori}, 7
-
-        # For new format, we return the local pose AND the global pose.
-        local_pos = state[7:10]
-        local_ori = state[10:14]
-        return {"local_pos": local_pos, "local_ori": local_ori, "pos": pos, "ori": ori}, 14
+        return dict(pos=state[0:3], ori=state[3:7]), 7

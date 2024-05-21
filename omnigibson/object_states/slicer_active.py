@@ -163,8 +163,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         self.PREVIOUSLY_TOUCHING[self.OBJ_IDXS[self.obj]] = state["previously_touching"]
         self.DELAY_COUNTER[self.OBJ_IDXS[self.obj]] = state["delay_counter"]
 
-    def _serialize(self, state):
-        state_flat = super()._serialize(state=state)
+    def serialize(self, state):
+        state_flat = super().serialize(state=state)
         return np.concatenate(
             [
                 state_flat,
@@ -174,7 +174,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         )
 
     def deserialize(self, state):
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
         state_dict[f"{self.value_name}"] = bool(state_dict[f"{self.value_name}"])
         state_dict["previously_touching"] = bool(state[idx])
         state_dict["delay_counter"] = int(state[idx + 1])

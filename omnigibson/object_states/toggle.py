@@ -134,7 +134,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         def overlap_callback(hit):
             nonlocal valid_hit
-            valid_hit = hit.rigid_body in self._robot_finger_paths
+            all_finger_paths = {path for path_set in self._robot_finger_paths for path in path_set}
+            valid_hit = hit.rigid_body in all_finger_paths
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
@@ -184,7 +185,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self._set_value(state["value"])
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
 
     def deserialize(self, state):

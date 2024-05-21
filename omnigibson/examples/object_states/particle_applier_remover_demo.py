@@ -4,7 +4,6 @@ import omnigibson as og
 from omnigibson.macros import gm, macros
 from omnigibson.object_states import Covered
 from omnigibson.objects import DatasetObject
-from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.usd_utils import create_joint
@@ -144,8 +143,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
-    modifier_root_link_path = f"{modifier.prim_path}/base_link"
+    modifier._scene = env.scene
+    modifier._scene_assigned = True
+    modifier._created_manually = True
     modifier._prim = modifier._load()
+    modifier_root_link_path = f"{modifier.prim_path}/base_link"
     if method_type == "Projection":
         metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
@@ -156,9 +158,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             joint_type="FixedJoint",
             enabled=True,
         )
-    modifier._post_load()
     modifier._loaded = True
-    env.scene.add_object(modifier)
+    modifier._post_load()
+    env.scene.object_registry.add(modifier)
+    og.sim.post_import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle
@@ -168,7 +171,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
-        table.states[Covered].set_value(get_system(particle_type), True)
+        table.states[Covered].set_value(env.scene.get_system(particle_type), True)
 
         # Take a few steps to let particles settle
         for _ in range(25):

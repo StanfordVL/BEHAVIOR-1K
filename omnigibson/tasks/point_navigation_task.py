@@ -68,7 +68,7 @@ class PointNavigationTask(BaseTask):
         floor=0,
         initial_pos=None,
         initial_quat=None,
-        goal_pos=None,
+        goal_pos=np.full(3, 0.0),
         goal_tolerance=0.5,
         goal_in_polar=False,
         path_range=None,
@@ -87,7 +87,7 @@ class PointNavigationTask(BaseTask):
         self._floor = floor
         self._initial_pos = initial_pos if initial_pos is None else np.array(initial_pos)
         self._initial_quat = initial_quat if initial_quat is None else np.array(initial_quat)
-        self._goal_pos = goal_pos if goal_pos is None else np.array(goal_pos)
+        self._goal_pos = np.full(3, 0.0) if goal_pos is None else np.array(goal_pos)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
@@ -260,17 +260,20 @@ class PointNavigationTask(BaseTask):
         log.info("Sampled goal position: {}".format(goal_pos))
         return initial_pos, initial_quat, goal_pos
 
-    def _get_geodesic_potential(self, env):
+    def _get_geodesic_potential(self, env, no_path_reward=-1.0):
         """
         Get potential based on geodesic distance
 
         Args:
             env: environment instance
+            no_path_reward (float): Reward to return if no path is found to the goal position
 
         Returns:
             float: geodesic distance to the target position
         """
         _, geodesic_dist = self.get_shortest_path_to_goal(env=env)
+        if geodesic_dist is None:
+            return no_path_reward
         return geodesic_dist
 
     def _get_l2_potential(self, env):
@@ -285,12 +288,13 @@ class PointNavigationTask(BaseTask):
         """
         return T.l2_distance(env.robots[self._robot_idn].states[Pose].get_value()[0][:2], self._goal_pos[:2])
 
-    def get_potential(self, env):
+    def get_potential(self, env, no_path_reward=-1.0):
         """
         Compute task-specific potential: distance to the goal
 
         Args:
             env (Environment): Environment instance
+            no_path_reward (float): Reward to return if no path is found to the goal position
 
         Returns:
             float: Computed potential
@@ -298,7 +302,7 @@ class PointNavigationTask(BaseTask):
         if self._reward_type == "l2":
             reward = self._get_l2_potential(env)
         elif self._reward_type == "geodesic":
-            reward = self._get_geodesic_potential(env)
+            reward = self._get_geodesic_potential(env, no_path_reward=no_path_reward)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 

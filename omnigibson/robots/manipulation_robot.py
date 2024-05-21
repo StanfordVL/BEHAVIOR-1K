@@ -397,15 +397,14 @@ class ManipulationRobot(BaseRobot):
         fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
             self.articulation_root_path, self.eef_link_names[arm]
         )
-        # TODO(parallel): This is currently disabled because it is NOT implemented with ControllableObjectViewAPI. Fix that.
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
-        # eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        # TODO(parallel): Replace this with a ControllableObjectViewAPI call too.
-        # fcns[f"eef_{arm}_jacobian_relative"] = lambda: self.get_relative_jacobian(clone=False)[
-        #     eef_link_idx, :, -self.n_joints :
-        # ]
+        start_idx = 6 if self.fixed_base else 0
+        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+        fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
+            self.articulation_root_path
+        )[eef_link_idx, :, start_idx : start_idx + self.n_joints]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
@@ -1434,7 +1433,13 @@ class ManipulationRobot(BaseRobot):
             return state
 
         # Include AG_state
-        state["ag_obj_constraint_params"] = self._ag_obj_constraint_params.copy()
+        ag_params = self._ag_obj_constraint_params.copy()
+        for arm in ag_params.keys():
+            if len(ag_params[arm]) > 0 and self.scene is not None:
+                ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
+                    ag_params[arm]["contact_pos"], [0, 0, 0, 1], *self.scene.prim.get_position_orientation()
+                )
+        state["ag_obj_constraint_params"] = ag_params
         return state
 
     def _load_state(self, state):
@@ -1455,11 +1460,16 @@ class ManipulationRobot(BaseRobot):
                 data = state["ag_obj_constraint_params"][arm]
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
+                contact_pos_global = data["contact_pos"]
+                if self.scene is not None:
+                    contact_pos_global, _ = T.pose_transform(
+                        *self.scene.prim.get_position_orientation(), contact_pos_global, [0, 0, 0, 1]
+                    )
+                self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Call super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # No additional serialization needed if we're using physical grasping
         if self.grasping_mode == "physical":
@@ -1470,7 +1480,7 @@ class ManipulationRobot(BaseRobot):
 
     def deserialize(self, state):
         # Call super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # No additional deserialization needed if we're using physical grasping
         if self.grasping_mode == "physical":

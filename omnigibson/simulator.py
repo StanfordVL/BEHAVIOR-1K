@@ -48,6 +48,7 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
+    DummyObjectViewAPI,
     FlatcacheAPI,
     GripperRigidContactAPI,
     PoseAPI,
@@ -257,7 +258,6 @@ def launch_simulator(*args, **kwargs):
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            use_floor_plane=False,
             floor_plane_visible=True,
             floor_plane_color=(1.0, 1.0, 1.0),
             use_skybox=True,
@@ -271,7 +271,6 @@ def launch_simulator(*args, **kwargs):
 
             # Store vars needed for initialization
             self.gravity = gravity
-            self._use_floor_plane = use_floor_plane
             self._floor_plane_visible = floor_plane_visible
             self._floor_plane_color = floor_plane_color
             self._use_skybox = use_skybox
@@ -318,6 +317,8 @@ def launch_simulator(*args, **kwargs):
             self._callbacks_on_stop = dict()
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
+            self._callbacks_on_system_init = dict()
+            self._callbacks_on_system_clear = dict()
 
             # Update internal settings
             self._set_physics_engine_settings()
@@ -347,10 +348,44 @@ def launch_simulator(*args, **kwargs):
             self.stage.DefinePrim("/World", "Xform")
 
             # Initialize all APIs and the stage
-            self.clear()
+            self.stop()
 
-            # Set the viewer dimensions
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
+
+            # Now start rebuilding everything
+            # Create collision group for fixed base objects' non root links, root links, and building structures
+            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
+            # Disable collision between root links of fixed base objects
+            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            # Disable collision between building structures
+            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
+            # Disable collision between building structures and fixed base objects
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+
+            # Also add skybox if requested
+            if self._use_skybox:
+                self._skybox = LightObject(
+                    relative_prim_path="/skybox",
+                    name="skybox",
+                    category="background",
+                    light_type="Dome",
+                    intensity=1500,
+                    fixed_base=True,
+                )
+                self._skybox.load(None)
+                self._skybox.color = (1.07, 0.85, 0.61)
+                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+
+            # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
+                self._set_viewer_camera()
+                self.viewer_camera.set_position_orientation(
+                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                )
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
 
@@ -503,6 +538,39 @@ def launch_simulator(*args, **kwargs):
             """
             self._viewer_camera.image_width = width
 
+        def add_ground_plane(self):
+            """
+            Generate a ground plane into the simulator.
+            """
+            if self._floor_plane is not None:
+                return
+            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+                prim_path="/World/ground_plane",
+                name="ground_plane",
+                z_position=0,
+                size=None,
+                color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
+                visible=self._floor_plane_visible,
+                # TODO: update with new PhysicsMaterial API
+                # static_friction=static_friction,
+                # dynamic_friction=dynamic_friction,
+                # restitution=restitution,
+            )
+
+            self._floor_plane = XFormPrim(
+                relative_prim_path="/ground_plane",
+                name=plane.name,
+                load_config={"created_manually": True},
+            )
+            self._floor_plane.load(None)
+
+            # Assign floors category to the floor plane
+            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+                prim=self._floor_plane.prim,
+                semantic_label="floors",
+                type_label="class",
+            )
+
         def set_lighting_mode(self, mode):
             """
             Sets the active lighting mode in the current simulator. Valid options are one of LightingMode
@@ -605,8 +673,9 @@ def launch_simulator(*args, **kwargs):
                 # Load the state back
                 self.load_state(state)
 
-            # Refresh all current rules
-            TransitionRuleAPI.prune_active_rules()
+            if gm.ENABLE_TRANSITION_RULES:
+                # Refresh all current rules
+                TransitionRuleAPI.prune_active_rules()
 
         def _remove_object(self, obj):
             """
@@ -672,14 +741,15 @@ def launch_simulator(*args, **kwargs):
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
                             obj.update_handles()
-                    for system in scene.systems:
-                        if issubclass(system, MacroPhysicalParticleSystem):
+                    for system in scene.get_active_systems():
+                        if isinstance(system, MacroPhysicalParticleSystem):
                             system.refresh_particles_view()
 
             # Finally update any unified views
             RigidContactAPI.initialize_view()
             GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
+            DummyObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -716,12 +786,13 @@ def launch_simulator(*args, **kwargs):
                     # Re-initialize the physics view because the number of objects has changed
                     self.update_handles()
 
-                    # Also refresh the transition rules that are currently active
-                    TransitionRuleAPI.refresh_all_rules()
+                    if gm.ENABLE_TRANSITION_RULES:
+                        # Also refresh the transition rules that are currently active
+                        TransitionRuleAPI.refresh_all_rules()
 
                 # Update any system-related state
                 for scene in self.scenes:
-                    for system in scene.systems:
+                    for system in scene.get_active_systems():
                         system.update()
 
                 # Propagate states if the feature is enabled
@@ -756,6 +827,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
             ControllableObjectViewAPI.clear()
+            DummyObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -797,7 +869,8 @@ def launch_simulator(*args, **kwargs):
                             for robot in scene.robots:
                                 if robot.initialized:
                                     robot.update_controller_mode()
-                        TransitionRuleAPI.refresh_all_rules()
+                        if gm.ENABLE_TRANSITION_RULES:
+                            TransitionRuleAPI.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -876,6 +949,7 @@ def launch_simulator(*args, **kwargs):
         def _on_physics_step(self):
             # Make the controllable object view API refresh
             ControllableObjectViewAPI.clear()
+            DummyObjectViewAPI.clear()
 
             # Run the controller step on every controllable object
             for scene in self.scenes:
@@ -885,6 +959,7 @@ def launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
+            DummyObjectViewAPI.flush_control()
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -1089,6 +1164,18 @@ def launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_remove_obj[name] = callback
 
+        def add_callback_on_system_init(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed every time a system is initialized
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback(system: System) --> None
+            """
+            self._callbacks_on_system_init[name] = callback
+
         def remove_callback_on_play(self, name):
             """
             Remove play callback whose reference is @name
@@ -1125,11 +1212,17 @@ def launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_remove_obj.pop(name, None)
 
-        @classmethod
-        def clear_instance(cls):
-            raise ValueError(
-                "You should not open a new stage - a single stage should be opened for the entire OG process lifetime."
-            )
+        def add_callback_on_system_clear(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed every time a system is cleared
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback(system: System) --> None
+            """
+            self._callbacks_on_system_clear[name] = callback
 
         @property
         def pi(self):
@@ -1195,131 +1288,11 @@ def launch_simulator(*args, **kwargs):
         def skybox(self):
             return self._skybox
 
-        def clear(self) -> None:
-            """
-            Clears the stage leaving the PhysicsScene only if under /World.
-            """
-            # Stop the physics
-            self.stop()
+        def get_callbacks_on_system_init(self):
+            return self._callbacks_on_system_init
 
-            # Clear all scenes
-            for scene in self.scenes:
-                scene.clear()
-            self._scenes = []
-
-            # Remove the skybox, floor plane and viewer camera
-            if self._skybox is not None:
-                self._skybox.remove()
-                self._skybox = None
-
-            if self._floor_plane is not None:
-                self._floor_plane.remove()
-                self._floor_plane = None
-
-            if self._viewer_camera is not None:
-                self._viewer_camera.remove()
-                self._viewer_camera = None
-
-            if self._camera_mover is not None:
-                self._camera_mover.clear()
-                self._camera_mover = None
-
-            # Clear the vision sensor cache
-            VisionSensor.clear()
-
-            # Clear all global update states
-            for state in self.object_state_types_requiring_update:
-                if issubclass(state, GlobalUpdateStateMixin):
-                    state.global_initialize()
-
-            # Clear all materials
-            MaterialPrim.clear()
-
-            # Clear all transition rules
-            TransitionRuleAPI.clear()
-
-            # Clear uniquely named items and other internal states
-            clear_python_utils()
-            clear_usd_utils()
-
-            # Clear some internals here.
-            self._objects_to_initialize = []
-            self._objects_require_contact_callback = False
-            self._objects_require_joint_break_callback = False
-            self._link_id_to_objects = dict()
-            self._callbacks_on_play = dict()
-            self._callbacks_on_stop = dict()
-            self._callbacks_on_import_obj = dict()
-            self._callbacks_on_remove_obj = dict()
-
-            # Assert now that the stage is clear except for the World prim, the PhysicsScene, and the viewport render target.
-            for prim in self.stage.Traverse():
-                assert any(
-                    allowed_path_pattern.fullmatch(prim.GetPath().pathString) is not None
-                    for allowed_path_pattern in CLEAR_ALLOWED_PRIM_PATH_PATTERNS
-                ), f"Found unexpected prim {prim.GetPath().pathString} after clearing."
-
-            # Now start rebuilding everything
-            # Create collision group for fixed base objects' non root links, root links, and building structures
-            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
-            # Disable collision between root links of fixed base objects
-            CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
-            # Disable collision between building structures
-            CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
-
-            # Disable collision between building structures and fixed base objects
-            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
-            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
-
-            # We just add a ground plane if requested
-            if self._use_floor_plane:
-                plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-                    prim_path="/World/ground_plane",
-                    name="ground_plane",
-                    z_position=0,
-                    size=None,
-                    color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
-                    visible=self._floor_plane_visible,
-                    # TODO: update with new PhysicsMaterial API
-                    # static_friction=static_friction,
-                    # dynamic_friction=dynamic_friction,
-                    # restitution=restitution,
-                )
-
-                self._floor_plane = XFormPrim(
-                    relative_prim_path="/ground_plane",
-                    name=plane.name,
-                )
-                self._floor_plane.load(None)
-
-                # Assign floors category to the floor plane
-                lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-                    prim=self._floor_plane.prim,
-                    semantic_label="floors",
-                    type_label="class",
-                )
-
-            # Also add skybox if requested
-            if self._use_skybox:
-                self._skybox = LightObject(
-                    relative_prim_path="/skybox",
-                    name="skybox",
-                    category="background",
-                    light_type="Dome",
-                    intensity=1500,
-                    fixed_base=True,
-                )
-                self._skybox.load(None)
-                self._skybox.color = (1.07, 0.85, 0.61)
-                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
-
-            # Set the viewer camera, and then set its default pose
-            if gm.RENDER_VIEWER_CAMERA:
-                self._set_viewer_camera()
-                self.viewer_camera.set_position_orientation(
-                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
-                )
+        def get_callbacks_on_system_clear(self):
+            return self._callbacks_on_system_clear
 
         def write_metadata(self, key, data):
             """
@@ -1500,7 +1473,7 @@ def launch_simulator(*args, **kwargs):
                 "This should be resolved by the next NVIDIA Isaac Sim release."
             )
 
-        def _serialize(self, state):
+        def serialize(self, state):
             # Default state is from the scene
             return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
 
@@ -1515,11 +1488,6 @@ def launch_simulator(*args, **kwargs):
             return dicts, total_state_size
 
     if not og.sim:
-        from omnigibson.systems.system_base import import_og_systems
-
-        # Import all OG systems from dataset
-        import_og_systems()
-
         # The simulator init function saves itself as og.sim.
         Simulator(*args, **kwargs)
 
