@@ -8,6 +8,7 @@ from typing import Optional
 import grpc
 import gymnasium as gym
 import wandb
+
 from .protos import environment_pb2, environment_pb2_grpc
 
 

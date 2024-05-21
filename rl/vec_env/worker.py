@@ -15,7 +15,8 @@ import omnigibson as og
 from omnigibson.macros import gm
 
 gm.USE_FLATCACHE = True
-reset_poses_path =  os.path.dirname(__file__) + "/../reset_poses.json"
+reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
+
 
 def main(local_addr, learner_addr, render):
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -26,7 +27,7 @@ def main(local_addr, learner_addr, render):
         gm.ENABLE_RENDERING = False
         del config["env"]["external_sensors"]
 
-    config['task']['precached_reset_pose_path'] = reset_poses_path
+    config["task"]["precached_reset_pose_path"] = reset_poses_path
 
     env = og.Environment(configs=config)
 
@@ -41,6 +42,7 @@ def main(local_addr, learner_addr, render):
 
     # Now start servicing!
     serve_env_over_grpc(env, local_addr, learner_addr)
+
 
 if __name__ == "__main__":
     import socket

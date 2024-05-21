@@ -12,6 +12,7 @@ import yaml
 from tqdm import tqdm
 
 import omnigibson as og
+from omnigibson import object_states
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     PlanningContext,
     StarterSemanticActionPrimitives,
@@ -20,11 +21,12 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 from omnigibson.macros import gm
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
-from omnigibson import object_states
+
 
 def pause_step(time):
-    for _ in range(int(time*100)):
+    for _ in range(int(time * 100)):
         og.sim.step()
+
 
 def get_random_joint_position(robot):
     joint_positions = []
@@ -67,13 +69,7 @@ def main(iterations):
             {
                 "type": "Fetch",
                 "obs_modalities": ["proprio"],
-                "proprio_obs": [
-                    "joint_qpos",
-                    "joint_qvel",
-                    "eef_0_pos",
-                    "eef_0_quat",
-                    "grasp_0"
-                ],
+                "proprio_obs": ["joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -135,12 +131,12 @@ def main(iterations):
 
     robot = env.robots[0]
     obj = env.scene.object_registry("name", "cologne")
-    
+
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
 
     # Open the file and load the data
-    with open('reset_poses_varied.json', 'r') as file:
-        reset_poses = json.load(file)  
+    with open("reset_poses_varied.json", "r") as file:
+        reset_poses = json.load(file)
 
     for i in tqdm(range(iterations)):
 
