@@ -1,4 +1,5 @@
 import numpy as np
+
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm

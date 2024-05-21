@@ -1,11 +1,13 @@
-import numpy as np
 import asyncio
 import os
 
+import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
+from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative
 
 
 class MaterialPrim(BasePrim):
@@ -16,11 +18,11 @@ class MaterialPrim(BasePrim):
     the specified prim path will be created.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
+            @relative_prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
             for their class. For this material prim, the below values can be specified:
 
             mdl_name (None or str): If specified, should be the name of the mdl preset to load (including .mdl).
@@ -33,7 +35,7 @@ class MaterialPrim(BasePrim):
     MATERIALS = dict()
 
     @classmethod
-    def get_material(cls, name, prim_path, load_config=None):
+    def get_material(cls, scene, name, prim_path, load_config=None):
         """
         Get a material prim from the persistent dictionary of materials, or create a new one if it doesn't exist.
 
@@ -51,13 +53,18 @@ class MaterialPrim(BasePrim):
             return cls.MATERIALS[prim_path]
 
         # Otherwise, create a new one and return it
-        new_material = cls(prim_path=prim_path, name=name, load_config=load_config)
+        relative_prim_path = absolute_prim_path_to_scene_relative(scene, prim_path)
+        new_material = cls(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+        new_material.load(scene)
+        assert (
+            new_material.prim_path == prim_path
+        ), f"Material prim path {new_material.prim_path} does not match {prim_path}"
         cls.MATERIALS[prim_path] = new_material
         return new_material
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -69,7 +76,7 @@ class MaterialPrim(BasePrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -88,10 +95,10 @@ class MaterialPrim(BasePrim):
         material_path = mtl_created[0]
 
         # Move prim to desired location
-        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self._prim_path)
+        lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
 
         # Return generated material
-        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self._prim_path)
+        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path)
 
     @classmethod
     def clear(cls):
@@ -127,7 +134,7 @@ class MaterialPrim(BasePrim):
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.MATERIALS.pop(self._prim_path)
+        self.MATERIALS.pop(self.prim_path)
 
         # Run super
         super().remove()
@@ -137,7 +144,7 @@ class MaterialPrim(BasePrim):
         super()._post_load()
 
         # Add this material to the list of global materials
-        self.MATERIALS[self._prim_path] = self
+        self.MATERIALS[self.prim_path] = self
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
@@ -174,7 +181,7 @@ class MaterialPrim(BasePrim):
                 occurred externally, no additional rendering step is needed
         """
         assert self._shader is not None
-        asyncio.run(self._load_mdl_parameters(render=render))
+        # asyncio.run(self._load_mdl_parameters(render=render))
 
     def shader_update_asset_paths_with_root_path(self, root_path):
         """

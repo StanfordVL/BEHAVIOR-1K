@@ -1,9 +1,10 @@
 import numpy as np
-from omnigibson.macros import create_module_macros
-from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.tensorized_value_state import TensorizedValueState
+
 import omnigibson as og
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.tensorized_value_state import TensorizedValueState
 from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
@@ -37,7 +38,7 @@ class Temperature(TensorizedValueState):
             rate (float): Heating rate of the source / sink
         """
         # Get idxs for objs
-        idxs = [cls.OBJ_IDXS[obj.name] for obj in objs]
+        idxs = [cls.OBJ_IDXS[obj] for obj in objs]
         cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_rendering_dt()
 
     @classmethod

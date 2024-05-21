@@ -1,7 +1,8 @@
+import numpy as np
+
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
 from omnigibson.utils.python_utils import classproperty
-import numpy as np
 
 
 class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
@@ -15,7 +16,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
 
-    # Dictionary mapping object name to index in VALUES
+    # Dictionary mapping object to index in VALUES
     OBJ_IDXS = None
 
     # Dict of callbacks that can be added to when an object is removed
@@ -44,16 +45,6 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         cls.VALUES = cls._update_values(values=cls.VALUES)
 
     @classmethod
-    def global_clear(cls):
-        # Call super first
-        super().global_clear()
-
-        # Clear internal state
-        cls.VALUES = None
-        cls.OBJ_IDXS = None
-        cls.CALLBACKS_ON_REMOVE = None
-
-    @classmethod
     def _update_values(cls, values):
         """
         Updates all internally tracked @values for this object state. Should be implemented by subclass.
@@ -75,11 +66,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             obj (StatefulObject): Object to add
         """
         assert (
-            obj.name not in cls.OBJ_IDXS
+            obj not in cls.OBJ_IDXS
         ), f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
 
         # Add this object to the tracked global state
-        cls.OBJ_IDXS[obj.name] = len(cls.VALUES)
+        cls.OBJ_IDXS[obj] = len(cls.VALUES)
         cls.VALUES = np.concatenate([cls.VALUES, np.zeros((1, *cls.value_shape), dtype=cls.value_type)], axis=0)
 
     @classmethod
@@ -93,13 +84,13 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         """
         # Removes this tracked object from the global value array
         assert (
-            obj.name in cls.OBJ_IDXS
+            obj in cls.OBJ_IDXS
         ), f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
-        deleted_idx = cls.OBJ_IDXS.pop(obj.name)
+        deleted_idx = cls.OBJ_IDXS.pop(obj)
 
         # Re-standardize the indices
-        for i, name in enumerate(cls.OBJ_IDXS.keys()):
-            cls.OBJ_IDXS[name] = i
+        for i, o in enumerate(cls.OBJ_IDXS.keys()):
+            cls.OBJ_IDXS[o] = i
         cls.VALUES = np.delete(cls.VALUES, [deleted_idx])
 
     @classmethod
@@ -164,18 +155,12 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _get_value(self):
         # Directly access value from global register
-        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj.name]])
+        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj]])
 
     def _set_value(self, new_value):
         # Directly set value in global register
-        self.VALUES[self.OBJ_IDXS[self.obj.name]] = new_value
+        self.VALUES[self.OBJ_IDXS[self.obj]] = new_value
         return True
-
-    @property
-    def state_size(self):
-        # This is the flattened size of @self.value_shape
-        # Note that np.product(()) returns 1, which is also correct for a non-arrayed value
-        return int(np.product(self.value_shape))
 
     # For this state, we simply store its value.
     def _dump_state(self):
@@ -193,7 +178,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         )
         return val.flatten().astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         value_length = int(np.product(self.value_shape))
         value = state[:value_length].reshape(self.value_shape) if len(self.value_shape) > 0 else state[0]
         return {self.value_name: value}, value_length

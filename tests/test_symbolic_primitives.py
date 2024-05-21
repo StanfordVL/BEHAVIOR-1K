@@ -1,23 +1,21 @@
 import os
+
 import pytest
 import yaml
-
-from omnigibson.macros import gm
-
-gm.USE_GPU_DYNAMICS = True
-gm.USE_FLATCACHE = True
 
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
-    SymbolicSemanticActionPrimitiveSet,
     SymbolicSemanticActionPrimitives,
+    SymbolicSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
 from omnigibson.systems import get_system
 
 
 def start_env():
-    og.sim.stop()
+    if og.sim:
+        og.sim.stop()
     config = {
         "env": {"initial_pos_z_offset": 0.1},
         "render": {"viewer_width": 1280, "viewer_height": 720},
@@ -94,6 +92,8 @@ def start_env():
         ],
     }
 
+    gm.USE_GPU_DYNAMICS = True
+
     env = og.Environment(configs=config)
 
     return env
@@ -108,7 +108,7 @@ def shared_env():
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
-    og.sim.scene.reset()
+    shared_env.scene.reset()
     return shared_env
 
 

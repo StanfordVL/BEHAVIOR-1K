@@ -13,7 +13,6 @@ from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.utils.asset_utils import get_og_assets_version
 
-
 # Params to be set as needed.
 MAX_NUM_OBJS = 400  # Maximum no. of objects to add.
 NUM_OBJS_PER_ITER = 20  # No. of objects to add per iteration.
@@ -43,7 +42,7 @@ def benchmark_scene(sim):
     assets_version = get_og_assets_version()
     print("assets_version", assets_version)
 
-    scene = Scene(floor_plane_visible=True)
+    scene = Scene()
     sim.import_scene(scene)
     sim.play()
 
@@ -55,13 +54,13 @@ def benchmark_scene(sim):
         for j in range(NUM_OBJS_PER_ITER):
             obj_idx = i * NUM_OBJS_PER_ITER + j
             obj = PrimitiveObject(
-                prim_path=f"/World/obj{obj_idx}",
+                relative_prim_path=f"/obj{obj_idx}",
                 primitive_type="Sphere",
                 name=f"obj{obj_idx}",
                 scale=OBJ_SCALE,
                 visual_only=False,
             )
-            sim.import_object(obj=obj, auto_initialize=False)
+            scene.add_object(obj=obj, auto_initialize=False)
             # x, y, z = _get_position(obj_idx, RAND_POSITION)
             x, y = 0, 0
             z = 0.5 + j * OBJ_SCALE * 2.25

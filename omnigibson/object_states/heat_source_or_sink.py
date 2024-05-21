@@ -1,3 +1,5 @@
+import numpy as np
+
 import omnigibson as og
 from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
@@ -7,10 +9,8 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.constants import PrimType
-import numpy as np
-
+from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -38,9 +38,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
     def __init__(
         self,
         obj,
-        temperature=m.DEFAULT_TEMPERATURE,
-        heating_rate=m.DEFAULT_HEATING_RATE,
-        distance_threshold=m.DEFAULT_DISTANCE_THRESHOLD,
+        temperature=None,
+        heating_rate=None,
+        distance_threshold=None,
         requires_toggled_on=False,
         requires_closed=False,
         requires_inside=False,
@@ -64,9 +64,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 ignored.
         """
         super(HeatSourceOrSink, self).__init__(obj)
-        self._temperature = temperature
-        self._heating_rate = heating_rate
-        self.distance_threshold = distance_threshold
+        self._temperature = temperature if temperature is not None else m.DEFAULT_TEMPERATURE
+        self._heating_rate = heating_rate if heating_rate is not None else m.DEFAULT_HEATING_RATE
+        self.distance_threshold = distance_threshold if distance_threshold is not None else m.DEFAULT_DISTANCE_THRESHOLD
 
         # If the heat source needs to be toggled on, we assert the presence
         # of that ability.
@@ -210,7 +210,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             def overlap_callback(hit):
                 nonlocal affected_objects
                 # global affected_objects
-                obj = og.sim.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
+                obj = self.obj.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
                 if obj is not None:
                     affected_objects.add(obj)
                 # Always continue traversal
@@ -230,7 +230,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
                 # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
                     cloth_positions = np.zeros((n_cloth_objs, 3))
@@ -261,7 +261,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
                 # Cloth isn't subject to overlap checks, so we also have to manually check their poses as well
-                cloth_objs = tuple(og.sim.scene.object_registry("prim_type", PrimType.CLOTH, []))
+                cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
                     cloth_positions = np.zeros((n_cloth_objs, 3))

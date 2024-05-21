@@ -1,7 +1,7 @@
 ![splash](./docs/assets/splash.png)
 
 # <h1><img height="40" src="./docs/assets/OmniGibson_logo.png" style="float:left;padding-right:10px"> OmniGibson</h1>
-[![Tests](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml/badge.svg?branch=og-develop&event=push)](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml)
+[![Tests](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/StanfordVL/OmniGibson/actions/workflows/tests.yml)
 [![Docker Image Version (latest by date)](https://img.shields.io/docker/v/stanfordvl/omnigibson?label=docker&sort=semver)](https://hub.docker.com/r/stanfordvl/omnigibson)
 [![Realtime Speed](https://behavior.stanford.edu/knowledgebase/profile/badge.svg)](https://stanfordvl.github.io/OmniGibson/profiling/)
 

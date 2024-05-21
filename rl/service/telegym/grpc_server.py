@@ -1,15 +1,15 @@
-from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
 import pickle
 import threading
-from typing import Optional
-import grpc
-from telegym.protos import environment_pb2
-from telegym.protos import environment_pb2_grpc
-
-import gymnasium as gym
 import time
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+from typing import Optional
+
+import grpc
+import gymnasium as gym
 import wandb
+from .protos import environment_pb2, environment_pb2_grpc
+
 
 def _unwrap_wrapper(env: gym.Env, wrapper_class: str) -> Optional[gym.Wrapper]:
     """
@@ -47,9 +47,7 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
     @property
     def env(self):
         # This function can only be used on the main thread
-        assert threading.current_thread() == threading.main_thread(), (
-            "You must only call `env` from the main thread."
-        )
+        assert threading.current_thread() == threading.main_thread(), "You must only call `env` from the main thread."
         return self._env
 
     def Step(self, request, unused_context):
@@ -57,24 +55,21 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
         action = pickle.loads(request.action)
         assert self.env.action_space.contains(action), "Action must be contained in action space."
         observation, reward, terminated, truncated, info = self.env.step(action)
-        wandb.log({"step_time": time.time() - start_time})
+        # wandb.log({"step_time": time.time() - start_time})
         return environment_pb2.StepResponse(
             observation=pickle.dumps(observation),
             reward=reward,
             terminated=terminated,
             truncated=truncated,
-            info=pickle.dumps(info)
+            info=pickle.dumps(info),
         )
 
     def Reset(self, request, unused_context):
         seed = request.seed if request.HasField("seed") else None
         maybe_options = {"options": pickle.loads(request.options)} if request.options else {}
         observation, reset_info = self.env.reset(seed=seed, **maybe_options)
-        
-        return environment_pb2.ResetResponse(
-            observation=pickle.dumps(observation),
-            reset_info=pickle.dumps(reset_info)
-        )
+
+        return environment_pb2.ResetResponse(observation=pickle.dumps(observation), reset_info=pickle.dumps(reset_info))
 
     def Render(self, request, unused_context):
         image = self.env.render()
@@ -86,8 +81,7 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
 
     def GetSpaces(self, request, unused_context):
         return environment_pb2.GetSpacesResponse(
-            observation_space=pickle.dumps(self.env.observation_space),
-            action_space=pickle.dumps(self.env.action_space)
+            observation_space=pickle.dumps(self.env.observation_space), action_space=pickle.dumps(self.env.action_space)
         )
 
     def EnvMethod(self, request, unused_context):
@@ -111,11 +105,12 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
     def IsWrapped(self, request, unused_context):
         is_it_wrapped = _is_wrapped(self.env, request.wrapper_type)
         return environment_pb2.IsWrappedResponse(is_wrapped=is_it_wrapped)
-    
+
+
 class EnvironmentServicerOnThread(environment_pb2_grpc.EnvironmentService):
     def __init__(self, request_queue, response_queue) -> None:
-        self.request_queue : Queue = request_queue
-        self.response_queue : Queue = response_queue
+        self.request_queue: Queue = request_queue
+        self.response_queue: Queue = response_queue
 
     def Step(self, request, unused_context):
         self.request_queue.put(request)
@@ -170,13 +165,13 @@ class EnvironmentServicerOnThread(environment_pb2_grpc.EnvironmentService):
         resp = self.response_queue.get()
         assert isinstance(resp, environment_pb2.IsWrappedResponse)
         return resp
-    
+
+
 def register(local_addr, learner_addr):
     channel = grpc.insecure_channel(learner_addr)
     stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel)
     request = environment_pb2.RegisterEnvironmentRequest(
-        ip=local_addr.split(":")[0],
-        port=int(local_addr.split(":")[1])
+        ip=local_addr.split(":")[0], port=int(local_addr.split(":")[1])
     )
     response = stub.RegisterEnvironment(request)
     assert response.success, "Registration failed"
@@ -228,5 +223,5 @@ def serve_env_over_grpc(env, local_addr, learner_addr):
             resp = servicer.IsWrapped(req, None)
         else:
             raise ValueError(f"Unknown request type: {type(req)}")
-        
+
         response_queue.put(resp)

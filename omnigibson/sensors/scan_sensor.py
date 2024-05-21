@@ -1,7 +1,7 @@
-import cv2
-import numpy as np
 from collections.abc import Iterable
 
+import cv2
+import numpy as np
 from transforms3d.quaternions import quat2mat
 
 import omnigibson.lazy as lazy
@@ -15,7 +15,7 @@ class ScanSensor(BaseSensor):
     General 2D LiDAR range sensor and occupancy grid sensor.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
@@ -49,7 +49,7 @@ class ScanSensor(BaseSensor):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         modalities="all",
         enabled=True,
@@ -102,7 +102,7 @@ class ScanSensor(BaseSensor):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             modalities=modalities,
             enabled=enabled,
@@ -112,7 +112,7 @@ class ScanSensor(BaseSensor):
 
     def _load(self):
         # Define a LIDAR prim at the current stage
-        result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self._prim_path)
+        result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self.prim_path)
 
         return lidar.GetPrim()
 
@@ -230,7 +230,7 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            raw_scan = self._rs.get_linear_depth_data(self._prim_path)
+            raw_scan = self._rs.get_linear_depth_data(self.prim_path)
             # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
             raw_scan = np.clip(raw_scan, self.min_range, self.max_range)
             obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)

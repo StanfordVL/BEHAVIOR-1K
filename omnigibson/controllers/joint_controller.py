@@ -1,16 +1,15 @@
 import numpy as np
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
-    IsGraspingState,
     ControlType,
+    GripperController,
+    IsGraspingState,
     LocomotionController,
     ManipulationController,
-    GripperController,
 )
-from omnigibson.utils.python_utils import assert_valid_key
-import omnigibson.utils.transform_utils as T
-
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.python_utils import assert_valid_key
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -187,7 +186,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))
+            dof_idxs_mat = np.ix_(self.dof_idx, self.dof_idx)
             mm = control_dict["mass_matrix"][dof_idxs_mat]
             u = np.dot(mm, u)
 

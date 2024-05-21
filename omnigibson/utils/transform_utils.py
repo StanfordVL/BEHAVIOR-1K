@@ -1153,3 +1153,14 @@ def z_angle_from_quat(quat):
 def z_rotation_from_quat(quat):
     """Get the quaternion for the rotation around the Z axis produced by the quaternion."""
     return R.from_euler("z", z_angle_from_quat(quat)).as_quat()
+
+
+def integer_spiral_coordinates(n):
+    # Map integers from Z to Z^2 in a spiral pattern around the origin.
+    # Sources:
+    # https://www.reddit.com/r/askmath/comments/18vqorf/find_the_nth_coordinate_of_a_square_spiral/
+    # https://oeis.org/A174344
+    m = np.floor(np.sqrt(n))
+    x = ((-1) ** m) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n)) % 2) - np.ceil(m / 2))
+    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n) + 1) % 2) + np.ceil(m / 2))
+    return int(x), int(y)

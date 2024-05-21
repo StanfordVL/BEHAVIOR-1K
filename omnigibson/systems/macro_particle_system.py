@@ -1,21 +1,26 @@
 import os
+
 import matplotlib.pyplot as plt
+import numpy as np
 import trimesh
+from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import FlatcacheAPI
-from omnigibson.prims.geom_prim import VisualGeomPrim, CollisionVisualGeomPrim
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem, VisualParticleSystem
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import classproperty, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.usd_utils import (
+    FlatcacheAPI,
+    absolute_prim_path_to_scene_relative,
+    scene_relative_prim_path_to_absolute,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -61,7 +66,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False)
+        particle_template.load(None)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -153,12 +158,6 @@ class MacroParticleSystem(BaseSystem):
         """
         return f"{cls.name}Particle"
 
-    @classproperty
-    def state_size(cls):
-        # In additon to super, we have:
-        # scale (3*n), and particle counter (1)
-        return super().state_size + 3 * cls.n_particles + 1
-
     @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
@@ -196,7 +195,7 @@ class MacroParticleSystem(BaseSystem):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
@@ -228,12 +227,12 @@ class MacroParticleSystem(BaseSystem):
         cls._color = color
 
     @classmethod
-    def add_particle(cls, prim_path, scale, idn=None):
+    def add_particle(cls, scene, relative_prim_path, scale, idn=None):
         """
         Adds a particle to this system.
 
         Args:
-            prim_path (str): Absolute path to the newly created particle, minus the name for this particle
+            relative_prim_path (str): Scene-relative path to the newly created particle, minus the name for this particle
             scale (3-array): (x,y,z) scale to set for the added particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
@@ -245,7 +244,7 @@ class MacroParticleSystem(BaseSystem):
         name = cls.particle_idn2name(idn=cls.next_available_particle_idn if idn is None else idn)
         # Make sure name doesn't already exist
         assert name not in cls.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
-        new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
+        new_particle = cls._load_new_particle(scene=scene, relative_prim_path=f"{relative_prim_path}/{name}", name=name)
 
         # Set the scale and make sure the particle is visible
         new_particle.scale *= scale
@@ -278,6 +277,7 @@ class MacroParticleSystem(BaseSystem):
     @classmethod
     def generate_particles(
         cls,
+        scene,
         positions,
         orientations=None,
         scales=None,
@@ -296,19 +296,19 @@ class MacroParticleSystem(BaseSystem):
 
         # Add particles
         for scale in scales:
-            cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=scale)
+            cls.add_particle(scene=None, relative_prim_path=f"{cls.relative_prim_path}/particles", scale=scale)
 
         # Set the tfs
         cls.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         """
         Loads a new particle into the current stage, leveraging @cls.particle_object as a template for the new particle
         to load. This function should be implemented by any subclasses.
 
         Args:
-            prim_path (str): The absolute stage path at which to create the new particle
+            relative_prim_path (str): The scene-relative path at which to create the new particle
             name (str): The name to assign to this new particle at the path
 
         Returns:
@@ -427,9 +427,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 )
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
+        prim_path = scene_relative_prim_path_to_absolute(scene, relative_prim_path)
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
@@ -442,7 +443,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 semantic_label=cls.name,
                 type_label="class",
             )
-        return VisualGeomPrim(prim_path=prim_path, name=name)
+        result = VisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result.load(scene)
+        return result
 
     @classmethod
     def _clear(cls):
@@ -541,8 +544,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position += offset
 
             # Create particle
+            particle_prim_path = obj.prim_path if is_cloth else link_prim_path
             particle = cls.add_particle(
-                prim_path=obj.prim_path if is_cloth else link_prim_path,
+                scene=obj.scene,
+                relative_prim_path=absolute_prim_path_to_scene_relative(obj.scene, particle_prim_path),
                 scale=scale,
             )
 
@@ -959,7 +964,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Create any groups we don't already have
         for name in groups_to_create:
-            obj = og.sim.scene.object_registry("name", name)
+            # TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("name", name)
             info = name_to_info_mapping[name]
             cls.create_attachment_group(obj=obj)
             is_cloth = cls._is_cloth_obj(obj=obj)
@@ -967,8 +973,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 # Reference is either the face ID (int) if cloth group or link name (str) if rigid body group
                 # Create the necessary particles
                 # Use scale (1,1,1) since it will get overridden anyways when loading state
+                particle_prim_path = obj.prim_path if is_cloth else obj.links[reference].prim_path
                 particle = cls.add_particle(
-                    prim_path=obj.prim_path if is_cloth else obj.links[reference].prim_path,
+                    scene=obj.scene,
+                    relative_prim_path=absolute_prim_path_to_scene_relative(obj.scene, particle_prim_path),
                     scale=np.ones(3),
                     idn=int(particle_idn),
                 )
@@ -1091,7 +1099,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         indices_to_remove = np.array([], dtype=int)
         for info in state["groups"].values():
-            obj = og.sim.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
+            # TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("uuid", info["particle_attached_obj_uuid"])
             # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
             if obj is not None:
                 group_objects.append(obj)
@@ -1138,7 +1147,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         return np.concatenate([*state_group_flat, state_flat]).astype(float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Synchronize the particle groups
         n_groups = int(state[0])
         groups_dict = dict()
@@ -1147,7 +1156,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         idx = 1
         for i in range(n_groups):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
-            obj = og.sim.scene.object_registry("uuid", obj_uuid)
+            # TODO(parallel): Which scene
+            obj = og.sim.scenes[0].object_registry("uuid", obj_uuid)
             assert obj is not None, f"Object with UUID {obj_uuid} not found in the scene"
             is_cloth = cls._is_cloth_obj(obj=obj)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}
@@ -1215,9 +1225,10 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             cls.refresh_particles_view()
 
     @classmethod
-    def _load_new_particle(cls, prim_path, name):
+    def _load_new_particle(cls, scene, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
+        prim_path = scene_relative_prim_path_to_absolute(scene, relative_prim_path)
         if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
@@ -1232,7 +1243,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 semantic_label=cls.name,
                 type_label="class",
             )
-        return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
+        result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
+        result.load(scene)
+        return result
 
     @classmethod
     def process_particle_object(cls):
@@ -1287,9 +1300,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         cls.refresh_particles_view()
 
     @classmethod
-    def add_particle(cls, prim_path, scale, idn=None):
+    def add_particle(cls, scene, relative_prim_path, scale, idn=None):
         # Run super first
-        particle = super().add_particle(prim_path=prim_path, scale=scale, idn=idn)
+        particle = super().add_particle(scene=scene, relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
         cls.refresh_particles_view()
@@ -1542,16 +1555,12 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         if n_particles_to_generate > 0:
             for i in range(n_particles_to_generate):
                 # Min scale == max scale, so no need for sampling
-                cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=cls.max_scale)
+                cls.add_particle(
+                    scene=None, relative_prim_path=f"{cls.relative_prim_path}/particles", scale=cls.max_scale
+                )
         else:
             # Remove excess particles
             cls.remove_particles(idxs=np.arange(-n_particles_to_generate))
-
-    @classproperty
-    def state_size(cls):
-        # In additon to super, we have:
-        # velocities (6*n)
-        return super().state_size + 6 * cls.n_particles
 
     @classmethod
     def _dump_state(cls):
@@ -1586,7 +1595,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Sync the number of particles first
         cls._sync_particles(n_particles=int(state[0]))
 

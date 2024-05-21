@@ -1,26 +1,26 @@
-import uuid
-import omnigibson as og
-import omnigibson.lazy as lazy
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.prims.prim_base import BasePrim
-from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.prims.material_prim import MaterialPrim
-from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, PoseAPI
-from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
-from omnigibson.utils.ui_utils import disclaimer, create_module_logger
-
-from pathlib import Path
+import datetime
 import os
 import tempfile
-import datetime
-import trimesh
-import pymeshlab
-import numpy as np
+import uuid
 from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import trimesh
+
+import omnigibson as og
+import omnigibson.lazy as lazy
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS, BaseSystem, PhysicalParticleSystem
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
+from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
+from omnigibson.utils.python_utils import assert_valid_key, classproperty, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
+from omnigibson.utils.ui_utils import create_module_logger, disclaimer
+from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative, mesh_prim_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -309,12 +309,6 @@ class PhysxParticleInstancer(BasePrim):
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
-    @property
-    def state_size(self):
-        # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
-        # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
-        return 3 + self.n_particles * 14
-
     def _dump_state(self):
         return dict(
             idn=self._idn,
@@ -365,7 +359,7 @@ class PhysxParticleInstancer(BasePrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Sanity check the identification number
         assert self._idn == state[0], (
             f"Got mismatch in identification number for this particle instancer when "
@@ -523,6 +517,7 @@ class MicroParticleSystem(BaseSystem):
         """
         # Default is PBR material
         return MaterialPrim.get_material(
+            scene=None,
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
@@ -707,13 +702,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     @classproperty
     def default_instancer_idn(cls):
         return 0
-
-    @classproperty
-    def state_size(cls):
-        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
-        # number of particles in each instancer (3n),
-        # and the corresponding states in each instancer (X)
-        return 1 + 3 * len(cls.particle_instancers) + sum(inst.state_size for inst in cls.particle_instancers.values())
 
     @classproperty
     def default_particle_instancer(cls):
@@ -1216,7 +1204,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         ).astype(float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Synchronize the particle instancers
         n_instancers = int(state[0])
         instancer_info = dict()
@@ -1237,9 +1225,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = cls.particle_instancer_idn_to_name(idn=idn)
-            state_size = cls.particle_instancers[name].state_size
-            particle_states[name] = cls.particle_instancers[name].deserialize(state[idx : idx + state_size])
-            idx += state_size
+            particle_states[name], deserialized_items = cls.particle_instancers[name]._deserialize(state[idx:])
+            idx += deserialized_items
 
         return (
             dict(
@@ -1385,9 +1372,12 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @classmethod
     def _create_particle_prototypes(cls):
         # Simulate particles with simple spheres
-        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, f"{cls.prim_path}/prototype0")
+        prototype_prim_path = f"{cls.prim_path}/prototype0"
+        prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
-        prototype = VisualGeomPrim(prim_path=prototype.GetPath().pathString, name=prototype.GetPath().pathString)
+        relative_prototype_prim_path = absolute_prim_path_to_scene_relative(None, prototype_prim_path)
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{cls.name}_prototype0")
+        prototype.load(None)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
@@ -1400,6 +1390,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
     def _get_particle_material_template(cls):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
         return MaterialPrim.get_material(
+            scene=None,
             prim_path=cls.mat_path,
             name=cls.mat_name,
             load_config={
@@ -1523,7 +1514,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def _create_particle_prototypes(cls):
         # Load the particle template
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False)
+        particle_template.load(None)
         cls._particle_template = particle_template
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
@@ -1543,7 +1534,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
         lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
 
         # Wrap it with VisualGeomPrim with the correct scale
-        prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
+        relative_prototype_path = absolute_prim_path_to_scene_relative(None, prototype_path)
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
+        prototype.load(None)
         prototype.scale *= cls.max_scale
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
@@ -1685,6 +1678,8 @@ class Cloth(MicroParticleSystem):
             )
 
             # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
+            import pymeshlab  # We import this here because it takes a few seconds to load.
+
             for _ in range(10):
                 ms = pymeshlab.MeshSet()
                 ms.load_new_mesh(tmp_fpath)
@@ -1782,11 +1777,6 @@ class Cloth(MicroParticleSystem):
     def particle_contact_offset(cls):
         return m.CLOTH_PARTICLE_CONTACT_OFFSET
 
-    @classproperty
-    def state_size(cls):
-        # Default is no state
-        return 0
-
     @classmethod
     def _dump_state(cls):
         # Empty by default
@@ -1803,6 +1793,6 @@ class Cloth(MicroParticleSystem):
         return np.array([], dtype=float)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # Nothing by default
         return dict(), 0

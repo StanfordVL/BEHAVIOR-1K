@@ -2,7 +2,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 
-
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -10,9 +9,9 @@ m.DEFAULT_COOK_TEMPERATURE = 70
 
 
 class Cooked(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj, cook_temperature=m.DEFAULT_COOK_TEMPERATURE):
+    def __init__(self, obj, cook_temperature=None):
         super(Cooked, self).__init__(obj)
-        self.cook_temperature = cook_temperature
+        self.cook_temperature = cook_temperature if cook_temperature is not None else m.DEFAULT_COOK_TEMPERATURE
 
     @classmethod
     def get_dependencies(cls):

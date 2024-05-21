@@ -1,14 +1,16 @@
-import os
-import yaml
-import numpy as np
-import omnigibson as og
-from omnigibson.macros import gm
-import wandb
 import argparse
+import os
 
+import numpy as np
+import wandb
+import yaml
 from telegym import serve_env_over_grpc
 
+import omnigibson as og
+from omnigibson.macros import gm
+
 gm.USE_FLATCACHE = True
+
 
 def main(local_addr, learner_addr, render):
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -17,7 +19,7 @@ def main(local_addr, learner_addr, render):
 
     if not render:
         gm.ENABLE_RENDERING = False
-        del config['env']['external_sensors']
+        del config["env"]["external_sensors"]
 
     env = og.Environment(configs=config)
 
@@ -34,7 +36,8 @@ def main(local_addr, learner_addr, render):
     serve_env_over_grpc(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
-    import sys, socket
+    import socket
+    import sys
 
     parser = argparse.ArgumentParser()
     parser.add_argument("learner_addr", type=str)

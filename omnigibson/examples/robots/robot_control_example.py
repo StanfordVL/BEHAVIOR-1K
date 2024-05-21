@@ -5,14 +5,12 @@ Options for random actions, as well as selection of robot action space
 """
 
 import numpy as np
-import yaml
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
-
+from omnigibson.utils.ui_utils import KeyboardRobotController, choose_from_options
 
 CONTROL_MODES = dict(
     random="Use autonomous random actions (default)",
@@ -66,12 +64,6 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
-<<<<<<< HEAD
-    # Create the config for generating the environment we want
-    env_cfg = dict()
-    env_cfg["action_frequency"] = 10
-    env_cfg["physics_frequency"] = 60
-=======
     # Choose scene to load
     scene_model = "Rs_int"
     if not quickstart:
@@ -83,18 +75,14 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         robot_name = choose_from_options(
             options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
         )
->>>>>>> og-develop
 
-    # # Add the robot we want to load
-    # robot0_cfg = dict()
-    # robot0_cfg["type"] = robot_name
-    # robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
-    # robot0_cfg["action_type"] = "continuous"
-    # robot0_cfg["action_normalize"] = True
+    scene_cfg = dict()
+    if scene_model == "empty":
+        scene_cfg["type"] = "Scene"
+    else:
+        scene_cfg["type"] = "InteractiveTraversableScene"
+        scene_cfg["scene_model"] = scene_model
 
-<<<<<<< HEAD
-    # # Create the environment
-=======
     # Add the robot we want to load
     robot0_cfg = dict()
     robot0_cfg["type"] = robot_name
@@ -103,24 +91,13 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     robot0_cfg["action_normalize"] = True
 
     # Compile config
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg], env={"use_floor_plane": (scene_model == "empty")})
 
     # Create the environment
->>>>>>> og-develop
     env = og.Environment(configs=cfg)
 
-    # # Choose robot controller to use
+    # Choose robot controller to use
     robot = env.robots[0]
-<<<<<<< HEAD
-    # controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
-
-    # # Choose control mode
-    control_mode = "teleop"
-    # if random_selection:
-    #     control_mode = "random"
-    # else:
-    #     control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
-=======
     controller_choices = {
         "base": "DifferentialDriveController",
         "arm_0": "InverseKinematicsController",
@@ -137,21 +114,20 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         control_mode = "teleop"
     else:
         control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
->>>>>>> og-develop
 
-    # # Update the control mode of the robot
-    # controller_config = {component: {"name": name} for component, name in controller_choices.items()}
-    # robot.reload_controllers(controller_config=controller_config)
+    # Update the control mode of the robot
+    controller_config = {component: {"name": name} for component, name in controller_choices.items()}
+    robot.reload_controllers(controller_config=controller_config)
 
-    # # Because the controllers have been updated, we need to update the initial state so the correct controller state
-    # # is preserved
-    # env.scene.update_initial_state()
+    # Because the controllers have been updated, we need to update the initial state so the correct controller state
+    # is preserved
+    env.scene.update_initial_state()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    # og.sim.viewer_camera.set_position_orientation(
-    #     position=np.array([1.46949, -3.97358, 2.21529]),
-    #     orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
-    # )
+    og.sim.viewer_camera.set_position_orientation(
+        position=np.array([1.46949, -3.97358, 2.21529]),
+        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+    )
 
     # Reset environment and robot
     env.reset()
@@ -179,16 +155,10 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
-<<<<<<< HEAD
-        action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        _, reward, _, _, _ = env.step(action=action)
-        print(reward)
-=======
         action = (
             action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         )
         env.step(action=action)
->>>>>>> og-develop
         step += 1
 
     # Always shut down the environment cleanly at the end

@@ -5,7 +5,10 @@ This only serves as a starting point that users can further build upon.
 """
 
 import argparse
-import os, time, cv2
+import os
+import time
+
+import cv2
 import yaml
 
 import omnigibson as og
@@ -15,25 +18,17 @@ from omnigibson.utils.python_utils import meets_minimum_version
 
 try:
     import gymnasium as gym
+    import tensorboard
     import torch as th
     import torch.nn as nn
-    import tensorboard
     from stable_baselines3 import PPO
+    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
     from stable_baselines3.common.preprocessing import maybe_transpose
     from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
     from stable_baselines3.common.utils import set_random_seed
-    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
-<<<<<<< HEAD
-    og.log.error("torch, stable-baselines3, or tensorboard is not installed. "
-                 "See which packages are missing, and then run the following for any missing packages:\n"
-                 "pip install torch\n"
-                 "pip install stable-baselines3==1.7.0\n"
-                 "pip install tensorboard\n"
-                 "Also, please use gymnasium instead of gym: pip install gymnasium>=0.28.1")
-=======
     og.log.error(
         "torch, stable-baselines3, or tensorboard is not installed. "
         "See which packages are missing, and then run the following for any missing packages:\n"
@@ -42,7 +37,6 @@ except ModuleNotFoundError:
         "pip install shimmy>=0.2.1\n"
         "Also, please update gym to >=0.26.1 after installing sb3: pip install gym>=0.26.1"
     )
->>>>>>> og-develop
     exit(1)
 
 assert meets_minimum_version(gym.__version__, "0.28.1"), "Please install/update gym to version >= 0.28.1"

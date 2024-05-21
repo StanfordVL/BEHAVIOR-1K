@@ -7,20 +7,19 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
-import omnigibson.lazy as lazy
+from collections.abc import Iterable
 
+import numpy as np
+
+import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.systems import get_system
-import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
-from omnigibson.utils.python_utils import classproperty
-import omnigibson as og
-
-import numpy as np
-from collections.abc import Iterable
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -41,11 +40,11 @@ class ClothPrim(GeomPrim):
         it will apply it.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
+            @relative_prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
             specified:
 
             scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
@@ -55,7 +54,7 @@ class ClothPrim(GeomPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -66,7 +65,7 @@ class ClothPrim(GeomPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -583,7 +582,7 @@ class ClothPrim(GeomPrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 

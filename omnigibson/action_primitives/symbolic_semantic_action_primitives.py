@@ -4,17 +4,16 @@ A set of action primitives that work without executing low-level physics but ins
 objects directly into their post-condition states. Useful for learning high-level methods.
 """
 
-from aenum import IntEnum, auto
-
 import numpy as np
-from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS
-from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
+from aenum import IntEnum, auto
 
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects import DatasetObject
+from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 
 
 class SymbolicSemanticActionPrimitiveSet(IntEnum):

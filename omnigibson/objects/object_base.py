@@ -1,19 +1,20 @@
 from abc import ABCMeta
-import numpy as np
 from collections.abc import Iterable
+from functools import cached_property
+
+import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.usd_utils import create_joint, CollisionAPI
-from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
-from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 import omnigibson.utils.transform_utils as T
-
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
+from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.usd_utils import CollisionAPI, create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -39,7 +40,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -55,7 +56,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -79,7 +80,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         # Generate default prim path if none is specified
-        prim_path = f"/World/{name}" if prim_path is None else prim_path
+        relative_prim_path = f"/{name}" if relative_prim_path is None else relative_prim_path
 
         # Store values
         self.uuid = get_uuid(name) if uuid is None else uuid
@@ -102,7 +103,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -112,13 +113,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["name"] = self.name
         self._init_info["args"]["uuid"] = self.uuid
 
-    def load(self):
-        # Run super method ONLY if we're not loaded yet
-        if self.loaded:
-            prim = self._prim
-        else:
-            prim = super().load()
-            log.info(f"Loaded {self.name} at {self.prim_path}")
+    def load(self, scene):
+        prim = super().load(scene)
+        log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
 
     def remove(self):
@@ -164,9 +161,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # the error explicitly here
             with suppress_omni_log(channels=["omni.hydra"]):
                 create_joint(
-                    prim_path=f"{self._prim_path}/rootJoint",
+                    prim_path=f"{self.prim_path}/rootJoint",
                     joint_type="FixedJoint",
-                    body1=f"{self._prim_path}/{self._root_link_name}",
+                    body1=f"{self.prim_path}/{self._root_link_name}",
                 )
 
             # Delete n_fixed_joints cached property if it exists since the number of fixed joints has now changed
@@ -239,11 +236,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
             # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
             # for more info
-            return f"{self._prim_path}/{self.root_link_name}"
+            return f"{self.prim_path}/{self.root_link_name}"
         else:
             # Fixed objects that are not kinematic only, or non-fixed objects that have no articulated joints but do
             # have fixed joints
-            return self._prim_path
+            return self.prim_path
 
     @property
     def mass(self):
@@ -287,7 +284,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Update init info for scale
         self._init_info["args"]["scale"] = scale
 
-    @property
+    @cached_property
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 

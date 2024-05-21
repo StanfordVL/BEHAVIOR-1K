@@ -39,13 +39,13 @@ to get the action based on the user teleoperation input, and pass the action to 
 You can save the current state of the simulator to a json file by calling `save`:
 
 ```
-og.sim.save(JSON_PATH)
+og.sim.save([JSON_PATH])
 ```
 
 To restore any saved state, simply call `restore`
 
 ```
-og.sim.restore(JSON_PATH)
+og.sim.restore([JSON_PATH])
 ```
 
 Alternatively, if you just want to save all the scene and objects info at the current tiemframe, you can also call `self.scene.dump_state(serialized=True)`, which will return a numpy array containing all the relavant information. You can then stack the array together to get the full trajectory of states.

@@ -1,36 +1,37 @@
-import operator
-from abc import ABCMeta, abstractmethod
-from collections import namedtuple, defaultdict
-import numpy as np
-import json
-from copy import copy
 import itertools
+import json
+import operator
 import os
-from collections import defaultdict
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict, namedtuple
+from copy import copy
+
+import bddl
 import networkx as nx
+import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import (
-    get_system,
-    is_system_active,
-    PhysicalParticleSystem,
-    VisualParticleSystem,
-    REGISTERED_SYSTEMS,
-)
-from omnigibson.objects.dataset_object import DatasetObject
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import *
 from omnigibson.object_states.factory import get_system_states
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.systems import (
+    REGISTERED_SYSTEMS,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    get_system,
+    is_system_active,
+)
+from omnigibson.systems.system_base import SYSTEM_REGISTRY
 from omnigibson.utils.asset_utils import get_all_object_category_models
+from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
 from omnigibson.utils.registry_utils import Registry
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.ui_utils import disclaimer, create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import RigidContactAPI
-from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
-import bddl
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -130,7 +131,7 @@ class TransitionRuleAPI:
         Args:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
         """
-        objects = og.sim.scene.objects
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
         for rule in rules:
             # Check if rule is still valid, if so, update its entry
             object_candidates = cls.get_rule_candidates(rule=rule, objects=objects)
@@ -191,7 +192,8 @@ class TransitionRuleAPI:
             state = og.sim.dump_state()
             for added_obj_attr in added_obj_attrs:
                 new_obj = added_obj_attr.obj
-                og.sim.import_object(new_obj)
+                # TODO(parallel): How do we tell what scene to add these objects to?
+                og.sim.scenes[0].add_object(new_obj)
                 # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
                 # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
                 if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
@@ -403,11 +405,14 @@ class TouchingAnyCondition(RuleCondition):
 
         if self._optimized:
             # Get all impulses
-            impulses = RigidContactAPI.get_all_impulses()
             idxs_to_check = np.concatenate([self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]])
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
-                if np.any(impulses[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                if np.any(
+                    RigidContactAPI.get_all_impulses(self._filter_1_scene_idxs[obj])[self._filter_1_idxs[obj]][
+                        :, idxs_to_check
+                    ]
+                ):
                     objs.append(obj)
         else:
             # Manually check contact
@@ -627,8 +632,8 @@ class BaseTransitionRule(Registerable):
                 len(cls.candidate_filters) > 0
             ), "At least one of individual_filters or group_filters must be specified!"
 
-            # Store conditions
-            cls.conditions = cls._generate_conditions()
+            # Delay condition generation until the first time it's accessed
+            cls.conditions = None
 
     @classproperty
     def candidate_filters(cls):
@@ -699,6 +704,8 @@ class BaseTransitionRule(Registerable):
         cls.candidates = object_candidates
 
         # Refresh all conditions
+        if cls.conditions is None:
+            cls.conditions = cls._generate_conditions()
         for condition in cls.conditions:
             condition.refresh(object_candidates=object_candidates)
 
@@ -727,6 +734,8 @@ class BaseTransitionRule(Registerable):
         """
         # Copy the candidates dictionary since it may be mutated in place by @conditions
         object_candidates = {filter_name: candidates.copy() for filter_name, candidates in cls.candidates.items()}
+        if cls.conditions is None:
+            cls.conditions = cls._generate_conditions()
         for condition in cls.conditions:
             if not condition(object_candidates=object_candidates):
                 # Condition was not met, so immediately terminate
@@ -787,7 +796,8 @@ class WasherDryerRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all obj
-        obj_positions = np.array([obj.aabb_center for obj in og.sim.scene.objects])
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
+        obj_positions = np.array([obj.aabb_center for obj in objects])
         return dict(obj_positions=obj_positions)
 
     @classmethod
@@ -810,7 +820,8 @@ class WasherDryerRule(BaseTransitionRule):
         obj_positions = global_info["obj_positions"]
         in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
-        in_volume_objs = list(np.array(og.sim.scene.objects)[in_volume])
+        objects = [obj for scene in og.sim.scenes for obj in scene.objects]
+        in_volume_objs = list(np.array(objects)[in_volume])
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
@@ -1221,7 +1232,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        for system in og.sim.scene.system_registry.objects:
+        for system in SYSTEM_REGISTRY.objects:
             # Skip cloth system
             if system.name == "cloth":
                 continue
@@ -1494,7 +1505,10 @@ class RecipeRule(BaseTransitionRule):
             bool: True if all the input objects exist in the scene
         """
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            if len(og.sim.scene.object_registry("category", obj_category, default_val=set())) < obj_quantity:
+            if all(
+                len(s.object_registry("category", obj_category, default_val=set())) < obj_quantity
+                for s in og.sim.scenes
+            ):
                 return False
         return True
 
@@ -1515,7 +1529,7 @@ class RecipeRule(BaseTransitionRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            if any(len(s.object_registry("category", category, default_val=set())) > 0 for s in og.sim.scenes):
                 return True
 
         # None found, return False
@@ -1649,7 +1663,11 @@ class RecipeRule(BaseTransitionRule):
         cls._OBJECTS_TO_IDX = dict()
 
         # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
-        objects_by_category = og.sim.scene.object_registry.get_dict("category")
+        objects_by_category = defaultdict(list)
+        for scene in og.sim.scenes:
+            scene_objects_by_category = scene.object_registry.get_dict("category")
+            for cat, objs in scene_objects_by_category.items():
+                objects_by_category[cat].extend(objs)
 
         for name, recipe in cls._RECIPES.items():
             # If all pre-requisites met, add to active recipes
@@ -1825,8 +1843,7 @@ class RecipeRule(BaseTransitionRule):
                 output_states[state_type] = (state_value,)
             for state_type, system_name, state_value in recipe["output_states"][category]["binary_system"]:
                 output_states[state_type] = (get_system(system_name), state_value)
-
-            n_category_objs = len(og.sim.scene.object_registry("category", category, []))
+            n_category_objs = len(container.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
             for i in range(n_instances):
@@ -2247,7 +2264,10 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in fillable_categories:
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            has_category = any(
+                len(scene.object_registry("category", category, default_val=set())) > 0 for scene in og.sim.scenes
+            )
+            if has_category:
                 return True
 
         # None found, return False
@@ -2270,7 +2290,10 @@ class CookingRule(RecipeRule):
             return True
         # Otherwise, at least one valid type must exist
         for category in heatsource_categories:
-            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+            has_category = any(
+                len(scene.object_registry("category", category, default_val=set())) > 0 for scene in og.sim.scenes
+            )
+            if has_category:
                 return True
 
         # None found, return False

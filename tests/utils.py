@@ -1,12 +1,11 @@
-import omnigibson as og
-
-from omnigibson.macros import gm
-from omnigibson.object_states import *
-from omnigibson.utils.constants import PrimType, ParticleModifyCondition, ParticleModifyMethod
-from omnigibson.systems import *
-import omnigibson.utils.transform_utils as T
 import numpy as np
 
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
+from omnigibson.object_states import *
+from omnigibson.systems import *
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
 
@@ -20,11 +19,11 @@ SYSTEM_EXAMPLES = {
 
 def og_test(func):
     def wrapper():
-        assert_test_scene()
+        env = assert_test_env()
         try:
-            func()
+            func(env)
         finally:
-            og.sim.scene.reset()
+            env.scene.reset()
 
     return wrapper
 
@@ -65,9 +64,16 @@ def get_obj_cfg(
     }
 
 
-def assert_test_scene():
-    if og.sim is None or og.sim.scene is None:
+env = None
+
+
+def assert_test_env():
+    global env
+    if env is None:
         cfg = {
+            "env": {
+                "use_floor_plane": True,
+            },
             "scene": {
                 "type": "Scene",
             },
@@ -175,14 +181,14 @@ def assert_test_scene():
             ],
         }
 
-        # Make sure sim is stopped
-        if og.sim is not None:
+        if og.sim is None:
+            # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = False
+        else:
+            # Make sure sim is stopped
             og.sim.stop()
-
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
 
         # Create the environment
         env = og.Environment(configs=cfg)
@@ -191,10 +197,13 @@ def assert_test_scene():
         og.sim.stop()
         bounding_box_object_names = ["bagel_dough", "raw_egg"]
         for name in bounding_box_object_names:
-            obj = og.sim.scene.object_registry("name", name)
+            obj = env.scene.object_registry("name", name)
             for collision_mesh in obj.root_link.collision_meshes.values():
                 collision_mesh.set_collision_approximation("boundingCube")
         og.sim.play()
+
+    assert env is not None, "Environment not created"
+    return env
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):

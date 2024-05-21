@@ -1,4 +1,5 @@
 import numpy as np
+
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm, macros
@@ -14,9 +15,11 @@ gm.ENABLE_HQ_RENDERING = True
 def main():
     # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
+        "env": {
+            "floor_plane_visible": True,
+        },
         "scene": {
             "type": "Scene",
-            "floor_plane_visible": True,
         },
         "objects": [
             {

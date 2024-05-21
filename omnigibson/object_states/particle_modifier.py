@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from collections import defaultdict
+
 import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, macros, gm
-from omnigibson.prims.geom_prim import VisualGeomPrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -15,30 +16,29 @@ from omnigibson.object_states.object_state_base import IntrinsicObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import (
-    BaseSystem,
-    VisualParticleSystem,
-    PhysicalParticleSystem,
-    get_system,
-    is_visual_particle_system,
-    is_physical_particle_system,
-    is_fluid_system,
-    is_system_active,
     REGISTERED_SYSTEMS,
+    BaseSystem,
+    PhysicalParticleSystem,
+    VisualParticleSystem,
+    get_system,
+    is_fluid_system,
+    is_physical_particle_system,
+    is_system_active,
+    is_visual_particle_system,
 )
-from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
-    get_particle_positions_in_frame,
     get_particle_positions_from_frame,
+    get_particle_positions_in_frame,
 )
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
-
+from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -77,6 +77,7 @@ m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
 
 
 def create_projection_visualization(
+    scene,
     prim_path,
     shape,
     projection_name,
@@ -91,6 +92,7 @@ def create_projection_visualization(
 
 
     Args:
+        scene (Scene): Scene object to generate the projection visualization within
         prim_path (str): Stage location for where to generate the projection visualization
         shape (str): Shape of the projection to generate. Valid options are: {Sphere, Cone}
         projection_name (str): Name associated with this projection visualization. Should be unique!
@@ -154,7 +156,9 @@ def create_projection_visualization(
     # Override the prototype with our own sphere with optional material
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
-    prototype = VisualGeomPrim(prim_path=prototype_path, name=f"{projection_name}_prototype")
+    relative_prototype_path = absolute_prim_path_to_scene_relative(scene, prototype_path)
+    prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=f"{projection_name}_prototype")
+    prototype.load(scene)
     prototype.initialize()
     # Set the scale (native scaling --> radius 0.5) and possibly update the material
     prototype.scale = particle_radius * 2.0
@@ -386,7 +390,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     )
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
-            self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
+            self.projection_mesh = VisualGeomPrim(
+                relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path),
+                name=f"{name_prefix}_projection_mesh",
+            )
+            self.projection_mesh.load(self.obj.scene)
             self.projection_mesh.initialize()
             self.projection_mesh.visible = False
 
@@ -734,11 +742,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         """
         raise NotImplementedError()
 
-    @property
-    def state_size(self):
-        # Only store the current_step
-        return 1
-
     def _dump_state(self):
         return dict(current_step=int(self._current_step))
 
@@ -748,7 +751,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     def _serialize(self, state):
         return np.array([state["current_step"]], dtype=float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         current_step = int(state[0])
         state_dict = dict(current_step=current_step)
 
@@ -1052,6 +1055,7 @@ class ParticleApplier(ParticleModifier):
                 )
             else:
                 self.projection_system, self.projection_emitter = create_projection_visualization(
+                    scene=self.obj.scene,
                     prim_path=projection_visualization_path,
                     shape=self._projection_mesh_params["type"],
                     projection_name=projection_name,
@@ -1061,13 +1065,22 @@ class ParticleApplier(ParticleModifier):
                     parent_scale=self.link.scale,
                     material=system.material,
                 )
+            relative_projection_system_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, self.projection_system.GetPrimPath().pathString
+            )
             self.projection_system_prim = BasePrim(
-                prim_path=self.projection_system.GetPrimPath().pathString, name=projection_name
+                relative_prim_path=relative_projection_system_path, name=projection_name
             )
+            self.projection_system_prim.load(self.obj.scene)
+
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
-            self.projection_source_sphere = VisualGeomPrim(
-                prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere"
+            relative_projection_source_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, projection_visualization_path
             )
+            self.projection_source_sphere = VisualGeomPrim(
+                relative_prim_path=relative_projection_source_path, name=f"{name_prefix}_projection_source_sphere"
+            )
+            self.projection_source_sphere.load(self.obj.scene)
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
@@ -1266,7 +1279,7 @@ class ParticleApplier(ParticleModifier):
             modifier_avg_scale = np.cbrt(np.product(self.obj.scale))
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
-                hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
+                hit_obj = self.obj.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
                 if hit_obj is not None:
                     # Create an attachment group if necessary
                     group = system.get_group_name(obj=hit_obj)

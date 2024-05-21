@@ -1,10 +1,11 @@
-import numpy as np
 from collections import namedtuple
-from scipy.spatial import ConvexHull, distance_matrix, QhullError
+
+import numpy as np
+from scipy.spatial import ConvexHull, QhullError, distance_matrix
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
 from omnigibson.object_states.cloth_mixin import ClothStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

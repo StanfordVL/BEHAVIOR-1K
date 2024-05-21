@@ -1,9 +1,11 @@
-import gym
-import omnigibson as og
 import os
+from time import time
+
+import gym
 import psutil
 from pynvml.smi import nvidia_smi
-from time import time
+
+import omnigibson as og
 
 
 class ProfilingEnv(og.Environment):

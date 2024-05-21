@@ -1,5 +1,7 @@
-from omnigibson.envs.rl_env import RLEnv
 from ray.rllib.algorithms.ppo import PPOConfig
+
+from omnigibson.envs.rl_env import RLEnv
+
 
 def main():
     DIST_COEFF = 0.1
@@ -26,30 +28,24 @@ def main():
                 "sensor_config": {
                     "VisionSensor": {
                         "modalities": ["rgb", "depth"],
-                        "sensor_kwargs": {
-                            "image_width": 224,
-                            "image_height": 224
-                        }
+                        "sensor_kwargs": {"image_width": 224, "image_height": 224},
                     }
                 },
                 "controller_config": {
-                    "base": {
-                        "name": "JointController",
-                        "motor_type": "velocity"
-                    },
+                    "base": {"name": "JointController", "motor_type": "velocity"},
                     "arm_left": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
+                        "command_output_limits": None,
+                        "use_delta_commands": False,
                     },
                     "arm_right": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
+                        "command_output_limits": None,
+                        "use_delta_commands": False,
                     },
                     "gripper_left": {
                         "name": "JointController",
@@ -57,7 +53,7 @@ def main():
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
                         "use_delta_commands": True,
-                        "use_single_command": True
+                        "use_single_command": True,
                     },
                     "gripper_right": {
                         "name": "JointController",
@@ -65,14 +61,10 @@ def main():
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
                         "use_delta_commands": True,
-                        "use_single_command": True
+                        "use_single_command": True,
                     },
-                    "camera": {
-                        "name": "JointController",
-                        "motor_type": "velocity",
-                        "use_delta_commands": False
-                    }
-                }
+                    "camera": {"name": "JointController", "motor_type": "velocity", "use_delta_commands": False},
+                },
             }
         ],
         "task": {
@@ -81,10 +73,7 @@ def main():
             "termination_config": {
                 "max_steps": 100000,
             },
-            "reward_config": {
-                "r_dist_coeff": DIST_COEFF,
-                "r_grasp": GRASP_REWARD
-            }
+            "reward_config": {"r_dist_coeff": DIST_COEFF, "r_grasp": GRASP_REWARD},
         },
         "objects": [
             {
@@ -94,13 +83,15 @@ def main():
                 "model": "lyipur",
                 "position": [-0.3, -0.8, 0.5],
             },
-        ]
+        ],
     }
 
-    reset_positions =  {
-        'coffee_table_fqluyq_0': ([-0.4767243 , -1.219805  ,  0.25702515], [-3.69874935e-04, -9.39229270e-04,  7.08872199e-01,  7.05336273e-01]),
-        'cologne': ([-0.30000001, -0.80000001,  0.44277492],
-                    [0.        , 0.        , 0.        , 1.00000012])
+    reset_positions = {
+        "coffee_table_fqluyq_0": (
+            [-0.4767243, -1.219805, 0.25702515],
+            [-3.69874935e-04, -9.39229270e-04, 7.08872199e-01, 7.05336273e-01],
+        ),
+        "cologne": ([-0.30000001, -0.80000001, 0.44277492], [0.0, 0.0, 0.0, 1.00000012]),
     }
 
     # Create the environment
@@ -131,6 +122,7 @@ def main():
         print(algo.train())  # 3. train it,
 
     algo.evaluate()  # 4. and evaluate it.
+
 
 if __name__ == "__main__":
     main()

@@ -1,29 +1,31 @@
 import json
 from abc import ABC
 from itertools import combinations
+
 import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.objects.light_object import LightObject
+from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
-    classproperty,
-    Serializable,
-    Registerable,
     Recreatable,
+    Registerable,
+    Serializable,
+    classproperty,
     create_object_from_init_info,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import CollisionAPI
-from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
-from omnigibson.objects.light_object import LightObject
-from omnigibson.robots.robot_base import m as robot_macros
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -31,8 +33,8 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Default texture to use for skybox
-m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+# TODO(parallel): Make this get dynamically computed based on scene AABB
+m.SCENE_MARGIN = 10.0
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
@@ -47,34 +49,20 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def __init__(
         self,
         scene_file=None,
-        use_floor_plane=True,
-        floor_plane_visible=True,
-        use_skybox=True,
-        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
-            use_floor_plane (bool): whether to load a flat floor plane into the simulator
-            floor_plane_visible (bool): whether to render the additionally added floor plane
-            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
-                to the generated floor plane
         """
         # Store internal variables
         self.scene_file = scene_file
         self._loaded = False  # Whether this scene exists in the stage or not
         self._initialized = False  # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
-        self._world_prim = None
+        self._scene_prim = None
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
-        self._use_floor_plane = use_floor_plane
-        self._floor_plane_visible = floor_plane_visible
-        self._floor_plane_color = floor_plane_color
-        self._floor_plane = None
-        self._use_skybox = use_skybox
-        self._skybox = None
 
         # Call super init
         super().__init__()
@@ -88,28 +76,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._registry
 
     @property
-    def skybox(self):
-        """
-        Returns:
-            None or LightObject: Skybox light associated with this scene, if it is used
-        """
-        return self._skybox
-
-    @property
-    def floor_plane(self):
-        """
-        Returns:
-            None or XFormPrim: Generated floor plane prim, if it is used
-        """
-        return self._floor_plane
-
-    @property
     def object_registry(self):
         """
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value="object_registry")
+        return self._registry(key="name", value=f"object_registry")
 
     @property
     def system_registry(self):
@@ -172,6 +144,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._loaded
 
     @property
+    def idx(self):
+        """Index of this scene in the simulator. Should not change."""
+        return og.sim.scenes.index(self)
+
+    @property
     def initialized(self):
         return self._initialized
 
@@ -180,34 +157,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
         """
-        # Create collision group for fixed base objects' non root links, root links, and building structures
-        CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
-        # Disable collision between root links of fixed base objects
-        CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
-        # Disable collision between building structures
-        CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
-
-        # Disable collision between building structures and 1. fixed base objects, 2. attached objects
-        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
-        CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
-
-        # We just add a ground plane if requested
-        if self._use_floor_plane:
-            self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
-
-        # Also add skybox if requested
-        if self._use_skybox:
-            self._skybox = LightObject(
-                prim_path="/World/skybox",
-                name="skybox",
-                category="background",
-                light_type="Dome",
-                intensity=1500,
-                fixed_base=True,
-            )
-            og.sim.import_object(self._skybox, register=False)
-            self._skybox.color = (1.07, 0.85, 0.61)
-            self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
+        # There's nothing to load for the base scene. Subclasses can implement this method.
+        # We simply check that the simulator has a floor plane.
+        assert og.sim.floor_plane, "Simulator must have a floor plane if using an empty Scene!"
 
     def _load_objects_from_scene_file(self):
         """
@@ -242,9 +194,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
             # Import into the simulator
-            og.sim.import_object(obj)
+            self.add_object(obj)
             # Set the init pose accordingly
-            obj.set_position_orientation(
+            obj.set_local_pose(
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
@@ -291,7 +243,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._registry = self._create_registry()
 
         # Store world prim and load the scene into the simulator
-        self._world_prim = og.sim.world_prim
+        scene_relative_path = f"/scene_{self.idx}"
+        self._scene_prim = XFormPrim(relative_prim_path=scene_relative_path, name=f"scene_{self.idx}")
+        self._scene_prim.load(None)
+
+        # Position the scene prim based on its index in the simulator.
+        x, y = T.integer_spiral_coordinates(self.idx)
+        self._scene_prim.set_position([x * m.SCENE_MARGIN, y * m.SCENE_MARGIN, 0])
+
+        # Go through whatever else loading the scene needs to do.
         self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
@@ -311,8 +271,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Clears any internal state before the scene is destroyed
         """
-        # Clears systems so they can be re-initialized
+        # Clears systems so they can be re-initialized.
         clear_all_systems()
+
+        # Remove all of the scene's objects.
+        og.sim.remove_object(list(self.objects))
+
+        # Remove the scene prim.
+        self._scene_prim.remove()
 
     def _initialize(self):
         """
@@ -327,6 +293,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         implement / extend the _initialize() method.
         """
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
+        assert og.sim.is_playing(), "Simulator must be playing in order to initialize the scene!"
         self._initialize()
 
         # Grab relevant objects info
@@ -342,8 +309,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             with open(self.scene_file, "r") as f:
                 scene_info = json.load(f)
             init_state = scene_info["state"]
-            og.sim.load_state(init_state, serialized=False)
-
+            self.load_state(init_state, serialized=False)
         self._initial_state = init_state
 
     def _create_registry(self):
@@ -356,7 +322,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create meta registry and populate with internal registries for robots, objects, and systems
         registry = SerializableRegistry(
-            name="master_registry",
+            name=f"scene_registry_{self.idx}",
             class_types=SerializableRegistry,
         )
 
@@ -366,7 +332,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add registry for objects
         registry.add(
             obj=SerializableRegistry(
-                name="object_registry",
+                name=f"object_registry",
                 class_types=BaseObject,
                 default_key="name",
                 unique_keys=self.object_registry_unique_keys,
@@ -427,29 +393,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj, register=True, _is_call_from_simulator=False):
+    def add_object(self, obj):
         """
-        Add an object to the scene, loading it if the scene is already loaded.
-
-        Note that calling add_object to an already loaded scene should only be done by the simulator's import_object()
-        function.
+        Add an object to the scene. The scene should already be loaded.
 
         Args:
             obj (BaseObject): the object to load
-            register (bool): whether to track this object internally in the scene registry
-            _is_call_from_simulator (bool): whether the caller is the simulator. This should
-            **not** be set by any callers that are not the Simulator class
 
         Returns:
             Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
                 (in that case, the object is stored to be loaded together with the scene)
         """
-        # Make sure the simulator is the one calling this function
-        assert _is_call_from_simulator, "Use import_object() for adding objects to a simulator and scene!"
-
-        # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
-        # let scene._load() load the object when called later on.
-        prim = obj.load()
+        # Load the object.
+        prim = obj.load(self)
 
         # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
         # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
@@ -466,12 +422,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     )
 
         # Add this object to our registry based on its type, if we want to register it
-        if register:
-            self.object_registry.add(obj)
+        self.object_registry.add(obj)
 
-            # Run any additional scene-specific logic with the created object
-            self._add_object(obj)
+        # Run any additional scene-specific logic with the created object
+        self._add_object(obj)
 
+        # Inform the simulator that there is a new object here.
+        og.sim.post_import_object(obj)
         return prim
 
     def remove_object(self, obj):
@@ -482,7 +439,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             obj (BaseObject): Object to remove
         """
         # Remove from the appropriate registry if registered.
-        # Sometimes we don't register objects to the object registry during import_object (e.g. particle templates)
+        # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
         if self.object_registry.object_is_registered(obj):
             self.object_registry.remove(obj)
 
@@ -500,6 +457,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         assert self._initial_state is not None
         self.load_state(self._initial_state)
         og.sim.step_physics()
+
+    @property
+    def prim(self):
+        """
+        Returns:
+            XFormPrim: the prim of the scene
+        """
+        assert self._scene_prim is not None, "Scene prim is not loaded yet!"
+        return self._scene_prim
+
+    @property
+    def prim_path(self):
+        """
+        Returns:
+            str: the prim path of the scene
+        """
+        assert self._scene_prim is not None, "Scene prim is not loaded yet!"
+        return self.prim.prim_path
 
     @property
     def n_floors(self):
@@ -589,57 +564,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return 0.0
 
-    def add_ground_plane(
-        self,
-        size=None,
-        z_position: float = 0,
-        name="ground_plane",
-        prim_path: str = "/World/groundPlane",
-        static_friction: float = 0.5,
-        dynamic_friction: float = 0.5,
-        restitution: float = 0.8,
-        color=None,
-        visible=True,
-    ):
-        """
-        Generate a ground plane into the simulator
-
-        Args:
-            size (None or float): If specified, sets the (x,y) size of the generated plane
-            z_position (float): Z position of the generated plane
-            name (str): Name to assign to the generated plane
-            prim_path (str): Prim path for the generated plane
-            static_friction (float): Static friction of the generated plane
-            dynamic_friction (float): Dynamics friction of the generated plane
-            restitution (float): Restitution of the generated plane
-            color (None or 3-array): If specified, sets the (R,G,B) color of the generated plane
-            visible (bool): Whether the plane should be visible or not
-        """
-        plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-            prim_path=prim_path,
-            name=name,
-            z_position=z_position,
-            size=size,
-            color=None if color is None else np.array(color),
-            visible=visible,
-            # TODO: update with new PhysicsMaterial API
-            # static_friction=static_friction,
-            # dynamic_friction=dynamic_friction,
-            # restitution=restitution,
-        )
-
-        self._floor_plane = XFormPrim(
-            prim_path=plane.prim_path,
-            name=plane.name,
-        )
-
-        # Assign floors category to the floor plane
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-            prim=self._floor_plane.prim,
-            semantic_label="floors",
-            type_label="class",
-        )
-
     def update_initial_state(self, state=None):
         """
         Updates the initial state for this scene (which the scene will get reset to upon calling reset())
@@ -678,11 +602,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self._objects_info
 
-    @property
-    def state_size(self):
-        # Total state size is the state size of our registry
-        return self._registry.state_size
-
     def _dump_state(self):
         # Default state for the scene is from the registry alone
         return self._registry.dump_state(serialized=False)
@@ -695,12 +614,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default state for the scene is from the registry alone
         return self._registry.serialize(state=state)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Default state for the scene is from the registry alone
-        # We split this into two explicit steps, because the actual registry state size might dynamically change
-        # as we're deserializing
-        state_dict = self._registry.deserialize(state=state)
-        return state_dict, self._registry.state_size
+        return self._registry._deserialize(state=state)
 
     @classproperty
     def _cls_registry(cls):

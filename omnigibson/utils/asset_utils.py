@@ -1,17 +1,19 @@
 import argparse
+import contextlib
+import inspect
 import json
 import os
 import subprocess
 import tempfile
-import contextlib
-import inspect
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from cryptography.fernet import Fernet
-from collections import defaultdict
 from urllib.request import urlretrieve
-import yaml
+
 import progressbar
+import yaml
+from cryptography.fernet import Fernet
+
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -231,8 +233,8 @@ def get_all_object_category_models_with_abilities(category, abilities):
             to support the requested list of @abilities
     """
     # Avoid circular imports
-    from omnigibson.objects.dataset_object import DatasetObject
     from omnigibson.object_states.factory import get_requirements_for_ability, get_states_for_ability
+    from omnigibson.objects.dataset_object import DatasetObject
 
     # Get all valid models
     all_models = get_all_object_category_models(category=category)
@@ -303,8 +305,8 @@ def get_attachment_metalinks(category, model):
         list of str: all attachment metalinks for the object model
     """
     # Avoid circular imports
-    from omnigibson.objects.dataset_object import DatasetObject
     from omnigibson.object_states import AttachedTo
+    from omnigibson.objects.dataset_object import DatasetObject
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
     usd_path = usd_path.replace(".usd", ".encrypted.usd")

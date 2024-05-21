@@ -1,6 +1,8 @@
+from typing import ClassVar as _ClassVar
+from typing import Optional as _Optional
+
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -22,7 +24,14 @@ class StepResponse(_message.Message):
     terminated: bool
     truncated: bool
     info: bytes
-    def __init__(self, observation: _Optional[bytes] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., info: _Optional[bytes] = ...) -> None: ...
+    def __init__(
+        self,
+        observation: _Optional[bytes] = ...,
+        reward: _Optional[float] = ...,
+        terminated: bool = ...,
+        truncated: bool = ...,
+        info: _Optional[bytes] = ...,
+    ) -> None: ...
 
 class ResetRequest(_message.Message):
     __slots__ = ("seed", "options")

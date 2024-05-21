@@ -1,7 +1,8 @@
 import math
-import numpy as np
 import time
+
 import gymnasium as gym
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -11,8 +12,8 @@ from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
     MAX_VIEWER_SIZE,
-    semantic_class_name_to_id,
     semantic_class_id_to_name,
+    semantic_class_name_to_id,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
@@ -44,7 +45,7 @@ class VisionSensor(BaseSensor):
         - Camera state
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
@@ -111,7 +112,7 @@ class VisionSensor(BaseSensor):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         modalities="all",
         enabled=True,
@@ -169,7 +170,7 @@ class VisionSensor(BaseSensor):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             modalities=modalities,
             enabled=enabled,
@@ -181,7 +182,7 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
         return lazy.pxr.UsdGeom.Camera.Define(
-            lazy.omni.isaac.core.utils.stage.get_current_stage(), self._prim_path
+            lazy.omni.isaac.core.utils.stage.get_current_stage(), self.prim_path
         ).GetPrim()
 
     def _post_load(self):
@@ -189,10 +190,10 @@ class VisionSensor(BaseSensor):
         super()._post_load()
 
         # Add this sensor to the list of global sensors
-        self.SENSORS[self._prim_path] = self
+        self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
-        self._render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, resolution)
+        self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -232,7 +233,7 @@ class VisionSensor(BaseSensor):
         self._viewport = viewport
 
         # Link the camera and viewport together
-        self._viewport.viewport_api.set_active_camera(self._prim_path)
+        self._viewport.viewport_api.set_active_camera(self.prim_path)
 
         # Requires 3 render updates to propagate changes
         for i in range(3):
@@ -386,7 +387,7 @@ class VisionSensor(BaseSensor):
                         if value == "/World/groundPlane":
                             value = "groundPlane"
                         else:
-                            obj = og.sim.scene.object_registry("prim_path", value)
+                            obj = self.scene.object_registry("prim_path", value)
                             # Remap instance segmentation labels from prim path to object name
                             assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
                             value = obj.name
@@ -503,10 +504,11 @@ class VisionSensor(BaseSensor):
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.SENSORS.pop(self._prim_path)
+        self.SENSORS.pop(self.prim_path)
 
-        # Remove viewport
-        self._viewport.destroy()
+        # Remove the viewport if it's not the main viewport
+        if self._viewport.name != "Viewport":
+            self._viewport.destroy()
 
         # Run super
         super().remove()
@@ -745,17 +747,11 @@ class VisionSensor(BaseSensor):
     @classmethod
     def clear(cls):
         """
-        Clears all cached sensors that have been generated. Should be used when the simulator is completely reset; i.e.:
-        all objects on the stage are destroyed
+        Clear all the class-wide variables.
         """
-        for sensor in cls.SENSORS.values():
-            # Destroy any sensor that is not attached to the main viewport window
-            if sensor._viewport.name != "Viewport":
-                sensor._viewport.destroy()
-
-        # Render to update
-        render()
-
+        cls.SEMANTIC_REMAPPER = Remapper()
+        cls.INSTANCE_REMAPPER = Remapper()
+        cls.INSTANCE_ID_REMAPPER = Remapper()
         cls.SENSORS = dict()
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None

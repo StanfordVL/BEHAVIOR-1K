@@ -1,8 +1,8 @@
 import numpy as np
+
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.sensors import VisionSensor
-
 
 _IN_REACH_DISTANCE_THRESHOLD = 2.0
 
@@ -65,4 +65,4 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
                 obj_names.extend([name for name in info["seg_instance"].values() if name not in names_to_exclude])
-        return [x for x in [og.sim.scene.object_registry("name", x) for x in obj_names] if x is not None]
+        return [x for x in [self.obj.scene.object_registry("name", x) for x in obj_names] if x is not None]

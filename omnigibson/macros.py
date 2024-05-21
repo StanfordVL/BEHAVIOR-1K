@@ -10,33 +10,57 @@ import pathlib
 
 from addict import Dict
 
+
+class MacroDict(Dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self["_read"] = set()
+
+    def __setattr__(self, name, value):
+        if name in self.get("_read", set()):
+            raise AttributeError(f"Cannot set attribute {name} in MacroDict, it has already been used.")
+        # Use the super's setattr for setting attributes, but handle _read directly to avoid recursion.
+        if name == "_read":
+            self[name] = value
+        else:
+            super().__setattr__(name, value)
+
+    def __getattr__(self, item):
+        # Directly check and modify '_read' to avoid going through __getattr__ or __setattr__.
+        if item != "_read":
+            self["_read"].add(item)
+        # Use direct dictionary access to avoid infinite recursion.
+        try:
+            return self[item]
+        except KeyError:
+            raise AttributeError(f"'MacroDict' object has no attribute '{item}'")
+
+
 # Initialize settings
-macros = Dict()
+macros = MacroDict()
 gm = macros.globals
+
+
+def determine_gm_path(default_path, env_var_name):
+    # Start with the default path
+    path = default_path
+    # Override with the environment variable, if set
+    if env_var_name in os.environ:
+        path = os.environ[env_var_name]
+    # Expand the user directory (~)
+    path = os.path.expanduser(path)
+    # Make the path absolute if it's not already
+    if not os.path.isabs(path):
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+    return path
+
 
 # Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
 # can override assets_path and dataset_path from environment variable
-gm.ASSET_PATH = "data/assets"
-if "OMNIGIBSON_ASSET_PATH" in os.environ:
-    gm.ASSET_PATH = os.environ["OMNIGIBSON_ASSET_PATH"]
-gm.ASSET_PATH = os.path.expanduser(gm.ASSET_PATH)
-if not os.path.isabs(gm.ASSET_PATH):
-    gm.ASSET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.ASSET_PATH)
-
-gm.DATASET_PATH = "data/og_dataset"
-if "OMNIGIBSON_DATASET_PATH" in os.environ:
-    gm.DATASET_PATH = os.environ["OMNIGIBSON_DATASET_PATH"]
-gm.DATASET_PATH = os.path.expanduser(gm.DATASET_PATH)
-if not os.path.isabs(gm.DATASET_PATH):
-    gm.DATASET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.DATASET_PATH)
-
-gm.KEY_PATH = "data/omnigibson.key"
-if "OMNIGIBSON_KEY_PATH" in os.environ:
-    gm.KEY_PATH = os.environ["OMNIGIBSON_KEY_PATH"]
-gm.KEY_PATH = os.path.expanduser(gm.KEY_PATH)
-if not os.path.isabs(gm.KEY_PATH):
-    gm.KEY_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.KEY_PATH)
+gm.ASSET_PATH = determine_gm_path(os.path.join("data", "assets"), "OMNIGIBSON_ASSET_PATH")
+gm.DATASET_PATH = determine_gm_path(os.path.join("data", "og_dataset"), "OMNIGIBSON_DATASET_PATH")
+gm.KEY_PATH = determine_gm_path(os.path.join("data", "omnigibson.key"), "OMNIGIBSON_KEY_PATH")
 
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
 # integer or string-form integer
@@ -99,11 +123,16 @@ gm.GPU_MAX_RIGID_PATCH_COUNT = 81920 * 4
 gm.ENABLE_OBJECT_STATES = True
 
 # Whether to enable transition rules or not
-gm.ENABLE_TRANSITION_RULES = True
+# TODO(undorl): This should not be committed with the parallel branch.
+gm.ENABLE_TRANSITION_RULES = False
 
 # Default settings for the omni UI viewer
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
+
+# Default physics / rendering frequencies (Hz)
+gm.DEFAULT_RENDERING_FREQ = 30
+gm.DEFAULT_PHYSICS_FREQ = 120
 
 # (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
 gm.AG_CLOTH = False
@@ -114,8 +143,6 @@ gm.FORCE_LIGHT_INTENSITY = 150000
 # Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
 gm.FORCE_ROUGHNESS = 0.7
 
-# Macro for rendering
-gm.ENABLE_RENDERING = True
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):
@@ -128,7 +155,7 @@ def create_module_macros(module_path):
             omnigibson/object_states_dirty.py, this would generate a dictionary existing at macros.object_states.dirty
 
     Returns:
-        Dict: addict dictionary which can be populated with values
+        MacroDict: addict/macro dictionary which can be populated with values
     """
     # Sanity check module path, make sure omnigibson/ is in the path
     module_path = pathlib.Path(module_path)
@@ -146,14 +173,14 @@ def create_module_macros(module_path):
     def _recursively_get_or_create_dict(dic, keys):
         # If no entry is in @keys, it returns @dic
         # Otherwise, checks whether the dictionary contains the first entry in @keys, if so, it grabs the
-        # corresponding nested dictionary, otherwise, generates a new Dict() as the value
+        # corresponding nested dictionary, otherwise, generates a new MacroDict() as the value
         # It then recurisvely calls this function with the new dic and the remaining keys
         if len(keys) == 0:
             return dic
         else:
             key = keys[0]
             if key not in dic:
-                dic[key] = Dict()
+                dic[key] = MacroDict()
             return _recursively_get_or_create_dict(dic=dic[key], keys=keys[1:])
 
     return _recursively_get_or_create_dict(dic=macros, keys=subsections)

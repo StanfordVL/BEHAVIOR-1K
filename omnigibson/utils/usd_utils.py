@@ -1,19 +1,22 @@
+import collections
+import itertools
 import math
-from collections.abc import Iterable
 import os
-
-import omnigibson.lazy as lazy
+from collections.abc import Iterable
 
 import numpy as np
 import trimesh
 
 import omnigibson as og
-from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
-from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.ui_utils import suppress_omni_log
-
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 def array_to_vtarray(arr, element_type):
@@ -171,31 +174,57 @@ def create_joint(
     return joint_prim
 
 
-class RigidContactAPI:
+class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
     """
 
-    # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
-    _PATH_TO_ROW_IDX = None
-    _PATH_TO_COL_IDX = None
+    def __init__(self):
+        self._PATH_TO_SCENE_IDX = dict()
 
-    # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
-    # index in the contact view matrix
-    _ROW_IDX_TO_PATH = None
-    _COL_IDX_TO_PATH = None
+        # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
+        self._PATH_TO_ROW_IDX = dict()
+        self._PATH_TO_COL_IDX = dict()
 
-    # Contact view for generating contact matrices at each timestep
-    _CONTACT_VIEW = None
+        # Numpy array of rigid body prim paths where its array index directly corresponds to the corresponding
+        # index in the contact view matrix
+        self._ROW_IDX_TO_PATH = dict()
+        self._COL_IDX_TO_PATH = dict()
 
-    # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
-    _CONTACT_MATRIX = None
+        # Contact view for generating contact matrices at each timestep
+        self._CONTACT_VIEW = dict()
 
-    # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
-    _CONTACT_CACHE = None
+        # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+        self._CONTACT_MATRIX = dict()
+
+        # Current contact data cache containing forces, points, normals, separations, contact_counts, start_indices
+        self._CONTACT_DATA = dict()
+
+        # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
+        self._CONTACT_CACHE = None
 
     @classmethod
-    def initialize_view(cls):
+    def get_row_filters(cls):
+        return [f"/World/scene_{i}/*/*" for i in range(len(og.sim.scenes))]
+
+    @classmethod
+    def get_column_filters(cls):
+        filters = dict()
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            filters[scene_idx] = []
+            for obj in scene.objects:
+                if obj.prim_type == PrimType.RIGID:
+                    for link in obj.links.values():
+                        if not link.kinematic_only:
+                            filters[scene_idx].append(link.prim_path)
+
+        return filters
+
+    @classmethod
+    def get_max_contact_data_count(cls):
+        return 0
+
+    def initialize_view(self):
         """
         Initializes the rigid contact view. Note: Can only be done when sim is playing!
         """
@@ -205,78 +234,89 @@ class RigidContactAPI:
         # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
         # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
         # mapping aligns with omni's ordering!
-        i = 0
-        cls._PATH_TO_COL_IDX = dict()
-        for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
-                for link in obj.links.values():
-                    if not link.kinematic_only:
-                        cls._PATH_TO_COL_IDX[link.prim_path] = i
-                        i += 1
+        column_filters = self.get_column_filters()
+        for scene_idx, filters in column_filters.items():
+            self._PATH_TO_COL_IDX[scene_idx] = dict()
+            for i, link_path in enumerate(filters):
+                self._PATH_TO_COL_IDX[scene_idx][link_path] = i
+                self._PATH_TO_SCENE_IDX[link_path] = scene_idx
 
         # If there are no valid objects, clear the view and terminate early
-        if i == 0:
-            cls._CONTACT_VIEW = None
+        if len(column_filters) == 0:
+            self._CONTACT_VIEW = dict()
             return
+
+        # Get the row filters too
+        row_filters = self.get_row_filters()
 
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
         # We also suppress the omni tensor plugin from giving warnings we expect
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
-                pattern="/World/*/*",
-                filter_patterns=list(cls._PATH_TO_COL_IDX.keys()),
-            )
+            for scene_idx, _ in enumerate(og.sim.scenes):
+                # TODO(parallel): How to make this work with the floor plane?
+                # If there are no collidable objects in the scene, skip.
+                if len(column_filters[scene_idx]) == 0:
+                    continue
 
-        # Create deterministic mapping from path to row index
-        cls._PATH_TO_ROW_IDX = {path: i for i, path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
+                self._CONTACT_VIEW[scene_idx] = og.sim.physics_sim_view.create_rigid_contact_view(
+                    pattern=row_filters[scene_idx],
+                    filter_patterns=column_filters[scene_idx],
+                    max_contact_data_count=self.get_max_contact_data_count(),
+                )
 
-        # Store the reverse mappings as well. This can just be a numpy array since the mapping uses integer indices
-        cls._ROW_IDX_TO_PATH = np.array(list(cls._PATH_TO_ROW_IDX.keys()))
-        cls._COL_IDX_TO_PATH = np.array(list(cls._PATH_TO_COL_IDX.keys()))
+                self._PATH_TO_ROW_IDX[scene_idx] = {
+                    path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
+                }
+
+                self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
+                self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
-        n_bodies = len(cls._PATH_TO_COL_IDX)
-        assert cls._CONTACT_VIEW.filter_count == n_bodies, (
-            f"Got unexpected contact view shape. Expected: (N, {n_bodies}); "
-            f"got: (N, {cls._CONTACT_VIEW.filter_count})"
-        )
+        # n_bodies = len(cls._PATH_TO_COL_IDX)
+        # assert cls._CONTACT_VIEW.filter_count == n_bodies, \
+        #     f"Got unexpected contact view shape. Expected: (N, {n_bodies}); " \
+        #     f"got: (N, {cls._CONTACT_VIEW.filter_count})"
 
-    @classmethod
-    def get_body_row_idx(cls, prim_path):
+    def get_scene_idx(self, prim_path):
+        """
+        Returns:
+            int: scene idx for the rigid body defined by @prim_path
+        """
+        return self._PATH_TO_SCENE_IDX[prim_path]
+
+    def get_body_row_idx(self, prim_path):
         """
         Returns:
             int: row idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_ROW_IDX[prim_path]
+        scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
+        return scene_idx, self._PATH_TO_ROW_IDX[scene_idx][prim_path]
 
-    @classmethod
-    def get_body_col_idx(cls, prim_path):
+    def get_body_col_idx(self, prim_path):
         """
         Returns:
             int: col idx assigned to the rigid body defined by @prim_path
         """
-        return cls._PATH_TO_COL_IDX[prim_path]
+        scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
+        return scene_idx, self._PATH_TO_COL_IDX[scene_idx][prim_path]
 
-    @classmethod
-    def get_row_idx_prim_path(cls, idx):
+    def get_row_idx_prim_path(self, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the row idx @idx in the contact matrix
         """
-        return cls._ROW_IDX_TO_PATH[idx]
+        return self._ROW_IDX_TO_PATH[scene_idx][idx]
 
-    @classmethod
-    def get_col_idx_prim_path(cls, idx):
+    def get_col_idx_prim_path(self, scene_idx, idx):
         """
         Returns:
             str: @prim_path corresponding to the column idx @idx in the contact matrix
         """
-        return cls._COL_IDX_TO_PATH[idx]
+        return self._COL_IDX_TO_PATH[scene_idx][idx]
 
-    @classmethod
-    def get_all_impulses(cls):
+    def get_all_impulses(self, scene_idx):
         """
         Grab all impulses at the current timestep
 
@@ -285,13 +325,12 @@ class RigidContactAPI:
                 in the simulator and M tracked rigid bodies
         """
         # Generate the contact matrix if it doesn't already exist
-        if cls._CONTACT_MATRIX is None:
-            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+        if scene_idx not in self._CONTACT_MATRIX:
+            self._CONTACT_MATRIX[scene_idx] = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
 
-        return cls._CONTACT_MATRIX
+        return self._CONTACT_MATRIX[scene_idx]
 
-    @classmethod
-    def get_impulses(cls, prim_paths_a, prim_paths_b):
+    def get_impulses(self, prim_paths_a, prim_paths_b):
         """
         Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
         rigid prims from @prim_paths_b
@@ -307,12 +346,114 @@ class RigidContactAPI:
                 from @prim_paths_b
         """
         # Compute subset of matrix and return
-        idxs_a = [cls._PATH_TO_ROW_IDX[path] for path in prim_paths_a]
-        idxs_b = [cls._PATH_TO_COL_IDX[path] for path in prim_paths_b]
-        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+        scene_idx = self._PATH_TO_SCENE_IDX[prim_paths_a[0]]
+        idxs_a = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths_a]
+        idxs_b = [self._PATH_TO_COL_IDX[scene_idx][path] for path in prim_paths_b]
+        return self.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
 
-    @classmethod
-    def in_contact(cls, prim_paths_a, prim_paths_b):
+    def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
+        """Get pairs of prim paths that are in contact."""
+        impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
+        interesting_col_paths = [
+            p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
+        ]
+        interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+
+        # Get the interesting-columns from the impulse matrix
+        interesting_impulse_columns = impulses[:, interesting_columns]
+        assert (
+            interesting_impulse_columns.ndim == 2
+        ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
+        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
+        interesting_row_paths = [
+            GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
+        ]
+
+        # Filter out idxes by whether or not the row path is in the row prim paths list
+        if row_prim_paths is not None:
+            interesting_row_idxes, interesting_row_paths = zip(
+                *[(i, p) for i, p in zip(interesting_row_idxes, interesting_row_paths) if p in row_prim_paths]
+            )
+            interesting_row_idxes = np.array(list(interesting_row_idxes))
+
+        # Get the full interesting section of the impulse matrix
+        interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
+        assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
+
+        # Early return if not in contact.
+        if not np.any(interesting_impulses > 0):
+            return set()
+
+        # Get all of the (row, col) pairs where the impulse is greater than 0
+        return {
+            (interesting_row_paths[row], interesting_col_paths[col])
+            for row, col in np.argwhere(interesting_impulses > 0)
+        }
+
+    def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
+        # First check if the object has any contacts
+        impulses = self.get_all_impulses(scene_idx)
+        row_idx = (
+            list(range(impulses.shape[0]))
+            if row_prim_paths is None
+            else [self.get_body_row_idx(path)[1] for path in row_prim_paths]
+        )
+        col_idx = (
+            list(range(impulses.shape[1]))
+            if column_prim_paths is None
+            else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
+        )
+        relevant_impulses = impulses[row_idx][:, col_idx]
+        if not np.any(relevant_impulses > 0):
+            return []
+
+        # Get the contact data
+        if scene_idx not in self._CONTACT_DATA:
+            self._CONTACT_DATA[scene_idx] = self._CONTACT_VIEW[scene_idx].get_contact_data(dt=1.0)
+
+        # Get the contact data for this prim
+        forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_DATA[scene_idx]
+
+        # Assert that one of two things is true: either the prim count and contact count are equal,
+        # in which case we can zip them to gether, or the prim count is 1, in which case we can just
+        # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
+        # happening between which two objects, so we return no contacts while printing an error.
+        contacts = []
+        for row in row_idx:
+            row_prim_path = self.get_row_idx_prim_path(scene_idx, row)
+            for col in col_idx:
+                if contact_counts[row, col] == 0:
+                    continue
+                col_prim_path = self.get_col_idx_prim_path(scene_idx, col)
+                start_idx = start_indices[row, col]
+                end_idx = start_idx + contact_counts[row, col]
+                if start_idx >= len(forces):
+                    log.warning(
+                        f"Contact data for prim {row_prim_path} and "
+                        f"{col_prim_path} is missing because there are too many contacts!"
+                    )
+                    continue
+                if end_idx > len(forces):
+                    log.warning(
+                        f"Contact data for prim {row_prim_path} and "
+                        f"{col_prim_path} is partial because there are too many contacts!"
+                    )
+                    continue
+                contacts.extend(
+                    zip(
+                        itertools.repeat(row_prim_path),
+                        itertools.repeat(col_prim_path),
+                        forces[start_idx:end_idx],
+                        points[start_idx:end_idx],
+                        normals[start_idx:end_idx],
+                        separations[start_idx:end_idx],
+                    )
+                )
+
+        return contacts
+
+    def in_contact(self, prim_paths_a, prim_paths_b):
         """
         Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
 
@@ -327,18 +468,46 @@ class RigidContactAPI:
         """
         # Check if the contact tuple already exists in the cache; if so, return the value
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
-        if key not in cls._CONTACT_CACHE:
+        if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-        return cls._CONTACT_CACHE[key]
+            self._CONTACT_CACHE[key] = np.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return self._CONTACT_CACHE[key]
 
-    @classmethod
-    def clear(cls):
+    def clear(self):
         """
         Clears the internal contact matrix and cache
         """
-        cls._CONTACT_MATRIX = None
-        cls._CONTACT_CACHE = dict()
+        self._CONTACT_MATRIX = dict()
+        self._CONTACT_DATA = dict()
+        self._CONTACT_CACHE = dict()
+
+
+# Instantiate the RigidContactAPI
+RigidContactAPI = RigidContactAPIImpl()
+
+
+class GripperRigidContactAPIImpl(RigidContactAPIImpl):
+    @classmethod
+    def get_column_filters(cls):
+        from omnigibson.robots.manipulation_robot import ManipulationRobot
+
+        filters = dict()
+        for scene_idx, scene in enumerate(og.sim.scenes):
+            filters[scene_idx] = []
+            for robot in scene.robots:
+                if isinstance(robot, ManipulationRobot):
+                    filters[scene_idx].extend(link.prim_path for links in robot.finger_links.values() for link in links)
+
+        return filters
+
+    @classmethod
+    def get_max_contact_data_count(cls):
+        # 2x per finger link, to be safe.
+        return len(cls.get_column_filters()[0]) * 2
+
+
+# Instantiate the GripperRigidContactAPI
+GripperRigidContactAPI = GripperRigidContactAPIImpl()
 
 
 class CollisionAPI:
@@ -358,7 +527,7 @@ class CollisionAPI:
             filter_self_collisions (bool): Whether to ignore self-collisions within the group. Default is False
         """
         # Can only be done when sim is stopped
-        assert og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
+        assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
         # Make sure the group doesn't already exist
         assert (
@@ -415,6 +584,14 @@ class CollisionAPI:
         """
         Clears the internal state of this CollisionAPI
         """
+        # Remove all the collision group prims
+        for col_group_prim in cls.ACTIVE_COLLISION_GROUPS.values():
+            og.sim.stage.RemovePrim(col_group_prim.GetPath().pathString)
+
+        # Remove the collision groups tree
+        og.sim.stage.RemovePrim("/World/collision_groups")
+
+        # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
 
 
@@ -570,12 +747,282 @@ class PoseAPI:
         return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
+class ControllableObjectViewAPI:
+    """
+    A centralized view that allows for reading and writing to an ArticulationView that covers all
+    controllable objects in the scene. This is used to avoid the overhead of reading from many views
+    for each robot in each physics step, a source of significant overhead.
+    """
+
+    # The unified ArticulationView used to access all of the controllable objects in the scene.
+    _VIEW = None
+
+    # Cache for all of the view functions' return values within the same simulation step.
+    # Keyed by function name without get_, the value is the return value of the function.
+    _READ_CACHE = {}
+
+    # Cache for all of the view functions' write values within the same simulation step.
+    # Keyed by the function name without set_, the value is the set of indices that need to be updated.
+    _WRITE_IDX_CACHE = collections.defaultdict(set)
+
+    # Mapping from prim path to index in the view.
+    _IDX = {}
+
+    # Mapping from prim idx to a dict that maps link name to link index in the view.
+    _LINK_IDX = {}
+
+    @classmethod
+    def clear(cls):
+        cls._READ_CACHE = {}
+        cls._WRITE_IDX_CACHE = collections.defaultdict(set)
+
+    @classmethod
+    def flush_control(cls):
+        if "dof_position_targets" in cls._WRITE_IDX_CACHE:
+            pos_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_position_targets"]))
+            pos_targets = cls._READ_CACHE["dof_position_targets"]
+            cls._VIEW.set_dof_position_targets(pos_targets, np.array(pos_indices))
+
+        if "dof_velocity_targets" in cls._WRITE_IDX_CACHE:
+            vel_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_velocity_targets"]))
+            vel_targets = cls._READ_CACHE["dof_velocity_targets"]
+            cls._VIEW.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
+
+        if "dof_actuation_forces" in cls._WRITE_IDX_CACHE:
+            eff_indices = np.array(sorted(cls._WRITE_IDX_CACHE["dof_actuation_forces"]))
+            eff_targets = cls._READ_CACHE["dof_actuation_forces"]
+            cls._VIEW.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
+
+    @classmethod
+    def initialize_view(cls):
+        # First, get all of the controllable objects in the scene (avoiding circular import)
+        from omnigibson.objects.controllable_object import ControllableObject
+
+        controllable_objects = [
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+        ]
+
+        # This only works if the root link is called base_link for every controllable object, so assert that
+        assert all(
+            co.root_link.prim_path.endswith("/base_link") for co in controllable_objects
+        ), "Controllable objects must have a link named base_link as the root link."
+
+        # Get their corresponding prim paths
+        expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
+        expected_dummy_prim_paths = {
+            obj._dummy.articulation_root_path
+            for obj in controllable_objects
+            if hasattr(obj, "_dummy") and obj._dummy is not None
+        }
+        expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
+
+        # Make sure we have at least one controllable object
+        if len(expected_prim_paths) == 0:
+            return
+
+        # Create the actual articulation view. Note that even though we search for base_link here,
+        # the returned things will not necessarily be the base_link prim paths, but the appropriate
+        # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
+        cls._VIEW = og.sim.physics_sim_view.create_articulation_view("/World/scene_*/controllable_*/base_link")
+        view_prim_paths = cls._VIEW.prim_paths
+        assert (
+            set(view_prim_paths) == expected_prim_paths
+        ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+
+        # Create the mapping from prim path to index
+        cls._IDX = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
+        cls._LINK_IDX = [
+            {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
+            for articulation_link_paths in cls._VIEW.link_paths
+        ]
+
+    @classmethod
+    def set_joint_position_targets(cls, prim_path, positions, indices):
+        assert len(indices) == len(positions), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_position_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_position_targets"] = cls._VIEW.get_dof_position_targets()
+
+        # Update the target
+        cls._READ_CACHE["dof_position_targets"][idx][indices] = positions
+
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_position_targets"].add(idx)
+
+    @classmethod
+    def set_joint_velocity_targets(cls, prim_path, velocities, indices):
+        assert len(indices) == len(velocities), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_velocity_targets" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocity_targets"] = cls._VIEW.get_dof_velocity_targets()
+
+        # Update the target
+        cls._READ_CACHE["dof_velocity_targets"][idx][indices] = velocities
+
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_velocity_targets"].add(idx)
+
+    @classmethod
+    def set_joint_efforts(cls, prim_path, efforts, indices):
+        assert len(indices) == len(efforts), "Indices and values must have the same length"
+        idx = cls._IDX[prim_path]
+
+        # Load the current targets.
+        if "dof_actuation_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_actuation_forces"] = cls._VIEW.get_dof_actuation_forces()
+
+        # Update the target
+        cls._READ_CACHE["dof_actuation_forces"][idx][indices] = efforts
+
+        # Add this index to the write cache
+        cls._WRITE_IDX_CACHE["dof_actuation_forces"].add(idx)
+
+    @classmethod
+    def get_position_orientation(cls, prim_path):
+        if "root_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_transforms"] = cls._VIEW.get_root_transforms()
+
+        idx = cls._IDX[prim_path]
+        pose = cls._READ_CACHE["root_transforms"][idx]
+        return pose[:3], pose[3:]
+
+    @classmethod
+    def get_linear_velocity(cls, prim_path):
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["root_velocities"][idx][:3]
+
+    @classmethod
+    def get_angular_velocity(cls, prim_path):
+        if "root_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["root_velocities"] = cls._VIEW.get_root_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["root_velocities"][idx][3:]
+
+    @classmethod
+    def get_relative_linear_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        linvel = cls.get_linear_velocity(prim_path)
+        return T.quat2mat(orn).T @ linvel
+
+    @classmethod
+    def get_relative_angular_velocity(cls, prim_path):
+        orn = cls.get_position_orientation(prim_path)[1]
+        angvel = cls.get_angular_velocity(prim_path)
+        return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
+
+    @classmethod
+    def get_joint_positions(cls, prim_path):
+        if "dof_positions" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_positions"] = cls._VIEW.get_dof_positions()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_positions"][idx]
+
+    @classmethod
+    def get_joint_velocities(cls, prim_path):
+        if "dof_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_velocities"] = cls._VIEW.get_dof_velocities()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_velocities"][idx]
+
+    @classmethod
+    def get_joint_efforts(cls, prim_path):
+        if "dof_projected_joint_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["dof_projected_joint_forces"] = cls._VIEW.get_dof_projected_joint_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["dof_projected_joint_forces"][idx]
+
+    @classmethod
+    def get_mass_matrix(cls, prim_path):
+        if "mass_matrices" not in cls._READ_CACHE:
+            cls._READ_CACHE["mass_matrices"] = cls._VIEW.get_mass_matrices()
+
+        idx = cls._IDX[prim_path]
+        # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
+        return cls._READ_CACHE["mass_matrices"][idx]
+
+    @classmethod
+    def get_generalized_gravity_forces(cls, prim_path):
+        if "generalized_gravity_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["generalized_gravity_forces"] = cls._VIEW.get_generalized_gravity_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["generalized_gravity_forces"][idx]
+
+    @classmethod
+    def get_coriolis_and_centrifugal_forces(cls, prim_path):
+        if "coriolis_and_centrifugal_forces" not in cls._READ_CACHE:
+            cls._READ_CACHE["coriolis_and_centrifugal_forces"] = cls._VIEW.get_coriolis_and_centrifugal_forces()
+
+        idx = cls._IDX[prim_path]
+        return cls._READ_CACHE["coriolis_and_centrifugal_forces"][idx]
+
+    @classmethod
+    def get_link_relative_position_orientation(cls, prim_path, link_name):
+        if "link_transforms" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_transforms"] = cls._VIEW.get_link_transforms()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        pose = cls._READ_CACHE["link_transforms"][idx][link_idx]
+        pos, orn = pose[:3], pose[3:]
+
+        # Get the root world transform too
+        world_pos, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.relative_pose_transform(pos, orn, world_pos, world_orn)
+
+    @classmethod
+    def get_link_relative_linear_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        linvel = vel[:3]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.quat2mat(world_orn).T @ linvel
+
+    @classmethod
+    def get_link_relative_angular_velocity(cls, prim_path, link_name):
+        if "link_velocities" not in cls._READ_CACHE:
+            cls._READ_CACHE["link_velocities"] = cls._VIEW.get_link_velocities()
+
+        idx = cls._IDX[prim_path]
+        link_idx = cls._LINK_IDX[idx][link_name]
+        vel = cls._READ_CACHE["link_velocities"][idx][link_idx]
+        angvel = vel[3:]
+
+        # Get the root world transform too
+        _, world_orn = cls.get_position_orientation(prim_path)
+
+        # Compute the relative position and orientation
+        return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
+
+
 def clear():
     """
     Clear state tied to singleton classes
     """
     PoseAPI.invalidate()
     CollisionAPI.clear()
+    ControllableObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
@@ -927,3 +1374,49 @@ def get_world_prim():
         Usd.Prim: Active world prim in the current stage
     """
     return lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+
+
+def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
+    """
+    Converts a scene-relative prim path to an absolute prim path.
+
+    Args:
+        scene (Scene): Scene object that the prim is in. None if it's global.
+        relative_prim_path (str): Relative prim path in the scene
+
+    Returns:
+        str: Absolute prim path in the stage
+    """
+    # Make sure the relative path is actually relative
+    assert not relative_prim_path.startswith("/World"), f"Expected relative prim path, got {relative_prim_path}"
+
+    # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+    # viewer camera or one of the scene prims.
+    if scene is None:
+        return "/World" + relative_prim_path
+
+    return scene.prim_path + relative_prim_path
+
+
+def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
+    """
+    Converts an absolute prim path to a scene-relative prim path.
+
+    Args:
+        scene (Scene): Scene object that the prim is in. None if it's global.
+        absolute_prim_path (str): Absolute prim path in the stage
+
+    Returns:
+        str: Relative prim path in the scene
+    """
+    assert absolute_prim_path.startswith("/World"), f"Expected absolute prim path, got {absolute_prim_path}"
+
+    # When the scene is set to None, this prim is not in a scene but is global e.g. like the
+    # viewer camera or one of the scene prims.
+    if scene is None:
+        assert not absolute_prim_path.startswith(
+            "/World/scene_"
+        ), f"Expected global prim path, got {absolute_prim_path}"
+        return absolute_prim_path[len("/World") :]
+
+    return absolute_prim_path[len(scene.prim_path) :]

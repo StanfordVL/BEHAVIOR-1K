@@ -1,9 +1,10 @@
-import omnigibson as og
 import numpy as np
-from omnigibson.macros import gm
-from telemoma.human_interface.teleop_core import TeleopAction
-from omnigibson.utils.transform_utils import quat2euler
 import pytest
+from telemoma.human_interface.teleop_core import TeleopAction
+
+import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson.utils.transform_utils import quat2euler
 
 
 @pytest.mark.skip(reason="test hangs on CI")
@@ -25,13 +26,13 @@ def test_teleop():
         ],
     }
 
-    # Make sure sim is stopped
-    if og.sim is not None:
+    if og.sim is None:
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+        gm.USE_GPU_DYNAMICS = False
+        gm.ENABLE_FLATCACHE = False
+    else:
+        # Make sure sim is stopped
         og.sim.stop()
-
-    # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
-    gm.USE_GPU_DYNAMICS = False
-    gm.ENABLE_FLATCACHE = False
 
     # Create the environment
     env = og.Environment(configs=cfg)

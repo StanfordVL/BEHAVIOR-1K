@@ -1,6 +1,7 @@
 import numpy as np
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.object_states import Pose
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.reward_functions.collision_reward import CollisionReward
@@ -8,13 +9,12 @@ from omnigibson.reward_functions.point_goal_reward import PointGoalReward
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
-from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -165,7 +165,7 @@ class PointNavigationTask(BaseTask):
         """
         if self._visualize_goal:
             self._initial_pos_marker = PrimitiveObject(
-                prim_path="/World/task_initial_pos_marker",
+                relative_prim_path="/task_initial_pos_marker",
                 primitive_type="Cylinder",
                 name="task_initial_pos_marker",
                 radius=self._goal_tolerance,
@@ -174,7 +174,7 @@ class PointNavigationTask(BaseTask):
                 rgba=np.array([1, 0, 0, 0.3]),
             )
             self._goal_pos_marker = PrimitiveObject(
-                prim_path="/World/task_goal_pos_marker",
+                relative_prim_path="/task_goal_pos_marker",
                 primitive_type="Cylinder",
                 name="task_goal_pos_marker",
                 radius=self._goal_tolerance,
@@ -184,15 +184,15 @@ class PointNavigationTask(BaseTask):
             )
 
             # Load the objects into the simulator
-            og.sim.import_object(self._initial_pos_marker)
-            og.sim.import_object(self._goal_pos_marker)
+            env.scene.add_object(self._initial_pos_marker)
+            env.scene.add_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
             waypoints = []
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
-                    prim_path=f"/World/task_waypoint_marker{i}",
+                    relative_prim_path=f"/task_waypoint_marker{i}",
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
                     radius=self._waypoint_width,
@@ -200,7 +200,7 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                og.sim.import_object(waypoint)
+                env.scene.add_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints

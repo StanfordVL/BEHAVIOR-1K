@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 
 from omnigibson.macros import gm
@@ -13,6 +14,14 @@ class Husky(LocomotionRobot):
 
     def _create_discrete_action_space(self):
         raise ValueError("Husky does not support discrete actions!")
+
+    @property
+    def wheel_radius(self):
+        return 0.165
+
+    @property
+    def wheel_axle_length(self):
+        return 0.670
 
     @property
     def base_control_idx(self):

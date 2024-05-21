@@ -2,33 +2,32 @@ import sys
 from collections import defaultdict
 
 import numpy as np
-
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states import Saturated
 from omnigibson.object_states.factory import (
     get_default_states,
-    get_state_name,
-    get_requirements_for_ability,
-    get_states_for_ability,
-    get_states_by_dependency_order,
-    get_texture_change_states,
     get_fire_states,
+    get_requirements_for_ability,
+    get_state_name,
+    get_states_by_dependency_order,
+    get_states_for_ability,
     get_steam_states,
-    get_visual_states,
     get_texture_change_priority,
+    get_texture_change_states,
+    get_visual_states,
 )
-from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.utils.constants import PrimType, EmitterType
+from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
-from omnigibson.object_states import Saturated
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -68,7 +67,7 @@ class StatefulObject(BaseObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -86,7 +85,7 @@ class StatefulObject(BaseObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -129,7 +128,7 @@ class StatefulObject(BaseObject):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,
@@ -522,8 +521,10 @@ class StatefulObject(BaseObject):
         # Also add non-kinematic states
         non_kin_states = dict()
         for state_type, state_instance in self._states.items():
-            if state_instance.stateful:
+            try:
                 non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
+            except NotImplementedError:
+                pass
 
         state["non_kin"] = non_kin_states
 
@@ -540,11 +541,13 @@ class StatefulObject(BaseObject):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.stateful:
-                if state_name in state["non_kin"]:
+            if state_name in state["non_kin"]:
+                try:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
-                else:
-                    log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
+                except NotImplementedError:
+                    pass
+            else:
+                log.debug(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
@@ -568,7 +571,7 @@ class StatefulObject(BaseObject):
         # Combine these two arrays
         return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Call super method first
         state_dic, idx = super()._deserialize(state=state)
 
@@ -576,9 +579,8 @@ class StatefulObject(BaseObject):
         non_kin_state_dic = dict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.stateful:
-                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx : idx + state_instance.state_size])
-                idx += state_instance.state_size
+            non_kin_state_dic[state_name], deserialized_items = state_instance._deserialize(state[idx:])
+            idx += deserialized_items
         state_dic["non_kin"] = non_kin_state_dic
 
         return state_dic, idx

@@ -1,11 +1,12 @@
+import numpy as np
+
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-import numpy as np
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -30,7 +31,7 @@ class LightObject(StatefulObject):
         self,
         name,
         light_type,
-        prim_path=None,
+        relative_prim_path=None,
         category="light",
         uuid=None,
         scale=None,
@@ -46,7 +47,7 @@ class LightObject(StatefulObject):
         Args:
             name (str): Name for the object. Names need to be unique per scene
             light_type (str): Type of light to create. Valid options are LIGHT_TYPES
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -81,7 +82,7 @@ class LightObject(StatefulObject):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,
@@ -99,13 +100,13 @@ class LightObject(StatefulObject):
 
     def _load(self):
         # Define XForm and base link for this light
-        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
-        base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
+        base_link = og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
 
         # Define the actual light link
         light_prim = (
             getattr(lazy.pxr.UsdLux, f"{self.light_type}Light")
-            .Define(og.sim.stage, f"{self._prim_path}/base_link/light")
+            .Define(og.sim.stage, f"{self.prim_path}/base_link/light")
             .GetPrim()
         )
 
@@ -116,7 +117,10 @@ class LightObject(StatefulObject):
         super()._post_load()
 
         # Grab reference to light link
-        self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
+        self._light_link = XFormPrim(
+            relative_prim_path=f"{self._relative_prim_path}/base_link/light", name=f"{self.name}:light_link"
+        )
+        self._light_link.load(self.scene)
 
         # Apply Shaping API and set default cone angle attribute
         shaping_api = lazy.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
@@ -230,10 +234,10 @@ class LightObject(StatefulObject):
         """
         self._light_link.set_attribute("inputs:texture:file", lazy.pxr.Sdf.AssetPath(texture_file_path))
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             light_type=self.light_type,
             name=name,
             intensity=self.intensity,

@@ -1,16 +1,17 @@
 from collections.abc import Iterable
+
 import numpy as np
+import trimesh.transformations
+from scipy.spatial.transform import Rotation as R
+
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
-from omnigibson.prims.prim_base import BasePrim
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
-import omnigibson.utils.transform_utils as T
-from scipy.spatial.transform import Rotation as R
-from omnigibson.macros import gm
-import trimesh.transformations
 
 
 class XFormPrim(BasePrim):
@@ -23,7 +24,7 @@ class XFormPrim(BasePrim):
         unless it is a non-root articulation link.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified:
@@ -34,7 +35,7 @@ class XFormPrim(BasePrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -46,13 +47,13 @@ class XFormPrim(BasePrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
 
     def _load(self):
-        return og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        return og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
     def _post_load(self):
         # run super first
@@ -83,7 +84,7 @@ class XFormPrim(BasePrim):
         if self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
-            material = MaterialPrim.get_material(prim_path=material_prim_path, name=material_name)
+            material = MaterialPrim.get_material(scene=self.scene, prim_path=material_prim_path, name=material_name)
             assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
             material.add_user(self)
             self._material = material
@@ -144,6 +145,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
+        # TODO: This is the line that causes Transformation Change on... errors
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
         r1 = R.from_quat(current_orientation).as_matrix()
@@ -187,6 +189,10 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        assert np.allclose(
+            product, np.diag(np.diag(product)), atol=1e-3
+        ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
     def get_position_orientation(self):
@@ -198,7 +204,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        return PoseAPI.get_world_pose(self._prim_path)
+        return PoseAPI.get_world_pose(self.prim_path)
 
     def set_position(self, position):
         """
@@ -334,7 +340,7 @@ class XFormPrim(BasePrim):
         """
         Returns the scaled transform of this prim.
         """
-        return PoseAPI.get_world_pose_with_scale(self._prim_path)
+        return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
         return trimesh.transformations.transform_points(points, self.scaled_transform)
@@ -359,6 +365,7 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
+        assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
@@ -395,7 +402,7 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self.prim_path)
 
     def remove_filtered_collision_pair(self, prim):
         """
@@ -406,18 +413,48 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
+        local_pos, local_ori = self.get_local_pose()
         pos, ori = self.get_position_orientation()
-        return dict(pos=pos, ori=ori)
+
+        # If we are in a scene, compute the scene-local transform (and save this as the world transform
+        # for legacy compatibility)
+        if self.scene is not None:
+            pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
+
+        # TODO(parallel): Switch back to canary values pos=[-1, -1, -1], ori=[-1, -1, -1, -1] when _load_state works.
+        # We return a dict that contains -1s for the original format that used global pos/orn.
+        return dict(local_pos=local_pos, local_ori=local_ori, pos=pos, ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
+        # If we have the local pose info, we can directly use them
+        # TODO(parallel): The below logic doesn't quite work because the intermediate prims don't move.
+        if False:  # "local_pos" in state and "local_ori" in state:
+            self.set_local_pose(state["local_pos"], state["local_ori"])
+        else:
+            # Otherwise, we use the legacy global pose as the scene-local pose.
+            pos, orn = np.array(state["pos"]), np.array(state["ori"])
+            if self.scene is not None:
+                pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+            self.set_position_orientation(pos, orn)
 
     def _serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"]]).astype(float)
+        return np.concatenate([state["pos"], state["ori"], state["local_pos"], state["local_ori"]]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
+        # TODO(cremebrule): Make all code OK with accepting different state sizes.
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        return dict(pos=state[0:3], ori=state[3:7]), 7
+        pos = state[0:3]
+        ori = state[3:7]
+        is_new_format = np.all(pos == -1) and np.all(ori == -1)
+
+        # For legacy format, we return the global pose. We do not have local pose.
+        if not is_new_format:
+            return {"pos": pos, "ori": ori}, 7
+
+        # For new format, we return the local pose AND the global pose.
+        local_pos = state[7:10]
+        local_ori = state[10:14]
+        return {"local_pos": local_pos, "local_ori": local_ori, "pos": pos, "ori": ori}, 14

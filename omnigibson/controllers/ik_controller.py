@@ -1,11 +1,11 @@
 import numpy as np
-from omnigibson.macros import gm, create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.utils.processing_utils import MovingAverageFilter
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -194,11 +194,6 @@ class InverseKinematicsController(JointController, ManipulationController):
             self.control_filter.reset()
         self._fixed_quat_target = None
 
-    @property
-    def state_size(self):
-        # Add state size from the control filter
-        return super().state_size + self.control_filter.state_size
-
     def _dump_state(self):
         # Run super first
         state = super()._dump_state()
@@ -231,16 +226,14 @@ class InverseKinematicsController(JointController, ManipulationController):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["control_filter"] = self.control_filter.deserialize(
-            state=state[idx : idx + self.control_filter.state_size]
-        )
+        state_dict["control_filter"], deserialized_items = self.control_filter._deserialize(state=state[idx:])
 
-        return state_dict, idx + self.control_filter.state_size
+        return state_dict, idx + deserialized_items
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict

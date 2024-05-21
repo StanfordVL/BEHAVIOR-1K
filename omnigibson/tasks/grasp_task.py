@@ -1,23 +1,28 @@
-import random
-import numpy as np
 import json
 import os
-from scipy.spatial.transform import Rotation as R
-import omnigibson as og
-from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
-from omnigibson.reward_functions.grasp_reward import GraspReward
+import random
 
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.tasks.task_base import BaseTask
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    PlanningContext,
+    StarterSemanticActionPrimitives,
+)
+from omnigibson.macros import gm
+from omnigibson.objects.object_base import REGISTERED_OBJECTS
+from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
+from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.falling import Falling
 from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, create_class_from_registry_and_config
 from omnigibson.utils.sim_utils import land_object
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
@@ -28,20 +33,35 @@ class GraspTask(BaseTask):
     """
 
     def __init__(
-        self,
-        obj_name,
-        termination_config=None,
-        reward_config=None,
+        self, obj_name, termination_config=None, reward_config=None, precached_reset_pose_path=None, objects_config=None
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
-        path = os.path.dirname(__file__)
-        f = open(path + "/../../rl/reset_poses.json")
-        self.reset_poses = json.load(f)
+        self._reset_poses = None
+        self._objects_config = objects_config
+        if precached_reset_pose_path is not None:
+            with open(precached_reset_pose_path) as f:
+                self._reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
     def _load(self, env):
-        pass
+        for obj_config in self._objects_config:
+            obj = env.scene.object_registry("name", obj_config["name"])
+            # Create object
+            if obj is None:
+                obj = create_class_from_registry_and_config(
+                    cls_name=obj_config["type"],
+                    cls_registry=REGISTERED_OBJECTS,
+                    cfg=obj_config,
+                    cls_type_descriptor="object",
+                )
+                # Import the object into the simulator and set the pose
+                env.scene.add_object(obj)
+
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     def _create_termination_conditions(self):
         terminations = dict()
@@ -59,73 +79,101 @@ class GraspTask(BaseTask):
         return rewards
 
     def _reset_agent(self, env):
-        if self._primitive_controller is None:
-            self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+        # if self._primitive_controller is None:
+        #    self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
-        # Reset the robot with primitive controller
-        ###########################################
-        # robot = env.robots[0]
-        # # Randomize the robots joint positions
-        # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        # dim = len(joint_control_idx)
-        # # For Tiago
-        # if "combined" in robot.robot_arm_descriptor_yamls:
-        #     joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-        #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-        #     control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
-        # # For Fetch
-        # else:
-        #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-        #     control_idx_in_joint_pos = np.arange(dim)
-
-        # with PlanningContext(self._primitive_controller.robot, self._primitive_controller.robot_copy, "original") as context:
-        #     for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-        #         joint_pos, joint_control_idx = self._get_random_joint_position(robot)
-        #         initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-        #         if not set_arm_and_detect_collision(context, initial_joint_pos):
-        #             robot.set_joint_positions(joint_pos, joint_control_idx)
-        #             og.sim.step()
-        #             break
-
-        # # Randomize the robot's 2d pose
-        # obj = env.scene.object_registry("name", self.obj_name)
-        # grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        # grasp_pose, _ = random.choice(grasp_poses)
-        # sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
-        # # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
-        # robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
-        # robot.set_position_orientation(*robot_pose)
-
-        # Reset the robot with cached reset poses
-        ###########################################
         robot = env.robots[0]
-        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        robot_pose = random.choice(self.reset_poses)
-        robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-        robot.set_position_orientation(robot_pose["base_pos"], robot_pose["base_ori"])
+        robot.release_grasp_immediately()
 
-        # Settle robot
-        for _ in range(10):
-            og.sim.step()
+        # If available, reset the robot with cached reset poses.
+        # This is significantly faster than randomizing using the primitives.
+        if self._reset_poses is not None:
+            pass
+            # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            # robot_pose = random.choice(self._reset_poses)
+            # robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            # robot_pos = np.array(robot_pose["base_pos"])
+            # robot_orn = np.array(robot_pose["base_ori"])
+            # # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            # robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            # robot.set_position_orientation(robot_pos, robot_orn)
 
-        for _ in range(100):
-            og.sim.step()
-            if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-                continue
-            if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
-                continue
-            # otherwise we've stopped
-            break
+        # Otherwise, reset using the primitive controller.
         else:
-            raise ValueError("Robot could not settle")
+            raise ValueError("Dont do a slow reset.")
+            # Randomize the robots joint positions
+            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            dim = len(joint_control_idx)
+            # For Tiago
+            if "combined" in robot.robot_arm_descriptor_yamls:
+                joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+                initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+                control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+            # For Fetch
+            else:
+                initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+                control_idx_in_joint_pos = np.arange(dim)
 
-        # Check if the robot has toppled
-        rotation = R.from_quat(robot.get_orientation())
-        robot_up = rotation.apply(np.array([0, 0, 1]))
-        if robot_up[2] < 0.75:
-            raise ValueError("Robot has toppled over")
+            with PlanningContext(
+                env, self._primitive_controller.robot, self._primitive_controller.robot_copy, "original"
+            ) as context:
+                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+                    joint_pos, joint_control_idx = self._get_random_joint_position(robot)
+                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+                    if not set_arm_and_detect_collision(context, initial_joint_pos):
+                        robot.set_joint_positions(joint_pos, joint_control_idx)
+                        og.sim.step()
+                        break
 
-        print("Reset robot pose to: ", robot_pose)
+            # Randomize the robot's 2d pose
+            obj = env.scene.object_registry("name", self.obj_name)
+            grasp_poses = get_grasp_poses_for_object_sticky(obj)
+            grasp_pose, _ = random.choice(grasp_poses)
+            sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
+            robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
+            robot.set_position_orientation(*robot_pose)
+
+        # We now do the settling after the fact, in the SB3 Vector Env class
+        # # Settle robot
+        # for _ in range(10):
+        #     og.sim.step()
+
+        # # Wait for the robot to fully stabilize.
+        # for _ in range(100):
+        #     og.sim.step()
+        #     if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+        #         continue
+        #     if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+        #         continue
+        #     break
+        # else:
+        #     raise ValueError("Robot could not settle")
+
+        # # Check if the robot has toppled
+        # rotation = R.from_quat(robot.get_orientation())
+        # robot_up = rotation.apply(np.array([0, 0, 1]))
+        # if robot_up[2] < 0.75:
+        #     raise ValueError("Robot has toppled over")
+
+        # print("Reset robot pose to: ", robot_pose)
+
+    def _reset_scene(self, env):
+        # Reset the scene
+        super()._reset_scene(env)
+
+        # Reset objects
+        for obj_config in self._objects_config:
+            # Get object in the scene
+            obj_name = obj_config["name"]
+            obj = env.scene.object_registry("name", obj_name)
+            if obj is None:
+                raise ValueError("Object {} not found in scene".format(obj_name))
+
+            # Set object pose
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):
@@ -136,12 +184,16 @@ class GraspTask(BaseTask):
             env (Environment): environment instance to reset
         """
         # Reset the scene, agent, and variables
+        import traceback
+
+        # Try up to 20 times.
         for _ in range(20):
             try:
                 self._reset_scene(env)
                 self._reset_agent(env)
                 break
             except Exception as e:
+                print(traceback.print_exc())
                 print("Resetting error: ", e)
         else:
             raise ValueError("Could not reset task.")

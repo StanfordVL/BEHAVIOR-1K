@@ -6,9 +6,8 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.utils.sampling_utils import raytest_batch, raytest
 from omnigibson.utils.constants import PrimType
-
+from omnigibson.utils.sampling_utils import raytest, raytest_batch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -143,9 +142,9 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
         for result in results:
             # Check if the inferred hit object is not None, we add it to our set
             obj_prim_path = "/".join(result["rigidBody"].split("/")[:-1])
-            obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
-            if obj is not None:
-                unique_objs.add(obj)
+            hit_obj = obj.scene.object_registry("prim_path", obj_prim_path, None)
+            if hit_obj is not None:
+                unique_objs.add(hit_obj)
         objs_by_direction.append(unique_objs)
 
     # Reshape so that these have the following indices:

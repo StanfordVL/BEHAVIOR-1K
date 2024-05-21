@@ -4,7 +4,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.temperature import Temperature
 
-
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -17,9 +16,9 @@ m.FROZEN_SAMPLING_RANGE_MIN = -50.0
 
 
 class Frozen(AbsoluteObjectState, BooleanStateMixin):
-    def __init__(self, obj, freeze_temperature=m.DEFAULT_FREEZE_TEMPERATURE):
+    def __init__(self, obj, freeze_temperature=None):
         super(Frozen, self).__init__(obj)
-        self.freeze_temperature = freeze_temperature
+        self.freeze_temperature = freeze_temperature if freeze_temperature is not None else m.DEFAULT_FREEZE_TEMPERATURE
 
     @classmethod
     def get_dependencies(cls):

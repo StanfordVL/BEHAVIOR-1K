@@ -1,18 +1,13 @@
-from ray.rllib.algorithms.sac import SACConfig
-from ray.rllib.algorithms.dqn import DQNConfig
-from ray.rllib.algorithms.ddpg.ddpg import DDPGConfig
-from ray.rllib.algorithms.impala import ImpalaConfig
-from ray.rllib.offline.estimators import (
-    ImportanceSampling,
-    WeightedImportanceSampling,
-    DirectMethod,
-    DoublyRobust,
-)
-from ray.rllib.offline.estimators.fqe_torch_model import FQETorchModel
-from ray.tune.logger import pretty_print
-from ray.rllib.algorithms.algorithm import Algorithm
 import gymnasium as gym
 import wandb
+from ray.rllib.algorithms.algorithm import Algorithm
+from ray.rllib.algorithms.ddpg.ddpg import DDPGConfig
+from ray.rllib.algorithms.dqn import DQNConfig
+from ray.rllib.algorithms.impala import ImpalaConfig
+from ray.rllib.algorithms.sac import SACConfig
+from ray.rllib.offline.estimators import DirectMethod, DoublyRobust, ImportanceSampling, WeightedImportanceSampling
+from ray.rllib.offline.estimators.fqe_torch_model import FQETorchModel
+from ray.tune.logger import pretty_print
 
 wandb.init(
     # set the wandb project where this run will be logged
@@ -64,13 +59,13 @@ algo = config.build()
 for i in range(1000):
     result = algo.train()
     if i % 100 == 99:
-        wandb.log(result['info']['learner'])
-        print(pretty_print(result['info']['learner']))
-        print(pretty_print(result['evaluation']['sampler_results']))
+        wandb.log(result["info"]["learner"])
+        print(pretty_print(result["info"]["learner"]))
+        print(pretty_print(result["evaluation"]["sampler_results"]))
         print(i)
-        print('----------------------------------')
+        print("----------------------------------")
 
-algo.save('./cartpole_sample_training_algo')
+algo.save("./cartpole_sample_training_algo")
 algo_loaded = Algorithm.from_checkpoint("./cartpole_sample_training_algo")
 # algo.save('./cartpole_sample_training_algo_ddpg')
 # algo_loaded = Algorithm.from_checkpoint("./cartpole_sample_training_algo_ddpg")

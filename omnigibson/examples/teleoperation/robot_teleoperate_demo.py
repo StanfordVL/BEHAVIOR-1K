@@ -23,9 +23,10 @@ def main():
     Spawn a robot in an empty scene with a breakfast table and some toys.
     Users can try pick and place the toy into the basket using selected external devices and robot of their choice.
     """
-    from omnigibson.utils.teleop_utils import TeleopSystem
-    from telemoma.utils.camera_utils import RealSenseCamera
     from telemoma.configs.base_config import teleop_config
+    from telemoma.utils.camera_utils import RealSenseCamera
+
+    from omnigibson.utils.teleop_utils import TeleopSystem
 
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     arm_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot arm teleop method")

@@ -1,19 +1,18 @@
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
-import omnigibson.utils.transform_utils as T
-import omnigibson as og
-from omnigibson.sensors import VisionSensor
-
-from utils import og_test, place_obj_on_floor_plane, SYSTEM_EXAMPLES
-
-import pytest
 import numpy as np
+import pytest
+from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.sensors import VisionSensor
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 
 
 @og_test
-def test_seg():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
-    robot = og.sim.scene.robots[0]
+def test_seg(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
+    robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))

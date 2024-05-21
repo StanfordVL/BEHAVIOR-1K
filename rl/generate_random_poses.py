@@ -1,20 +1,29 @@
 import argparse
-from datetime import datetime
+import json
 import math
 import os
+import random
 import uuid
-import numpy as np
+from datetime import datetime
+
 import matplotlib.pyplot as plt
+import numpy as np
 import yaml
+from tqdm import tqdm
+
 import omnigibson as og
+from omnigibson.action_primitives.starter_semantic_action_primitives import (
+    PlanningContext,
+    StarterSemanticActionPrimitives,
+    StarterSemanticActionPrimitiveSet,
+)
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet, PlanningContext
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 
-import random
-from tqdm import tqdm
-import json
+def pause_step(time):
+    for _ in range(int(time*100)):
+        og.sim.step()
 
 def get_random_joint_position(robot):
     joint_positions = []
@@ -26,29 +35,25 @@ def get_random_joint_position(robot):
         joint_positions.append(val)
     return joint_positions, joint_control_idx
 
+
 def main(iterations):
-    DIST_COEFF = 0.1
-    GRASP_REWARD = 0.3
     MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
     cfg = {
         "env": {
-            "action_timestep": 1 / 10.,
-            "physics_timestep": 1 / 60.,
+            "action_frequency": 10,
+            "physics_frequency": 60,
             "flatten_obs_space": True,
             "flatten_action_space": True,
             "external_sensors": [
                 {
                     "sensor_type": "VisionSensor",
                     "modalities": ["rgb"],
-                    "sensor_kwargs": {
-                        "image_width": 224,
-                        "image_height": 224
-                    },
+                    "sensor_kwargs": {"image_width": 224, "image_height": 224},
                     "local_position": [-0.5, -2.0, 1.0],
-                    "local_orientation": [0.707, 0.0, 0.0, 0.707]
+                    "local_orientation": [0.707, 0.0, 0.0, 0.707],
                 }
-            ],   
+            ],
         },
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -58,8 +63,14 @@ def main(iterations):
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
-                "proprio_obs": ["robot_pos", "robot_2d_ori", "joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
+                "obs_modalities": ["proprio"],
+                "proprio_obs": [
+                    "joint_qpos",
+                    "joint_qvel",
+                    "eef_0_pos",
+                    "eef_0_quat",
+                    "grasp_0"
+                ],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -68,15 +79,6 @@ def main(iterations):
                 "rigid_trunk": False,
                 "default_arm_pose": "diagonal30",
                 "default_trunk_offset": 0.365,
-                "sensor_config": {
-                    "VisionSensor": {
-                        "modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
-                        "sensor_kwargs": {
-                            "image_width": 224,
-                            "image_height": 224
-                        }
-                    }
-                },
                 "controller_config": {
                     "base": {
                         "name": "DifferentialDriveController",
@@ -87,7 +89,7 @@ def main(iterations):
                     #     "command_input_limits": (np.array([-0.2, -0.2, -0.2, -np.pi, -np.pi, -np.pi]),
                     #     np.array([0.2, 0.2, 0.2, np.pi, np.pi, np.pi])),
                     #     "command_output_limits": None,
-                    #     "mode": "pose_absolute_ori", 
+                    #     "mode": "pose_absolute_ori",
                     #     "kv": 3.0
                     # },
                     "arm_0": {
@@ -95,36 +97,25 @@ def main(iterations):
                         "motor_type": "position",
                         "command_input_limits": None,
                         "command_output_limits": None,
-                        "use_delta_commands": False
+                        "use_delta_commands": False,
                     },
                     "gripper_0": {
                         "name": "MultiFingerGripperController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "mode": "binary"
+                        "mode": "binary",
                     },
                     "camera": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": None,
                         "command_output_limits": None,
-                        "use_delta_commands": False
-                    }
-                }
+                        "use_delta_commands": False,
+                    },
+                },
             }
         ],
-        "task": {
-            "type": "GraspTask",
-            "obj_name": "cologne",
-            "termination_config": {
-                "max_steps": 400,
-            },
-            "reward_config": {
-                "r_dist_coeff": DIST_COEFF,
-                "r_grasp": GRASP_REWARD
-            }
-        },
         "objects": [
             {
                 "type": "DatasetObject",
@@ -133,13 +124,14 @@ def main(iterations):
                 "model": "lyipur",
                 "position": [-0.3, -0.8, 0.5],
             },
-        ]
+        ],
     }
 
-    gm.USE_GPU_DYNAMICS = True
+    gm.USE_GPU_DYNAMICS = False
 
     env = og.Environment(configs=cfg)
-    primitive_controller = env.task._primitive_controller
+    # primitive_controller = env.task._primitive_controller
+    primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
     robot = env.robots[0]
     # Randomize the robots joint positions
@@ -155,13 +147,12 @@ def main(iterations):
         initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
         control_idx_in_joint_pos = np.arange(dim)
 
-
     saved_poses = []
     for i in tqdm(range(iterations)):
         selected_joint_pos = None
         selected_base_pose = None
         try:
-            with PlanningContext(primitive_controller.robot, primitive_controller.robot_copy, "original") as context:
+            with PlanningContext(env, primitive_controller.robot, primitive_controller.robot_copy, "original") as context:
                 for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
                     joint_pos, joint_control_idx = get_random_joint_position(robot)
                     initial_joint_pos[control_idx_in_joint_pos] = joint_pos
@@ -184,23 +175,24 @@ def main(iterations):
             pose = {
                 "joint_pos": selected_joint_pos,
                 "base_pos": selected_base_pose[0].tolist(),
-                "base_ori": selected_base_pose[1].tolist()
+                "base_ori": selected_base_pose[1].tolist(),
             }
             saved_poses.append(pose)
+            pause_step(2)
 
         except Exception as e:
             print("Error in iteration: ", i)
             print(e)
-            print('--------------------')
+            print("--------------------")
 
-    with open('reset_poses.json', 'w') as f:
-        json.dump(saved_poses, f)
+    # with open("reset_poses.json", "w") as f:
+    #     json.dump(saved_poses, f)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run worker")
     parser.add_argument("iterations")
-    
+
     args = parser.parse_args()
     main(int(args.iterations))
 

@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from omnigibson.utils.python_utils import classproperty, Registerable
-
+from omnigibson.utils.python_utils import Registerable, classproperty
 
 # Registered sensor noises
 REGISTERED_SENSOR_NOISES = dict()

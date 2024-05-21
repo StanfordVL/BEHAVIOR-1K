@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 
 import omnigibson as og
@@ -59,10 +60,10 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     print("Completed scene modification, saving scene...")
     save_path = os.path.join(TEST_OUT_PATH, "saved_stage.json")
-    og.sim.save(json_path=save_path)
+    og.sim.save(json_paths=[save_path])
 
     print("Re-loading scene...")
-    og.sim.restore(json_path=save_path)
+    og.sim.restore(json_paths=[save_path])
 
     # Take a sim step and play
     og.sim.step()

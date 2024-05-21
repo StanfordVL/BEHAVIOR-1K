@@ -1,25 +1,25 @@
-import os
 import json
+import os
+
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
+import omnigibson.lazy as lazy
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import (
-    classproperty,
+    SerializableNonInstance,
     assert_valid_key,
-    get_uuid,
     camel_case_to_snake_case,
+    classproperty,
+    get_uuid,
     snake_case_to_camel_case,
     subclass_factory,
-    SerializableNonInstance,
-    UniquelyNamedNonInstance,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
-import omnigibson.lazy as lazy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -44,7 +44,7 @@ _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 SYSTEM_PREFIXES = {"diced", "cooked", "melted"}
 
 
-class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
+class BaseSystem(SerializableNonInstance):
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
     This is useful for items in a scene that are non-discrete / cannot be distinguished into individual instances,
@@ -99,7 +99,15 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Returns:
             str: Path to this system's prim in the scene stage
         """
-        return f"/World/{cls.name}"
+        return "/World" + cls.relative_prim_path
+
+    @classproperty
+    def relative_prim_path(cls):
+        """
+        Returns:
+            str: Path to this system's prim in the scene stage relative to the world
+        """
+        return f"/{cls.name}"
 
     @classproperty
     def n_particles(cls):
@@ -417,11 +425,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     def __init__(self):
         raise ValueError("System classes should not be created!")
 
-    @classproperty
-    def state_size(cls):
-        # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
-        return 7 + 7 * cls.n_particles
-
     @classmethod
     def _dump_state(cls):
         positions, orientations = (
@@ -466,7 +469,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         )
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         # First index is number of particles, then min_scale and max_scale, then the individual particle poses
         state_dict = dict()
         n_particles = int(state[0])
@@ -548,20 +551,6 @@ class VisualParticleSystem(BaseSystem):
                 this will OVERRIDE cls.min_scale and cls.max_scale when sampling particles!
         """
         return False
-
-    @classproperty
-    def state_size(cls):
-        # Get super size first
-        state_size = super().state_size
-
-        # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
-        # particle ids, particle indices, and corresponding link info for each particle (m * 3)
-        return (
-            state_size
-            + 1
-            + 2 * len(cls._group_particles)
-            + sum(3 * cls.num_group_particles(group) for group in cls.groups)
-        )
 
     @classmethod
     def _clear(cls):
@@ -1285,7 +1274,7 @@ def is_fluid_system(system_name):
 
 def get_system(system_name, force_active=True):
     # Make sure scene exists
-    assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
+    assert og.sim.scenes, "Cannot get systems until scene is imported!"
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
     system = (
         REGISTERED_SYSTEMS[system_name]

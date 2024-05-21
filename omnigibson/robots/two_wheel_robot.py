@@ -1,10 +1,12 @@
 from abc import abstractmethod
+
 import gymnasium as gym
 import numpy as np
 
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class TwoWheelRobot(LocomotionRobot):
@@ -67,9 +69,9 @@ class TwoWheelRobot(LocomotionRobot):
         dic = super()._get_proprioception_dict()
 
         # Grab wheel joint velocity info
-        joints = list(self._joints.values())
-        wheel_joints = [joints[idx] for idx in self.base_control_idx]
-        l_vel, r_vel = [jnt.get_state()[1] for jnt in wheel_joints]
+        l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
+            self.base_control_idx
+        ]
 
         # Compute linear and angular velocities
         lin_vel = (l_vel + r_vel) / 2.0 * self.wheel_radius

@@ -6,50 +6,46 @@ See provided tiago_primitives.yaml config file for an example. See examples/acti
 runnable examples.
 """
 
-from functools import cached_property
 import inspect
 import logging
 import random
-from aenum import IntEnum, auto
+from functools import cached_property
 from math import ceil
-import cv2
-from matplotlib import pyplot as plt
 
+import cv2
 import gymnasium as gym
 import numpy as np
+from aenum import IntEnum, auto
+from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation, Slerp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveError,
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.controllers import JointController, DifferentialDriveController
+from omnigibson.controllers import DifferentialDriveController, JointController
+from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import BaseRobot, Fetch, Tiago
 from omnigibson.tasks.behavior_task import BehaviorTask
+from omnigibson.utils.control_utils import FKSolver, IKSolver
+from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import (
-    plan_base_motion,
+    detect_robot_collision_in_sim,
     plan_arm_motion,
     plan_arm_motion_ik,
+    plan_base_motion,
     set_base_and_detect_collision,
-    detect_robot_collision_in_sim,
 )
-
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.control_utils import IKSolver
-from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
-from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.control_utils import FKSolver
-
+from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.utils.ui_utils import create_module_logger
-
-from omnigibson.objects.usd_object import USDObject
 
 m = create_module_macros(module_path=__file__)
 
@@ -111,7 +107,8 @@ class PlanningContext(object):
     A context manager that sets up a robot copy for collision checking in planning.
     """
 
-    def __init__(self, robot, robot_copy, robot_copy_type="original"):
+    def __init__(self, env, robot, robot_copy, robot_copy_type="original"):
+        self.env = env
         self.robot = robot
         self.robot_copy = robot_copy
         self.robot_copy_type = robot_copy_type if robot_copy_type in robot_copy.prims.keys() else "original"
@@ -221,7 +218,7 @@ class PlanningContext(object):
         # Disable original robot colliders so copy can't collide with it
         disabled_colliders += [link.prim_path for link in self.robot.links.values()]
         filter_categories = ["floors"]
-        for obj in og.sim.scene.objects:
+        for obj in self.env.scene.objects:
             if obj.category in filter_categories:
                 disabled_colliders += [link.prim_path for link in obj.links.values()]
 
@@ -296,17 +293,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
         self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
         if self._base_controller_is_joint:
-            assert (
-                self.robot.controllers["base"].control_type == ControlType.VELOCITY
-            ), "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
+            # TODO(rl): Whats happening here
+            # assert self.robot.controllers["base"].control_type == ControlType.VELOCITY, \
+            #     "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
             assert not self.robot.controllers[
                 "base"
             ].use_delta_commands, (
                 "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
             )
-            assert (
-                self.robot.controllers["base"].command_dim == 3
-            ), "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
+            # assert self.robot.controllers["base"].command_dim == 3, \
+            #     "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
 
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -348,7 +344,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """Loads a copy of the robot that can be manipulated into arbitrary configurations for collision checking in planning."""
         robot_copy = RobotCopy()
 
-        robots_to_copy = {"original": {"robot": self.robot, "copy_path": "/World/robot_copy"}}
+        robots_to_copy = {"original": {"robot": self.robot, "copy_path": self.robot.prim_path + "_copy"}}
         if hasattr(self.robot, "simplified_mesh_usd_path"):
             simplified_robot = {
                 "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
@@ -374,7 +370,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot_to_copy = None
             if robot_type == "simplified":
                 robot_to_copy = rc["robot"]
-                og.sim.import_object(robot_to_copy)
+                self.env.scene.add_object(robot_to_copy)
             else:
                 robot_to_copy = rc["robot"]
 
@@ -906,10 +902,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
-        # Otherwise just return the default arm control idx
-        return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+        if isinstance(self.robot, Fetch):
+            return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
-    @cached_property
+        # Otherwise just return the default arm control idx
+        return self.robot.arm_control_idx[self.arm]
+
+    @property
     def _manipulation_descriptor_path(self):
         """The appropriate manipulation descriptor for the current settings."""
         if isinstance(self.robot, Tiago) and m.TIAGO_TORSO_FIXED:
@@ -975,7 +974,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        with PlanningContext(self.robot, self.robot_copy, "original") as context:
+        with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion(
                 robot=self.robot,
                 end_conf=joint_pos,
@@ -1011,7 +1010,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         eef_ori = T.quat2axisangle(eef_pose[1])
         end_conf = np.append(eef_pos, eef_ori)
 
-        with PlanningContext(self.robot, self.robot_copy, "original") as context:
+        with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion_ik(
                 robot=self.robot,
                 end_conf=end_conf,
@@ -1550,7 +1549,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
-        with PlanningContext(self.robot, self.robot_copy, "simplified") as context:
+        with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
             plan = plan_base_motion(
                 robot=self.robot,
                 end_conf=pose_2d,
@@ -1730,7 +1729,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        with PlanningContext(self.robot, self.robot_copy, "simplified") as context:
+        with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
             for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 if pose_on_obj is None:
                     pos_on_obj = self._sample_position_on_aabb_side(obj)

@@ -1,15 +1,14 @@
-import omnigibson as og
-from omnigibson.systems import *
-from omnigibson.object_states import Covered
-
-from utils import og_test, SYSTEM_EXAMPLES
-
 import pytest
+from utils import SYSTEM_EXAMPLES, og_test
+
+import omnigibson as og
+from omnigibson.object_states import Covered
+from omnigibson.systems import *
 
 
 @og_test
-def test_system_clear():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+def test_system_clear(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):
             system = get_system(system_name)

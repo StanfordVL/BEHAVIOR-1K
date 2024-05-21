@@ -1,9 +1,9 @@
-from omnigibson.utils.constants import PrimType
-from omnigibson.object_states import Folded, Unfolded
-from omnigibson.macros import gm
 import numpy as np
 
 import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson.object_states import Folded, Unfolded
+from omnigibson.utils.constants import PrimType
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True

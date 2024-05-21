@@ -1,6 +1,7 @@
-import numpy as np
 import time
 from typing import Iterable, Optional, Tuple
+
+import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,10 +11,10 @@ from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
 try:
+    from telemoma.configs.base_config import teleop_config
     from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
     from telemoma.human_interface.teleop_policy import TeleopPolicy
     from telemoma.utils.general_utils import AttrDict
-    from telemoma.configs.base_config import teleop_config
 except ImportError as e:
     raise e from ValueError("For teleoperation, install telemoma by running 'pip install telemoma'")
 
@@ -49,7 +50,7 @@ class TeleopSystem(TeleopPolicy):
                 self.control_markers[arm_name] = USDObject(
                     name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True
                 )
-                og.sim.import_object(self.control_markers[arm_name])
+                self.robot.scene.add_object(self.control_markers[arm_name])
 
     def get_obs(self) -> TeleopObservation:
         """

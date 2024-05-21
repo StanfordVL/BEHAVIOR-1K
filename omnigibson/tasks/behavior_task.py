@@ -1,35 +1,36 @@
-import numpy as np
 import os
+
+import numpy as np
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
-    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
+    get_natural_initial_conditions,
     get_object_scope,
 )
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import (
-    get_system,
-    add_callback_on_system_init,
-    add_callback_on_system_clear,
-    REGISTERED_SYSTEMS,
-)
-from omnigibson.scenes.scene_base import Scene
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
+from omnigibson.scenes.scene_base import Scene
+from omnigibson.systems.system_base import (
+    REGISTERED_SYSTEMS,
+    add_callback_on_system_clear,
+    add_callback_on_system_init,
+    get_system,
+)
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.bddl_utils import BEHAVIOR_ACTIVITIES, BDDLEntity, BDDLSampler, OmniGibsonBDDLBackend
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -50,7 +51,6 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
-        debug_object_sampling (bool): whether to debug placement functionality
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -69,7 +69,6 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        debug_object_sampling=False,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -103,8 +102,10 @@ class BehaviorTask(BaseTask):
         self.feedback = None  # None or str
         self.sampler = None  # BDDLSampler
 
+        # Scene info
+        self.scene_name = None
+
         # Object info
-        self.debug_object_sampling = debug_object_sampling  # bool
         self.online_object_sampling = online_object_sampling  # bool
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to BDDLEntity
@@ -204,6 +205,9 @@ class BehaviorTask(BaseTask):
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
+
+        # Store the scene name
+        self.scene_name = env.scene.scene_model
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -314,7 +318,6 @@ class BehaviorTask(BaseTask):
             activity_conditions=self.activity_conditions,
             object_scope=self.object_scope,
             backend=self.backend,
-            debug=self.debug_object_sampling,
         )
 
         # Compose future objects
@@ -372,7 +375,7 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in REGISTERED_SYSTEMS
-                entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
+                entity = get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,
@@ -433,7 +436,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_added_obj(self, obj):
         """
-        Internal callback function to be called when sim.import_object() is called to potentially update internal
+        Internal callback function to be called when new objects are added to the simulator to potentially update internal
         bddl object scope
 
         Args:
@@ -529,20 +532,21 @@ class BehaviorTask(BaseTask):
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:
+            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
             fname = self.get_cached_activity_scene_filename(
-                scene_model=og.sim.scene.scene_model,
+                scene_model=self.scene_name,
                 activity_name=self.activity_name,
                 activity_definition_id=self.activity_definition_id,
                 activity_instance_id=self.activity_instance_id,
             )
-            path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
+            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
 
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
         # Write metadata and then save
         self.write_task_metadata()
-        og.sim.save(json_path=path)
+        og.sim.save(json_paths=[path])
 
     @property
     def name(self):

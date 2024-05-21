@@ -1,36 +1,34 @@
 import json
-import bddl
 import os
 import random
-import numpy as np
-import networkx as nx
 from collections import defaultdict
-from bddl.activity import (
-    get_goal_conditions,
-    get_ground_goal_state_options,
-    get_initial_conditions,
-)
+
+import bddl
+import networkx as nx
+import numpy as np
+from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation
-from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormula
+from bddl.logic_base import AtomicFormula, BinaryAtomicFormula, UnaryAtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
+
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.asset_utils import (
-    get_attachment_metalinks,
-    get_all_object_categories,
-    get_all_object_category_models_with_abilities,
-)
-from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.python_utils import Wrapper
+from omnigibson import object_states
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots import BaseRobot
-from omnigibson import object_states
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
-from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
-from omnigibson.systems.system_base import is_system_active, get_system
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.systems.system_base import get_system, is_system_active
+from omnigibson.utils.asset_utils import (
+    get_all_object_categories,
+    get_all_object_category_models_with_abilities,
+    get_attachment_metalinks,
+)
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import Wrapper
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -568,22 +566,13 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(
-        self,
-        env,
-        activity_conditions,
-        object_scope,
-        backend,
-        debug=False,
-    ):
+    def __init__(self, env, activity_conditions, object_scope, backend):
         # Store internal variables from inputs
         self._env = env
         self._scene_model = (
             self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
         )
         self._agent = self._env.robots[0]
-        if debug:
-            gm.DEBUG = True
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
@@ -726,7 +715,7 @@ class BDDLSampler:
                         f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
                         f"Only non-sampleable (scene) objects can have room assignment."
                     )
-                if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in self._env.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
@@ -949,11 +938,13 @@ class BDDLSampler:
                     for cat, models in valid_models.items()
                 }
                 room_insts = (
-                    [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None]
+                    if self._scene_model is None
+                    else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
-                    room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    room_objs = self._env.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [
                         obj
                         for obj in room_objs
@@ -1275,7 +1266,7 @@ class BDDLSampler:
 
                 # create the object
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(og.sim.scene.objects)}",
+                    name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
                     prim_type=(
@@ -1286,8 +1277,7 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert og.sim.scene.loaded, "Scene is not loaded"
-                og.sim.import_object(simulator_obj)
+                self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
@@ -1434,11 +1424,11 @@ class BDDLSampler:
                             og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
-                            og.sim.scene.object_registry.update(keys=["in_rooms"])
+                            self._env.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
-        og.sim.scene.object_registry.update(keys=["in_rooms"])
+        self._env.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step

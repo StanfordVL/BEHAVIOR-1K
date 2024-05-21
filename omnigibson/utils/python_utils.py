@@ -5,9 +5,9 @@ A set of utility functions for general python usage
 import inspect
 import re
 from abc import ABCMeta
-from copy import deepcopy
 from collections.abc import Iterable
-from functools import wraps, cache
+from copy import deepcopy
+from functools import cache, wraps
 from importlib import import_module
 
 import numpy as np
@@ -344,63 +344,6 @@ def meets_minimum_version(test_version, minimum_version):
     return True
 
 
-class UniquelyNamed:
-    """
-    Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
-    entity must be UNIQUE!
-    """
-
-    def __init__(self, *args, **kwargs):
-        global NAMES
-        # Register this object, making sure it's name is unique
-        assert self.name not in NAMES, f"UniquelyNamed object with name {self.name} already exists!"
-        NAMES.add(self.name)
-
-    def remove_names(self):
-        """
-        Checks if self.name exists in the global NAMES registry, and deletes it if so. Possibly also iterates through
-        all owned member variables and checks for their corresponding names if @include_all_owned is True.
-
-        Args:
-            include_all_owned (bool): If True, will iterate through all owned members of this instance and remove their
-                names as well, if they are UniquelyNamed
-
-            skip_ids (None or set of int): If specified, will skip over any ids in the specified set that are matched
-                to any attributes found (this compares id(attr) to @skip_ids).
-        """
-        # Check for this name, possibly remove it if it exists
-        if self.name in NAMES:
-            NAMES.remove(self.name)
-
-    @property
-    def name(self):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
-
-
-class UniquelyNamedNonInstance:
-    """
-    Identical to UniquelyNamed, but intended for non-instanceable classes
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        global CLASS_NAMES
-        # Register this object, making sure it's name is unique
-        assert cls.name not in CLASS_NAMES, f"UniquelyNamed class with name {cls.name} already exists!"
-        CLASS_NAMES.add(cls.name)
-
-    @classproperty
-    def name(cls):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
-
-
 class Registerable:
     """
     Simple class template that provides an abstract interface for registering classes.
@@ -453,14 +396,6 @@ class Serializable:
     as well.
     """
 
-    @property
-    def state_size(self):
-        """
-        Returns:
-            int: Size of this object's serialized state
-        """
-        raise NotImplementedError()
-
     def _dump_state(self):
         """
         Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
@@ -481,7 +416,7 @@ class Serializable:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical np.array capturing this object's state
         """
         state = self._dump_state()
         return self.serialize(state=state) if serialized else state
@@ -502,11 +437,17 @@ class Serializable:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical np.array capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
-        state = self.deserialize(state=state) if serialized else state
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = self.deserialize(state=state)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
         self._load_state(state=state)
 
     def _serialize(self, state):
@@ -538,7 +479,7 @@ class Serializable:
         # Simply returns self._serialize() for now. this is for future proofing
         return self._serialize(state=state)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         """
         De-serializes flattened 1D numpy array @state into nested dictionary state.
         Should be implemented by subclass.
@@ -556,40 +497,11 @@ class Serializable:
         """
         raise NotImplementedError
 
-    def deserialize(self, state):
-        """
-        De-serializes flattened 1D numpy array @state into nested dictionary state.
-        Should be implemented by subclass.
-
-        Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
-
-        Returns:
-            dict: Keyword-mapped states of this object. Should match structure of output from
-                self._dump_state()
-        """
-        # Sanity check the idx with the expected state size
-        state_dict, idx = self._deserialize(state=state)
-        assert idx == self.state_size, (
-            f"Invalid state deserialization occurred! Expected {self.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
-
-        return state_dict
-
 
 class SerializableNonInstance:
     """
     Identical to Serializable, but intended for non-instanceable classes
     """
-
-    @classproperty
-    def state_size(cls):
-        """
-        Returns:
-            int: Size of this object's serialized state
-        """
-        raise NotImplementedError()
 
     @classmethod
     def _dump_state(cls):
@@ -613,7 +525,7 @@ class SerializableNonInstance:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical np.array capturing this object's state.
         """
         state = cls._dump_state()
         return cls.serialize(state=state) if serialized else state
@@ -636,11 +548,17 @@ class SerializableNonInstance:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical np.array capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
-        state = cls.deserialize(state=state) if serialized else state
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = cls.deserialize(state=state)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
         cls._load_state(state=state)
 
     @classmethod
@@ -675,7 +593,7 @@ class SerializableNonInstance:
         return cls._serialize(state=state)
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         """
         De-serializes flattened 1D numpy array @state into nested dictionary state.
         Should be implemented by subclass.
@@ -692,28 +610,6 @@ class SerializableNonInstance:
                     deserialization left off before continuing.
         """
         raise NotImplementedError
-
-    @classmethod
-    def deserialize(cls, state):
-        """
-        De-serializes flattened 1D numpy array @state into nested dictionary state.
-        Should be implemented by subclass.
-
-        Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
-
-        Returns:
-            dict: Keyword-mapped states of this object. Should match structure of output from
-                self._dump_state()
-        """
-        # Sanity check the idx with the expected state size
-        state_dict, idx = cls._deserialize(state=state)
-        assert idx == cls.state_size, (
-            f"Invalid state deserialization occurred! Expected {cls.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
-
-        return state_dict
 
 
 class CachedFunctions:
@@ -738,7 +634,6 @@ class CachedFunctions:
     def __setitem__(self, key, value):
         self.add_fcn(name=key, fcn=value)
 
-    @cache
     def get(self, name, *args, **kwargs):
         """
         Computes the function referenced by @name with the corresponding @args and @kwargs. Note that for a unique

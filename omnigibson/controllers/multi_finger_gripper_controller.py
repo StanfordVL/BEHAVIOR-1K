@@ -1,16 +1,15 @@
 import numpy as np
 
-from omnigibson.macros import create_module_macros
-from omnigibson.controllers import IsGraspingState, ControlType, GripperController
-from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import ControlType, GripperController, IsGraspingState
+from omnigibson.macros import create_module_macros
+from omnigibson.utils.python_utils import assert_valid_key
 
 VALID_MODES = {
     "binary",
     "ternary",
     "smooth",
-    "smooth_delta"
-    "independent",
+    "smooth_delta" "independent",
 }
 
 
@@ -118,7 +117,6 @@ class MultiFingerGripperController(GripperController):
             mode == "smooth_delta" and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
-
         # Run super init
         super().__init__(
             control_freq=control_freq,
@@ -174,7 +172,6 @@ class MultiFingerGripperController(GripperController):
         """
         target = goal_dict["target"]
         joint_pos = control_dict["joint_position"][self.dof_idx]
-        
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
