@@ -151,4 +151,4 @@ def shutdown_handler(*args, **kwargs):
 
 
 # Something somewhere disables the default SIGINT handler, so we need to re-enable it
-# signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGINT, shutdown_handler)

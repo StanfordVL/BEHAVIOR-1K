@@ -7,40 +7,24 @@ import omnigibson as og
 
 
 # TODO: Figure out if there is a good interface to implement in Gymnasium
-class VectorEnvironment(DummyVecEnv):
-
-    # def __init__(self, num_envs, config):
-    #     self.num_envs = num_envs
-    #     self.envs = [og.Environment(configs=copy.deepcopy(config)) for _ in range(num_envs)]
-
-    # def step(self, actions):
-    #     try:
-    #         observations, rewards, dones, infos = [], [], [], []
-    #         for i, action in enumerate(actions):
-    #             self.envs[i]._pre_step(action)
-    #         # Run simulation step
-    #         og.sim.step()
-    #         for i, action in enumerate(actions):
-    #             obs, reward, done, info = self.envs[i]._post_step(action)
-    #             observations.append(obs)
-    #             rewards.append(reward)
-    #             dones.append(done)
-    #             infos.append(info)
-    #         return observations, rewards, dones, infos
-    #     except Exception as e:
-    #         print(e)
+class VectorEnvironment:
 
     def __init__(self, num_envs, config):
-        self.waiting = False
-        self.render_mode = "rgb_array"
-
         self.num_envs = num_envs
-        start_time = time.time()
+        if og.sim is not None:
+            og.sim.stop()
+
+        # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
+        # needing to happen before spaces are available for it to read things from.
         self.envs = [
-            og.Environment(configs=copy.deepcopy(config)) for _ in trange(num_envs, desc="Loading environments")
+            og.Environment(configs=copy.deepcopy(config), in_vec_env=True)
+            for _ in trange(num_envs, desc="Loading environments")
         ]
-        end_time = time.time()
-        print(f"Loaded {num_envs} environments in {end_time - start_time} seconds")
+
+        # Play, and finish loading all the envs
+        og.sim.play()
+        for env in self.envs:
+            env.post_play_load()
 
     def step(self, actions):
         try:

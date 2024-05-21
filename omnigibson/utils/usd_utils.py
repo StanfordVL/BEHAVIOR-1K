@@ -417,7 +417,7 @@ class RigidContactAPIImpl:
         forces, points, normals, separations, contact_counts, start_indices = self._CONTACT_DATA[scene_idx]
 
         # Assert that one of two things is true: either the prim count and contact count are equal,
-        # in which case we can zip them to gether, or the prim count is 1, in which case we can just
+        # in which case we can zip them together, or the prim count is 1, in which case we can just
         # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
         # happening between which two objects, so we return no contacts while printing an error.
         contacts = []

@@ -402,7 +402,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_objects()
         self._load_task()
-        # TODO(undorl): Do not merge this
         self._load_external_sensors()
 
     def post_play_load(self):
@@ -434,10 +433,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Denote scene as not loaded yet
         self._loaded = False
-        # TODO: Does this need to be here?
         og.sim.stop()
         self._load_task(task_config=task_config)
-        # TODO: Does this need to be here?
         og.sim.play()
 
         # Load obs / action spaces
@@ -565,12 +562,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Increment step
         self._current_step += 1
-
-        # Hacky way of getting the success condition
-        info["is_success"] = info["reward"]["grasp"]["grasp_success"]
-        info.update({("reward_" + k): v for k, v in info["reward"]["grasp"].items()})
-
-        return obs, reward, terminated, truncated, info
+        return obs, reward, done, info
 
     def step(self, action):
         """
