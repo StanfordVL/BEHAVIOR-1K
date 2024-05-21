@@ -11,12 +11,20 @@ class VectorEnvironment:
 
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
-        start_time = time.time()
+        if og.sim is not None:
+            og.sim.stop()
+
+        # First we create the environments. We can't let DummyVecEnv do this for us because of the play call
+        # needing to happen before spaces are available for it to read things from.
         self.envs = [
-            og.Environment(configs=copy.deepcopy(config)) for _ in trange(num_envs, desc="Loading environments")
+            og.Environment(configs=copy.deepcopy(config), in_vec_env=True)
+            for _ in trange(num_envs, desc="Loading environments")
         ]
-        end_time = time.time()
-        print(f"Loaded {num_envs} environments in {end_time - start_time} seconds")
+
+        # Play, and finish loading all the envs
+        og.sim.play()
+        for env in self.envs:
+            env.post_play_load()
 
     def step(self, actions):
         try:

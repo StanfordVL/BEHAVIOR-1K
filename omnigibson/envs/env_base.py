@@ -35,7 +35,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
 
-    def __init__(self, configs):
+    def __init__(self, configs, in_vec_env=False):
         """
         Args:
             configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
@@ -49,6 +49,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Support gymnasium's render mode metadata
         self.render_mode = "rgb_array"
         self.metadata = {"render.modes": ["rgb_array"]}
+
+        # Store if we are part of a vec env
+        self.in_vec_env = in_vec_env
 
         # Convert config file(s) into a single parsed dict
         configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
@@ -101,6 +104,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load this environment
         self.load()
+
+        # If we are not in a vec env, we can play ourselves. Otherwise we wait for the vec env to play.
+        if not self.in_vec_env:
+            og.sim.play()
+            self.post_play_load()
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -213,7 +221,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Load the scene and robot specified in the config file.
         """
-        og.sim.stop()
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
         # Create the scene from our scene config
@@ -259,13 +266,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if robot._dummy is not None:
                     robot._dummy.load(self.scene)
 
-            if len(self.robots_config) > 0:
-                # Auto-initialize all robots
-                og.sim.play()
-                self.scene.reset()
-                self.scene.update_initial_state()
-                og.sim.stop()
-
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
     def _load_objects(self):
@@ -290,13 +290,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             self.scene.add_object(obj)
             obj.set_local_pose(position=position, orientation=orientation)
 
-        if len(self.objects_config) > 0:
-            # Auto-initialize all objects
-            og.sim.play()
-            self.scene.reset()
-            self.scene.update_initial_state()
-            og.sim.stop()
-
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
     def _load_external_sensors(self):
@@ -314,7 +307,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     sensor_config["name"] = f"external_sensor{i}"
                 # Determine prim path if not specified
                 if "prim_path" not in sensor_config:
-                    sensor_config["prim_path"] = f"/World/{sensor_config['name']}"
+                    sensor_config["relative_prim_path"] = f"/{sensor_config['name']}"
                 # Pop the desired position and orientation
                 local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop(
                     "local_orientation", None
@@ -411,7 +404,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
-        og.sim.play()
+    def post_play_load(self):
+        # Save the state
+        self.scene.update_initial_state()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -554,6 +549,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
             info["last_observation"] = obs
             obs = self.reset()
 
+        # Hacky way to check for time limit info to split terminated and truncated
+        terminated = False
+        truncated = False
+        for tc, tc_data in info["done"]["termination_conditions"].items():
+            if tc_data["done"]:
+                if tc == "timeout":
+                    truncated = True
+                else:
+                    terminated = True
+        assert (terminated or truncated) == done, "Terminated and truncated must match done!"
+
         # Increment step
         self._current_step += 1
         return obs, reward, done, info
@@ -604,7 +610,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.render()
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
-        rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
+        # TODO: get_obs is a tuple, should it be?
+        rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
         return np.concatenate(rgb_images, axis=1)[:, :, :3]
 
     def _reset_variables(self):
@@ -614,7 +621,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._current_episode += 1
         self._current_step = 0
 
-    def reset(self, **kwargs):
+    def reset(self, get_obs=True, **kwargs):
         """
         Reset episode.
         """
@@ -624,50 +631,51 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Reset internal variables
         self._reset_variables()
 
-        # Run a single simulator step to make sure we can grab updated observations
-        og.sim.step()
+        if get_obs:
+            # Run a single simulator step to make sure we can grab updated observations
+            og.sim.step()
 
-        # Grab and return observations
-        obs, _ = self.get_obs()
+            # Grab and return observations
+            obs, _ = self.get_obs()
 
-        if self._loaded:
-            # Sanity check to make sure received observations match expected observation space
-            check_obs = recursively_generate_compatible_dict(dic=obs)
-            if not self.observation_space.contains(check_obs):
-                exp_obs = dict()
-                for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
-                    exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
-                real_obs = dict()
-                for key, value in recursively_generate_flat_dict(dic=check_obs).items():
-                    if isinstance(value, np.ndarray):
-                        real_obs[key] = ("obs", key, value.dtype, value.shape)
-                    else:
-                        real_obs[key] = ("obs", key, type(value), "()")
+            if self._loaded:
+                # Sanity check to make sure received observations match expected observation space
+                check_obs = recursively_generate_compatible_dict(dic=obs)
+                if not self.observation_space.contains(check_obs):
+                    exp_obs = dict()
+                    for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
+                        exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
+                    real_obs = dict()
+                    for key, value in recursively_generate_flat_dict(dic=check_obs).items():
+                        if isinstance(value, np.ndarray):
+                            real_obs[key] = ("obs", key, value.dtype, value.shape)
+                        else:
+                            real_obs[key] = ("obs", key, type(value), "()")
 
-                exp_keys = set(exp_obs.keys())
-                real_keys = set(real_obs.keys())
-                shared_keys = exp_keys.intersection(real_keys)
-                missing_keys = exp_keys - real_keys
-                extra_keys = real_keys - exp_keys
+                    exp_keys = set(exp_obs.keys())
+                    real_keys = set(real_obs.keys())
+                    shared_keys = exp_keys.intersection(real_keys)
+                    missing_keys = exp_keys - real_keys
+                    extra_keys = real_keys - exp_keys
 
-                if missing_keys:
-                    log.error("MISSING OBSERVATION KEYS:")
-                    log.error(missing_keys)
-                if extra_keys:
-                    log.error("EXTRA OBSERVATION KEYS:")
-                    log.error(extra_keys)
+                    if missing_keys:
+                        log.error("MISSING OBSERVATION KEYS:")
+                        log.error(missing_keys)
+                    if extra_keys:
+                        log.error("EXTRA OBSERVATION KEYS:")
+                        log.error(extra_keys)
 
-                mismatched_keys = []
-                for k in shared_keys:
-                    if exp_obs[k][2:] != real_obs[k][2:]:  # Compare dtypes and shapes
-                        mismatched_keys.append(k)
-                        log.error(f"MISMATCHED OBSERVATION FOR KEY '{k}':")
-                        log.error(f"Expected: {exp_obs[k]}")
-                        log.error(f"Received: {real_obs[k]}")
+                    mismatched_keys = []
+                    for k in shared_keys:
+                        if exp_obs[k][2:] != real_obs[k][2:]:  # Compare dtypes and shapes
+                            mismatched_keys.append(k)
+                            log.error(f"MISMATCHED OBSERVATION FOR KEY '{k}':")
+                            log.error(f"Expected: {exp_obs[k]}")
+                            log.error(f"Received: {real_obs[k]}")
 
-                raise ValueError("Observation space does not match returned observations!")
+                    raise ValueError("Observation space does not match returned observations!")
 
-        return obs
+            return obs, {}
 
     @property
     def episode_steps(self):

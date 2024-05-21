@@ -276,6 +276,7 @@ def launch_simulator(*args, **kwargs):
             self._use_skybox = use_skybox
             self._viewer_camera = None
             self._camera_mover = None
+            self._render_on_step = True
 
             self._floor_plane = None
             self._skybox = None
@@ -468,7 +469,7 @@ def launch_simulator(*args, **kwargs):
                 lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-            lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", not gm.ENABLE_RENDERING)
+            lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
@@ -913,7 +914,7 @@ def launch_simulator(*args, **kwargs):
             Args:
                 render (bool): Whether rendering should occur or not
             """
-            render = gm.ENABLE_RENDERING
+            render = self._render_on_step
             if self.stage is None:
                 raise Exception("There is no stage currently opened, init_stage needed before calling this func")
 
@@ -1039,6 +1040,17 @@ def launch_simulator(*args, **kwargs):
                 bool: True if the simulator is paused, otherwise False
             """
             return not (self.is_stopped() or self.is_playing())
+
+        @contextlib.contextmanager
+        def render_on_step(self, value):
+            """
+            A context scope for setting whether rendering should occur on each simulator step.
+            """
+            # Store the original value, set the new value, yield, and then reset the original value
+            original_value = self._render_on_step
+            self._render_on_step = value
+            yield
+            self._render_on_step = original_value
 
         @contextlib.contextmanager
         def stopped(self):

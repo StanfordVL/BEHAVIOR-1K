@@ -1,5 +1,6 @@
 from abc import ABCMeta
 from collections.abc import Iterable
+from functools import cached_property
 
 import numpy as np
 import trimesh
@@ -291,7 +292,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Update init info for scale
         self._init_info["args"]["scale"] = scale
 
-    @property
+    @cached_property
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 

@@ -11,6 +11,8 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     PlanningContext,
     StarterSemanticActionPrimitives,
 )
+from omnigibson.macros import gm
+from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
@@ -19,7 +21,7 @@ from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, create_class_from_registry_and_config
 from omnigibson.utils.sim_utils import land_object
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
@@ -31,22 +33,35 @@ class GraspTask(BaseTask):
     """
 
     def __init__(
-        self,
-        obj_name,
-        termination_config=None,
-        reward_config=None,
-        precached_reset_pose_path=None,
+        self, obj_name, termination_config=None, reward_config=None, precached_reset_pose_path=None, objects_config=None
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
         self._reset_poses = None
+        self._objects_config = objects_config
         if precached_reset_pose_path is not None:
             with open(precached_reset_pose_path) as f:
                 self._reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
     def _load(self, env):
-        pass
+        for obj_config in self._objects_config:
+            obj = env.scene.object_registry("name", obj_config["name"])
+            # Create object
+            if obj is None:
+                obj = create_class_from_registry_and_config(
+                    cls_name=obj_config["type"],
+                    cls_registry=REGISTERED_OBJECTS,
+                    cfg=obj_config,
+                    cls_type_descriptor="object",
+                )
+                # Import the object into the simulator and set the pose
+                env.scene.add_object(obj)
+
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     def _create_termination_conditions(self):
         terminations = dict()
@@ -64,22 +79,28 @@ class GraspTask(BaseTask):
         return rewards
 
     def _reset_agent(self, env):
-        if self._primitive_controller is None:
-            self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+        # if self._primitive_controller is None:
+        #    self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
         robot = env.robots[0]
+        robot.release_grasp_immediately()
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            robot_pose = random.choice(self._reset_poses)
-            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = np.array(robot_pose["base_pos"])
-            robot.set_local_pose(robot_pos, robot_pose["base_ori"])
+            pass
+            # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            # robot_pose = random.choice(self._reset_poses)
+            # robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            # robot_pos = np.array(robot_pose["base_pos"])
+            # robot_orn = np.array(robot_pose["base_ori"])
+            # # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            # robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            # robot.set_position_orientation(robot_pos, robot_orn)
 
         # Otherwise, reset using the primitive controller.
         else:
+            raise ValueError("Dont do a slow reset.")
             # Randomize the robots joint positions
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             dim = len(joint_control_idx)
@@ -112,8 +133,7 @@ class GraspTask(BaseTask):
             robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
 
-        # This is temporarily disabled because we don't want to spend time resetting.
-
+        # We now do the settling after the fact, in the SB3 Vector Env class
         # # Settle robot
         # for _ in range(10):
         #     og.sim.step()
@@ -136,6 +156,24 @@ class GraspTask(BaseTask):
         #     raise ValueError("Robot has toppled over")
 
         # print("Reset robot pose to: ", robot_pose)
+
+    def _reset_scene(self, env):
+        # Reset the scene
+        super()._reset_scene(env)
+
+        # Reset objects
+        for obj_config in self._objects_config:
+            # Get object in the scene
+            obj_name = obj_config["name"]
+            obj = env.scene.object_registry("name", obj_name)
+            if obj is None:
+                raise ValueError("Object {} not found in scene".format(obj_name))
+
+            # Set object pose
+            obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
+            obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
+            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj.set_position_orientation(obj_pos, obj_orn)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):
