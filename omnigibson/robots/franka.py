@@ -108,9 +108,8 @@ class FrankaPanda(ManipulationRobot):
             ]
         elif end_effector == "allegro":
             self._model_name = "franka_allegro"
-            # thumb.proximal, ..., thumb.tip, ..., ring.tip
-            self._gripper_control_idx = np.array([8, 12, 16, 20, 10, 14, 18, 22, 9, 13, 17, 21, 7, 11, 15, 19])
             self._eef_link_names = "base_link"
+            # thumb.proximal, ..., thumb.tip, ..., ring.tip
             self._finger_link_names = [f"link_{i}_0" for i in range(16)]
             self._finger_joint_names = [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]
             # position where the hand is parallel to the ground
@@ -128,9 +127,8 @@ class FrankaPanda(ManipulationRobot):
             ]
         elif "leap" in end_effector:
             self._model_name = f"franka_{end_effector}"
-            # thumb.proximal, ..., thumb.tip, ..., ring.tip
-            self._gripper_control_idx = np.array([8, 12, 16, 20, 7, 11, 15, 19, 9, 13, 17, 21, 10, 14, 18, 22])
             self._eef_link_names = "palm_center"
+            # thumb.proximal, ..., thumb.tip, ..., ring.tip
             self._finger_link_names = [
                 f"{link}_{i}" for i in range(1, 5) for link in ["mcp_joint", "pip", "dip", "fingertip", "realtip"]
             ]
@@ -152,9 +150,8 @@ class FrankaPanda(ManipulationRobot):
             ]
         elif end_effector == "inspire":
             self._model_name = f"franka_{end_effector}"
-            # thumb.proximal, ..., thumb.tip, ..., ring.tip
-            self._gripper_control_idx = np.array([7, 12, 17, 18, 8, 13, 9, 14, 10, 15, 11, 16])
             self._eef_link_names = "palm_center"
+            # thumb.proximal, ..., thumb.tip, ..., ring.tip
             hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
             self._finger_link_names = [f"link{i}" for i in hand_part_names]
             self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
@@ -254,7 +251,11 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def gripper_control_idx(self):
-        return {self.default_arm: self._gripper_control_idx}
+        return {
+            self.default_arm: [
+                list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]
+            ]
+        }
 
     @property
     def arm_link_names(self):
