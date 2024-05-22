@@ -1185,14 +1185,12 @@ class ManipulationRobot(BaseRobot):
         if joint_type is None:
             return
 
-        # TODO: Sometimes p2p joint rather than a fixed joint exists and this accounts for that
-        # if contact_pos is None:
-        #     force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
-        #     for c_link_prim_path, c_contact_pos in force_data:
-        #         if c_link_prim_path == ag_link.prim_path:
-        #             contact_pos = np.array(c_contact_pos)
-        #             break
-        contact_pos = ag_obj.get_position()
+        if contact_pos is None:
+            force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
+            for c_link_prim_path, c_contact_pos in force_data:
+                if c_link_prim_path == ag_link.prim_path:
+                    contact_pos = np.array(c_contact_pos)
+                    break
         assert contact_pos is not None
 
         # Joint frame set at the contact point
@@ -1307,8 +1305,7 @@ class ManipulationRobot(BaseRobot):
         if gm.AG_CLOTH:
             return self._establish_grasp_cloth(arm, ag_data)
         else:
-            if ag_data is not None and ag_data[0].category == "cologne":
-                return self._establish_grasp_rigid(arm, ag_data, contact_pos)
+            return self._establish_grasp_rigid(arm, ag_data, contact_pos)
 
     def _calculate_in_hand_object_cloth(self, arm="default"):
         """

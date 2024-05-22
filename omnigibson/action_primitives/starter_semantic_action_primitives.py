@@ -293,7 +293,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
         self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
         if self._base_controller_is_joint:
-            # TODO(rl): Whats happening here
             # assert self.robot.controllers["base"].control_type == ControlType.VELOCITY, \
             #     "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
             assert not self.robot.controllers[

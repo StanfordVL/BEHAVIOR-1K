@@ -180,6 +180,7 @@ class MaterialPrim(BasePrim):
                 Note that a rendering step is necessary to load these I/Os, though if a step has already
                 occurred externally, no additional rendering step is needed
         """
+        # TODO: Consider optimizing this somehow.
         assert self._shader is not None
         asyncio.run(self._load_mdl_parameters(render=render))
 

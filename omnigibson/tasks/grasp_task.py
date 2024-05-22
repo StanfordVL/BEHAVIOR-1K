@@ -79,28 +79,26 @@ class GraspTask(BaseTask):
         return rewards
 
     def _reset_agent(self, env):
-        # if self._primitive_controller is None:
-        #    self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
-
         robot = env.robots[0]
         robot.release_grasp_immediately()
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
-            pass
-            # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            # robot_pose = random.choice(self._reset_poses)
-            # robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            # robot_pos = np.array(robot_pose["base_pos"])
-            # robot_orn = np.array(robot_pose["base_ori"])
-            # # Move it to the appropriate scene. TODO: The scene should provide a function for this.
-            # robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
-            # robot.set_position_orientation(robot_pos, robot_orn)
+            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            robot_pose = random.choice(self._reset_poses)
+            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            robot_pos = np.array(robot_pose["base_pos"])
+            robot_orn = np.array(robot_pose["base_ori"])
+            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            robot.set_position_orientation(robot_pos, robot_orn)
 
         # Otherwise, reset using the primitive controller.
         else:
-            raise ValueError("Dont do a slow reset.")
+            if self._primitive_controller is None:
+                self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+
             # Randomize the robots joint positions
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             dim = len(joint_control_idx)
@@ -133,29 +131,26 @@ class GraspTask(BaseTask):
             robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
 
-        # We now do the settling after the fact, in the SB3 Vector Env class
-        # # Settle robot
-        # for _ in range(10):
-        #     og.sim.step()
+            # Settle robot
+            for _ in range(10):
+                og.sim.step()
 
-        # # Wait for the robot to fully stabilize.
-        # for _ in range(100):
-        #     og.sim.step()
-        #     if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
-        #         continue
-        #     if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
-        #         continue
-        #     break
-        # else:
-        #     raise ValueError("Robot could not settle")
+            # Wait for the robot to fully stabilize.
+            for _ in range(100):
+                og.sim.step()
+                if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+                    continue
+                if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+                    continue
+                break
+            else:
+                raise ValueError("Robot could not settle")
 
-        # # Check if the robot has toppled
-        # rotation = R.from_quat(robot.get_orientation())
-        # robot_up = rotation.apply(np.array([0, 0, 1]))
-        # if robot_up[2] < 0.75:
-        #     raise ValueError("Robot has toppled over")
-
-        # print("Reset robot pose to: ", robot_pose)
+            # Check if the robot has toppled
+            rotation = R.from_quat(robot.get_orientation())
+            robot_up = rotation.apply(np.array([0, 0, 1]))
+            if robot_up[2] < 0.75:
+                raise ValueError("Robot has toppled over")
 
     def _reset_scene(self, env):
         # Reset the scene

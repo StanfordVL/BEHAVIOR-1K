@@ -57,13 +57,12 @@ class XFormPrim(BasePrim):
         # run super first
         super()._post_load()
 
+        # Make sure all xforms have pose and scaling info
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-
-        # TODO: In the future, fix this for speed
-        # if self._created_manually:
-        # Make sure all xforms have pose and scaling info
-        self._set_xform_properties()
+        # TODO: This is disabled because it does not work as intended. In the future, fix this for speed
+        if True:  # self._created_manually:
+            self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
@@ -134,7 +133,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
-        # TODO: This is the line that causes Transformation Change on... errors
+        # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
         r1 = R.from_quat(current_orientation).as_matrix()
@@ -155,6 +154,7 @@ class XFormPrim(BasePrim):
 
     @property
     def _binding_api(self):
+        # TODO: Do we always need to apply this?
         return (
             lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
             if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
@@ -433,6 +433,5 @@ class XFormPrim(BasePrim):
         return np.concatenate([state["pos"], state["ori"]]).astype(float)
 
     def deserialize(self, state):
-        # TODO(cremebrule): Make all code OK with accepting different state sizes.
         # We deserialize deterministically by knowing the order of values -- pos, ori
         return dict(pos=state[0:3], ori=state[3:7]), 7

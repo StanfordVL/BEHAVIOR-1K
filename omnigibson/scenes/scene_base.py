@@ -209,7 +209,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
     def prebuild(self):
         """
-        Prebuild the scene before loading it into the simulator. This is useful for caching the scene USD for faster
+        Prebuild the scene USD before loading it into the simulator. This is useful for caching the scene USD for faster
         loading times.
 
         Returns:
@@ -355,9 +355,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
+        Do not override this function. Override _load instead.
         """
-        # Do not override this function. Override _load instead.
-
         # Make sure simulator is stopped
         assert og.sim.is_stopped(), "Simulator should be stopped when loading this scene!"
 

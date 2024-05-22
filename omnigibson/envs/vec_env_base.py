@@ -6,9 +6,7 @@ from tqdm import trange
 import omnigibson as og
 
 
-# TODO: Figure out if there is a good interface to implement in Gymnasium
 class VectorEnvironment:
-
     def __init__(self, num_envs, config):
         self.num_envs = num_envs
         if og.sim is not None:
@@ -31,7 +29,6 @@ class VectorEnvironment:
             observations, rewards, dones, infos = [], [], [], []
             for i, action in enumerate(actions):
                 self.envs[i]._pre_step(action)
-            # Run simulation step
             og.sim.step()
             for i, action in enumerate(actions):
                 obs, reward, done, info = self.envs[i]._post_step(action)

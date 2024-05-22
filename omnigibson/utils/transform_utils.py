@@ -1156,6 +1156,7 @@ def z_rotation_from_quat(quat):
 
 
 def integer_spiral_coordinates(n):
+    """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
     # Sources:
     # https://www.reddit.com/r/askmath/comments/18vqorf/find_the_nth_coordinate_of_a_square_spiral/

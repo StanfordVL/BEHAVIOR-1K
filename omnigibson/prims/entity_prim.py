@@ -1034,6 +1034,7 @@ class EntityPrim(XFormPrim):
         """
         return np.concatenate([joint.damping for joint in self._joints.values()])
 
+    # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
     def joint_lower_limits(self):
         """
@@ -1043,6 +1044,7 @@ class EntityPrim(XFormPrim):
         """
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
+    # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
     def joint_upper_limits(self):
         """

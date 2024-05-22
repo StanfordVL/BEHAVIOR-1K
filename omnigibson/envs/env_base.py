@@ -405,6 +405,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_external_sensors()
 
     def post_play_load(self):
+        """Complete loading tasks that require the simulator to be playing."""
         # Save the state
         self.scene.update_initial_state()
 
@@ -515,6 +516,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             info["scene_graph"] = self.get_scene_graph()
 
     def _pre_step(self, action):
+        """Apply the pre-sim-step part of an environment step."""
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
             action_dict = dict()
@@ -532,6 +534,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot.apply_action(action_dict[robot.name])
 
     def _post_step(self, action):
+        """Apply the post-sim-step part of an environment step."""
         # Grab observations
         obs, obs_info = self.get_obs()
 
@@ -584,7 +587,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         try:
             self._pre_step(action)
-            # Run simulation step
             og.sim.step()
             return self._post_step(action)
         except:
@@ -593,6 +595,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             )
 
     def render(self):
+        """Render the environment for debug viewing."""
         # Only works if there is an external sensor
         if not self._external_sensors:
             return None

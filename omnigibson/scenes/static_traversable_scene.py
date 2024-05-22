@@ -93,7 +93,7 @@ class StaticTraversableScene(TraversableScene):
             self.floor_heights = sorted(list(map(float, f.readlines())))
             log.debug("Floors {}".format(self.floor_heights))
 
-        # Move the floor plane to the first floor by default
+        # Move the first floor to be at the floor level by default.
         default_floor = 0
         floor_height = self.floor_heights[default_floor] + m.ADDITIONAL_ELEVATION
         scene_position = self._scene_prim.get_position()

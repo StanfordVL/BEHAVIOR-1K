@@ -710,6 +710,7 @@ class ControllableObject(BaseObject):
 
         return dic
 
+    # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
     def control_limits(self):
         """

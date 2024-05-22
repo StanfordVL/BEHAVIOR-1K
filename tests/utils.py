@@ -183,7 +183,7 @@ def assert_test_env():
             gm.ENABLE_OBJECT_STATES = True
             gm.USE_GPU_DYNAMICS = True
             gm.ENABLE_FLATCACHE = False
-            # TODO(parallel-hang): temporarily disable transition rules; fix later
+            # TODO: temporarily disable transition rules; fix later
             gm.ENABLE_TRANSITION_RULES = False
         else:
             # Make sure sim is stopped
