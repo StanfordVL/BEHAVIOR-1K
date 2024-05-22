@@ -252,9 +252,9 @@ class FrankaPanda(ManipulationRobot):
     @property
     def gripper_control_idx(self):
         return {
-            self.default_arm: [
-                list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]
-            ]
+            self.default_arm: np.array(
+                [list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]]
+            )
         }
 
     @property
