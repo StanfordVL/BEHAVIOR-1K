@@ -106,6 +106,22 @@ class StaticTraversableScene(TraversableScene):
         # Load the traversability map
         self._trav_map.load_map(get_scene_path(self.scene_model))
 
+    def move_floor_plane(self, floor=0, additional_elevation=0.02, height=None):
+        """
+        Resets the floor plane to a new floor
+
+        Args:
+            floor (int): Integer identifying the floor to move the floor plane to
+            additional_elevation (float): Additional elevation with respect to the height of the floor
+            height (None or float): If specified, alternative parameter to directly control the height of the ground
+                plane. Note that this will override @additional_elevation and @floor!
+        """
+        if height is not None:
+            height_adjustment = height - self.floor_heights[floor]
+        else:
+            height_adjustment = self.floor_heights[floor] - self._scene_prim.get_position()[2] + additional_elevation
+        self._scene_prim.set_position(np.array([0, 0, height_adjustment]))
+
     def get_floor_height(self, floor=0):
         """
         Return the current floor height (in meter)

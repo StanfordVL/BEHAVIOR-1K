@@ -65,24 +65,19 @@ def clear():
     # Clear all scenes
     for scene in sim.scenes:
         scene.clear()
-    sim._scenes = []
 
     # Remove the skybox, floor plane and viewer camera
     if sim._skybox is not None:
         sim._skybox.remove()
-        sim._skybox = None
 
     if sim._floor_plane is not None:
         sim._floor_plane.remove()
-        sim._floor_plane = None
 
     if sim._viewer_camera is not None:
         sim._viewer_camera.remove()
-        sim._viewer_camera = None
 
     if sim._camera_mover is not None:
         sim._camera_mover.clear()
-        sim._camera_mover = None
 
     # Clear the vision sensor cache
     VisionSensor.clear()
@@ -103,19 +98,10 @@ def clear():
     clear_python_utils()
     clear_usd_utils()
 
-    # Clear some internals here.
-    sim._objects_to_initialize = []
-    sim._objects_require_contact_callback = False
-    sim._objects_require_joint_break_callback = False
-    sim._link_id_to_objects = dict()
-    sim._callbacks_on_play = dict()
-    sim._callbacks_on_stop = dict()
-    sim._callbacks_on_import_obj = dict()
-    sim._callbacks_on_remove_obj = dict()
-
-    lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
+    assert lazy.omni.isaac.core.utils.stage.close_stage()
     sim = None
-    sim = launch()
+    lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
+    launch()
 
 
 def cleanup(*args, **kwargs):

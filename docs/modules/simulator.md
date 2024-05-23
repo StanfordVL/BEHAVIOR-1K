@@ -12,7 +12,7 @@ icon: material/repeat
 
 ### Creating
 
-Because this `Simulator` is a global singleton, it is only instantiated exactly once, and always occurs at the _very beginning_ of **`OmniGibson`**'s launching. This either occurs when an environment instance is created (`env = Environment(...)`), or when `og.launch()` is explicitly called.
+Because this `Simulator` is a global singleton, it is instantiated every time the stage is cleared and always occurs at the _very beginning_ of **`OmniGibson`**'s launching. This either occurs when an environment instance is created (`env = Environment(...)`), when `og.launch()` is explicitly called, or whenever the stage is reset.
 
 ### Runtime
 
@@ -32,7 +32,7 @@ The simulator can be manually stepped, with or without physics / rendering (`sim
 If necessary, low-level physics behavior can also be set as well, via the physics interface (`sim.pi`), physics simulation interface (`sim.psi`), physics scene query interface (`sim.psqi`), and physics context (`sim.get_physics_context()`). The simulation timesteps can also be directly set via `sim.set_simulation_dt(...)`.
 
 #### Callbacks
-It may be useful to have callbacks trigger when certain simulation events occur. We provide utility functions to add / remove callbacks when `sim.play()`, `sim.stop()`, `scene.import_object()`, and `scene.remove_object()` is called.
+It may be useful to have callbacks trigger when certain simulation events occur. We provide utility functions to add / remove callbacks when `sim.play()`, `sim.stop()`, `sim.post_import_object()`, and `sim.remove_object()` is called.
 
 #### Viewport Camera
 The simulator owns a global [`VisionSensor`](./sensors.md) camera which can be controlled by the user and accessed via `sim.viewer_camera`. To enable keyboard teleoperation of the camera, call `sim.enable_viewer_camera_teleoperation()`.

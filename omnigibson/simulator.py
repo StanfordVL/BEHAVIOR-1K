@@ -67,16 +67,6 @@ m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
-# List of prim paths that should still be on the stage after clearing the simulator.
-CLEAR_ALLOWED_PRIM_PATH_REGEXES = [
-    "/physicsScene",
-    "/World",
-    "/Render(/.*)?",
-    "/OmniverseKit_.*",
-    "/Orchestrator(/.*)?",
-]
-CLEAR_ALLOWED_PRIM_PATH_PATTERNS = [re.compile(pattern) for pattern in CLEAR_ALLOWED_PRIM_PATH_REGEXES]
-
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -258,11 +248,17 @@ def launch_simulator(*args, **kwargs):
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            floor_plane_visible=True,
-            floor_plane_color=(1.0, 1.0, 1.0),
-            use_skybox=True,
             device=None,
         ):
+            # Stage should either not exist or be empty when creating a new Simulator instance
+            current_stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+            if current_stage is not None:
+                # Check that this stage is empty
+                for prim in current_stage.Traverse():
+                    assert not lazy.omni.isaac.core.utils.prims.get_prim_path(prim).startswith(
+                        "/World"
+                    ), "Stage is not empty when creating a new Simulator instance!"
+
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
             # called downstream during the initialization of this object will try to access og.sim.
             # This makes that possible (and also introduces possible issues around circular dependencies)
@@ -271,9 +267,6 @@ def launch_simulator(*args, **kwargs):
 
             # Store vars needed for initialization
             self.gravity = gravity
-            self._floor_plane_visible = floor_plane_visible
-            self._floor_plane_color = floor_plane_color
-            self._use_skybox = use_skybox
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
@@ -364,20 +357,6 @@ def launch_simulator(*args, **kwargs):
             # Disable collision between building structures and fixed base objects
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
-
-            # Also add skybox if requested
-            if self._use_skybox:
-                self._skybox = LightObject(
-                    relative_prim_path="/skybox",
-                    name="skybox",
-                    category="background",
-                    light_type="Dome",
-                    intensity=1500,
-                    fixed_base=True,
-                )
-                self._skybox.load(None)
-                self._skybox.color = (1.07, 0.85, 0.61)
-                self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
@@ -538,7 +517,7 @@ def launch_simulator(*args, **kwargs):
             """
             self._viewer_camera.image_width = width
 
-        def add_ground_plane(self):
+        def add_ground_plane(self, floor_plane_visible=True, floor_plane_color=None):
             """
             Generate a ground plane into the simulator.
             """
@@ -549,8 +528,8 @@ def launch_simulator(*args, **kwargs):
                 name="ground_plane",
                 z_position=0,
                 size=None,
-                color=None if self._floor_plane_color is None else np.array(self._floor_plane_color),
-                visible=self._floor_plane_visible,
+                color=None if floor_plane_color is None else np.array(floor_plane_color),
+                visible=floor_plane_visible,
                 # TODO: update with new PhysicsMaterial API
                 # static_friction=static_friction,
                 # dynamic_friction=dynamic_friction,
@@ -570,6 +549,24 @@ def launch_simulator(*args, **kwargs):
                 semantic_label="floors",
                 type_label="class",
             )
+
+        def add_skybox(self):
+            """
+            Generate a skybox into the simulator.
+            """
+            if self._skybox is not None:
+                return
+            self._skybox = LightObject(
+                relative_prim_path="/skybox",
+                name="skybox",
+                category="background",
+                light_type="Dome",
+                intensity=1500,
+                fixed_base=True,
+            )
+            self._skybox.load(None)
+            self._skybox.color = (1.07, 0.85, 0.61)
+            self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
         def set_lighting_mode(self, mode):
             """
@@ -1444,6 +1441,22 @@ def launch_simulator(*args, **kwargs):
             if self._device is not None and "cuda" in self._device:
                 device_id = self._settings.get_as_int("/physics/cudaDevice")
                 self._device = f"cuda:{device_id}"
+
+        @property
+        def initial_physics_dt(self):
+            """
+            Returns:
+                float: Physics timestep
+            """
+            return self._initial_physics_dt
+
+        @property
+        def initial_rendering_dt(self):
+            """
+            Returns:
+                float: Rendering timestep
+            """
+            return self._initial_rendering_dt
 
         def _dump_state(self):
             # Default state is from the scene

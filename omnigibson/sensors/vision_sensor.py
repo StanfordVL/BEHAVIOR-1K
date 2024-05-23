@@ -754,6 +754,14 @@ class VisionSensor(BaseSensor):
         """
         Clear all the class-wide variables.
         """
+        for sensor in cls.SENSORS.values():
+            # Destroy any sensor that is not attached to the main viewport window
+            if sensor._viewport.name != "Viewport":
+                sensor._viewport.destroy()
+
+        # Render to update
+        render()
+
         cls.SEMANTIC_REMAPPER = Remapper()
         cls.INSTANCE_REMAPPER = Remapper()
         cls.INSTANCE_ID_REMAPPER = Remapper()

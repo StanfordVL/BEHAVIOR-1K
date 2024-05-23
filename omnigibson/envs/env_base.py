@@ -69,23 +69,31 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.physics_frequency = self.env_config["physics_frequency"]
         self.action_frequency = self.env_config["action_frequency"]
-        self.floor_plane_visible = self.env_config["floor_plane_visible"]
-        self.floor_plane_color = self.env_config["floor_plane_color"]
         self.device = self.env_config["device"]
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
         ]  # how high to offset object placement to account for one action step of dropping
 
-        # Launch Isaac Sim
-        launch_simulator(
-            physics_dt=(1.0 / self.physics_frequency),
-            rendering_dt=(1.0 / self.action_frequency),
-            floor_plane_visible=self.floor_plane_visible,
-            floor_plane_color=self.floor_plane_color,
-            device=self.device,
-            viewer_width=self.render_config["viewer_width"],
-            viewer_height=self.render_config["viewer_height"],
-        )
+        physics_frequency = 1.0 / self.physics_frequency
+        rendering_frequency = 1.0 / self.action_frequency
+        viewer_width = self.render_config["viewer_width"]
+        viewer_height = self.render_config["viewer_height"]
+        # If the sim is launched, check that the parameters match
+        if og.sim is not None:
+            assert og.sim.initial_physics_dt == physics_frequency
+            assert og.sim.initial_rendering_dt == rendering_frequency
+            assert og.sim.device == self.device
+            assert og.sim.viewer_width == viewer_width
+            assert og.sim.viewer_height == viewer_height
+        # Otherwise, launch Isaac Sim
+        else:
+            launch_simulator(
+                physics_dt=(physics_frequency),
+                rendering_dt=(rendering_frequency),
+                device=self.device,
+                viewer_width=viewer_width,
+                viewer_height=viewer_height,
+            )
 
         # Initialize other placeholders that will be filled in later
         self._task = None
@@ -230,11 +238,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
-        if og.sim.floor_plane is not None:
-            assert self._scene.use_floor_plane, f"Floor plane exists but scene does not use it!"
-        else:
-            if self._scene.use_floor_plane:
-                og.sim.add_ground_plane()
         og.sim.import_scene(self._scene)
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
@@ -797,8 +800,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             "env": {
                 "action_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
-                "floor_plane_visible": True,
-                "floor_plane_color": (1.0, 1.0, 1.0),
                 "device": None,
                 "automatic_reset": False,
                 "flatten_action_space": False,

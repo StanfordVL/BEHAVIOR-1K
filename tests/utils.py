@@ -16,10 +16,12 @@ SYSTEM_EXAMPLES = {
     "stain": MacroVisualParticleSystem,
 }
 
+env = None
+
 
 def og_test(func):
     def wrapper():
-        env = assert_test_env()
+        assert_test_env()
         try:
             func(env)
         finally:
@@ -62,9 +64,6 @@ def get_obj_cfg(
         "abilities": abilities,
         "visual_only": visual_only,
     }
-
-
-env = None
 
 
 def assert_test_env():
@@ -202,7 +201,6 @@ def assert_test_env():
         og.sim.play()
 
     assert env is not None, "Environment not created"
-    return env
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):

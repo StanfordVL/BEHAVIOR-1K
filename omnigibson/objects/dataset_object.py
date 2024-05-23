@@ -54,8 +54,7 @@ class DatasetObject(USDObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:

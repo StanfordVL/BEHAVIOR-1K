@@ -328,7 +328,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = obj.scene.dump_state(serialized=False)
+    state = og.sim.dump_state()
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)
@@ -338,7 +338,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
-    obj.scene.load_state(state, serialized=False)
+    og.sim.load_state(state)
 
     # Valid if there are no collisions
     return not in_collision

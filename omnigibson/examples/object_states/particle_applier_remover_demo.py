@@ -143,6 +143,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
+    # Note: the following is a hacky trick done only for this specific demo that mutates the way the object applies particles;
+    # the following trick should not be followed ever
     modifier._scene = env.scene
     modifier._scene_assigned = True
     modifier._created_manually = True

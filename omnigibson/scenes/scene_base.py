@@ -66,6 +66,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self,
         scene_file=None,
         use_floor_plane=True,
+        floor_plane_visible=True,
+        use_skybox=True,
+        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -82,6 +85,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
         self._use_floor_plane = use_floor_plane
+        self._floor_plane_visible = floor_plane_visible
+        self._floor_plane_color = floor_plane_color
+        self._use_skybox = use_skybox
 
         # Call super init
         super().__init__()
@@ -366,6 +372,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
+
+        # Load floor plane and skybox
+        if self.use_floor_plane:
+            og.sim.add_ground_plane(
+                floor_plane_visible=self._floor_plane_visible, floor_plane_color=self._floor_plane_color
+            )
+        if self._use_skybox:
+            og.sim.add_skybox()
 
         # Go through whatever else loading the scene needs to do.
         self._load()

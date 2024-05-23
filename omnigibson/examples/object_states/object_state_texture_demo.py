@@ -14,9 +14,6 @@ gm.ENABLE_HQ_RENDERING = True
 def main():
     # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
-        "env": {
-            "floor_plane_visible": True,
-        },
         "scene": {
             "type": "Scene",
         },

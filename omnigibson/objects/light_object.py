@@ -47,8 +47,7 @@ class LightObject(StatefulObject):
         Args:
             name (str): Name for the object. Names need to be unique per scene
             light_type (str): Type of light to create. Valid options are LIGHT_TYPES
-            relative_prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
