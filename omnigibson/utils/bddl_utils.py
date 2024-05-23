@@ -2,6 +2,7 @@ import json
 import os
 import random
 from collections import defaultdict
+from copy import deepcopy
 
 import bddl
 import networkx as nx
@@ -1032,7 +1033,7 @@ class BDDLSampler:
                                     f"{condition_type} kinematic condition sampling",
                                     room_type,
                                     scene_obj,
-                                    room_inst,
+                                    str(room_inst),
                                     parent_obj_name,
                                     condition.STATE_NAME,
                                     str(condition.body),
@@ -1391,7 +1392,7 @@ class BDDLSampler:
                                 # After the final round of kinematic sampling, we assign in_rooms to newly imported objects
                                 if group == "kinematic":
                                     parent = self._object_scope[condition.body[1]]
-                                    entity.in_rooms = parent.in_rooms.copy()
+                                    entity.in_rooms = deepcopy(parent.in_rooms)
 
                                 # Can terminate immediately
                                 break
