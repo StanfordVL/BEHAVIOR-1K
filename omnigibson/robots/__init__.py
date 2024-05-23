@@ -2,8 +2,6 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.behavior_robot import BehaviorRobot
 from omnigibson.robots.fetch import Fetch
 from omnigibson.robots.franka import FrankaPanda
-from omnigibson.robots.franka_allegro import FrankaAllegro
-from omnigibson.robots.franka_leap import FrankaLeap
 from omnigibson.robots.franka_mounted import FrankaMounted
 from omnigibson.robots.freight import Freight
 from omnigibson.robots.husky import Husky
