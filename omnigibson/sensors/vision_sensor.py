@@ -592,7 +592,6 @@ class VisionSensor(BaseSensor):
         # Also update render product and update all annotators
         old_render_product = self._render_product
         new_render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, (width, height))
-        # from IPython import embed; embed()
         for annotator in self._annotators.values():
             annotator.detach([old_render_product.path])
             annotator.attach([new_render_product])
@@ -626,7 +625,6 @@ class VisionSensor(BaseSensor):
         # Also update render product and update all annotators
         old_render_product = self._render_product
         new_render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, (width, height))
-        # from IPython import embed; embed()
         for annotator in self._annotators.values():
             annotator.detach([old_render_product.path])
             annotator.attach([new_render_product])
