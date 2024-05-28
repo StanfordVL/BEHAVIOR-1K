@@ -16,6 +16,7 @@ def main():
     cfg = {
         "scene": {
             "type": "Scene",
+            "floor_plane_visible": True,
         },
         "objects": [
             {

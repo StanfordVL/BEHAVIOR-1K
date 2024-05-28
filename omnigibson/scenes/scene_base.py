@@ -67,14 +67,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         scene_file=None,
         use_floor_plane=True,
         floor_plane_visible=True,
-        use_skybox=True,
         floor_plane_color=(1.0, 1.0, 1.0),
+        use_skybox=True,
     ):
         """
         Args:
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 None results in no additional objects being loaded into the scene
             use_floor_plane (bool): whether to load a flat floor plane into the simulator
+            floor_plane_visible (bool): whether to render the additionally added floor plane
+            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
+                to the generated floor plane
+            use_skybox (bool): whether to load a skybox into the simulator
         """
         # Store internal variables
         self.scene_file = scene_file
