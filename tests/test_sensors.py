@@ -33,7 +33,8 @@ def test_seg(env):
             )
 
     og.sim.step()
-    og.sim.render()
+    for _ in range(3):
+        og.sim.render()
 
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
