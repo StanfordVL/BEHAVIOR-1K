@@ -124,6 +124,9 @@ def _launch_app():
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
+    # Close the stage so that we can create a new one when a Simulator Instance is created
+    assert lazy.omni.isaac.core.utils.stage.close_stage()
+
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
@@ -250,14 +253,9 @@ def launch_simulator(*args, **kwargs):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
         ):
-            # Stage should either not exist or be empty when creating a new Simulator instance
-            current_stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
-            if current_stage is not None:
-                # Check that this stage is empty
-                for prim in current_stage.Traverse():
-                    assert not lazy.omni.isaac.core.utils.prims.get_prim_path(prim).startswith(
-                        "/World"
-                    ), "Stage is not empty when creating a new Simulator instance!"
+            assert (
+                lazy.omni.isaac.core.utils.stage.get_current_stage() is None
+            ), "Stage should not exist when creating a new Simulator instance"
 
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
             # called downstream during the initialization of this object will try to access og.sim.
