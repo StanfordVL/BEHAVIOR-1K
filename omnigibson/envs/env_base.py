@@ -616,7 +616,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.render()
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
-        # TODO: get_obs is a tuple, should it be?
         rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
         return np.concatenate(rgb_images, axis=1)[:, :, :3]
 
