@@ -45,6 +45,7 @@ setup(
         "click~=8.1.3",
         "aenum~=3.1.15",
         "rtree~=1.2.0",
+        "graphviz~=0.20",
     ],
     tests_require=[],
     python_requires=">=3",
