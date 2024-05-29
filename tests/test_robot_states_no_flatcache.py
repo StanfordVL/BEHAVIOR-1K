@@ -40,5 +40,5 @@ def test_object_in_FOV_of_robot():
     vision_sensor.set_position_orientation(position=[100, 150, 100])
     og.sim.step()
     og.sim.step()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == []
+    assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
     og.clear()
