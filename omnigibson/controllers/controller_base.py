@@ -3,6 +3,7 @@ from enum import IntEnum
 
 import numpy as np
 
+from omnigibson.utils.constants import MAGIC_DEFAULT
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
 # Global dicts that will contain mappings
@@ -125,13 +126,13 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._command_input_transform = None
 
         # Standardize command input / output limits to be (min_array, max_array)
-        command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
+        command_input_limits = (-1.0, 1.0) if MAGIC_DEFAULT == command_input_limits else command_input_limits
         command_output_limits = (
             (
                 np.array(self._control_limits[self.control_type][0])[self.dof_idx],
                 np.array(self._control_limits[self.control_type][1])[self.dof_idx],
             )
-            if command_output_limits == "default"
+            if MAGIC_DEFAULT == command_output_limits
             else command_output_limits
         )
         self._command_input_limits = (

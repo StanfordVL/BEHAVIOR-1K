@@ -69,7 +69,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
         self.physics_frequency = self.env_config["physics_frequency"]
         self.action_frequency = self.env_config["action_frequency"]
-        self.device = self.env_config["device"]
+        self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
         ]  # how high to offset object placement to account for one action step of dropping

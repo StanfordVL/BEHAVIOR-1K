@@ -4,6 +4,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.utils.constants import MAGIC_DEFAULT
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
@@ -153,7 +154,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if command_input_limits == "default":
+                if MAGIC_DEFAULT == command_input_limits:
                     command_input_limits = [
                         [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
                         [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],
@@ -162,7 +163,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                     command_input_limits[0][3:] = -np.pi
                     command_input_limits[1][3:] = np.pi
             if command_output_limits is not None:
-                if command_output_limits == "default":
+                if MAGIC_DEFAULT == command_output_limits:
                     command_output_limits = [
                         [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
                         [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],
