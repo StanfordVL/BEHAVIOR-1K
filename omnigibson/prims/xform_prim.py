@@ -61,7 +61,7 @@ class XFormPrim(BasePrim):
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # TODO: This is disabled because it does not work as intended. In the future, fix this for speed
-        if True:  # self._created_manually:
+        if not self._xform_props_pre_loaded:
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),

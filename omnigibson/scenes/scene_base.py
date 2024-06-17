@@ -53,6 +53,7 @@ REGISTERED_SCENES = dict()
 PREBUILT_USDS = dict()
 
 # Right edge position of the last scene loaded.
+# TODO(parallel-hang): Get rid of this
 LAST_RIGHT_EDGE_POS = np.nan
 
 
@@ -207,6 +208,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def idx(self):
         """Index of this scene in the simulator. Should not change."""
+        # TODO(parallel-hang): Return self._idx
         return og.sim.scenes.index(self)
 
     @property

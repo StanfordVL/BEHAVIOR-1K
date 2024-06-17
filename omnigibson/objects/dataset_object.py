@@ -89,6 +89,8 @@ class DatasetObject(USDObject):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+        # TODO(parallel-hang): Pass _xform_props_pre_loaded = True to object_base to entityprim, make sure entityprim passes it into rigidprim and jointprim initializers
+
         # Store variables
         if isinstance(in_rooms, str):
             assert "," not in in_rooms
