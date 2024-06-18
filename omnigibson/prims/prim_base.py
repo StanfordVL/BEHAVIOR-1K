@@ -52,7 +52,9 @@ class BasePrim(Serializable, Recreatable, ABC):
         # that get created during the _load phase of this class, but sometimes we create prims using
         # alternative methods and then create this class - in that case too we need to make sure we
         # add the right xform properties, so callers will just pass in the created manually flag.
-        self._created_manually = "created_manually" in self._load_config and self._load_config["created_manually"]
+        self._xform_props_pre_loaded = (
+            "xform_props_pre_loaded" in self._load_config and self._load_config["xform_props_pre_loaded"]
+        )
 
         # Run super init
         super().__init__()
@@ -98,9 +100,6 @@ class BasePrim(Serializable, Recreatable, ABC):
             self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
         else:
             # If not, we'll load it.
-            # Override w/e value is available via created_manually - we are definitely creating this
-            # object manually now!
-            self._created_manually = True
             self._prim = self._load()
 
         # Mark the prim as loaded.

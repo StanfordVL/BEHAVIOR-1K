@@ -600,7 +600,8 @@ def launch_simulator(*args, **kwargs):
 
             # Load the scene.
             self._scenes.append(scene)
-            scene.load()
+            # TODO(parallel-hang): Actually implement this API
+            self._last_scene_edge = scene.load(idx=len(self.scenes), last_scene_edge=self._last_scene_edge)
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
