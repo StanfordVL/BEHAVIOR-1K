@@ -48,7 +48,7 @@ class GraspReward(BaseRewardFunction):
 
         info = {"grasp_success": current_grasping}
 
-        # Reward varying based on combination of whether the robot was previously grasping the desired and object
+        # Reward varying based on combination of whether the robot was previously grasping the desired object
         # and is currently grasping the desired object
         reward = 0.0
 

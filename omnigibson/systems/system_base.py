@@ -391,16 +391,6 @@ class VisualParticleSystem(BaseSystem):
     Particle system class for generating particles not subject to physics, and are attached to individual objects
     """
 
-    # Maps group name to the particles associated with it
-    # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
-    _group_particles = None
-
-    # Maps group name to the parent object (the object with particles attached to it) of the group
-    _group_objects = None
-
-    # Maps group name to tuple (min_scale, max_scale) to apply to sampled particles for that group
-    _group_scales = None
-
     def __init__(self, name, **kwargs):
         # Run super
         super().__init__(name=name, **kwargs)

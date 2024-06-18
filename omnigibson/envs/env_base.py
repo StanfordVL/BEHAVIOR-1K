@@ -88,8 +88,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Otherwise, launch Isaac Sim
         else:
             launch_simulator(
-                physics_dt=(physics_frequency),
-                rendering_dt=(rendering_frequency),
+                physics_dt=physics_frequency,
+                rendering_dt=rendering_frequency,
                 device=self.device,
                 viewer_width=viewer_width,
                 viewer_height=viewer_height,

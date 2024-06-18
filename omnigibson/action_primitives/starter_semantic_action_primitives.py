@@ -896,8 +896,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return self.robot.arm_control_idx["left"]
             else:
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-
-        if isinstance(self.robot, Fetch):
+        elif isinstance(self.robot, Fetch):
             return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
         # Otherwise just return the default arm control idx
