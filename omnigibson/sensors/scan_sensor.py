@@ -15,7 +15,7 @@ class ScanSensor(BaseSensor):
     General 2D LiDAR range sensor and occupancy grid sensor.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.

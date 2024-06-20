@@ -221,7 +221,7 @@ class MacroParticleSystem(BaseSystem):
         Adds a particle to this system.
 
         Args:
-            relative_prim_path (str): Scene-relative path to the newly created particle, minus the name for this particle
+            relative_prim_path (str): scene-local prim path to the newly created particle, minus the name for this particle
             scale (3-array): (x,y,z) scale to set for the added particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
@@ -295,7 +295,7 @@ class MacroParticleSystem(BaseSystem):
         to load. This function should be implemented by any subclasses.
 
         Args:
-            relative_prim_path (str): The scene-relative path at which to create the new particle
+            relative_prim_path (str): scene-local prim path at which to create the new particle
             name (str): The name to assign to this new particle at the path
 
         Returns:

@@ -21,7 +21,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         unless it is a non-root articulation link.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
@@ -94,9 +94,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._scene = scene
         self._scene_assigned = True
 
+        breakpoint()
+
         # Then check if the prim is already loaded
         if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
-            log.debug(f"prim {self.name} already exists, skipping load")
+            log.debug(f"prim {self.name} in scene #{scene.idx} already exists, skipping load")
             self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
         else:
             # If not, we'll load it.
@@ -147,7 +149,7 @@ class BasePrim(Serializable, Recreatable, ABC):
     def scene(self):
         """
         Returns:
-            Scene: Scene object that this prim is loaded into
+            Scene or None: Scene object that this prim is loaded into
         """
         assert self._scene_assigned, "Scene has not been assigned to this prim yet!"
         return self._scene
@@ -273,7 +275,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         all other kwargs should be identical to this instance's values.
 
         Args:
-            relative_prim_path (str): Absolute path to the newly generated prim
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             name (str): Name for the newly created prim
             load_config (dict): Keyword-mapped kwargs to use to set specific attributes for the created prim's instance
 

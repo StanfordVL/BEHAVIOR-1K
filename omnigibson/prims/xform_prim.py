@@ -24,7 +24,7 @@ class XFormPrim(BasePrim):
         unless it is a non-root articulation link.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified:
@@ -256,7 +256,7 @@ class XFormPrim(BasePrim):
         """
         return quat2euler(self.get_orientation())
 
-    def get_2d_orientation(self):
+    def get_xy_orientation(self):
         """
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.

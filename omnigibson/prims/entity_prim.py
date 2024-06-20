@@ -29,7 +29,7 @@ class EntityPrim(XFormPrim):
     be converted into an articulation!
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that by default, this assumes an articulation already exists (i.e.:
@@ -247,7 +247,7 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": (
                     self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
                 ),
-                "is_part_of_articulation": self._articulation_view is not None and link_name != self._root_link_name,
+                "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(

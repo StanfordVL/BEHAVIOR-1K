@@ -338,7 +338,6 @@ def launch_simulator(*args, **kwargs):
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
-            # Initialize all APIs and the stage
             self.stop()
 
             for state in self.object_state_types_requiring_update:
@@ -617,7 +616,7 @@ def launch_simulator(*args, **kwargs):
 
         def post_import_object(self, obj):
             """
-            Import an object into the simulator.
+            Post import an object into the simulator, handling any additional setup that needs to be done.
 
             Args:
                 obj (BaseObject): an object to load
@@ -993,7 +992,7 @@ def launch_simulator(*args, **kwargs):
                                     obj1, headers[(actor0_obj, actor1_obj)], contact_data
                                 )
 
-        def find_object_in_scenes(self, prim_path):
+        def get_obj_at_prim_path(self, prim_path):
             for scene in self.scenes:
                 obj = scene.object_registry("prim_path", prim_path)
                 if obj is not None:
@@ -1018,7 +1017,7 @@ def launch_simulator(*args, **kwargs):
 
                     tokens = joint_path.split("/")
                     for i in range(2, len(tokens) + 1):
-                        obj = self.find_object_in_scenes("/".join(tokens[:i]))
+                        obj = self.get_obj_at_prim_path("/".join(tokens[:i]))
                         if obj is not None:
                             break
 

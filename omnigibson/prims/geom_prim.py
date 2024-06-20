@@ -19,7 +19,7 @@ class GeomPrim(XFormPrim):
     created from scratch.at
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this mesh prim, the below values can be specified:

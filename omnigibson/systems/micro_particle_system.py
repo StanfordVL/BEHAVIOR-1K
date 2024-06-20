@@ -90,7 +90,7 @@ class PhysxParticleInstancer(BasePrim):
     def __init__(self, relative_prim_path, name, idn):
         """
         Args:
-            relative_prim_path (str): relative prim path of the Prim to encapsulate or create.
+            relative_prim_path (str): scene-local prim path of the Instancer to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             idn (int): Unique identification number to assign to this particle instancer. This is used to
                 deterministically reproduce individual particle instancer states dynamically, even if we

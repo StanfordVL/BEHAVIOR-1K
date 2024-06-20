@@ -19,7 +19,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
     Sensor-specific get_obs method is implemented in subclasses
 
     Args:
-        relative_prim_path (str): prim path of the Sensor to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the sensor. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
