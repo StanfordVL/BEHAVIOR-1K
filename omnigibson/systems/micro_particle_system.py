@@ -678,7 +678,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self.particle_prototypes = None
 
         # Particle instancers -- maps name to particle instancer prims (dict)
-        self.particle_instancers = dict()
+        self.particle_instancers = None
 
         self._particle_contact_offset = particle_contact_offset
 
@@ -696,7 +696,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @property
     def n_particles(self):
-        return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
+        return (
+            sum([instancer.n_particles for instancer in self.particle_instancers.values()])
+            if self.particle_instancers is not None
+            else 0
+        )
 
     @property
     def n_instancers(self):
@@ -704,7 +708,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return len(self.particle_instancers)
+        return len(self.particle_instancers) if self.particle_instancers is not None else 0
 
     @property
     def instancer_idns(self):
@@ -712,7 +716,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return [inst.idn for inst in self.particle_instancers.values()]
+        return [inst.idn for inst in self.particle_instancers.values()] if self.particle_instancers is not None else []
 
     @property
     def self_collision(self):
@@ -758,7 +762,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         super()._clear()
 
         self.particle_prototypes = None
-        self.particle_instancers = dict()
+        self.particle_instancers = None
 
     @property
     def next_available_instancer_idn(self):
@@ -787,7 +791,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
         return (
             self.particle_instancers[name]
-            if name in self.particle_instancers
+            if self.particle_instancers and name in self.particle_instancers
             else self.generate_particle_instancer(n_particles=0, idn=self.default_instancer_idn)
         )
 
@@ -1011,6 +1015,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
         instancer.initialize()
         instancer.load(self._scene)
+        if self.particle_instancers is None:
+            self.particle_instancers = dict()
         self.particle_instancers[name] = instancer
 
         return instancer
@@ -1196,7 +1202,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         idn_to_info_mapping = {
             idn: {"group": group, "count": count} for idn, group, count in zip(idns, particle_groups, particle_counts)
         }
-        current_instancer_names = set(self.particle_instancers.keys())
+        current_instancer_names = set(self.particle_instancers.keys()) if self.particle_instancers else set()
         desired_instancer_names = set(self.particle_instancer_idn_to_name(idn=idn) for idn in idns)
         instancers_to_delete = current_instancer_names - desired_instancer_names
         instancers_to_create = desired_instancer_names - current_instancer_names
@@ -1231,10 +1237,16 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
-            instancer_particle_groups=[inst.particle_group for inst in self.particle_instancers.values()],
-            instancer_particle_counts=[inst.n_particles for inst in self.particle_instancers.values()],
-            particle_states=dict(
-                ((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items())
+            instancer_particle_groups=(
+                [inst.particle_group for inst in self.particle_instancers.values()] if self.particle_instancers else []
+            ),
+            instancer_particle_counts=(
+                [inst.n_particles for inst in self.particle_instancers.values()] if self.particle_instancers else []
+            ),
+            particle_states=(
+                dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
+                if self.particle_instancers
+                else dict()
             ),
         )
 

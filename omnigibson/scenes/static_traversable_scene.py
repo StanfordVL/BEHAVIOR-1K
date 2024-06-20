@@ -17,7 +17,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 # Additional elevation for the floor plane
-m.ADDITIONAL_ELEVATION = 0.02
+m.FLOOR_Z_OFFSET = 0.02
 
 
 class StaticTraversableScene(TraversableScene):
@@ -95,7 +95,7 @@ class StaticTraversableScene(TraversableScene):
 
         # Move the first floor to be at the floor level by default.
         default_floor = 0
-        floor_height = self.floor_heights[default_floor] + m.ADDITIONAL_ELEVATION
+        floor_height = self.floor_heights[default_floor] + m.FLOOR_Z_OFFSET
         scene_position = self._scene_prim.get_position()
         scene_position[2] = floor_height
         self._scene_prim.set_position(scene_position)

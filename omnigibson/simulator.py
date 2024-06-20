@@ -67,6 +67,9 @@ m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
+m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
+
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -271,6 +274,7 @@ def launch_simulator(*args, **kwargs):
 
             self._floor_plane = None
             self._skybox = None
+            self._last_scene_edge = None
 
             # Run super init
             super().__init__(
@@ -597,10 +601,15 @@ def launch_simulator(*args, **kwargs):
             if scene in self._scenes:
                 raise ValueError("Scene is already imported!")
 
+            self._last_scene_edge = scene.load(
+                idx=len(self.scenes),
+                last_scene_edge=self._last_scene_edge,
+                initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
+                scene_margin=m.SCENE_MARGIN,
+            )
+
             # Load the scene.
             self._scenes.append(scene)
-            # TODO(parallel-hang): Actually implement this API
-            self._last_scene_edge = scene.load(idx=len(self.scenes), last_scene_edge=self._last_scene_edge)
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
@@ -1367,7 +1376,7 @@ def launch_simulator(*args, **kwargs):
             if not self.scenes:
                 log.warning("Scene has not been loaded. Nothing to save.")
                 return
-            if not json_path.endswith(".json"):
+            if not all([json_path.endswith(".json") for json_path in json_paths]):
                 log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
                 return
 

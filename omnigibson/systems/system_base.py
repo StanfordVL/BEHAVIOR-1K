@@ -179,6 +179,7 @@ class BaseSystem(Serializable):
         Generates new particles
 
         Args:
+            scene (Scene): Scene object to generate particles in
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)

@@ -39,22 +39,11 @@ from omnigibson.utils.usd_utils import CollisionAPI, add_asset_to_stage
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
-
-# Margin between the AABBs of two different scenes.
-m.SCENE_MARGIN = 10.0
-m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
-
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
 
 # Prebuilt USDs that are cached per scene file to speed things up.
 PREBUILT_USDS = dict()
-
-# Right edge position of the last scene loaded.
-# TODO(parallel-hang): Get rid of this
-LAST_RIGHT_EDGE_POS = np.nan
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -89,6 +78,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim = None
         self._initial_state = None
         self._objects_info = None  # Information associated with this scene
+        self._idx = None
         self._use_floor_plane = use_floor_plane
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
@@ -208,8 +198,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def idx(self):
         """Index of this scene in the simulator. Should not change."""
-        # TODO(parallel-hang): Return self._idx
-        return og.sim.scenes.index(self)
+        assert self._idx is not None, "This scene is not loaded yet!"
+        return self._idx
 
     @property
     def initialized(self):
@@ -278,7 +268,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         cloth_system = systems.Cloth(name="cloth")
         self.system_registry.add(cloth_system)
 
-    def _load_scene_prim_with_objects(self):
+    def _load_scene_prim_with_objects(self, last_scene_edge, initial_scene_prim_z_offset, scene_margin):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
@@ -314,7 +304,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position([0, 0, m.INITIAL_SCENE_PRIM_Z_OFFSET if self.idx != 0 else 0])
+        self._scene_prim.set_position([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
@@ -327,15 +317,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             )
 
         # Position the scene prim based on the last scene's right edge
-        global LAST_RIGHT_EDGE_POS
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position([LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + left_edge_to_center, 0, 0])
-            LAST_RIGHT_EDGE_POS = LAST_RIGHT_EDGE_POS + m.SCENE_MARGIN + (aabb_max[0] - aabb_min[0])
+            self._scene_prim.set_position([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
-            LAST_RIGHT_EDGE_POS = aabb_max[0]
+            new_scene_edge = aabb_max[0]
+
+        return new_scene_edge
 
     def _load_metadata_from_scene_file(self):
         """
@@ -363,7 +354,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return True
 
-    def load(self):
+    def load(self, idx, **kwargs):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
@@ -375,6 +366,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Check if scene is already loaded
         if self._loaded:
             raise ValueError("This scene is already loaded.")
+
+        self._idx = idx
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
@@ -395,13 +388,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         # and metadata
-        self._load_scene_prim_with_objects()
+        new_scene_edge = self._load_scene_prim_with_objects(**kwargs)
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
         # Always stop the sim if we started it internally
         if not og.sim.is_stopped():
             og.sim.stop()
+
+        return new_scene_edge
 
     def clear(self):
         """
