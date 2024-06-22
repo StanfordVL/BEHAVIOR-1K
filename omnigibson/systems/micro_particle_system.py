@@ -18,7 +18,7 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
-from omnigibson.utils.python_utils import assert_valid_key, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import (

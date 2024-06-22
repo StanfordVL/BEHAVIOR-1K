@@ -13,7 +13,6 @@ from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
