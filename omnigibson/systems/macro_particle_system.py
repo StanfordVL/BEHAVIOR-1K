@@ -349,7 +349,19 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     """
 
     def __init__(
-        self, name, create_particle_template, min_scale=None, max_scale=None, scale_relative_to_parent=False, **kwargs
+        self,
+        name,
+        create_particle_template,
+        min_scale=None,
+        max_scale=None,
+        scale_relative_to_parent=False,
+        sampling_axis_probabilities=(0.25, 0.25, 0.5),
+        sampling_aabb_offset=0.01,
+        sampling_bimodal_mean_fraction=0.9,
+        sampling_bimodal_stdev_fraction=0.2,
+        sampling_max_attempts=20,
+        sampling_hit_proportion=0.4,
+        **kwargs,
     ):
         """
         Args:
@@ -395,12 +407,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Default parameters for sampling particle locations
         # See omnigibson/utils/sampling_utils.py for how they are used.
-        self._SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
-        self._SAMPLING_AABB_OFFSET = 0.01
-        self._SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
-        self._SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
-        self._SAMPLING_MAX_ATTEMPTS = 20
-        self._SAMPLING_HIT_PROPORTION = 0.4
+        self._SAMPLING_AXIS_PROBABILITIES = sampling_axis_probabilities
+        self._SAMPLING_AABB_OFFSET = sampling_aabb_offset
+        self._SAMPLING_BIMODAL_MEAN_FRACTION = sampling_bimodal_mean_fraction
+        self._SAMPLING_BIMODAL_STDEV_FRACTION = sampling_bimodal_stdev_fraction
+        self._SAMPLING_MAX_ATTEMPTS = sampling_max_attempts
+        self._SAMPLING_HIT_PROPORTION = sampling_hit_proportion
         return super().__init__(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
 
     def initialize(self, scene):

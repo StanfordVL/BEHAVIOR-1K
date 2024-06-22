@@ -10,7 +10,24 @@ from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
 
 class GraspReward(BaseRewardFunction):
     """
-    Grasp reward
+    A composite reward function for grasping tasks. This reward function not only evaluates the success of object grasping
+    but also considers various penalties and efficiencies.
+
+    The reward is calculated based on several factors:
+    - Grasping reward: A positive reward is given if the robot is currently grasping the specified object.
+    - Distance reward: A reward based on the inverse exponential distance between the end-effector and the object.
+    - Regularization penalty: Penalizes large magnitude actions to encourage smoother and more energy-efficient movements.
+    - Position and orientation penalties: Discourages excessive movement of the end-effector.
+    - Collision penalty: Penalizes collisions with the environment or other objects.
+
+    Attributes:
+        obj_name (str): Name of the object to grasp.
+        dist_coeff (float): Coefficient for the distance reward calculation.
+        grasp_reward (float): Reward given for successfully grasping the object.
+        collision_penalty (float): Penalty incurred for any collision.
+        eef_position_penalty_coef (float): Coefficient for the penalty based on end-effector's position change.
+        eef_orientation_penalty_coef (float): Coefficient for the penalty based on end-effector's orientation change.
+        regularization_coef (float): Coefficient for penalizing large actions.
     """
 
     def __init__(

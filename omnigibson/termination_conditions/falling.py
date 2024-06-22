@@ -19,11 +19,12 @@ class Falling(FailureCondition):
             no longer upright
     """
 
-    def __init__(self, robot_idn=0, fall_height=0.03, topple=True):
+    def __init__(self, robot_idn=0, fall_height=0.03, topple=True, tilt_tolerance=0.75):
         # Store internal vars
         self._robot_idn = robot_idn
         self._fall_height = fall_height
         self._topple = topple
+        self._tilt_tolerance = tilt_tolerance
 
         # Run super init
         super().__init__()
@@ -38,7 +39,7 @@ class Falling(FailureCondition):
         if self._topple:
             rotation = R.from_quat(env.scene.robots[self._robot_idn].get_orientation())
             robot_up = rotation.apply(np.array([0, 0, 1]))
-            if robot_up[2] < 0.75:
+            if robot_up[2] < self._tilt_tolerance:
                 return True
 
         return False

@@ -184,6 +184,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 visual_only=True,
                 load_config={"created_manually": True},
             )
+            self._dummy.load(self.scene)
 
         return prim
 
@@ -354,7 +355,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         ori = T.quat2euler(quat)
 
-        ori_2d = T.compute_2d_orientation(quat)
+        ori_2d = T.calculate_xy_plane_angle(quat)
 
         # Pack everything together
         return dict(

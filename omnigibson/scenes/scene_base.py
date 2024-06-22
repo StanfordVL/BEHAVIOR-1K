@@ -103,10 +103,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self._init_state = scene_info["state"]["object_registry"]
             self._init_systems = list(scene_info["state"]["system_registry"].keys())
             self._task_metadata = {}
-            try:
+            if "metadata" in scene_info and "task" in scene_info["metadata"]:
                 self._task_metadata = scene_info["metadata"]["task"]
-            except:
-                pass
 
             # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
             # accordingly

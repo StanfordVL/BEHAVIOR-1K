@@ -47,8 +47,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.reset()
         for i in range(100):
             action = env.action_space.sample()
-            state, reward, done, info = env.step(action)
-            if done:
+            state, reward, terminated, truncated, info = env.step(action)
+            if terminated or truncated:
                 og.log.info("Episode finished after {} timesteps".format(i + 1))
                 break
 

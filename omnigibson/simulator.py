@@ -48,7 +48,7 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    DummyObjectViewAPI,
+    DummyControllableObjectViewAPI,
     FlatcacheAPI,
     GripperRigidContactAPI,
     PoseAPI,
@@ -524,8 +524,9 @@ def launch_simulator(*args, **kwargs):
             """
             if self._floor_plane is not None:
                 return
+            ground_plane_relative_path = "/ground_plane"
             plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-                prim_path="/World/ground_plane",
+                prim_path="/World" + ground_plane_relative_path,
                 name="ground_plane",
                 z_position=0,
                 size=None,
@@ -538,7 +539,7 @@ def launch_simulator(*args, **kwargs):
             )
 
             self._floor_plane = XFormPrim(
-                relative_prim_path="/ground_plane",
+                relative_prim_path=ground_plane_relative_path,
                 name=plane.name,
                 load_config={"created_manually": True},
             )
@@ -598,8 +599,8 @@ def launch_simulator(*args, **kwargs):
             assert isinstance(scene, Scene), "import_scene can only be called with Scene"
 
             # Check that the scene is not already imported
-            if scene in self._scenes:
-                raise ValueError("Scene is already imported!")
+            if scene.loaded:
+                raise ValueError("Scene is already loaded!")
 
             self._last_scene_edge = scene.load(
                 idx=len(self.scenes),
@@ -621,7 +622,7 @@ def launch_simulator(*args, **kwargs):
             # Need to one more step for particle systems to work
             self.step()
             self.stop()
-            log.info("Imported scene.")
+            log.info(f"Imported scene {scene.idx}.")
 
         def post_import_object(self, obj):
             """
@@ -753,7 +754,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-            DummyObjectViewAPI.initialize_view()
+            DummyControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -831,7 +832,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
             ControllableObjectViewAPI.clear()
-            DummyObjectViewAPI.clear()
+            DummyControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -953,7 +954,7 @@ def launch_simulator(*args, **kwargs):
         def _on_physics_step(self):
             # Make the controllable object view API refresh
             ControllableObjectViewAPI.clear()
-            DummyObjectViewAPI.clear()
+            DummyControllableObjectViewAPI.clear()
 
             # Run the controller step on every controllable object
             for scene in self.scenes:
@@ -963,7 +964,7 @@ def launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
-            DummyObjectViewAPI.flush_control()
+            DummyControllableObjectViewAPI.flush_control()
 
         def _on_contact(self, contact_headers, contact_data):
             """

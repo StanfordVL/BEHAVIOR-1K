@@ -39,7 +39,7 @@ except ModuleNotFoundError:
     )
     exit(1)
 
-assert meets_minimum_version(gym.__version__, "0.28.1"), "Please install/update gym to version >= 0.28.1"
+assert meets_minimum_version(gym.__version__, "0.28.1"), "Please install/update gymnasium to version >= 0.28.1"
 
 # We don't need object states nor transitions rules, so we disable them now, and also enable flatcache for maximum speed
 gm.ENABLE_OBJECT_STATES = False

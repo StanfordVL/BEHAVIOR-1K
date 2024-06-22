@@ -46,7 +46,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Call super first
         super().__init__()
 
-        # Support gymnasium's render mode metadata
+        # Required render mode metadata for gymnasium
         self.render_mode = "rgb_array"
         self.metadata = {"render.modes": ["rgb_array"]}
 
@@ -265,9 +265,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 )
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
+                # TODO: Fix this after scene_local_position_orientation API is fixed
                 robot.set_local_pose(position=position, orientation=orientation)
-                if robot._dummy is not None:
-                    robot._dummy.load(self.scene)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -519,7 +518,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             info["scene_graph"] = self.get_scene_graph()
 
     def _pre_step(self, action):
-        """Apply the pre-sim-step part of an environment step."""
+        """Apply the pre-sim-step part of an environment step, i.e. apply the robot actions."""
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
             action_dict = dict()
@@ -537,7 +536,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot.apply_action(action_dict[robot.name])
 
     def _post_step(self, action):
-        """Apply the post-sim-step part of an environment step."""
+        """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""
         # Grab observations
         obs, obs_info = self.get_obs()
 
@@ -568,7 +567,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Increment step
         self._current_step += 1
-        return obs, reward, done, info
+        return obs, reward, terminated, truncated, info
 
     def step(self, action):
         """

@@ -47,8 +47,13 @@ class SB3VectorEnvironment(DummyVecEnv):
             global last_stepped_env, last_stepped_time
 
             if last_stepped_env != self:
-                # If another environment was used after us, we need to check that we have been reset
-                # after that.
+                # If another environment was used after us, we need to check that we have been reset after that.
+                # Consider the common setup where you have a train env and an eval env in the same process.
+                # When you step the eval env, the physics state of the train env also gets stepped,
+                # despite the train env not taking new actions or outputting new observations.
+                # By the time you next step the train env your state has drastically changed.
+                # To avoid this from happening, we add a requirement: you can only be stepping
+                # one vector env at a time - if you want to step another one, you need to reset it first.
                 assert (
                     last_stepped_time is None or self.last_reset_time > last_stepped_time
                 ), "You must call reset() before using a different environment."
@@ -95,7 +100,8 @@ class SB3VectorEnvironment(DummyVecEnv):
                 maybe_options = {"options": self._options[env_idx]} if self._options[env_idx] else {}
                 self.envs[env_idx].reset(get_obs=False, seed=self._seeds[env_idx], **maybe_options)
 
-            # Settle the robots
+            # Settle the environments
+            # TODO: fix this once we make the task classes etc. vectorized
             for _ in range(30):
                 og.sim.step()
 

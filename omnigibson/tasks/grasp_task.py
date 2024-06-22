@@ -68,6 +68,7 @@ class GraspTask(BaseTask):
         # terminations["graspgoal"] = GraspGoal(
         #     self.obj_name
         # )
+        # This helpes to prevent resets happening at different times
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         # terminations["falling"] = Falling()
 
@@ -179,7 +180,6 @@ class GraspTask(BaseTask):
             env (Environment): environment instance to reset
         """
         # Reset the scene, agent, and variables
-        import traceback
 
         # Try up to 20 times.
         for _ in range(20):
@@ -188,7 +188,6 @@ class GraspTask(BaseTask):
                 self._reset_agent(env)
                 break
             except Exception as e:
-                print(traceback.print_exc())
                 print("Resetting error: ", e)
         else:
             raise ValueError("Could not reset task.")

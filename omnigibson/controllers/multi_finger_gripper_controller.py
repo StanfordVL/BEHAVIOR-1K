@@ -8,8 +8,6 @@ from omnigibson.utils.python_utils import assert_valid_key
 VALID_MODES = {
     "binary",
     "ternary",
-    "smooth",
-    "smooth_delta",
     "independent",
 }
 
@@ -77,11 +75,8 @@ class MultiFingerGripperController(GripperController):
                 "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
                     (send max pos / vel / tor signal), otherwise send max close control signals
                 "ternary": 1D command, if preprocessed value > 0.33 is interpreted as an max open
-                    (send max pos / vel / tor signal), < 0.33 as max close control, and otherwise stay
+                    (send max pos / vel / tor signal), < -0.33 as max close control, and otherwise stay
                     still
-                "smooth": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
-                "smooth_delta": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
-                    adding the command on top of the existing value
                 "independent": 2D command, sends independent signals to each finger joint equal to the preprocessed command
 
             open_qpos (None or Array[float]): If specified, the joint positions representing a fully-opened gripper.

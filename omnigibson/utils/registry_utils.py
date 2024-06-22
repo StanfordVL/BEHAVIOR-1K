@@ -135,6 +135,7 @@ class Registry:
         from omnigibson.systems.system_base import BaseSystem
 
         if isinstance(obj, BaseSystem):
+            # At this point, the system is not yet loaded, which means it does not have its global prim path yet
             keys = [k for k in keys if k != "prim_path"]
         for k in keys:
             obj_attr = self._get_obj_attr(obj=obj, attr=k)
@@ -284,9 +285,9 @@ class Registry:
         Get the names of the objects in this registry
 
         Returns:
-            list of str: Names of the instances owned by this registry
+            set of str: Names of the instances owned by this registry
         """
-        return [obj.name for obj in self.objects]
+        return {obj.name for obj in self.objects}
 
     @property
     def all_keys(self):

@@ -136,8 +136,8 @@ class XFormPrim(BasePrim):
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
-        r1 = R.from_quat(current_orientation).as_matrix()
-        r2 = R.from_quat(new_orientation).as_matrix()
+        r1 = T.quat2mat(current_orientation)
+        r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
         assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
@@ -261,7 +261,7 @@ class XFormPrim(BasePrim):
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.
         """
-        return T.compute_2d_orientation(self.get_orientation())
+        return T.calculate_xy_plane_angle(self.get_orientation())
 
     def get_local_pose(self):
         """

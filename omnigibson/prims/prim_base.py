@@ -76,6 +76,9 @@ class BasePrim(Serializable, Recreatable, ABC):
         ), f"Prim {self.name} at prim_path {self.prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
+        # Cache state size
+        self._state_size = len(self.dump_state(serialized=True))
+
         self._initialized = True
 
     def load(self, scene):
@@ -152,6 +155,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         """
         assert self._scene_assigned, "Scene has not been assigned to this prim yet!"
         return self._scene
+
+    @property
+    def state_size(self):
+        # This is the cached value
+        return self._state_size
 
     @property
     def prim_path(self):

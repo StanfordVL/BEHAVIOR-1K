@@ -8,14 +8,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.utils.python_utils import (
-    Serializable,
-    assert_valid_key,
-    camel_case_to_snake_case,
-    get_uuid,
-    snake_case_to_camel_case,
-    subclass_factory,
-)
+from omnigibson.utils.python_utils import Serializable, get_uuid
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
@@ -39,6 +32,9 @@ m.BBOX_UPPER_LIMIT_MAX = 0.1
 _CALLBACKS_ON_SYSTEM_INIT = dict()
 _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
+# Global dict that contains mappings of all the systems
+UUID_TO_SYSTEM_NAME = dict()
+
 
 class BaseSystem(Serializable):
     """
@@ -56,7 +52,7 @@ class BaseSystem(Serializable):
         self.min_scale = min_scale if min_scale is not None else np.ones(3)
         self.max_scale = max_scale if max_scale is not None else np.ones(3)
 
-        self._uuid = get_uuid(self._name)
+        self._uuid = None
 
         self._scene = None
 
@@ -124,8 +120,11 @@ class BaseSystem(Serializable):
         """
         Initializes this system
         """
-        self._scene = scene
         assert not self.initialized, f"Already initialized system {self.name}!"
+        self._scene = scene
+        self._uuid = get_uuid(self.prim_path)
+        UUID_TO_SYSTEM_NAME[self._uuid] = self.name
+
         og.sim.stage.DefinePrim(self.prim_path, "Scope")
 
         self.initialized = True
@@ -198,6 +197,8 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
+        UUID_TO_SYSTEM_NAME.pop(self._uuid)
+        self._uuid = None
 
         for callback in og.sim.get_callbacks_on_system_clear():
             callback(self)
@@ -332,6 +333,11 @@ class BaseSystem(Serializable):
         """
         raise NotImplementedError()
 
+    @property
+    def state_size(self):
+        # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
+        return 7 + 7 * self.n_particles
+
     def _dump_state(self):
         positions, orientations = (
             self.get_particles_local_pose() if self._store_local_poses else self.get_particles_position_orientation()
@@ -439,6 +445,20 @@ class VisualParticleSystem(BaseSystem):
                 this will OVERRIDE self.min_scale and self.max_scale when sampling particles!
         """
         return False
+
+    @property
+    def state_size(self):
+        # Get super size first
+        state_size = super().state_size
+
+        # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
+        # particle ids, particle indices, and corresponding link info for each particle (m * 3)
+        return (
+            state_size
+            + 1
+            + 2 * len(self._group_particles)
+            + sum(3 * self.num_group_particles(group) for group in self.groups)
+        )
 
     def _clear(self):
         super()._clear()

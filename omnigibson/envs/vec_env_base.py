@@ -25,20 +25,18 @@ class VectorEnvironment:
             env.post_play_load()
 
     def step(self, actions):
-        try:
-            observations, rewards, dones, infos = [], [], [], []
-            for i, action in enumerate(actions):
-                self.envs[i]._pre_step(action)
-            og.sim.step()
-            for i, action in enumerate(actions):
-                obs, reward, done, info = self.envs[i]._post_step(action)
-                observations.append(obs)
-                rewards.append(reward)
-                dones.append(done)
-                infos.append(info)
-            return observations, rewards, dones, infos
-        except Exception as e:
-            print(e)
+        observations, rewards, terminates, truncates, infos = [], [], [], [], []
+        for i, action in enumerate(actions):
+            self.envs[i]._pre_step(action)
+        og.sim.step()
+        for i, action in enumerate(actions):
+            obs, reward, terminated, truncated, info = self.envs[i]._post_step(action)
+            observations.append(obs)
+            rewards.append(reward)
+            terminates.append(terminated)
+            truncates.append(truncated)
+            infos.append(info)
+        return observations, rewards, terminates, truncates, infos
 
     def reset(self):
         for env in self.envs:

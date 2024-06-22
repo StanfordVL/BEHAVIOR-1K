@@ -107,6 +107,7 @@ class PhysxParticleInstancer(BasePrim):
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
     def remove(self):
+        # We need to create this parent prim to avoid calling the low level omniverse delete prim method
         parent_absolute_path = self.prim.GetParent().GetPath().pathString
         parent_relative_path = absolute_prim_path_to_scene_relative(self._scene, parent_absolute_path)
         self._parent_prim = BasePrim(relative_prim_path=parent_relative_path, name=f"{self._name}_parent")
@@ -316,6 +317,12 @@ class PhysxParticleInstancer(BasePrim):
             prototype_ids.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
+
+    @property
+    def state_size(self):
+        # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
+        # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
+        return 3 + self.n_particles * 14
 
     def _dump_state(self):
         local_positions, local_orientations = zip(
@@ -779,6 +786,20 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     @property
     def default_instancer_idn(self):
         return 0
+
+    @property
+    def state_size(self):
+        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
+        # number of particles in each instancer (3n),
+        # and the corresponding states in each instancer (X)
+        if self.particle_instancers is None:
+            return 1
+        else:
+            return (
+                1
+                + 3 * len(self.particle_instancers)
+                + sum(inst.state_size for inst in self.particle_instancers.values())
+            )
 
     @property
     def default_particle_instancer(self):
@@ -1757,6 +1778,11 @@ class Cloth(MicroParticleSystem):
     @property
     def particle_contact_offset(self):
         return m.CLOTH_PARTICLE_CONTACT_OFFSET
+
+    @property
+    def state_size(self):
+        # Default is no state
+        return 0
 
     def _dump_state(self):
         # Empty by default
