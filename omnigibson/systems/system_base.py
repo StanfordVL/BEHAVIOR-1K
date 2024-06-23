@@ -52,7 +52,8 @@ class BaseSystem(Serializable):
         self.min_scale = min_scale if min_scale is not None else np.ones(3)
         self.max_scale = max_scale if max_scale is not None else np.ones(3)
 
-        self._uuid = None
+        self._uuid = get_uuid(self.name)
+        UUID_TO_SYSTEM_NAME[self._uuid] = self.name
 
         self._scene = None
 
@@ -122,8 +123,6 @@ class BaseSystem(Serializable):
         """
         assert not self.initialized, f"Already initialized system {self.name}!"
         self._scene = scene
-        self._uuid = get_uuid(self.prim_path)
-        UUID_TO_SYSTEM_NAME[self._uuid] = self.name
 
         og.sim.stage.DefinePrim(self.prim_path, "Scope")
 
@@ -197,8 +196,6 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
-        UUID_TO_SYSTEM_NAME.pop(self._uuid)
-        self._uuid = None
 
         for callback in og.sim.get_callbacks_on_system_clear():
             callback(self)

@@ -325,12 +325,15 @@ class PhysxParticleInstancer(BasePrim):
         return 3 + self.n_particles * 14
 
     def _dump_state(self):
-        local_positions, local_orientations = zip(
-            *[
-                T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
-                for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
-            ]
-        )
+        if self.particle_positions.size == 0 and self.particle_orientations.size == 0:
+            local_positions, local_orientations = [], []
+        else:
+            local_positions, local_orientations = zip(
+                *[
+                    T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
+                    for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
+                ]
+            )
         return dict(
             idn=self._idn,
             particle_group=self.particle_group,
@@ -1028,16 +1031,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             enabled=not self.visual_only,
         )
 
+        if self.particle_instancers is None:
+            self.particle_instancers = dict()
+
         # Create the instancer object that wraps the raw prim
         instancer = PhysxParticleInstancer(
             relative_prim_path=absolute_prim_path_to_scene_relative(self._scene, instance.GetPrimPath().pathString),
             name=name,
             idn=idn,
         )
-        instancer.initialize()
         instancer.load(self._scene)
-        if self.particle_instancers is None:
-            self.particle_instancers = dict()
+        instancer.initialize()
         self.particle_instancers[name] = instancer
 
         return instancer

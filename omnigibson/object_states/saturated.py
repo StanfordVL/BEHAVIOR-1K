@@ -78,7 +78,7 @@ class ModifiedParticles(RelativeObjectState):
                     np.concatenate(
                         [
                             (
-                                self.object.scene.system_registry("name", system_name).uuid,
+                                self.obj.scene.system_registry("name", system_name).uuid,
                                 state[system_name],
                             )
                             for system_name in system_names
@@ -235,7 +235,10 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                     state_flat,
                     np.concatenate(
                         [
-                            (self.object.scene.system_registry("name", system_name).uuid, state[system_name])
+                            (
+                                self.obj.scene.system_registry("name", system_name).uuid,
+                                state[system_name],
+                            )
                             for system_name in system_names
                         ]
                     ),
