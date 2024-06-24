@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 from omnigibson.utils.ui_utils import create_module_logger

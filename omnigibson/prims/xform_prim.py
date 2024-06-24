@@ -24,7 +24,7 @@ class XFormPrim(BasePrim):
         unless it is a non-root articulation link.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified:
@@ -35,56 +35,44 @@ class XFormPrim(BasePrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._binding_api = None
         self._material = None
-        self._collision_filter_api = None
         self.original_scale = None
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
 
     def _load(self):
-        return og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        return og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
     def _post_load(self):
         # run super first
         super()._post_load()
 
         # Make sure all xforms have pose and scaling info
-        self._set_xform_properties()
+        # These only need to be done if we are creating this prim from scratch.
+        # Pre-created OG objects' prims always have these things set up ahead of time.
+        # TODO: This is disabled because it does not work as intended. In the future, fix this for speed
+        if not self._xform_props_pre_loaded:
+            self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
         self.original_scale = np.array(self.get_attribute("xformOp:scale"))
 
-        # Create collision filter API
-        self._collision_filter_api = (
-            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
-            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
-            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
-        )
-
-        # Create binding API
-        self._binding_api = (
-            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
-            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
-        )
-
         # Grab the attached material if it exists
         if self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
-            material = MaterialPrim.get_material(prim_path=material_prim_path, name=material_name)
+            material = MaterialPrim.get_material(scene=self.scene, prim_path=material_prim_path, name=material_name)
             assert material.loaded, f"Material prim path {material_prim_path} doesn't exist on stage."
             material.add_user(self)
             self._material = material
@@ -145,14 +133,32 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
+        # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
-        r1 = R.from_quat(current_orientation).as_matrix()
-        r2 = R.from_quat(new_orientation).as_matrix()
+        r1 = T.quat2mat(current_orientation)
+        r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
         assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
+        )
+
+    @property
+    def _collision_filter_api(self):
+        return (
+            lazy.pxr.UsdPhysics.FilteredPairsAPI(self._prim)
+            if self._prim.HasAPI(lazy.pxr.UsdPhysics.FilteredPairsAPI)
+            else lazy.pxr.UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+        )
+
+    @property
+    def _binding_api(self):
+        # TODO: Do we always need to apply this?
+        return (
+            lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
+            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI)
+            else lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         )
 
     def has_material(self):
@@ -161,7 +167,7 @@ class XFormPrim(BasePrim):
             bool: True if there is a visual material bound to this prim. False otherwise
         """
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return False if material_path == "" else True
+        return material_path != ""
 
     def set_position_orientation(self, position=None, orientation=None):
         """
@@ -203,7 +209,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the world frame
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
-        return PoseAPI.get_world_pose(self._prim_path)
+        return PoseAPI.get_world_pose(self.prim_path)
 
     def set_position(self, position):
         """
@@ -250,21 +256,12 @@ class XFormPrim(BasePrim):
         """
         return quat2euler(self.get_orientation())
 
-    def get_2d_orientation(self):
+    def get_xy_orientation(self):
         """
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.
         """
-        fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
-        fwd[2] = 0.0
-
-        # If the object is facing close to straight up, then we can't compute a 2D orientation
-        # in that case, we return zero.
-        if np.linalg.norm(fwd) < 1e-4:
-            return 0.0
-
-        fwd /= np.linalg.norm(fwd)
-        return np.arctan2(fwd[1], fwd[0])
+        return T.calculate_xy_plane_angle(self.get_orientation())
 
     def get_local_pose(self):
         """
@@ -339,7 +336,7 @@ class XFormPrim(BasePrim):
         """
         Returns the scaled transform of this prim.
         """
-        return PoseAPI.get_world_pose_with_scale(self._prim_path)
+        return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
         return trimesh.transformations.transform_points(points, self.scaled_transform)
@@ -352,7 +349,9 @@ class XFormPrim(BasePrim):
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
-        return np.array(self.get_attribute("xformOp:scale"))
+        scale = self.get_attribute("xformOp:scale")
+        assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
+        return np.array(scale)
 
     @scale.setter
     def scale(self, scale):
@@ -401,7 +400,7 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self.prim_path)
 
     def remove_filtered_collision_pair(self, prim):
         """
@@ -412,18 +411,27 @@ class XFormPrim(BasePrim):
         """
         # Add to both this prim's and the other prim's filtered pair
         self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
-        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
         pos, ori = self.get_position_orientation()
+
+        # If we are in a scene, compute the scene-local transform (and save this as the world transform
+        # for legacy compatibility)
+        if self.scene is not None:
+            pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
+
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
+        pos, orn = np.array(state["pos"]), np.array(state["ori"])
+        if self.scene is not None:
+            pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+        self.set_position_orientation(pos, orn)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.concatenate([state["pos"], state["ori"]]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori
         return dict(pos=state[0:3], ori=state[3:7]), 7

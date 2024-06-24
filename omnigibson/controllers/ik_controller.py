@@ -219,9 +219,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Load relevant info for this controller
         self.control_filter.load_state(state["control_filter"], serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize state for this controller
         return np.concatenate(
@@ -231,16 +231,14 @@ class InverseKinematicsController(JointController, ManipulationController):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["control_filter"] = self.control_filter.deserialize(
-            state=state[idx : idx + self.control_filter.state_size]
-        )
+        state_dict["control_filter"], deserialized_items = self.control_filter.deserialize(state=state[idx:])
 
-        return state_dict, idx + self.control_filter.state_size
+        return state_dict, idx + deserialized_items
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict

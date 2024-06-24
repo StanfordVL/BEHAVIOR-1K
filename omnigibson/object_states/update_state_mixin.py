@@ -48,13 +48,6 @@ class GlobalUpdateStateMixin(BaseObjectState):
         """
         pass
 
-    @classmethod
-    def global_clear(cls):
-        """
-        Executes a global clear sequence for this object state. Default is no-op
-        """
-        pass
-
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template

@@ -10,7 +10,7 @@ from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.transform_utils import euler2quat
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 log = create_module_logger(module_name=__name__)
 
@@ -38,7 +38,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -87,7 +87,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -135,7 +135,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,
@@ -275,8 +275,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 

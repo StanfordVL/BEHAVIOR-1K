@@ -64,7 +64,7 @@ Robots can be added to a given `Environment` instance by specifying them in the 
 
 ### Runtime
 
-Usually, actions are passed to robots and observations retrieved via the `obs, info, reward, done = env.step(action)`. However, actions can be directly deployed and observations retrieved from the robot using the following APIs:
+Usually, actions are passed to robots and observations retrieved via the `obs, info, terminated, truncated, done = env.step(action)`. However, actions can be directly deployed and observations retrieved from the robot using the following APIs:
 
 <div class="annotate" markdown>
 - **Applying actions**: `robot.apply_action(action)` (1)

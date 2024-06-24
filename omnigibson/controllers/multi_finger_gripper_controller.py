@@ -1,5 +1,6 @@
 import numpy as np
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import assert_valid_key
@@ -220,7 +221,6 @@ class MultiFingerGripperController(GripperController):
             assert np.all(
                 self._control == self._control[0]
             ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
-
             assert m.POS_TOLERANCE > self._limit_tolerance, (
                 "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "
                 "gripper controller's tolerance of zero-ing out velocities, which makes the heuristics invalid."

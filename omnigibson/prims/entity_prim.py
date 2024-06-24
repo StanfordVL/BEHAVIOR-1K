@@ -13,7 +13,7 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -29,7 +29,7 @@ class EntityPrim(XFormPrim):
     be converted into an articulation!
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that by default, this assumes an articulation already exists (i.e.:
@@ -42,7 +42,7 @@ class EntityPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -53,6 +53,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
+        self._articulated = None
         self._articulation_tree = None
         self._articulation_view_direct = None
 
@@ -64,7 +65,7 @@ class EntityPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -117,7 +118,7 @@ class EntityPrim(XFormPrim):
             # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
             # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
-            new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
+            new_path = f"{self.prim_path}/{old_link_prim.GetName()}_cloth"
             lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
             lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
@@ -134,7 +135,7 @@ class EntityPrim(XFormPrim):
             # Import now to avoid too-eager load of Omni classes due to inheritance
             from omnigibson.utils.deprecated_utils import ArticulationView
 
-            self._articulation_view_direct = ArticulationView(f"{self._prim_path}/{self.root_link_name}")
+            self._articulation_view_direct = ArticulationView(f"{self.prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -176,6 +177,9 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
+        # Cache weather we are articulated or not
+        self._articulated = self.articulation_root_path is not None
+
     def remove(self):
         # First remove all joints
         if self._joints is not None:
@@ -195,11 +199,6 @@ class EntityPrim(XFormPrim):
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        # Make sure to clean up all pre-existing names for all links
-        if self._links is not None:
-            for link in self._links.values():
-                link.remove_names()
-
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         joint_children = set()
@@ -248,24 +247,21 @@ class EntityPrim(XFormPrim):
                 "kinematic_only": (
                     self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
                 ),
+                "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
                 "remesh": self._load_config.get("remesh", True),
             }
             self._links[link_name] = link_cls(
-                prim_path=prim.GetPrimPath().__str__(),
+                relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
                 load_config=link_load_config,
             )
+            self._links[link_name].load(self.scene)
 
     def update_joints(self):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        # Make sure to clean up all pre-existing names for all joints
-        if self._joints is not None:
-            for joint in self._joints.values():
-                joint.remove_names()
-
         # Initialize joints dictionary
         self._joints = dict()
         self.update_handles()
@@ -283,10 +279,11 @@ class EntityPrim(XFormPrim):
                         joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
                         joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
-                            prim_path=joint_path,
+                            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
                             articulation_view=self._articulation_view_direct,
                         )
+                        joint.load(self.scene)
                         joint.initialize()
                         self._joints[joint_name] = joint
         else:
@@ -388,7 +385,8 @@ class EntityPrim(XFormPrim):
         """
         # Note that this is not equivalent to self.n_joints > 0 because articulation root path is
         # overridden by the object classes
-        return self.articulation_root_path is not None
+        assert self._articulated is not None, "Articulation state not initialized!"
+        return self._articulated
 
     @property
     def articulation_root_path(self):
@@ -397,7 +395,7 @@ class EntityPrim(XFormPrim):
             None or str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
                 this corresponds to self.prim_path
         """
-        return self._prim_path if self.n_joints > 0 else None
+        return self.prim_path if self.n_joints > 0 else None
 
     @property
     def root_link_name(self):
@@ -458,6 +456,10 @@ class EntityPrim(XFormPrim):
         Returns:
         int: Number of fixed joints owned by this articulation
         """
+        # If the articulation view is available, use it.
+        if self._articulation_view and self._articulation_view._metadata:
+            return sum(1 for joint_dof in self._articulation_view._metadata.joint_dof_counts if joint_dof == 0)
+
         # Manually iterate over all links and check for any joints that are not fixed joints!
         num = 0
         children = list(self.prim.GetChildren())
@@ -608,7 +610,7 @@ class EntityPrim(XFormPrim):
         """
         contacts = []
         for link in self._links.values():
-            contacts += link.contact_list()
+            contacts.extend(link.contact_list())
         return contacts
 
     def enable_gravity(self) -> None:
@@ -896,7 +898,7 @@ class EntityPrim(XFormPrim):
 
     def get_joint_efforts(self, normalized=False):
         """
-        Grabs this entity's joint efforts
+        Grabs this entity's "measured" joint efforts
 
         Args:
             normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
@@ -907,7 +909,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_efforts = self._articulation_view.get_applied_joint_efforts().reshape(self.n_dof)
+        joint_efforts = self._articulation_view.get_measured_joint_efforts().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
@@ -1032,7 +1034,8 @@ class EntityPrim(XFormPrim):
         """
         return np.concatenate([joint.damping for joint in self._joints.values()])
 
-    @property
+    # TODO: These are cached, but they are not updated when the joint limit is changed
+    @cached_property
     def joint_lower_limits(self):
         """
         Returns:
@@ -1041,7 +1044,8 @@ class EntityPrim(XFormPrim):
         """
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
-    @property
+    # TODO: These are cached, but they are not updated when the joint limit is changed
+    @cached_property
     def joint_upper_limits(self):
         """
         Returns:
@@ -1476,9 +1480,9 @@ class EntityPrim(XFormPrim):
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
         stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
-        link_prim = stage.DefinePrim(f"{self._prim_path}/{link_name}", "Xform")
-        vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
-        col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
+        link_prim = stage.DefinePrim(f"{self.prim_path}/{link_name}", "Xform")
+        vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/visuals").GetPrim()
+        col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/collisions").GetPrim()
 
         # Set the radius to be 0.03m. In theory, we want this radius to be as small as possible. Otherwise, the cloth
         # dynamics will be unrealistic. However, in practice, if the radius is too small, the attachment becomes very
@@ -1500,9 +1504,10 @@ class EntityPrim(XFormPrim):
 
         # Create a attachment point link
         link = RigidPrim(
-            prim_path=link_prim.GetPrimPath().__str__(),
+            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, link_prim.GetPrimPath().pathString),
             name=f"{self._name}:{link_name}",
         )
+        link.load(self.scene)
         link.disable_collisions()
         # TODO (eric): Should we disable gravity for this link?
         # link.disable_gravity()
@@ -1541,7 +1546,7 @@ class EntityPrim(XFormPrim):
         # Make sure this object is awake
         self.wake()
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
         # adding them to the a flattened array
         state_flat = [self.root_link.serialize(state=state["root_link"])]
@@ -1554,20 +1559,20 @@ class EntityPrim(XFormPrim):
 
         return np.concatenate(state_flat).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
-        idx = self.root_link.state_size
-        state_dict = dict(root_link=self.root_link.deserialize(state=state[:idx]))
+        root_link_state, idx = self.root_link.deserialize(state=state)
+        state_dict = dict(root_link=root_link_state)
         joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name] = prim.deserialize(state=state[idx : idx + prim.state_size])
-            idx += prim.state_size
+            joint_state_dict[prim_name], deserialized_items = prim.deserialize(state=state[idx:])
+            idx += deserialized_items
         state_dict["joints"] = joint_state_dict
 
         return state_dict, idx
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Subclass must implement this method for duplication functionality
         raise NotImplementedError(
             "Subclass must implement _create_prim_with_same_kwargs() to enable duplication "

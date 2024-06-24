@@ -4,7 +4,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
-from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -19,7 +18,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
-        assert is_physical_particle_system(
+        assert self.obj.scene.is_physical_particle_system(
             system_name=system.name
         ), "Can only get Filled state with a valid PhysicalParticleSystem!"
 
@@ -41,7 +40,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _set_value(self, system, new_value):
         # Sanity check to make sure system is valid
-        assert is_physical_particle_system(
+        assert self.obj.scene.is_physical_particle_system(
             system_name=system.name
         ), "Can only set Filled state with a valid PhysicalParticleSystem!"
 
@@ -59,7 +58,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
                     check_contact=True,
                     max_samples=(
                         m.N_MAX_MACRO_PARTICLE_SAMPLES
-                        if issubclass(system, MacroParticleSystem)
+                        if isinstance(system, MacroParticleSystem)
                         else m.N_MAX_MICRO_PARTICLE_SAMPLES
                     ),
                 )

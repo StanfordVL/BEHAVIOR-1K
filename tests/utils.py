@@ -16,14 +16,16 @@ SYSTEM_EXAMPLES = {
     "stain": MacroVisualParticleSystem,
 }
 
+env = None
+
 
 def og_test(func):
     def wrapper():
-        assert_test_scene()
+        assert_test_env()
         try:
-            func()
+            func(env)
         finally:
-            og.sim.scene.reset()
+            env.scene.reset()
 
     return wrapper
 
@@ -64,8 +66,9 @@ def get_obj_cfg(
     }
 
 
-def assert_test_scene():
-    if og.sim is None or og.sim.scene is None:
+def assert_test_env():
+    global env
+    if env is None:
         cfg = {
             "scene": {
                 "type": "Scene",
@@ -179,6 +182,8 @@ def assert_test_scene():
             gm.ENABLE_OBJECT_STATES = True
             gm.USE_GPU_DYNAMICS = True
             gm.ENABLE_FLATCACHE = False
+            # TODO: temporarily disable transition rules; fix later
+            gm.ENABLE_TRANSITION_RULES = False
         else:
             # Make sure sim is stopped
             og.sim.stop()
@@ -190,10 +195,12 @@ def assert_test_scene():
         og.sim.stop()
         bounding_box_object_names = ["bagel_dough", "raw_egg"]
         for name in bounding_box_object_names:
-            obj = og.sim.scene.object_registry("name", name)
+            obj = env.scene.object_registry("name", name)
             for collision_mesh in obj.root_link.collision_meshes.values():
                 collision_mesh.set_collision_approximation("boundingCube")
         og.sim.play()
+
+    assert env is not None, "Environment not created"
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
@@ -234,7 +241,7 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
 
 
-def remove_all_systems():
-    for system in ParticleRemover.supported_active_systems.values():
+def remove_all_systems(scene):
+    for system in scene.get_active_systems():
         system.remove_all_particles()
     og.sim.step()

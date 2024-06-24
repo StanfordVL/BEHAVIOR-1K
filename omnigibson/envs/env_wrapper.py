@@ -52,7 +52,8 @@ class EnvironmentWrapper(Wrapper, Registerable):
             4-tuple:
                 - (dict) observations from the environment
                 - (float) reward from the environment
-                - (bool) whether the current episode is completed or not
+                - (bool) whether the current episode is terminated
+                - (bool) whether the current episode is truncated
                 - (dict) misc information
         """
         return self.env.step(action)

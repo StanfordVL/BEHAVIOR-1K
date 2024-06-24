@@ -110,6 +110,22 @@ def prims_to_rigid_prim_set(inp_prims):
     return out
 
 
+def prim_paths_to_rigid_prims(prim_paths, scene):
+    """
+    Given a set of rigid body prim paths @body_prim_paths, return a list of (BaseObject, RigidPrim) tuples.
+    """
+    rigid_prims = set()
+    for body in prim_paths:
+        tokens = body.split("/")
+        obj_prim_path = "/".join(tokens[:-1])
+        link_name = tokens[-1]
+        obj = scene.object_registry("prim_path", obj_prim_path)
+        if obj is not None:
+            rigid_prims.add((obj, obj.links[link_name]))
+
+    return rigid_prims
+
+
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
     Grab collisions that occurred during the most recent physics timestep associated with prims @prims
@@ -135,7 +151,10 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         og.sim.step_physics()
 
     # Standardize inputs
-    prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
+    if prims is not None:
+        prims = prims if isinstance(prims, Iterable) else [prims]
+    else:
+        prims = [x for scene in og.sim.scenes for x in scene.objects]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = (
         [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
@@ -309,7 +328,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = og.sim.scene.dump_state(serialized=False)
+    state = og.sim.dump_state()
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)
@@ -319,7 +338,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
-    og.sim.load_state(state, serialized=False)
+    og.sim.load_state(state)
 
     # Valid if there are no collisions
     return not in_collision

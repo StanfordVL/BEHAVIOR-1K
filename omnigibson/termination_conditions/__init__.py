@@ -1,4 +1,5 @@
 from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal

@@ -7,15 +7,15 @@ from omnigibson.systems import *
 
 
 @og_test
-def test_dump_load():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+def test_dump_load(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = get_system(system_name)
-        assert issubclass(system, system_class)
+        system = env.scene.get_system(system_name)
+        assert isinstance(system, system_class)
         if issubclass(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
-            system.generate_particles(positions=[[0, 0, 1]])
+            system.generate_particles(scene=env.scene, positions=[[0, 0, 1]])
         assert system.n_particles > 0
         system.remove_all_particles()
 
@@ -23,25 +23,25 @@ def test_dump_load():
     og.sim.load_state(state)
 
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = get_system(system_name)
+        system = env.scene.system_registry("name", system_name)
         system.clear()
 
 
 @og_test
-def test_dump_load_serialized():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+def test_dump_load_serialized(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = get_system(system_name)
-        assert issubclass(system, system_class)
+        system = env.scene.get_system(system_name)
+        assert isinstance(system, system_class)
         if issubclass(system_class, VisualParticleSystem):
             assert breakfast_table.states[Covered].set_value(system, True)
         else:
-            system.generate_particles(positions=[[0, 0, 1]])
+            system.generate_particles(scene=env.scene, positions=[[0, 0, 1]])
         assert system.n_particles > 0
 
     state = og.sim.dump_state(serialized=True)
     og.sim.load_state(state, serialized=True)
 
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = get_system(system_name)
+        system = env.scene.system_registry("name", system_name)
         system.clear()

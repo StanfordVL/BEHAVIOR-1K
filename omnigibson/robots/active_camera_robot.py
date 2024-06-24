@@ -4,6 +4,7 @@ import numpy as np
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -36,8 +37,8 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
         dic["camera_qpos_sin"] = np.sin(joint_positions[self.camera_control_idx])
         dic["camera_qpos_cos"] = np.cos(joint_positions[self.camera_control_idx])

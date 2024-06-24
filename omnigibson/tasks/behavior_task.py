@@ -20,12 +20,6 @@ from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.scenes.scene_base import Scene
-from omnigibson.systems.system_base import (
-    REGISTERED_SYSTEMS,
-    add_callback_on_system_clear,
-    add_callback_on_system_init,
-    get_system,
-)
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
@@ -101,6 +95,9 @@ class BehaviorTask(BaseTask):
         self.ground_goal_state_options = None
         self.feedback = None  # None or str
         self.sampler = None  # BDDLSampler
+
+        # Scene info
+        self.scene_name = None
 
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
@@ -203,6 +200,9 @@ class BehaviorTask(BaseTask):
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
+        # Store the scene name
+        self.scene_name = env.scene.scene_model
+
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
             for entity in self.object_scope.values():
@@ -215,8 +215,9 @@ class BehaviorTask(BaseTask):
         callback_name = f"{self.activity_name}_refresh"
         og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
-        add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
-        add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
+
+        og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
+        og.sim.add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -368,8 +369,8 @@ class BehaviorTask(BaseTask):
                     f"from loaded scene, but could not be found!"
                 )
                 name = inst_to_name[obj_inst]
-                is_system = name in REGISTERED_SYSTEMS
-                entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
+                is_system = name in env.scene.system_registry.object_names
+                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,
@@ -430,7 +431,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_added_obj(self, obj):
         """
-        Internal callback function to be called when sim.import_object() is called to potentially update internal
+        Internal callback function to be called when new objects are added to the simulator to potentially update internal
         bddl object scope
 
         Args:
@@ -526,20 +527,21 @@ class BehaviorTask(BaseTask):
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:
+            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
             fname = self.get_cached_activity_scene_filename(
-                scene_model=og.sim.scene.scene_model,
+                scene_model=self.scene_name,
                 activity_name=self.activity_name,
                 activity_definition_id=self.activity_definition_id,
                 activity_instance_id=self.activity_instance_id,
             )
-            path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
+            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
 
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
         # Write metadata and then save
         self.write_task_metadata()
-        og.sim.save(json_path=path)
+        og.sim.save(json_paths=[path])
 
     @property
     def name(self):

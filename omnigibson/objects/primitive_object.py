@@ -29,7 +29,7 @@ class PrimitiveObject(StatefulObject):
         self,
         name,
         primitive_type,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -53,8 +53,7 @@ class PrimitiveObject(StatefulObject):
             name (str): Name for the object. Names need to be unique per scene
             primitive_type (str): type of primitive object to create. Should be one of:
                 {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
@@ -102,7 +101,7 @@ class PrimitiveObject(StatefulObject):
         self._primitive_type = primitive_type
 
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,
@@ -121,15 +120,15 @@ class PrimitiveObject(StatefulObject):
 
     def _load(self):
         # Define an Xform at the specified path
-        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
         # Define a nested mesh corresponding to the root link for this prim
-        base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        base_link = og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
         self._vis_geom = create_primitive_mesh(
-            prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type
+            prim_path=f"{self.prim_path}/base_link/visuals", primitive_type=self._primitive_type
         )
         self._col_geom = create_primitive_mesh(
-            prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type
+            prim_path=f"{self.prim_path}/base_link/collisions", primitive_type=self._primitive_type
         )
 
         # Add collision API to collision geom
@@ -138,8 +137,8 @@ class PrimitiveObject(StatefulObject):
         lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
 
         # Create a material for this object for the base link
-        og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
-        mat_path = f"{self._prim_path}/Looks/default"
+        og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
+        mat_path = f"{self.prim_path}/Looks/default"
         mat = create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
 
@@ -328,10 +327,10 @@ class PrimitiveObject(StatefulObject):
                     )
                 )
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             primitive_type=self._primitive_type,
             name=name,
             category=self.category,
@@ -362,17 +361,17 @@ class PrimitiveObject(StatefulObject):
         if self._primitive_type in VALID_SIZE_OBJECTS:
             self.size = state["size"]
 
-    def _deserialize(self, state):
-        state_dict, idx = super()._deserialize(state=state)
+    def deserialize(self, state):
+        state_dict, idx = super().deserialize(state=state)
         # state_dict["extents"] = state[idx: idx + 3]
         state_dict["radius"] = state[idx]
         state_dict["height"] = state[idx + 1]
         state_dict["size"] = state[idx + 2]
         return state_dict, idx + 3
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         return np.concatenate(
             [

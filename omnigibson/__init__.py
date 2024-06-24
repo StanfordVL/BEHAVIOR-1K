@@ -6,7 +6,7 @@ import signal
 import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.envs import Environment
+from omnigibson.envs import Environment, VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -43,6 +43,65 @@ sim = None  # (this is a singleton so it's okay that it's global)
 # Create and expose a temporary directory for any use cases. It will get destroyed upon omni
 # shutdown by the shutdown function.
 tempdir = tempfile.mkdtemp()
+
+
+def clear():
+    """
+    Clear the stage and then call launch_simulator again to make og.sim point to a new simulator instance
+    """
+    global sim
+
+    import omnigibson.lazy as lazy
+    from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
+    from omnigibson.prims.material_prim import MaterialPrim
+    from omnigibson.sensors.vision_sensor import VisionSensor
+    from omnigibson.transition_rules import TransitionRuleAPI
+    from omnigibson.utils.python_utils import clear as clear_python_utils
+    from omnigibson.utils.usd_utils import clear as clear_usd_utils
+
+    # Stop the physics
+    sim.stop()
+
+    # Clear all scenes
+    for scene in sim.scenes:
+        scene.clear()
+
+    # Remove the skybox, floor plane and viewer camera
+    if sim._skybox is not None:
+        sim._skybox.remove()
+
+    if sim._floor_plane is not None:
+        sim._floor_plane.remove()
+
+    if sim._viewer_camera is not None:
+        sim._viewer_camera.remove()
+
+    if sim._camera_mover is not None:
+        sim._camera_mover.clear()
+
+    # Clear the vision sensor cache
+    VisionSensor.clear()
+
+    # Clear all global update states
+    for state in sim.object_state_types_requiring_update:
+        if issubclass(state, GlobalUpdateStateMixin):
+            state.global_initialize()
+
+    # Clear all materials
+    MaterialPrim.clear()
+
+    if gm.ENABLE_TRANSITION_RULES:
+        # Clear all transition rules
+        TransitionRuleAPI.clear()
+
+    # Clear uniquely named items and other internal states
+    clear_python_utils()
+    clear_usd_utils()
+
+    assert lazy.omni.isaac.core.utils.stage.close_stage()
+    sim = None
+    lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
+    launch()
 
 
 def cleanup(*args, **kwargs):
