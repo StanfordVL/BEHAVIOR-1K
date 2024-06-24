@@ -354,7 +354,7 @@ class RigidContactAPIImpl:
 
     def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         """Get pairs of prim paths that are in contact."""
-        impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+        impulses = np.linalg.norm(self.get_all_impulses(scene_idx), axis=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
