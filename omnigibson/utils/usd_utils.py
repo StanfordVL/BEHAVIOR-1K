@@ -946,7 +946,6 @@ class BatchControlViewAPIImpl:
             self._read_cache["mass_matrices"] = self._view.get_mass_matrices()
 
         idx = self._idx[prim_path]
-        # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
         return self._read_cache["mass_matrices"][idx]
 
     def get_generalized_gravity_forces(self, prim_path):

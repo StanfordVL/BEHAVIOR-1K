@@ -231,6 +231,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
 
+        assert og.sim.get_physics_dt() == 1.0 / self.physics_frequency, "Physics frequency mismatch!"
+        assert og.sim.get_rendering_dt() == 1.0 / self.action_frequency, "Rendering frequency mismatch!"
+
         # Create the scene from our scene config
         self._scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
