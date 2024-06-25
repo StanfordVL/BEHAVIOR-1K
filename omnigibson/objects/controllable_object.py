@@ -12,7 +12,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, DummyObjectViewAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, DummyControllableObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -560,7 +560,7 @@ class ControllableObject(BaseObject):
         fcns["gravity_force"] = lambda: (
             ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
             if not self.fixed_base
-            else DummyObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
+            else DummyControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
             self.articulation_root_path

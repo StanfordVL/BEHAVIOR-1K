@@ -44,7 +44,7 @@ class VisionSensor(BaseSensor):
         - Camera state
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
@@ -389,7 +389,7 @@ class VisionSensor(BaseSensor):
                     # Remap instance segmentation labels to object name
                     if not id:
                         # value is the prim path of the object
-                        if value == "/World/ground_plane":
+                        if value == og.sim.floor_plane.prim_path:
                             value = "groundPlane"
                         else:
                             obj = self.scene.object_registry("prim_path", value)

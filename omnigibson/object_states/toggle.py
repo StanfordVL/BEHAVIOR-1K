@@ -176,6 +176,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         diffuse_tint = (1.0, 1.0, 1.0)
         return albedo_add, diffuse_tint
 
+    @property
+    def state_size(self):
+        return 2
+
     # For this state, we simply store its value and the robot_can_toggle steps.
     def _dump_state(self):
         return dict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)

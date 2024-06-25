@@ -172,22 +172,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Also import dummy object if this robot is not fixed base AND it has a controller that
         # requires generalized gravity forces. We incur a relatively heavy cost at every step if we
         # have to move the dummy. So we only do this if we absolutely need to.
-        # TODO: Make this work - for now this feature is disabled because we can't check the config
-        # at this time. As a result we always load the dummy.
-        needs_dummy = True
         if not self.fixed_base:
-            # TODO: Make this work after controllers get updated post-load.
-            # Check if we have any operational space controllers or joint controllers with use_impedances on.
-            # for cfg in self._controller_config.values():
-            #     if cfg["controller_type"] == "OperationalSpaceController":
-            #         needs_dummy = True
-            #         break
-            #     if cfg["controller_type"] == "JointController" and cfg.get("use_impedances", False):
-            #         needs_dummy = True
-            #         break
-            pass
-
-        if needs_dummy:
             dummy_path = self.prim_path.replace("controllable_", "dummy_")
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
@@ -199,6 +184,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 visual_only=True,
                 load_config={"created_manually": True},
             )
+            self._dummy.load(self.scene)
 
         return prim
 
@@ -369,7 +355,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         ori = T.quat2euler(quat)
 
-        ori_2d = T.compute_2d_orientation(quat)
+        ori_2d = T.calculate_xy_plane_angle(quat)
 
         # Pack everything together
         return dict(

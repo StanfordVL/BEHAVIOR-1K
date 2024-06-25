@@ -259,6 +259,22 @@ class ManipulationRobot(BaseRobot):
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
+        """
+        For arm @arm, calculate any body IDs and corresponding link IDs that are not part of the robot
+        itself that are in contact with any of this arm's gripper's fingers
+        Args:
+            arm (str): specific arm whose gripper will be checked for contact. Default is "default" which
+                corresponds to the first entry in self.arm_names
+            return_contact_positions (bool): if True, will additionally return the contact (x,y,z) position
+        Returns:
+            2-tuple:
+                - set: set of unique contact prim_paths that are not the robot self-collisions.
+                    If @return_contact_positions is True, then returns (prim_path, pos), where pos is the contact
+                    (x,y,z) position
+                    Note: if no objects that are not the robot itself are intersecting, the set will be empty.
+                - dict: dictionary mapping unique contact objects defined by the contact prim_path to
+                    set of unique robot link prim_paths that it is in contact with
+        """
         arm = self.default_arm if arm == "default" else arm
         # Get robot contact links
         link_paths = set(self.link_prim_paths)

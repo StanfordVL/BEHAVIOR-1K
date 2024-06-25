@@ -520,10 +520,8 @@ class StatefulObject(BaseObject):
         # Also add non-kinematic states
         non_kin_states = dict()
         for state_type, state_instance in self._states.items():
-            try:
+            if state_instance.stateful:
                 non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
-            except NotImplementedError:
-                pass
 
         state["non_kin"] = non_kin_states
 
@@ -540,13 +538,11 @@ class StatefulObject(BaseObject):
         # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_name in state["non_kin"]:
-                try:
+            if state_instance.stateful:
+                if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
-                except NotImplementedError:
-                    pass
-            else:
-                log.debug(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
+                else:
+                    log.debug(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
@@ -578,11 +574,9 @@ class StatefulObject(BaseObject):
         non_kin_state_dic = dict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            try:
+            if state_instance.stateful:
                 non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
                 idx += deserialized_items
-            except NotImplementedError:
-                pass
         state_dic["non_kin"] = non_kin_state_dic
 
         return state_dic, idx

@@ -147,7 +147,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     # the following trick should not be followed ever
     modifier._scene = env.scene
     modifier._scene_assigned = True
-    modifier._created_manually = True
     modifier._prim = modifier._load()
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
     if method_type == "Projection":

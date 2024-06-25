@@ -21,7 +21,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         unless it is a non-root articulation link.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
@@ -52,7 +52,9 @@ class BasePrim(Serializable, Recreatable, ABC):
         # that get created during the _load phase of this class, but sometimes we create prims using
         # alternative methods and then create this class - in that case too we need to make sure we
         # add the right xform properties, so callers will just pass in the created manually flag.
-        self._created_manually = "created_manually" in self._load_config and self._load_config["created_manually"]
+        self._xform_props_pre_loaded = (
+            "xform_props_pre_loaded" in self._load_config and self._load_config["xform_props_pre_loaded"]
+        )
 
         # Run super init
         super().__init__()
@@ -74,6 +76,9 @@ class BasePrim(Serializable, Recreatable, ABC):
         ), f"Prim {self.name} at prim_path {self.prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
+        # Cache state size
+        self._state_size = len(self.dump_state(serialized=True))
+
         self._initialized = True
 
     def load(self, scene):
@@ -94,13 +99,11 @@ class BasePrim(Serializable, Recreatable, ABC):
 
         # Then check if the prim is already loaded
         if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
+            # TODO(parallel-hang): make this more descriptive
             log.debug(f"prim {self.name} already exists, skipping load")
             self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
         else:
             # If not, we'll load it.
-            # Override w/e value is available via created_manually - we are definitely creating this
-            # object manually now!
-            self._created_manually = True
             self._prim = self._load()
 
         # Mark the prim as loaded.
@@ -148,10 +151,15 @@ class BasePrim(Serializable, Recreatable, ABC):
     def scene(self):
         """
         Returns:
-            Scene: Scene object that this prim is loaded into
+            Scene or None: Scene object that this prim is loaded into
         """
         assert self._scene_assigned, "Scene has not been assigned to this prim yet!"
         return self._scene
+
+    @property
+    def state_size(self):
+        # This is the cached value
+        return self._state_size
 
     @property
     def prim_path(self):
@@ -274,7 +282,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         all other kwargs should be identical to this instance's values.
 
         Args:
-            relative_prim_path (str): Absolute path to the newly generated prim
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             name (str): Name for the newly created prim
             load_config (dict): Keyword-mapped kwargs to use to set specific attributes for the created prim's instance
 

@@ -24,7 +24,7 @@ class XFormPrim(BasePrim):
         unless it is a non-root articulation link.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified:
@@ -61,7 +61,7 @@ class XFormPrim(BasePrim):
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # TODO: This is disabled because it does not work as intended. In the future, fix this for speed
-        if True:  # self._created_manually:
+        if not self._xform_props_pre_loaded:
             self._set_xform_properties()
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
@@ -136,8 +136,8 @@ class XFormPrim(BasePrim):
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
-        r1 = R.from_quat(current_orientation).as_matrix()
-        r2 = R.from_quat(new_orientation).as_matrix()
+        r1 = T.quat2mat(current_orientation)
+        r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
         assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
@@ -256,12 +256,12 @@ class XFormPrim(BasePrim):
         """
         return quat2euler(self.get_orientation())
 
-    def get_2d_orientation(self):
+    def get_xy_orientation(self):
         """
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.
         """
-        return T.compute_2d_orientation(self.get_orientation())
+        return T.calculate_xy_plane_angle(self.get_orientation())
 
     def get_local_pose(self):
         """

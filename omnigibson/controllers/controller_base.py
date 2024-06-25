@@ -377,6 +377,11 @@ class BaseController(Serializable, Registerable, Recreatable):
         return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
 
     @property
+    def state_size(self):
+        # Default is goal dim + 1 (for whether the goal is valid or not)
+        return self.goal_dim + 1
+
+    @property
     def goal(self):
         """
         Returns:

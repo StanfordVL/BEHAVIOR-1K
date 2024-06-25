@@ -48,7 +48,7 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    DummyObjectViewAPI,
+    DummyControllableObjectViewAPI,
     FlatcacheAPI,
     GripperRigidContactAPI,
     PoseAPI,
@@ -66,6 +66,9 @@ m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566, 1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678, 0.73138017)
 
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
+m.SCENE_MARGIN = 10.0
+m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 
 # Helper functions for starting omnigibson
@@ -271,6 +274,7 @@ def launch_simulator(*args, **kwargs):
 
             self._floor_plane = None
             self._skybox = None
+            self._last_scene_edge = None
 
             # Run super init
             super().__init__(
@@ -338,7 +342,6 @@ def launch_simulator(*args, **kwargs):
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
-            # Initialize all APIs and the stage
             self.stop()
 
             for state in self.object_state_types_requiring_update:
@@ -521,8 +524,9 @@ def launch_simulator(*args, **kwargs):
             """
             if self._floor_plane is not None:
                 return
+            ground_plane_relative_path = "/ground_plane"
             plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
-                prim_path="/World/ground_plane",
+                prim_path="/World" + ground_plane_relative_path,
                 name="ground_plane",
                 z_position=0,
                 size=None,
@@ -535,7 +539,7 @@ def launch_simulator(*args, **kwargs):
             )
 
             self._floor_plane = XFormPrim(
-                relative_prim_path="/ground_plane",
+                relative_prim_path=ground_plane_relative_path,
                 name=plane.name,
                 load_config={"created_manually": True},
             )
@@ -595,12 +599,18 @@ def launch_simulator(*args, **kwargs):
             assert isinstance(scene, Scene), "import_scene can only be called with Scene"
 
             # Check that the scene is not already imported
-            if scene in self._scenes:
-                raise ValueError("Scene is already imported!")
+            if scene.loaded:
+                raise ValueError("Scene is already loaded!")
+
+            self._last_scene_edge = scene.load(
+                idx=len(self.scenes),
+                last_scene_edge=self._last_scene_edge,
+                initial_scene_prim_z_offset=m.INITIAL_SCENE_PRIM_Z_OFFSET,
+                scene_margin=m.SCENE_MARGIN,
+            )
 
             # Load the scene.
             self._scenes.append(scene)
-            scene.load()
 
             # Make sure simulator is not running, then start it so that we can initialize the scene
             assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
@@ -612,11 +622,11 @@ def launch_simulator(*args, **kwargs):
             # Need to one more step for particle systems to work
             self.step()
             self.stop()
-            log.info("Imported scene.")
+            log.info(f"Imported scene {scene.idx}.")
 
         def post_import_object(self, obj):
             """
-            Import an object into the simulator.
+            Post import an object into the simulator, handling any additional setup that needs to be done.
 
             Args:
                 obj (BaseObject): an object to load
@@ -744,7 +754,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.initialize_view()
             GripperRigidContactAPI.initialize_view()
             ControllableObjectViewAPI.initialize_view()
-            DummyObjectViewAPI.initialize_view()
+            DummyControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -822,7 +832,7 @@ def launch_simulator(*args, **kwargs):
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
             ControllableObjectViewAPI.clear()
-            DummyObjectViewAPI.clear()
+            DummyControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -944,7 +954,7 @@ def launch_simulator(*args, **kwargs):
         def _on_physics_step(self):
             # Make the controllable object view API refresh
             ControllableObjectViewAPI.clear()
-            DummyObjectViewAPI.clear()
+            DummyControllableObjectViewAPI.clear()
 
             # Run the controller step on every controllable object
             for scene in self.scenes:
@@ -954,7 +964,7 @@ def launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
-            DummyObjectViewAPI.flush_control()
+            DummyControllableObjectViewAPI.flush_control()
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -992,7 +1002,7 @@ def launch_simulator(*args, **kwargs):
                                     obj1, headers[(actor0_obj, actor1_obj)], contact_data
                                 )
 
-        def find_object_in_scenes(self, prim_path):
+        def get_obj_at_prim_path(self, prim_path):
             for scene in self.scenes:
                 obj = scene.object_registry("prim_path", prim_path)
                 if obj is not None:
@@ -1017,7 +1027,7 @@ def launch_simulator(*args, **kwargs):
 
                     tokens = joint_path.split("/")
                     for i in range(2, len(tokens) + 1):
-                        obj = self.find_object_in_scenes("/".join(tokens[:i]))
+                        obj = self.get_obj_at_prim_path("/".join(tokens[:i]))
                         if obj is not None:
                             break
 
@@ -1367,7 +1377,7 @@ def launch_simulator(*args, **kwargs):
             if not self.scenes:
                 log.warning("Scene has not been loaded. Nothing to save.")
                 return
-            if not json_path.endswith(".json"):
+            if not all([json_path.endswith(".json") for json_path in json_paths]):
                 log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
                 return
 

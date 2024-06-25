@@ -19,7 +19,7 @@ Because this `Simulator` is a global singleton, it is instantiated every time th
 After **`OmniGibson`** is launched, the simulator interface can be accessed globally via `og.sim`. Below, we briefly describe multiple common usages of the simulation interface:
 
 #### Importing and Removing Scenes / Objects
-The simulator can directly import a scene via `sim.import_scene(scene)`, and an object can be imported into a scene via `scene.import_object(object)`. The imported scene and its corresponding objects can be directly accessed through `sim.scenes`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear the entire scene via `sim.clear()`.
+The simulator can directly import a scene via `sim.import_scene(scene)`, and an object can be imported into a scene via `scene.import_object(object)`. The imported scene and its corresponding objects can be directly accessed through `sim.scenes`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear all the scenes via `og.clear()`.
 
 #### Propagating Physics
 The simulator can be manually stepped, with or without physics / rendering (`sim.step()`, `sim.step_physics()`, `sim.render()`), and can be stopped (`sim.stop()`), paused (`sim.pause()`), or played (`sim.play()`). Note that physics only runs when the simulator is playing! The current sim mode can be checked via `sim.is_stopped()`, `sim.is_paused()`, and `sim.is_playing()`.

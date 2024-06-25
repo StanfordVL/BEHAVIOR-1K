@@ -18,7 +18,7 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
-from omnigibson.utils.python_utils import assert_valid_key, snake_case_to_camel_case, subclass_factory
+from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import (
@@ -90,7 +90,7 @@ class PhysxParticleInstancer(BasePrim):
     def __init__(self, relative_prim_path, name, idn):
         """
         Args:
-            relative_prim_path (str): relative prim path of the Prim to encapsulate or create.
+            relative_prim_path (str): scene-local prim path of the Instancer to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             idn (int): Unique identification number to assign to this particle instancer. This is used to
                 deterministically reproduce individual particle instancer states dynamically, even if we
@@ -107,6 +107,7 @@ class PhysxParticleInstancer(BasePrim):
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
     def remove(self):
+        # We need to create this parent prim to avoid calling the low level omniverse delete prim method
         parent_absolute_path = self.prim.GetParent().GetPath().pathString
         parent_relative_path = absolute_prim_path_to_scene_relative(self._scene, parent_absolute_path)
         self._parent_prim = BasePrim(relative_prim_path=parent_relative_path, name=f"{self._name}_parent")
@@ -317,13 +318,22 @@ class PhysxParticleInstancer(BasePrim):
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
 
+    @property
+    def state_size(self):
+        # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
+        # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
+        return 3 + self.n_particles * 14
+
     def _dump_state(self):
-        local_positions, local_orientations = zip(
-            *[
-                T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
-                for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
-            ]
-        )
+        if self.particle_positions.size == 0 and self.particle_orientations.size == 0:
+            local_positions, local_orientations = [], []
+        else:
+            local_positions, local_orientations = zip(
+                *[
+                    T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
+                    for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
+                ]
+            )
         return dict(
             idn=self._idn,
             particle_group=self.particle_group,
@@ -678,7 +688,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self.particle_prototypes = None
 
         # Particle instancers -- maps name to particle instancer prims (dict)
-        self.particle_instancers = dict()
+        self.particle_instancers = None
 
         self._particle_contact_offset = particle_contact_offset
 
@@ -696,7 +706,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @property
     def n_particles(self):
-        return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
+        return (
+            sum([instancer.n_particles for instancer in self.particle_instancers.values()])
+            if self.particle_instancers is not None
+            else 0
+        )
 
     @property
     def n_instancers(self):
@@ -704,7 +718,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return len(self.particle_instancers)
+        return len(self.particle_instancers) if self.particle_instancers is not None else 0
 
     @property
     def instancer_idns(self):
@@ -712,7 +726,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return [inst.idn for inst in self.particle_instancers.values()]
+        return [inst.idn for inst in self.particle_instancers.values()] if self.particle_instancers is not None else []
 
     @property
     def self_collision(self):
@@ -758,7 +772,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         super()._clear()
 
         self.particle_prototypes = None
-        self.particle_instancers = dict()
+        self.particle_instancers = None
 
     @property
     def next_available_instancer_idn(self):
@@ -777,6 +791,20 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return 0
 
     @property
+    def state_size(self):
+        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
+        # number of particles in each instancer (3n),
+        # and the corresponding states in each instancer (X)
+        if self.particle_instancers is None:
+            return 1
+        else:
+            return (
+                1
+                + 3 * len(self.particle_instancers)
+                + sum(inst.state_size for inst in self.particle_instancers.values())
+            )
+
+    @property
     def default_particle_instancer(self):
         """
         Returns:
@@ -787,7 +815,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
         return (
             self.particle_instancers[name]
-            if name in self.particle_instancers
+            if self.particle_instancers and name in self.particle_instancers
             else self.generate_particle_instancer(n_particles=0, idn=self.default_instancer_idn)
         )
 
@@ -1003,14 +1031,17 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             enabled=not self.visual_only,
         )
 
+        if self.particle_instancers is None:
+            self.particle_instancers = dict()
+
         # Create the instancer object that wraps the raw prim
         instancer = PhysxParticleInstancer(
             relative_prim_path=absolute_prim_path_to_scene_relative(self._scene, instance.GetPrimPath().pathString),
             name=name,
             idn=idn,
         )
-        instancer.initialize()
         instancer.load(self._scene)
+        instancer.initialize()
         self.particle_instancers[name] = instancer
 
         return instancer
@@ -1196,7 +1227,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         idn_to_info_mapping = {
             idn: {"group": group, "count": count} for idn, group, count in zip(idns, particle_groups, particle_counts)
         }
-        current_instancer_names = set(self.particle_instancers.keys())
+        current_instancer_names = set(self.particle_instancers.keys()) if self.particle_instancers else set()
         desired_instancer_names = set(self.particle_instancer_idn_to_name(idn=idn) for idn in idns)
         instancers_to_delete = current_instancer_names - desired_instancer_names
         instancers_to_create = desired_instancer_names - current_instancer_names
@@ -1231,10 +1262,16 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
-            instancer_particle_groups=[inst.particle_group for inst in self.particle_instancers.values()],
-            instancer_particle_counts=[inst.n_particles for inst in self.particle_instancers.values()],
-            particle_states=dict(
-                ((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items())
+            instancer_particle_groups=(
+                [inst.particle_group for inst in self.particle_instancers.values()] if self.particle_instancers else []
+            ),
+            instancer_particle_counts=(
+                [inst.n_particles for inst in self.particle_instancers.values()] if self.particle_instancers else []
+            ),
+            particle_states=(
+                dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
+                if self.particle_instancers
+                else dict()
             ),
         )
 
@@ -1745,6 +1782,11 @@ class Cloth(MicroParticleSystem):
     @property
     def particle_contact_offset(self):
         return m.CLOTH_PARTICLE_CONTACT_OFFSET
+
+    @property
+    def state_size(self):
+        # Default is no state
+        return 0
 
     def _dump_state(self):
         # Empty by default

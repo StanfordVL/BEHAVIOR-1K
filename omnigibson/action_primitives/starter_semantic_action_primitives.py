@@ -293,15 +293,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
         self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
         if self._base_controller_is_joint:
-            # assert self.robot.controllers["base"].control_type == ControlType.VELOCITY, \
-            #     "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
             assert not self.robot.controllers[
                 "base"
             ].use_delta_commands, (
                 "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
             )
-            # assert self.robot.controllers["base"].command_dim == 3, \
-            #     "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
 
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -896,8 +892,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return self.robot.arm_control_idx["left"]
             else:
                 return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-
-        if isinstance(self.robot, Fetch):
+        elif isinstance(self.robot, Fetch):
             return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
         # Otherwise just return the default arm control idx

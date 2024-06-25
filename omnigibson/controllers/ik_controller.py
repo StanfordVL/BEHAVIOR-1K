@@ -195,6 +195,11 @@ class InverseKinematicsController(JointController, ManipulationController):
             self.control_filter.reset()
         self._fixed_quat_target = None
 
+    @property
+    def state_size(self):
+        # Add state size from the control filter
+        return super().state_size + self.control_filter.state_size
+
     def _dump_state(self):
         # Run super first
         state = super()._dump_state()

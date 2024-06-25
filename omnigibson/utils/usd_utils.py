@@ -354,7 +354,7 @@ class RigidContactAPIImpl:
 
     def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         """Get pairs of prim paths that are in contact."""
-        impulses = np.linalg.norm(GripperRigidContactAPI.get_all_impulses(scene_idx), axis=-1)
+        impulses = np.linalg.norm(self.get_all_impulses(scene_idx), axis=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
@@ -504,6 +504,9 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
     @classmethod
     def get_max_contact_data_count(cls):
         # 2x per finger link, to be safe.
+        # 2 here is not the finger count, it's the number of items we will record contacts with, per finger.
+        # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
+        # This number should very rarely go above 2.
         return len(cls.get_column_filters()[0]) * 2
 
 
@@ -943,7 +946,6 @@ class BatchControlViewAPIImpl:
             self._read_cache["mass_matrices"] = self._view.get_mass_matrices()
 
         idx = self._idx[prim_path]
-        # TODO: Maybe do the shape correction here. physics_view.mass_matrix_shape has it.
         return self._read_cache["mass_matrices"][idx]
 
     def get_generalized_gravity_forces(self, prim_path):
@@ -1022,7 +1024,7 @@ class BatchControlViewAPIImpl:
 
 
 ControllableObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/controllable_*/base_link")
-DummyObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/dummy_*/base_link")
+DummyControllableObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/dummy_*/base_link")
 
 
 def clear():
@@ -1032,7 +1034,7 @@ def clear():
     PoseAPI.invalidate()
     CollisionAPI.clear()
     ControllableObjectViewAPI.clear()
-    DummyObjectViewAPI.clear()
+    DummyControllableObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
@@ -1384,7 +1386,7 @@ def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
     Converts a scene-relative prim path to an absolute prim path.
 
     Args:
-        scene (Scene): Scene object that the prim is in. None if it's global.
+        scene (Scene or None): Scene object that the prim is in. None if it's global.
         relative_prim_path (str): Relative prim path in the scene
 
     Returns:

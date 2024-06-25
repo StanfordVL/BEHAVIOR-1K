@@ -150,6 +150,14 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Set value to be default (True)
         self._set_value(True)
 
+    @property
+    def state_size(self):
+        # Call super first
+        size = super().state_size
+
+        # Add additional 2 to keep track of previously touching and delay counter
+        return size + 2
+
     # For this state, we simply store its value.
     def _dump_state(self):
         state = super()._dump_state()

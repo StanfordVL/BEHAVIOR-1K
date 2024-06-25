@@ -13,7 +13,6 @@ from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import snake_case_to_camel_case, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
@@ -45,7 +44,7 @@ class MacroParticleSystem(BaseSystem):
         self._particle_template = None
 
         # dict, array of particle objects, mapped by their prim names
-        self.particles = dict()
+        self.particles = None
 
         # Counter to increment monotonically as we add more particles
         self._particle_counter = 0
@@ -135,12 +134,12 @@ class MacroParticleSystem(BaseSystem):
         super()._clear()
 
         self._particle_template = None
-        self.particles = dict()
+        self.particles = None
         self._color = None
 
     @property
     def n_particles(self):
-        return len(self.particles)
+        return len(self.particles) if self.particles is not None else 0
 
     @property
     def material(self):
@@ -157,7 +156,11 @@ class MacroParticleSystem(BaseSystem):
 
     def _dump_state(self):
         state = super()._dump_state()
-        state["scales"] = np.array([particle.scale for particle in self.particles.values()])
+        state["scales"] = (
+            np.array([particle.scale for particle in self.particles.values()])
+            if self.particles is not None
+            else np.array([])
+        )
         state["particle_counter"] = self._particle_counter
         return state
 
@@ -166,8 +169,9 @@ class MacroParticleSystem(BaseSystem):
         super()._load_state(state=state)
 
         # Set particle scales
-        for particle, scale in zip(self.particles.values(), state["scales"]):
-            particle.scale = scale
+        if self.particles is not None:
+            for particle, scale in zip(self.particles.values(), state["scales"]):
+                particle.scale = scale
 
         # Set particle counter
         self._particle_counter = state["particle_counter"]
@@ -221,7 +225,7 @@ class MacroParticleSystem(BaseSystem):
         Adds a particle to this system.
 
         Args:
-            relative_prim_path (str): Scene-relative path to the newly created particle, minus the name for this particle
+            relative_prim_path (str): scene-local prim path to the newly created particle, minus the name for this particle
             scale (3-array): (x,y,z) scale to set for the added particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
@@ -232,7 +236,9 @@ class MacroParticleSystem(BaseSystem):
         # Generate the new particle
         name = self.particle_idn2name(idn=self.next_available_particle_idn if idn is None else idn)
         # Make sure name doesn't already exist
-        assert name not in self.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
+        assert (
+            self.particles is None or name not in self.particles.keys()
+        ), f"Cannot create particle with name {name} because it already exists!"
         new_particle = self._load_new_particle(
             scene=scene, relative_prim_path=f"{relative_prim_path}/{name}", name=name
         )
@@ -242,6 +248,8 @@ class MacroParticleSystem(BaseSystem):
         new_particle.visible = True
 
         # Track this particle as well
+        if self.particles is None:
+            self.particles = dict()
         self.particles[new_particle.name] = new_particle
 
         # Increment counter
@@ -259,7 +267,7 @@ class MacroParticleSystem(BaseSystem):
         idxs,
         **kwargs,
     ):
-        particle_names = tuple(self.particles.keys())
+        particle_names = tuple(self.particles.keys()) if self.particles else []
         for idx in idxs:
             self.remove_particle_by_name(particle_names[idx])
 
@@ -295,7 +303,7 @@ class MacroParticleSystem(BaseSystem):
         to load. This function should be implemented by any subclasses.
 
         Args:
-            relative_prim_path (str): The scene-relative path at which to create the new particle
+            relative_prim_path (str): scene-local prim path at which to create the new particle
             name (str): The name to assign to this new particle at the path
 
         Returns:
@@ -340,7 +348,19 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     """
 
     def __init__(
-        self, name, create_particle_template, min_scale=None, max_scale=None, scale_relative_to_parent=False, **kwargs
+        self,
+        name,
+        create_particle_template,
+        min_scale=None,
+        max_scale=None,
+        scale_relative_to_parent=False,
+        sampling_axis_probabilities=(0.25, 0.25, 0.5),
+        sampling_aabb_offset=0.01,
+        sampling_bimodal_mean_fraction=0.9,
+        sampling_bimodal_stdev_fraction=0.2,
+        sampling_max_attempts=20,
+        sampling_hit_proportion=0.4,
+        **kwargs,
     ):
         """
         Args:
@@ -386,12 +406,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Default parameters for sampling particle locations
         # See omnigibson/utils/sampling_utils.py for how they are used.
-        self._SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
-        self._SAMPLING_AABB_OFFSET = 0.01
-        self._SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
-        self._SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
-        self._SAMPLING_MAX_ATTEMPTS = 20
-        self._SAMPLING_HIT_PROPORTION = 0.4
+        self._SAMPLING_AXIS_PROBABILITIES = sampling_axis_probabilities
+        self._SAMPLING_AABB_OFFSET = sampling_aabb_offset
+        self._SAMPLING_BIMODAL_MEAN_FRACTION = sampling_bimodal_mean_fraction
+        self._SAMPLING_BIMODAL_STDEV_FRACTION = sampling_bimodal_stdev_fraction
+        self._SAMPLING_MAX_ATTEMPTS = sampling_max_attempts
+        self._SAMPLING_HIT_PROPORTION = sampling_hit_proportion
         return super().__init__(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
 
     def initialize(self, scene):
@@ -410,7 +430,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         z_extent = self.particle_object.aabb_extent[2]
         # Iterate over all objects, and update all particles belonging to any cloth objects
         for name, obj in self._group_objects.items():
-            group = VisualParticleSystem.get_group_name(obj=obj)
+            group = self.get_group_name(obj=obj)
             if obj.prim_type == PrimType.CLOTH and self.num_group_particles(group=group) > 0:
                 # Update the transforms
                 cloth = obj.root_link
@@ -483,7 +503,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Remove this particle from its respective group as well
         parent_obj = self._particles_info[name]["obj"]
-        group = VisualParticleSystem.get_group_name(obj=parent_obj)
+        group = self.get_group_name(obj=parent_obj)
         self._group_particles[group].pop(name)
         self._particles_local_mat.pop(name)
         particle_info = self._particles_info.pop(name)
@@ -663,7 +683,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 - (n, 3)-array: per-particle (x,y,z) position
                 - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
         """
-        n_particles = len(particles)
+        n_particles = len(particles) if particles else 0
         if n_particles == 0:
             return (np.array([]).reshape(0, 3), np.array([]).reshape(0, 4))
 
@@ -747,7 +767,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 - (n, 3)-array: per-particle (x,y,z) position
                 - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
         """
-        n_particles = len(particles)
+        n_particles = len(particles) if particles is not None else 0
         if n_particles == 0:
             return
 
@@ -977,7 +997,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             # Also store the cloth face IDs as a vector
             if is_cloth:
-                self._cloth_face_ids[VisualParticleSystem.get_group_name(obj)] = np.array(
+                self._cloth_face_ids[self.get_group_name(obj)] = np.array(
                     [self._particles_info[particle_name]["face_id"] for particle_name in self._group_particles[name]]
                 )
 
@@ -992,7 +1012,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
     def _dump_state(self):
         state = super()._dump_state()
-        particle_names = list(self.particles.keys())
+        particle_names = list(self.particles.keys()) if self.particles else []
         # Add in per-group information
         groups_dict = dict()
         name2idx = {name: idx for idx, name in enumerate(particle_names)}

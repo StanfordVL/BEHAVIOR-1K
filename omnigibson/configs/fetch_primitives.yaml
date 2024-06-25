@@ -66,9 +66,3 @@ objects: []
 
 task:
   type: DummyTask
-
-# scene_graph:
-#   egocentric: true
-#   full_obs: true
-#   only_true: true
-#   merge_parallel_edges: false

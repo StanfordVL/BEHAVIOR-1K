@@ -39,7 +39,7 @@ class RigidPrim(XFormPrim):
         it will apply it.
 
     Args:
-        relative_prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
@@ -53,6 +53,7 @@ class RigidPrim(XFormPrim):
             visual_only (None or bool): If specified, whether this prim should include collisions or not.
                 Default is True.
             kinematic_only (None or bool): If specified, whether this prim should be kinematic-only or not.
+            belongs_to_articulation (None or bool): If specified, whether this prim is part of an articulation or not.
     """
 
     def __init__(
@@ -63,7 +64,7 @@ class RigidPrim(XFormPrim):
     ):
         # Other values that will be filled in at runtime
         self._rigid_prim_view_direct = None
-        self._is_part_of_articulation = None
+        self._belongs_to_articulation = None
         self._cs = None  # Contact sensor interface
         self._body_name = None
 
@@ -96,8 +97,8 @@ class RigidPrim(XFormPrim):
         self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
 
         # Check if it's part of an articulation view
-        self._is_part_of_articulation = (
-            "is_part_of_articulation" in self._load_config and self._load_config["is_part_of_articulation"]
+        self._belongs_to_articulation = (
+            "belongs_to_articulation" in self._load_config and self._load_config["belongs_to_articulation"]
         )
 
         # run super first
@@ -803,7 +804,7 @@ class RigidPrim(XFormPrim):
     def _load_state(self, state):
         # If we are part of an articulation, there's nothing to do, the entityprim will take care
         # of setting everything for us.
-        if self._is_part_of_articulation:
+        if self._belongs_to_articulation:
             return
 
         # Call super first

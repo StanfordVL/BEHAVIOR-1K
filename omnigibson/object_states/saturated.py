@@ -2,16 +2,13 @@ import numpy as np
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.utils.python_utils import StringIntegerMapper
+from omnigibson.systems.system_base import UUID_TO_SYSTEM_NAME
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
 # Default saturation limit
 m.DEFAULT_SATURATION_LIMIT = 1e6
-
-# Create string to integer mapping
-m.NAME_MAPPER = StringIntegerMapper()
 
 
 class ModifiedParticles(RelativeObjectState):
@@ -55,6 +52,11 @@ class ModifiedParticles(RelativeObjectState):
         """
         self.particle_counts = {name: -1 for name in system_names}
 
+    @property
+    def state_size(self):
+        # Two entries per system (name + count) + number of systems
+        return len(self.particle_counts) * 2 + 1
+
     def _dump_state(self):
         state = dict(n_systems=len(self.particle_counts))
         for system_name, val in self.particle_counts.items():
@@ -74,7 +76,13 @@ class ModifiedParticles(RelativeObjectState):
                 [
                     state_flat,
                     np.concatenate(
-                        [(m.NAME_MAPPER.string_to_int(system_name), state[system_name]) for system_name in system_names]
+                        [
+                            (
+                                self.obj.scene.system_registry("name", system_name).uuid,
+                                state[system_name],
+                            )
+                            for system_name in system_names
+                        ]
                     ),
                 ]
             ).astype(float)
@@ -85,8 +93,8 @@ class ModifiedParticles(RelativeObjectState):
         state_shaped = state[1 : 1 + n_systems * 2].reshape(-1, 2)
         state_dict = dict(n_systems=n_systems)
         system_names = []
-        for int_id, val in state_shaped:
-            system_name = m.NAME_MAPPER.int_to_string(int(int_id))
+        for uuid, val in state_shaped:
+            system_name = UUID_TO_SYSTEM_NAME[int(uuid)]
             state_dict[system_name] = int(val)
             system_names.append(system_name)
 
@@ -197,6 +205,11 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         """
         self._limits = {system_name: m.DEFAULT_SATURATION_LIMIT for system_name in system_names}
 
+    @property
+    def state_size(self):
+        # Limit per entry * 2 (UUID, value) + default limit + n limits
+        return len(self._limits) * 2 + 2
+
     def _dump_state(self):
         state = dict(n_systems=len(self._limits), default_limit=self._default_limit)
         for system_name, limit in self._limits.items():
@@ -221,7 +234,13 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 [
                     state_flat,
                     np.concatenate(
-                        [(m.NAME_MAPPER.string_to_int(system_name), state[system_name]) for system_name in system_names]
+                        [
+                            (
+                                self.obj.scene.system_registry("name", system_name).uuid,
+                                state[system_name],
+                            )
+                            for system_name in system_names
+                        ]
                     ),
                 ]
             ).astype(float)
@@ -233,7 +252,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         state_shaped = state[2 : 2 + n_systems * 2].reshape(-1, 2)
         system_names = []
         for uuid, val in state_shaped:
-            system_name = m.NAME_MAPPER.int_to_string(int(uuid))
+            system_name = UUID_TO_SYSTEM_NAME[int(uuid)]
             state_dict[system_name] = int(val)
             system_names.append(system_name)
 

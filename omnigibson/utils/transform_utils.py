@@ -1167,7 +1167,7 @@ def integer_spiral_coordinates(n):
     return int(x), int(y)
 
 
-def compute_2d_orientation(quaternion):
+def calculate_xy_plane_angle(quaternion):
     """
     Compute the 2D orientation angle from a quaternion assuming the initial forward vector is along the x-axis.
 
