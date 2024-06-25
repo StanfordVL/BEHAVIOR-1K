@@ -302,7 +302,6 @@ def meets_minimum_version(test_version, minimum_version):
     Returns:
         bool: Whether @test_version meets @minimum_version
     """
-    return True  # temp fix for new versioning scheme
     test_nums = [int(num) for num in test_version.split(".")]
     minimum_nums = [int(num) for num in minimum_version.split(".")]
     assert len(test_nums) == 3
