@@ -9,7 +9,6 @@ from omnigibson.controllers import (
     ManipulationController,
 )
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.constants import MAGIC_DEFAULT
 from omnigibson.utils.python_utils import assert_valid_key
 
 # Create settings for this module
@@ -102,7 +101,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self._use_delta_commands and MAGIC_DEFAULT == command_output_limits
+            self._use_delta_commands and type(command_output_limits) == str and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
