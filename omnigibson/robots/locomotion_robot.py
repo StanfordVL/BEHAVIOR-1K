@@ -45,8 +45,8 @@ class LocomotionRobot(BaseRobot):
 
         # Add base info
         dic["base_qpos"] = joint_positions[self.base_control_idx]
-        dic["base_qpos_sin"] = np.sin(joint_positions[self.base_control_idx])
-        dic["base_qpos_cos"] = np.cos(joint_positions[self.base_control_idx])
+        dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
+        dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
         dic["base_qvel"] = joint_velocities[self.base_control_idx]
 
         return dic

@@ -40,8 +40,8 @@ class ActiveCameraRobot(BaseRobot):
         joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
         joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
-        dic["camera_qpos_sin"] = np.sin(joint_positions[self.camera_control_idx])
-        dic["camera_qpos_cos"] = np.cos(joint_positions[self.camera_control_idx])
+        dic["camera_qpos_sin"] = th.sin(joint_positions[self.camera_control_idx])
+        dic["camera_qpos_cos"] = th.cos(joint_positions[self.camera_control_idx])
         dic["camera_qvel"] = joint_velocities[self.camera_control_idx]
 
         return dic

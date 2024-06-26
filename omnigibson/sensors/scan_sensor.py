@@ -172,7 +172,7 @@ class ScanSensor(BaseSensor):
         )
 
         # Convert into 3D unit vectors for each angle
-        unit_vector_laser = th.Tensor([[np.cos(ang), np.sin(ang), 0.0] for ang in angles])
+        unit_vector_laser = th.Tensor([[th.cos(ang), th.sin(ang), 0.0] for ang in angles])
 
         # Scale unit vectors by corresponding laser scan distnaces
         assert ((scan >= 0.0) & (scan <= 1.0)).all(), "scan out of valid range [0, 1]"

@@ -718,8 +718,8 @@ class VisionSensor(BaseSensor):
         horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
         vertical_fov = horizontal_fov * height / width
 
-        fx = (width / 2.0) / np.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / np.tan(vertical_fov / 2.0)
+        fx = (width / 2.0) / th.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / th.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 

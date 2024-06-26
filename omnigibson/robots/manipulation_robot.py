@@ -431,8 +431,8 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             # Add arm info
             dic["arm_{}_qpos".format(arm)] = joint_positions[self.arm_control_idx[arm]]
-            dic["arm_{}_qpos_sin".format(arm)] = np.sin(joint_positions[self.arm_control_idx[arm]])
-            dic["arm_{}_qpos_cos".format(arm)] = np.cos(joint_positions[self.arm_control_idx[arm]])
+            dic["arm_{}_qpos_sin".format(arm)] = th.sin(joint_positions[self.arm_control_idx[arm]])
+            dic["arm_{}_qpos_cos".format(arm)] = th.cos(joint_positions[self.arm_control_idx[arm]])
             dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
             # Add eef and grasping info

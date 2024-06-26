@@ -49,7 +49,7 @@ def get_equidistant_coordinate_planes(n_planes):
     # Compute the positive directions of the 1st axis of each plane.
     first_axis_angles = th.linspace(0, 3.1415 / 2, n_planes)
     first_axes = np.stack(
-        [np.cos(first_axis_angles), np.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
+        [th.cos(first_axis_angles), th.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
     )
 
     # Compute the positive directions of the 2nd axes. These axes are

@@ -360,16 +360,16 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Pack everything together
         return dict(
             joint_qpos=joint_positions,
-            joint_qpos_sin=np.sin(joint_positions),
-            joint_qpos_cos=np.cos(joint_positions),
+            joint_qpos_sin=th.sin(joint_positions),
+            joint_qpos_cos=th.cos(joint_positions),
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
-            robot_ori_cos=np.cos(ori),
-            robot_ori_sin=np.sin(ori),
+            robot_ori_cos=th.cos(ori),
+            robot_ori_sin=th.sin(ori),
             robot_2d_ori=ori_2d,
-            robot_2d_ori_cos=np.cos(ori_2d),
-            robot_2d_ori_sin=np.sin(ori_2d),
+            robot_2d_ori_cos=th.cos(ori_2d),
+            robot_2d_ori_sin=th.sin(ori_2d),
             robot_lin_vel=ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path),
             robot_ang_vel=ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path),
         )

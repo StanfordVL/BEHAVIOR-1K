@@ -389,8 +389,8 @@ class BehaviorTask(BaseTask):
                 ]
             )
         )
-        objs_rpy_cos = np.cos(objs_rpy)
-        objs_rpy_sin = np.sin(objs_rpy)
+        objs_rpy_cos = th.cos(objs_rpy)
+        objs_rpy_sin = th.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)

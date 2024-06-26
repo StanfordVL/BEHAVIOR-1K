@@ -297,7 +297,7 @@ def random_quat(rand=None):
     t1 = pi2 * rand[1]
     t2 = pi2 * rand[2]
     return th.Tensor(
-        (np.sin(t1) * r1, np.cos(t1) * r1, np.sin(t2) * r2, np.cos(t2) * r2),
+        (th.sin(t1) * r1, th.cos(t1) * r1, th.sin(t2) * r2, th.cos(t2) * r2),
         dtype=th.float32,
     )
 
@@ -1096,7 +1096,7 @@ def perspective(fovy, aspect, znear, zfar):
     """Create perspective projection matrix."""
     # fovy is in degree
     assert znear != zfar
-    h = np.tan(fovy / 360.0 * 3.1415) * znear
+    h = th.tan(fovy / 360.0 * 3.1415) * znear
     w = h * aspect
     return frustum(-w, w, -h, h, znear, zfar)
 

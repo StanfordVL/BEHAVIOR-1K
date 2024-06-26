@@ -1722,8 +1722,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.Tensor(
                     [
-                        pose_on_obj[0][0] + distance * np.cos(yaw),
-                        pose_on_obj[0][1] + distance * np.sin(yaw),
+                        pose_on_obj[0][0] + distance * th.cos(yaw),
+                        pose_on_obj[0][1] + distance * th.sin(yaw),
                         yaw + 3.1415 - avg_arm_workspace_range,
                     ]
                 )

@@ -1392,8 +1392,8 @@ class ParticleApplier(ParticleModifier):
         # Get start, end points in local link frame, start points to end points along the -z direction
         end_points = np.stack(
             [
-                sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
-                sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
+                sampled_r_theta[:, 0] * th.cos(sampled_r_theta[:, 1]),
+                sampled_r_theta[:, 0] * th.sin(sampled_r_theta[:, 1]),
                 -h * th.ones(n_samples),
             ],
             dim=1,
