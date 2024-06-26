@@ -142,7 +142,7 @@ class GeomPrim(XFormPrim):
         position, orientation = self.get_local_pose()
         scale = self.scale
         points_scaled = points * scale
-        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_rotated = th.dot(T.quat2mat(orientation), points_scaled.T).T
         points_transformed = points_rotated + position
         return points_transformed
 

@@ -513,7 +513,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Particles spawn in negative z-axis direction, so check positive dot product of link frame with global
             cond = (
                 lambda obj: (
-                    np.dot(
+                    th.dot(
                         T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ th.Tensor([0, 0, 1]),
                         th.Tensor([0, 0, 1]),
                     )

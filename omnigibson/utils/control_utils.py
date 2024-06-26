@@ -159,7 +159,7 @@ def orientation_error(desired, current):
     rd2 = desired[:, :, 1]
     rd3 = desired[:, :, 2]
 
-    error = 0.5 * (np.cross(rc1, rd1) + np.cross(rc2, rd2) + np.cross(rc3, rd3))
+    error = 0.5 * (th.cross(rc1, rd1) + th.cross(rc2, rd2) + th.cross(rc3, rd3))
 
     # Reshape
     error = error.reshape(*input_shape, 3)

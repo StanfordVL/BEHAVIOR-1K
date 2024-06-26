@@ -332,7 +332,7 @@ class ClothPrim(GeomPrim):
         # Shape [F, 3]
         v1 = positions[:, 2, :] - positions[:, 0, :]
         v2 = positions[:, 1, :] - positions[:, 0, :]
-        normals = np.cross(v1, v2)
+        normals = th.cross(v1, v2)
         return normals / th.norm(normals, dim=1).reshape(-1, 1)
 
     def contact_list(self, keypoints_only=True):

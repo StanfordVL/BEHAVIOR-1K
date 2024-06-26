@@ -472,7 +472,7 @@ def _compute_osc_torques(
     # For angular velocity, this is just the base angular velocity
     # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
     #   due to the base linear velocity
-    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos)
+    lin_vel_err = base_lin_vel + th.cross(base_ang_vel, ee_pos)
     vel_err = th.cat((lin_vel_err, base_ang_vel)) - ee_vel
 
     # Determine desired wrench

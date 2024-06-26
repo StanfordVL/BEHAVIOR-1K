@@ -54,7 +54,7 @@ def get_equidistant_coordinate_planes(n_planes):
 
     # Compute the positive directions of the 2nd axes. These axes are
     # orthogonal to both their corresponding first axes and to the Z axis.
-    second_axes = np.cross([0, 0, 1], first_axes)
+    second_axes = th.cross([0, 0, 1], first_axes)
 
     # Return the axes in the shape (n_planes, 2, 3)
     return np.stack([first_axes[:, None, :], second_axes[:, None, :]], dim=1)

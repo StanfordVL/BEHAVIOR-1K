@@ -29,7 +29,7 @@ class Pose(AbsoluteObjectState):
             return True
         # Calculate quat distance simply as the dot product
         # A * B = |A||B|cos(theta)
-        quat_cos_angle = th.abs(np.dot(old_quat, current_quat))
+        quat_cos_angle = th.abs(th.dot(old_quat, current_quat))
         if (1 - quat_cos_angle) > m.ORIENTATION_VALIDATION_EPSILON:
             return True
 

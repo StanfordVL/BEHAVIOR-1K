@@ -52,7 +52,7 @@ def fit_plane(points, refusal_log):
 
     ctr = points.mean(dim=0)
     x = points - ctr
-    normal = np.linalg.svd(np.dot(x.T, x))[0][:, -1]
+    normal = np.linalg.svd(th.dot(x.T, x))[0][:, -1]
     normal /= th.norm(normal)
     return ctr, normal
 
@@ -92,7 +92,7 @@ def get_distance_to_plane(points, plane_centroid, plane_normal):
     Returns:
         k-array: Absolute distances from each point to the plane
     """
-    return th.abs(np.dot(points - plane_centroid, plane_normal))
+    return th.abs(th.dot(points - plane_centroid, plane_normal))
 
 
 def get_projection_onto_plane(points, plane_centroid, plane_normal):
@@ -152,11 +152,11 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
 
     # Get an orthogonal vector using a random vector.
     random_vector = np.random.rand(3)
-    orthogonal_vector_1 = np.cross(ray_direction, random_vector)
+    orthogonal_vector_1 = th.cross(ray_direction, random_vector)
     orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 
     # Get a second vector orthogonal to both the ray and the first vector.
-    orthogonal_vector_2 = -np.cross(ray_direction, orthogonal_vector_1)
+    orthogonal_vector_2 = -th.cross(ray_direction, orthogonal_vector_1)
     orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
     orthogonal_vectors = th.Tensor([orthogonal_vector_1, orthogonal_vector_2])
@@ -174,8 +174,8 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
     # Apply the grid onto the orthogonal vectors to obtain the rays in the world frame.
-    sources = [source + np.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
-    destinations = [destination + np.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
+    sources = [source + th.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
+    destinations = [destination + th.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
 
     return sources, destinations, ray_grid
 
@@ -932,7 +932,7 @@ def sample_cuboid_on_object(
                 # We get a vector from the centroid towards the center ray source, and flip the plane normal to match it.
                 # The cosine has positive sign if the two vectors are similar and a negative one if not.
                 plane_to_source = sources[center_idx] - plane_centroid
-                plane_normal *= np.sign(np.dot(plane_to_source, plane_normal))
+                plane_normal *= np.sign(th.dot(plane_to_source, plane_normal))
 
                 # Check that the plane normal is similar to the hit normal
                 if not check_normal_similarity(
@@ -1077,7 +1077,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
         bool: Whether the normal similarity is acceptable or not
     """
     parallel_hit_main_hit_dot_products = np.clip(
-        np.dot(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
+        th.dot(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
         -1.0,
         1.0,
     )
@@ -1135,7 +1135,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = np.arccos(np.clip(np.dot(hit_normal, th.Tensor([0, 0, 1])), -1.0, 1.0))
+    hit_angle_with_z = np.arccos(np.clip(th.dot(hit_normal, th.Tensor([0, 0, 1])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)

@@ -198,7 +198,7 @@ def quat_inverse(quaternion):
     Returns:
         th.Tensor: (x,y,z,w) quaternion inverse
     """
-    return quat_conjugate(quaternion) / np.dot(quaternion, quaternion)
+    return quat_conjugate(quaternion) / th.dot(quaternion, quaternion)
 
 
 def quat_distance(quaternion1, quaternion0):
@@ -231,9 +231,9 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
     True
 
     >>> q = quat_slerp(q0, q1, 0.5)
-    >>> angle = math.acos(np.dot(q0, q))
-    >>> th.allclose(2.0, math.acos(np.dot(q0, q1)) / angle) or \
-        th.allclose(2.0, math.acos(-np.dot(q0, q1)) / angle)
+    >>> angle = math.acos(th.dot(q0, q))
+    >>> th.allclose(2.0, math.acos(th.dot(q0, q1)) / angle) or \
+        th.allclose(2.0, math.acos(-th.dot(q0, q1)) / angle)
     True
 
     Args:
@@ -251,7 +251,7 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
         return q0
     elif fraction == 1.0:
         return q1
-    d = np.dot(q0, q1)
+    d = th.dot(q0, q1)
     if abs(abs(d) - 1.0) < EPS:
         return q0
     if shortestpath and d < 0.0:
@@ -405,8 +405,8 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     # Then compose 3x3 rotation matrix and convert into quaternion
     vec_n = vec / th.norm(vec)  # x
     up_n = up / th.norm(up)
-    s_n = np.cross(up_n, vec_n)  # y
-    u_n = np.cross(vec_n, s_n)  # z
+    s_n = th.cross(up_n, vec_n)  # y
+    u_n = th.cross(vec_n, s_n)  # z
     return mat2quat(th.Tensor([vec_n, s_n, u_n]).T)
 
 
@@ -780,7 +780,7 @@ def rotation_matrix(angle, direction, point=None):
     if point is not None:
         # rotation not around origin
         point = th.Tensor(point[:3], dtype=th.float32, copy=False)
-        M[:3, 3] = point - np.dot(R, point)
+        M[:3, 3] = point - th.dot(R, point)
     return M
 
 
@@ -908,7 +908,7 @@ def unit_vector(data, dim=None, out=None):
     if out is None:
         data = th.Tensor(data, dtype=th.float32, copy=True)
         if data.ndim == 1:
-            data /= math.sqrt(np.dot(data, data))
+            data /= math.sqrt(th.dot(data, data))
             return data
     else:
         if out is not data:
@@ -962,7 +962,7 @@ def get_orientation_diff_in_radian(orn0, orn1):
     vec0 /= th.norm(vec0)
     vec1 = quat2axisangle(orn1)
     vec1 /= th.norm(vec1)
-    return np.arccos(np.dot(vec0, vec1))
+    return np.arccos(th.dot(vec0, vec1))
 
 
 def get_pose_error(target_pose, current_pose):
@@ -992,7 +992,7 @@ def get_pose_error(target_pose, current_pose):
     r1d = target_pose[:3, 0]
     r2d = target_pose[:3, 1]
     r3d = target_pose[:3, 2]
-    rot_err = 0.5 * (np.cross(r1, r1d) + np.cross(r2, r2d) + np.cross(r3, r3d))
+    rot_err = 0.5 * (th.cross(r1, r1d) + th.cross(r2, r2d) + th.cross(r3, r3d))
 
     error[:3] = pos_err
     error[3:] = rot_err
@@ -1025,7 +1025,7 @@ def vecs2axisangle(vec0, vec1):
     vec1 = normalize(vec1, dim=-1)
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return np.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
+    return th.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
 def vecs2quat(vec0, vec1, normalized=False):
@@ -1046,7 +1046,7 @@ def vecs2quat(vec0, vec1, normalized=False):
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = th.sum(vec0 * vec1, dim=-1, keepdims=True)
     quat_unnormalized = th.where(
-        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
+        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([th.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
     return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdims=True)
 
