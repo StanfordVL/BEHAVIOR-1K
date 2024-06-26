@@ -94,7 +94,7 @@ class FrankaPanda(ManipulationRobot):
         self.end_effector = end_effector
         if end_effector == "gripper":
             self._model_name = "franka_panda"
-            self._gripper_control_idx = np.arange(7, 9)
+            self._gripper_control_idx = th.arange(7, 9)
             self._eef_link_names = "panda_hand"
             self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
             self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
@@ -247,7 +247,7 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def arm_control_idx(self):
-        return {self.default_arm: np.arange(7)}
+        return {self.default_arm: th.arange(7)}
 
     @property
     def gripper_control_idx(self):

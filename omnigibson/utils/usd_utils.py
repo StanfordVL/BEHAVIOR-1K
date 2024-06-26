@@ -1231,7 +1231,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     keyface_idx = (
         np.random.choice(n_unique_faces, size=n_keyfaces, replace=False)
         if n_unique_faces > n_keyfaces
-        else np.arange(n_unique_faces)
+        else th.arange(n_unique_faces)
     )
 
     return keypoint_idx, keyface_idx

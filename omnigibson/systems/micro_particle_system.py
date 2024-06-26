@@ -168,7 +168,7 @@ class PhysxParticleInstancer(BasePrim):
             self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, dim=0)
 
     def remove_all_particles(self):
-        self.remove_particles(idxs=np.arange(self.n_particles))
+        self.remove_particles(idxs=th.arange(self.n_particles))
 
     @property
     def n_particles(self):
@@ -925,7 +925,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 else th.Tensor(prototype_indices, dtype=int)
             )
         else:
-            prototype_indices = np.random.choice(np.arange(len(self.particle_prototypes)), size=(n_particles,))
+            prototype_indices = np.random.choice(th.arange(len(self.particle_prototypes)), size=(n_particles,))
 
         if inst is None:
             inst = self.generate_particle_instancer(
@@ -1246,7 +1246,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 instancer.add_particles(positions=th.zeros((count_diff, 3)))
             elif count_diff < 0:
                 # We need to remove particles from this group
-                instancer.remove_particles(idxs=np.arange(-count_diff))
+                instancer.remove_particles(idxs=th.arange(-count_diff))
 
         # Delete any instancers we no longer want
         for name in instancers_to_delete:

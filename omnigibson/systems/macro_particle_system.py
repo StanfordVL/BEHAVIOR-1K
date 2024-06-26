@@ -1316,7 +1316,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = self.get_particles_position_orientation()
             orientations = ori if orientations is None else orientations
             positions = pos if positions is None else (positions - T.quat2mat(orientations) @ self._particle_offset)
-        self.particles_view.set_transforms(th.cat([positions, orientations], dim=1), indices=np.arange(len(positions)))
+        self.particles_view.set_transforms(th.cat([positions, orientations], dim=1), indices=th.arange(len(positions)))
 
     def set_particles_local_pose(self, positions=None, orientations=None):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
@@ -1373,7 +1373,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             l_vels, a_vels = self.get_particles_velocities()
             lin_vels = l_vels if lin_vels is None else lin_vels
             ang_vels = a_vels if ang_vels is None else ang_vels
-        self.particles_view.set_velocities(th.cat([lin_vels, ang_vels], dim=1), indices=np.arange(len(lin_vels)))
+        self.particles_view.set_velocities(th.cat([lin_vels, ang_vels], dim=1), indices=th.arange(len(lin_vels)))
 
     def set_particle_velocities(self, idx, lin_vel=None, ang_vel=None):
         assert (
@@ -1479,7 +1479,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 )
         else:
             # Remove excess particles
-            self.remove_particles(idxs=np.arange(-n_particles_to_generate))
+            self.remove_particles(idxs=th.arange(-n_particles_to_generate))
 
     def _dump_state(self):
         state = super()._dump_state()

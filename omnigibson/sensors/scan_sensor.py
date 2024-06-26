@@ -165,7 +165,7 @@ class ScanSensor(BaseSensor):
         assert self.n_vertical_rays == 1, "Occupancy grid is only valid for a 1D range sensor (n_vertical_rays = 1)!"
 
         # Grab vector of corresponding angles for each scan line
-        angles = np.arange(
+        angles = th.arange(
             -np.radians(self.horizontal_fov / 2),
             np.radians(self.horizontal_fov / 2),
             np.radians(self.horizontal_resolution),

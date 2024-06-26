@@ -1674,7 +1674,7 @@ class RecipeRule(BaseTransitionRule):
         # Finally, compute relevant objects and category mapping based on relevant categories
         i = 0
         for category, objects in objects_by_category.items():
-            cls._CATEGORY_IDXS[category] = i + np.arange(len(objects))
+            cls._CATEGORY_IDXS[category] = i + th.arange(len(objects))
             cls._OBJECTS += list(objects)
             for obj in objects:
                 cls._OBJECTS_TO_IDX[obj] = i

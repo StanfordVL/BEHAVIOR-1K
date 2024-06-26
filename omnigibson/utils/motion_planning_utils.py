@@ -239,7 +239,7 @@ def plan_arm_motion(
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
         initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
-        control_idx_in_joint_pos = np.arange(dim)
+        control_idx_in_joint_pos = th.arange(dim)
     else:
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         dim = len(joint_control_idx)
@@ -249,7 +249,7 @@ def plan_arm_motion(
             control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
         else:
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
-            control_idx_in_joint_pos = np.arange(dim)
+            control_idx_in_joint_pos = th.arange(dim)
 
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
@@ -338,7 +338,7 @@ def plan_arm_motion_ik(
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
         initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
-        control_idx_in_joint_pos = np.arange(dim)
+        control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls["left_fixed"]
     else:
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
@@ -349,7 +349,7 @@ def plan_arm_motion_ik(
             control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
         else:
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
-            control_idx_in_joint_pos = np.arange(dim)
+            control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls[robot.default_arm]
 
     ik_solver = IKSolver(

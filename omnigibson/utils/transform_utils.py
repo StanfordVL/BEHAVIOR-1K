@@ -98,7 +98,7 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
 
     # scaling_factors -> 0 as len(data) gets large
     # this leads to divide-by-zeros below
-    scaling_factors = np.power(1.0 - alpha, np.arange(data.size + 1, dtype=dtype), dtype=dtype)
+    scaling_factors = np.power(1.0 - alpha, th.arange(data.size + 1, dtype=dtype), dtype=dtype)
     # create cumulative sum array
     np.multiply(data, (alpha * scaling_factors[-2]) / scaling_factors[:-1], dtype=dtype, out=out)
     np.cumsum(out, dtype=dtype, out=out)

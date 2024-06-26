@@ -1156,7 +1156,7 @@ class ParticleApplier(ParticleModifier):
         ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            np.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
+            th.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
@@ -1450,7 +1450,7 @@ class ParticleApplier(ParticleModifier):
         start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
         sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
-        end_points[np.arange(n_samples), axes] = lower_upper[sides, axes]
+        end_points[th.arange(n_samples), axes] = lower_upper[sides, axes]
 
         return start_points, end_points
 

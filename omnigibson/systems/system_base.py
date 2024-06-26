@@ -878,7 +878,7 @@ class PhysicalParticleSystem(BaseSystem):
 
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            np.arange(l + self.particle_radius, h - self.particle_radius + 1e-10, self.particle_particle_rest_distance)
+            th.arange(l + self.particle_radius, h - self.particle_radius + 1e-10, self.particle_particle_rest_distance)
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points

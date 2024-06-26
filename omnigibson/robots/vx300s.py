@@ -147,12 +147,12 @@ class VX300S(ManipulationRobot):
     @property
     def arm_control_idx(self):
         # The first 7 joints
-        return {self.default_arm: np.arange(6)}
+        return {self.default_arm: th.arange(6)}
 
     @property
     def gripper_control_idx(self):
         # The last two joints
-        return {self.default_arm: np.arange(6, 8)}
+        return {self.default_arm: th.arange(6, 8)}
 
     @property
     def disabled_collision_pairs(self):

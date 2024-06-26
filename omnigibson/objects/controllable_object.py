@@ -439,7 +439,7 @@ class ControllableObject(BaseObject):
             "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
         )
         # Set indices manually so that we're standardized
-        indices = np.arange(self.n_dof)
+        indices = th.arange(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -691,7 +691,7 @@ class ControllableObject(BaseObject):
         idx = 0
         for controller in self.controller_order:
             cmd_dim = self._controllers[controller].command_dim
-            dic[controller] = np.arange(idx, idx + cmd_dim)
+            dic[controller] = th.arange(idx, idx + cmd_dim)
             idx += cmd_dim
 
         return dic

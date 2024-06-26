@@ -111,7 +111,7 @@ class GraspTask(BaseTask):
             # For Fetch
             else:
                 initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
-                control_idx_in_joint_pos = np.arange(dim)
+                control_idx_in_joint_pos = th.arange(dim)
 
             with PlanningContext(
                 env, self._primitive_controller.robot, self._primitive_controller.robot_copy, "original"
