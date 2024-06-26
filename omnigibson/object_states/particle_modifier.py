@@ -1221,7 +1221,7 @@ class ParticleApplier(ParticleModifier):
                 # Create an attachment group if necessary
                 if group not in system.groups:
                     system.create_attachment_group(obj=self.obj)
-                avg_scale = np.cbrt(np.product(self.obj.scale))
+                avg_scale = np.cbrt(th.prod(self.obj.scale))
                 scales = system.sample_scales_by_group(group=group, n=len(start_points))
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
@@ -1278,7 +1278,7 @@ class ParticleApplier(ParticleModifier):
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
-            modifier_avg_scale = np.cbrt(np.product(self.obj.scale))
+            modifier_avg_scale = np.cbrt(th.prod(self.obj.scale))
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = self.obj.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
@@ -1294,9 +1294,7 @@ class ParticleApplier(ParticleModifier):
                     # (in the USD hierarchy) underneath the in_contact object, we need to compensate for the relative
                     # scale differences between the two objects, so that "moving" the particle to the new object won't
                     # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
-                    particles_info[group]["scales"].append(
-                        scale * modifier_avg_scale / np.cbrt(np.product(hit_obj.scale))
-                    )
+                    particles_info[group]["scales"].append(scale * modifier_avg_scale / np.cbrt(th.prod(hit_obj.scale)))
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
             for group, particle_info in particles_info.items():

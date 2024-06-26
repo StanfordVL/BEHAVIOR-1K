@@ -626,7 +626,7 @@ class VisualParticleSystem(BaseSystem):
         # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
         # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
         obj = self._group_objects[group]
-        avg_scale = np.cbrt(np.product(obj.scale))
+        avg_scale = np.cbrt(th.prod(obj.scale))
         return scales / avg_scale
 
     def generate_particles(

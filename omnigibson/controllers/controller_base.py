@@ -115,7 +115,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(th.sum([np.product(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(th.sum([th.prod(shape) for shape in self._goal_shapes.values()]))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -339,7 +339,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             idx = 1
             goal = dict()
             for key, shape in self._goal_shapes.items():
-                length = np.product(shape)
+                length = th.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:

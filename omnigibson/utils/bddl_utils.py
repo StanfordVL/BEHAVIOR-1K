@@ -1015,8 +1015,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1368,8 +1368,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:

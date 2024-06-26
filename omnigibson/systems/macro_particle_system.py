@@ -605,7 +605,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=max_samples)
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
-        avg_scale = np.cbrt(np.product(obj.scale))
+        avg_scale = np.cbrt(th.prod(obj.scale))
 
         bbox_extents_global = scales * self.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 

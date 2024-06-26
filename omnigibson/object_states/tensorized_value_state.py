@@ -165,8 +165,8 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     @property
     def state_size(self):
         # This is the flattened size of @self.value_shape
-        # Note that np.product(()) returns 1, which is also correct for a non-arrayed value
-        return int(np.product(self.value_shape))
+        # Note that th.prod(()) returns 1, which is also correct for a non-arrayed value
+        return int(th.prod(self.value_shape))
 
     # For this state, we simply store its value.
     def _dump_state(self):
@@ -185,7 +185,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         return val.flatten().float()
 
     def deserialize(self, state):
-        value_length = int(np.product(self.value_shape))
+        value_length = int(th.prod(self.value_shape))
         value = state[:value_length].reshape(self.value_shape) if len(self.value_shape) > 0 else state[0]
         return {self.value_name: value}, value_length
 

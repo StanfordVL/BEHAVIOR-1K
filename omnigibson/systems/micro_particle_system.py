@@ -423,7 +423,7 @@ class PhysxParticleInstancer(BasePrim):
 
         idx = 3
         for key, size in zip(keys, sizes):
-            length = np.product(size)
+            length = th.prod(size)
             state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 
