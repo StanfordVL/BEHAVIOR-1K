@@ -978,7 +978,7 @@ class SlicingRule(BaseTransitionRule):
                 ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
-                scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
+                scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
                 # Calculate global part bounding box pose.
                 part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)

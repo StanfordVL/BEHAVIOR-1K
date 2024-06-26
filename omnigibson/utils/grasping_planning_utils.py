@@ -63,7 +63,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     approach_axis = np.random.choice([0, 1, 2])
     approach_direction = np.random.choice([-1, 1]) if approach_axis != 2 else 1
     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * np.eye(3)[approach_axis]
-    randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - np.abs(constant_dimension_in_base_frame)
+    randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
     random_dimensions_in_base_frame = np.random.uniform(
         [-1, -1, 0], [1, 1, 1]
     )  # note that we don't allow going below center
@@ -183,8 +183,8 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
-    assert np.isclose(th.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
-    push_axis_idx = np.argmax(np.abs(push_axis))
+    assert np.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
+    push_axis_idx = np.argmax(th.abs(push_axis))
     canonical_push_axis = np.eye(3)[push_axis_idx]
 
     # TODO: Need to figure out how to get the correct push direction.
@@ -353,9 +353,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     lateral_axis = np.cross(open_direction, joint_axis)
 
     # Match the axes to the canonical axes of the link bb.
-    lateral_axis_idx = np.argmax(np.abs(lateral_axis))
-    open_axis_idx = np.argmax(np.abs(open_direction))
-    joint_axis_idx = np.argmax(np.abs(joint_axis))
+    lateral_axis_idx = np.argmax(th.abs(lateral_axis))
+    open_axis_idx = np.argmax(th.abs(open_direction))
+    joint_axis_idx = np.argmax(th.abs(joint_axis))
     assert lateral_axis_idx != open_axis_idx
     assert lateral_axis_idx != joint_axis_idx
     assert open_axis_idx != joint_axis_idx

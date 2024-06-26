@@ -349,7 +349,7 @@ class EntityPrim(XFormPrim):
                         axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
 
                         # Find the correct scale along the joint axis direction
-                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+                        scale_along_axis = self.scale[np.argmax(th.abs(axis_in_obj_frame))]
 
             joint.lower_limit = joint.lower_limit * scale_along_axis
             joint.upper_limit = joint.upper_limit * scale_along_axis
@@ -1115,7 +1115,7 @@ class EntityPrim(XFormPrim):
             n-array: n-DOF length array specifying whether joint is at its limit,
                 with 1.0 --> at limit, otherwise 0.0
         """
-        return 1.0 * (np.abs(self.get_joint_positions(normalized=True)) > 0.99)
+        return 1.0 * (th.abs(self.get_joint_positions(normalized=True)) > 0.99)
 
     @property
     def joint_has_limits(self):

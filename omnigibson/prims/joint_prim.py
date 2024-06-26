@@ -338,7 +338,7 @@ class JointPrim(BasePrim):
         default_max_vel = (
             m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == JointType.JOINT_REVOLUTE else m.DEFAULT_MAX_PRISMATIC_VEL
         )
-        return default_max_vel if raw_vel is None or np.abs(raw_vel) > m.INF_VEL_THRESHOLD else raw_vel
+        return default_max_vel if raw_vel is None or th.abs(raw_vel) > m.INF_VEL_THRESHOLD else raw_vel
 
     @max_velocity.setter
     def max_velocity(self, vel):
@@ -364,7 +364,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_effort = self._articulation_view.get_max_efforts(joint_indices=self.dof_indices)[0][0]
-        return m.DEFAULT_MAX_EFFORT if raw_effort is None or np.abs(raw_effort) > m.INF_EFFORT_THRESHOLD else raw_effort
+        return m.DEFAULT_MAX_EFFORT if raw_effort is None or th.abs(raw_effort) > m.INF_EFFORT_THRESHOLD else raw_effort
 
     @max_effort.setter
     def max_effort(self, effort):
@@ -471,7 +471,7 @@ class JointPrim(BasePrim):
         ).flatten()
         return (
             -m.DEFAULT_MAX_POS
-            if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_lower) > m.INF_POS_THRESHOLD
+            if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or th.abs(raw_pos_lower) > m.INF_POS_THRESHOLD
             else raw_pos_lower
         )
 
@@ -505,7 +505,7 @@ class JointPrim(BasePrim):
         ).flatten()
         return (
             m.DEFAULT_MAX_POS
-            if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_upper) > m.INF_POS_THRESHOLD
+            if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or th.abs(raw_pos_upper) > m.INF_POS_THRESHOLD
             else raw_pos_upper
         )
 
@@ -532,7 +532,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         return np.all(
-            np.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD
+            th.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD
         )
 
     @property

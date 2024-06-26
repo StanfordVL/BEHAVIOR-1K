@@ -92,7 +92,7 @@ def get_distance_to_plane(points, plane_centroid, plane_normal):
     Returns:
         k-array: Absolute distances from each point to the plane
     """
-    return np.abs(np.dot(points - plane_centroid, plane_normal))
+    return th.abs(np.dot(points - plane_centroid, plane_normal))
 
 
 def get_projection_onto_plane(points, plane_centroid, plane_normal):

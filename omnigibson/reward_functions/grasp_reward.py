@@ -70,7 +70,7 @@ class GraspReward(BaseRewardFunction):
         reward = 0.0
 
         # Penalize large actions
-        action_mag = np.sum(np.abs(action))
+        action_mag = np.sum(th.abs(action))
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
         info["regularization_penalty_factor"] = action_mag

@@ -1063,11 +1063,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = th.Tensor(joint_pos) - th.Tensor(current_joint_pos)
-            if th.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
+            if th.max(th.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if th.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
+            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
                 # We're stuck!
                 break
 
@@ -1247,7 +1247,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 for joint_idx, target_joint_pos, current_joint_pos in zip(
                     self._manipulation_control_idx, joint_pos, current_joint_positions
                 ):
-                    if np.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
+                    if th.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
                         failed_joints.append(joints[joint_idx].joint_name)
 
                 if failed_joints:
