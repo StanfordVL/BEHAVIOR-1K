@@ -86,12 +86,12 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
 
     # Prepare this object's info for ray casting.
     if obj.prim_type == PrimType.CLOTH:
-        ray_starts = np.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
+        ray_starts = th.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
 
     else:
         aabb_lower, aabb_higher = obj.states[AABB].get_value()
         object_position = (aabb_lower + aabb_higher) / 2.0
-        ray_starts = np.tile(object_position, (len(directions), 1))
+        ray_starts = th.tile(object_position, (len(directions), 1))
 
         if not use_aabb_center:
             # Dynamically compute start points by iterating over the directions and pre-shooting rays from

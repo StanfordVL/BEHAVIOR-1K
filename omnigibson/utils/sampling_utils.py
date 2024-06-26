@@ -492,7 +492,7 @@ def sample_raytest_start_end_full_grid_topdown(
 
     start_points = th.stack(
         [
-            np.tile(x, len(y)),
+            th.tile(x, len(y)),
             np.repeat(y, len(x)),
             th.ones(n_rays) * half_extent_with_offset[2],
         ]

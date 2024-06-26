@@ -26,7 +26,7 @@ def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose_inv(T.pose2mat((pos, quat)))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = th.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     particle_positions = (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
@@ -55,7 +55,7 @@ def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose2mat((pos, quat))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = th.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     return (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
@@ -200,9 +200,9 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     # particle position with the normal, and validating that the value is < 0)
     D, _ = mesh_face_centroids.shape
     N, _ = particle_positions.shape
-    mesh_points = np.tile(mesh_face_centroids.reshape(1, D, 3), (N, 1, 1))
-    mesh_normals = np.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
-    particle_positions = np.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
+    mesh_points = th.tile(mesh_face_centroids.reshape(1, D, 3), (N, 1, 1))
+    mesh_normals = th.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
+    particle_positions = th.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
     # All arrays are now (N, D, 3) shape -- efficient for batching
     in_range = ((particle_positions - mesh_points) * mesh_normals).sum(dim=-1) < 0  # shape (N, D)
     # All D normals must be satisfied for a single point to be considered inside the hull

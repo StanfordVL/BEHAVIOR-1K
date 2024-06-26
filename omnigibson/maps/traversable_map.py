@@ -199,7 +199,7 @@ class TraversableMap(BaseMap):
             path_world = path_world[: self.num_waypoints]
             num_remaining_waypoints = self.num_waypoints - path_world.shape[0]
             if num_remaining_waypoints > 0:
-                remaining_waypoints = np.tile(target_world, (num_remaining_waypoints, 1))
+                remaining_waypoints = th.tile(target_world, (num_remaining_waypoints, 1))
                 path_world = th.cat((path_world, remaining_waypoints), dim=0)
 
         return path_world, geodesic_distance
