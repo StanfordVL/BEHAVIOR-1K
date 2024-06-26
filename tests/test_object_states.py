@@ -649,8 +649,8 @@ def test_toggled_on(env):
     q = robot.get_joint_positions()
     jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
     q[jnt_idxs["torso_lift_joint"]] = 0.0
-    q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
-    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(9.0)
+    q[jnt_idxs["shoulder_pan_joint"]] = th.deg2rad(90.0)
+    q[jnt_idxs["shoulder_lift_joint"]] = th.deg2rad(9.0)
     q[jnt_idxs["upperarm_roll_joint"]] = 0.0
     q[jnt_idxs["elbow_flex_joint"]] = 0.0
     q[jnt_idxs["forearm_roll_joint"]] = 0.0

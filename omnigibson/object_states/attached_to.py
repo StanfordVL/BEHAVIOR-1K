@@ -26,7 +26,7 @@ m = create_module_macros(module_path=__file__)
 m.ATTACHMENT_LINK_PREFIX = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
-m.DEFAULT_ORIENTATION_THRESHOLD = np.deg2rad(5.0)  # 5 degrees
+m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(5.0)  # 5 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 1000  # Newton
 m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter

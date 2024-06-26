@@ -79,7 +79,7 @@ m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
-m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
+m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = th.deg2rad(45)
 
 log = create_module_logger(module_name=__name__)
 
@@ -1221,7 +1221,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
                 pos_diff = th.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
                 orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
-                if pos_diff < 0.005 and orn_diff < np.deg2rad(0.1):
+                if pos_diff < 0.005 and orn_diff < th.deg2rad(0.1):
                     return
 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
@@ -1266,7 +1266,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
                 pos_diff = th.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
                 orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
-                if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
+                if pos_diff < 0.001 and orn_diff < th.deg2rad(0.1):
                     return
 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
