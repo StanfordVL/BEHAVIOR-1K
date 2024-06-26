@@ -385,7 +385,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
             obs_space["proprio"] = self._build_obs_box_space(
-                shape=(self.proprioception_dim,), low=-np.inf, high=np.inf, dtype=th.float64
+                shape=(self.proprioception_dim,), low=-float("inf"), high=float("inf"), dtype=th.float64
             )
 
         return obs_space

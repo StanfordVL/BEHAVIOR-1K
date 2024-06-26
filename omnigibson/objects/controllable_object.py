@@ -301,8 +301,8 @@ class ControllableObject(BaseObject):
         low, high = [], []
         for controller in self._controllers.values():
             limits = controller.command_input_limits
-            low.append(th.Tensor([-np.inf] * controller.command_dim) if limits is None else limits[0])
-            high.append(th.Tensor([np.inf] * controller.command_dim) if limits is None else limits[1])
+            low.append(th.Tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
+            high.append(th.Tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(shape=(self.action_dim,), low=th.cat(low), high=th.cat(high), dtype=float)
 

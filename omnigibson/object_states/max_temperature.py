@@ -77,4 +77,4 @@ class MaxTemperature(TensorizedValueState):
         super(MaxTemperature, self).__init__(obj)
 
         # Set value to be default
-        self._set_value(-np.inf)
+        self._set_value(-float("inf"))

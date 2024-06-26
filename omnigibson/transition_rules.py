@@ -1384,7 +1384,7 @@ class RecipeRule(BaseTransitionRule):
 
         # If multi-instance is True but doesn't require kinematic states between objects
         if input_object_tree is None:
-            num_instances = np.inf
+            num_instances = float("inf")
             # Compute how many instances of this recipe can be produced.
             # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
             # container, then 2 instance of the recipe can be produced.

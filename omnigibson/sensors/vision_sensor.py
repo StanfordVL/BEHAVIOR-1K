@@ -734,13 +734,13 @@ class VisionSensor(BaseSensor):
             space=gym.spaces.Tuple(
                 (
                     gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=th.uint32),  # semanticId
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # x_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # y_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # z_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # x_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # y_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=th.float32),  # z_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=th.float32),  # transform
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # x_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # y_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # z_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # x_max
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # y_max
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # z_max
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(4, 4), dtype=th.float32),  # transform
                     gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=th.float32),  # occlusion ratio
                 )
             )
@@ -761,13 +761,13 @@ class VisionSensor(BaseSensor):
 
         obs_space_mapping = dict(
             rgb=((self.image_height, self.image_width, 4), 0, 255, th.uint8),
-            depth=((self.image_height, self.image_width), 0.0, np.inf, th.float32),
-            depth_linear=((self.image_height, self.image_width), 0.0, np.inf, th.float32),
+            depth=((self.image_height, self.image_width), 0.0, float("inf"), th.float32),
+            depth_linear=((self.image_height, self.image_width), 0.0, float("inf"), th.float32),
             normal=((self.image_height, self.image_width, 4), -1.0, 1.0, th.float32),
             seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, th.uint32),
             seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, th.uint32),
             seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, th.uint32),
-            flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, th.float32),
+            flow=((self.image_height, self.image_width, 4), -float("inf"), float("inf"), th.float32),
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,
