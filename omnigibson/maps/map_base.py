@@ -46,7 +46,7 @@ class BaseMap:
             2-array or (N, 2)-array: 2D location(s) in world reference frame (in metric space)
         """
         axis = 0 if len(xy.shape) == 1 else 1
-        return np.flip((xy - self.map_size / 2.0) * self.map_resolution, dim=axis)
+        return th.flip((xy - self.map_size / 2.0) * self.map_resolution, dim=axis)
 
     def world_to_map(self, xy):
         """
@@ -55,4 +55,5 @@ class BaseMap:
             xy: 2D location in world reference frame (metric)
         :return: 2D location in map reference frame (image)
         """
-        return np.flip((th.Tensor(xy) / self.map_resolution + self.map_size / 2.0)).int()
+        point_wrt_map = th.Tensor(xy) / self.map_resolution + self.map_size / 2.0
+        return th.flip(point_wrt_map, dims=tuple(range(point_wrt_map.dim()))).int()

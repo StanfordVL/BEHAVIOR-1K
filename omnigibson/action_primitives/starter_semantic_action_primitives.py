@@ -1558,7 +1558,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         trav_map = self.env.scene._trav_map
         for q in plan:
             # The below code is useful for plotting the RRT tree.
-            SEARCHED.append(np.flip(trav_map.world_to_map((q[0], q[1]))))
+            map_point = trav_map.world_to_map((q[0], q[1]))
+            SEARCHED.append(th.flip(map_point, dims=tuple(range(map_point.dim()))))
 
             fig = plt.figure()
             plt.imshow(trav_map.floor_map[0])
