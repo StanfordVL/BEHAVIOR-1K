@@ -70,7 +70,7 @@ class SegmentationMap(BaseMap):
             room_cats = [line.rstrip() for line in fp.readlines()]
 
         sem_id_to_ins_id = {}
-        unique_ins_ids = np.unique(img_ins)
+        unique_ins_ids = th.unique(img_ins)
         unique_ins_ids = np.delete(unique_ins_ids, 0)
         for ins_id in unique_ins_ids:
             # find one pixel for each ins id

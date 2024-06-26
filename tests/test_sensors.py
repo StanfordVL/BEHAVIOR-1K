@@ -43,7 +43,7 @@ def test_seg(env):
 
     seg_semantic = all_observation["seg_semantic"]
     seg_semantic_info = all_info["seg_semantic"]
-    assert set(np.unique(seg_semantic)) == set(seg_semantic_info.keys())
+    assert set(th.unique(seg_semantic)) == set(seg_semantic_info.keys())
     expected_dict = {
         335706086: "diced__apple",
         825831922: "floors",
@@ -58,7 +58,7 @@ def test_seg(env):
 
     seg_instance = all_observation["seg_instance"]
     seg_instance_info = all_info["seg_instance"]
-    assert set(np.unique(seg_instance)) == set(seg_instance_info.keys())
+    assert set(th.unique(seg_instance)) == set(seg_instance_info.keys())
     expected_dict = {
         2: "robot0",
         3: "groundPlane",
@@ -73,7 +73,7 @@ def test_seg(env):
 
     seg_instance_id = all_observation["seg_instance_id"]
     seg_instance_id_info = all_info["seg_instance_id"]
-    assert set(np.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
+    assert set(th.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
     expected_dict = {
         3: "/World/robot0/gripper_link/visuals",
         4: "/World/robot0/wrist_roll_link/visuals",

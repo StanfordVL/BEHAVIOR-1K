@@ -1219,7 +1219,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     n_vertices = len(faces_flat)
 
     # Sample vertices
-    unique_vertices = np.unique(faces_flat)
+    unique_vertices = th.unique(faces_flat)
     assert len(unique_vertices) == n_unique_vertices
     keypoint_idx = (
         np.random.choice(unique_vertices, size=n_keypoints, replace=False)

@@ -339,7 +339,7 @@ class VisionSensor(BaseSensor):
                 replicator_mapping[key] in semantic_class_id_to_name(self._scene).values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        image_keys = np.unique(img)
+        image_keys = th.unique(img)
         assert set(image_keys).issubset(
             set(replicator_mapping.keys())
         ), "Semantic segmentation image does not match the original id_to_labels mapping."
@@ -407,7 +407,7 @@ class VisionSensor(BaseSensor):
         # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
         # They show up in the image, but not in the info (id_to_labels).
         # We identify these values, find the corresponding semantic label (system name), and add the mapping.
-        image_keys, key_indices = np.unique(img, return_index=True)
+        image_keys, key_indices = th.unique(img, return_index=True)
         for key, img_idx in zip(image_keys, key_indices):
             if str(key) not in id_to_labels:
                 semantic_label = semantic_img.flatten()[img_idx]

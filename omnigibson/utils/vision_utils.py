@@ -122,7 +122,7 @@ class Remapper:
         # For all the values that exist in the image but not in old_mapping.keys(), we map them to whichever key in
         # new_mapping that equals to 'unlabelled'. This is needed because some values in the image don't necessarily
         # show up in the old_mapping, i.e. particle systems.
-        for key in np.unique(image) if image_keys is None else image_keys:
+        for key in th.unique(image) if image_keys is None else image_keys:
             if key not in old_mapping.keys():
                 new_key = next((k for k, v in new_mapping.items() if v == "unlabelled"), None)
                 assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
@@ -133,7 +133,7 @@ class Remapper:
         # Make sure all values are correctly remapped and not equal to the default value
         assert th.all(remapped_img != np.iinfo(th.uint32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
-        for key in np.unique(remapped_img):
+        for key in th.unique(remapped_img):
             remapped_labels[key] = new_mapping[key]
 
         return remapped_img, remapped_labels
