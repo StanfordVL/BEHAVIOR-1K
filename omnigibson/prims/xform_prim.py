@@ -139,7 +139,7 @@ class XFormPrim(BasePrim):
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
-        assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
+        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-4), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )
@@ -195,7 +195,7 @@ class XFormPrim(BasePrim):
 
         local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert np.allclose(
+        assert th.allclose(
             product, np.diag(np.diag(product)), atol=1e-3
         ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))

@@ -207,12 +207,12 @@ def test_pose(env):
     pos2, orn2 = get_random_pose()
     dishtowel.set_position_orientation(pos2, orn2)
 
-    assert np.allclose(breakfast_table.states[Pose].get_value()[0], pos1)
-    assert np.allclose(breakfast_table.states[Pose].get_value()[1], orn1) or np.allclose(
+    assert th.allclose(breakfast_table.states[Pose].get_value()[0], pos1)
+    assert th.allclose(breakfast_table.states[Pose].get_value()[1], orn1) or th.allclose(
         breakfast_table.states[Pose].get_value()[1], -orn1
     )
-    assert np.allclose(dishtowel.states[Pose].get_value()[0], pos2)
-    assert np.allclose(dishtowel.states[Pose].get_value()[1], orn2) or np.allclose(
+    assert th.allclose(dishtowel.states[Pose].get_value()[0], pos2)
+    assert th.allclose(dishtowel.states[Pose].get_value()[1], orn2) or th.allclose(
         dishtowel.states[Pose].get_value()[1], -orn2
     )
 
@@ -234,14 +234,14 @@ def test_aabb(env):
     # Need to take one sim step
     og.sim.step()
 
-    assert np.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
+    assert th.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
     assert th.all(
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
     pp = dishtowel.root_link.compute_particle_positions()
     offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(dim=0) - offset, pp.max(dim=0) + offset))
+    assert th.allclose(dishtowel.states[AABB].get_value(), (pp.min(dim=0) - offset, pp.max(dim=0) + offset))
     assert th.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
     with pytest.raises(NotImplementedError):

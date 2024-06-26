@@ -137,7 +137,7 @@ def quat_multiply(quaternion1, quaternion0):
 
     E.g.:
     >>> q = quat_multiply([1, -2, 3, 4], [-5, 6, 7, 8])
-    >>> np.allclose(q, [-44, -14, 48, 28])
+    >>> th.allclose(q, [-44, -14, 48, 28])
     True
 
     Args:
@@ -189,7 +189,7 @@ def quat_inverse(quaternion):
     E.g.:
     >>> q0 = random_quaternion()
     >>> q1 = quat_inverse(q0)
-    >>> np.allclose(quat_multiply(q0, q1), [0, 0, 0, 1])
+    >>> th.allclose(quat_multiply(q0, q1), [0, 0, 0, 1])
     True
 
     Args:
@@ -223,17 +223,17 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
     >>> q0 = random_quat()
     >>> q1 = random_quat()
     >>> q = quat_slerp(q0, q1, 0.0)
-    >>> np.allclose(q, q0)
+    >>> th.allclose(q, q0)
     True
 
     >>> q = quat_slerp(q0, q1, 1.0)
-    >>> np.allclose(q, q1)
+    >>> th.allclose(q, q1)
     True
 
     >>> q = quat_slerp(q0, q1, 0.5)
     >>> angle = math.acos(np.dot(q0, q))
-    >>> np.allclose(2.0, math.acos(np.dot(q0, q1)) / angle) or \
-        np.allclose(2.0, math.acos(-np.dot(q0, q1)) / angle)
+    >>> th.allclose(2.0, math.acos(np.dot(q0, q1)) / angle) or \
+        th.allclose(2.0, math.acos(-np.dot(q0, q1)) / angle)
     True
 
     Args:
@@ -274,7 +274,7 @@ def random_quat(rand=None):
 
     E.g.:
     >>> q = random_quat()
-    >>> np.allclose(1.0, vector_norm(q))
+    >>> th.allclose(1.0, vector_norm(q))
     True
     >>> q = random_quat(np.random.random(3))
     >>> q.shape

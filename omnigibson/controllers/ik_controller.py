@@ -316,7 +316,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         # If the delta is really small, we just keep the current joint position. This avoids joint
         # drift caused by IK solver inaccuracy even when zero delta actions are provided.
-        if np.allclose(pos_relative, target_pos, atol=1e-4) and np.allclose(quat_relative, target_quat, atol=1e-4):
+        if th.allclose(pos_relative, target_pos, atol=1e-4) and th.allclose(quat_relative, target_quat, atol=1e-4):
             target_joint_pos = current_joint_pos
         else:
             # Otherwise we try to solve for the IK configuration.

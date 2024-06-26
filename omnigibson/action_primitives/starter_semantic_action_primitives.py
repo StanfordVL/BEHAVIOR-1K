@@ -1289,7 +1289,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_lower_limit = self.robot.joint_lower_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_lower_limit, atol=0.01):
+            if th.allclose(joint_position, joint_lower_limit, atol=0.01):
                 break
 
             action = self._empty_action()
@@ -1308,7 +1308,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_upper_limit, atol=0.01):
+            if th.allclose(joint_position, joint_upper_limit, atol=0.01):
                 break
 
             action = self._empty_action()

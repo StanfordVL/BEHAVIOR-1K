@@ -304,7 +304,7 @@ class EntityPrim(XFormPrim):
         Helper function to update internal joint limits for prismatic joints based on the object's scale
         """
         # If the scale is [1, 1, 1], we can skip this step
-        if np.allclose(self.scale, np.ones(3)):
+        if th.allclose(self.scale, np.ones(3)):
             return
 
         prismatic_joints = {
@@ -315,7 +315,7 @@ class EntityPrim(XFormPrim):
         if len(prismatic_joints) == 0:
             return
 
-        uniform_scale = np.allclose(self.scale, self.scale[0])
+        uniform_scale = th.allclose(self.scale, self.scale[0])
 
         for joint_name, joint in prismatic_joints.items():
             if uniform_scale:

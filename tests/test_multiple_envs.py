@@ -51,7 +51,7 @@ def test_multi_scene_dump_and_load():
     initial_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
     vec_env.envs[0].scene._load_state(scene_three_state)
     new_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
-    assert np.allclose(new_robot_pos_scene_one - initial_robot_pos_scene_one, robot_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos_scene_one - initial_robot_pos_scene_one, robot_displacement, atol=1e-3)
 
     og.clear()
 
@@ -64,7 +64,7 @@ def test_multi_scene_displacement():
 
     dist_0_1 = robot_1_pos - robot_0_pos
     dist_1_2 = robot_2_pos - robot_1_pos
-    assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
+    assert th.allclose(dist_0_1, dist_1_2, atol=1e-3)
     og.clear()
 
 
@@ -78,8 +78,8 @@ def test_multi_scene_scene_prim():
     vec_env.envs[0].scene._load_state(scene_state)
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position()
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position()
-    assert np.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-    assert np.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
 
 
 def test_multi_scene_particle_source():

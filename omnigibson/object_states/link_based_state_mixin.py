@@ -116,7 +116,7 @@ class LinkBasedStateMixin(BaseObjectState):
                 self._links[name] = link
                 # Make sure the scale is similar if the link is not a cloth prim
                 if not isinstance(link, ClothPrim):
-                    assert np.allclose(
+                    assert th.allclose(
                         link.scale, self.obj.scale
                     ), f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
 
