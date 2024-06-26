@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:2023.1.1
+FROM nvcr.io/nvidia/isaac-sim:4.0.0
 
 # Set up all the prerequisites.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -9,9 +9,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym*
 RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy*
 RUN /isaac-sim/python.sh -m pip install click~=8.1.3
-
-# Disable the livestream extension getting launched by default in Isaac Sim 2023.1.1
-RUN sed -i 's/\"omni.kit.livestream.native.*//g' /isaac-sim/apps/omni.isaac.sim.python.kit
 
 # Mount the data directory
 VOLUME ["/data"]
