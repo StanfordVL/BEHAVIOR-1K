@@ -64,9 +64,10 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     approach_direction = np.random.choice([-1, 1]) if approach_axis != 2 else 1
     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * th.eye(3)[approach_axis]
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
-    random_dimensions_in_base_frame = np.random.uniform(
-        [-1, -1, 0], [1, 1, 1]
-    )  # note that we don't allow going below center
+    dim_lo, dim_hi = th.Tensor([-1, -1, 0]), th.Tensor([1, 1, 1])
+    random_dimensions_in_base_frame = (dim_hi - dim_lo) * th.rand(
+        dim_lo.size()
+    ) + dim_lo  # note that we don't allow going below center
     grasp_center_in_base_frame = (
         random_dimensions_in_base_frame * randomizable_dimensions_in_base_frame + constant_dimension_in_base_frame
     )
@@ -214,10 +215,11 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     min_lateral_pos_wrt_surface_center = (canonical_x_axis + canonical_y_axis) * -bbox_extent_in_link_frame / 2
     max_lateral_pos_wrt_surface_center = (canonical_x_axis + canonical_y_axis) * bbox_extent_in_link_frame / 2
     diff_lateral_pos_wrt_surface_center = max_lateral_pos_wrt_surface_center - min_lateral_pos_wrt_surface_center
-    sampled_lateral_pos_wrt_min = np.random.uniform(
+    bound_lo, bound_hi = (
         m.PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[0] * diff_lateral_pos_wrt_surface_center,
         m.PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[1] * diff_lateral_pos_wrt_surface_center,
     )
+    sampled_lateral_pos_wrt_min = th.rand(bound_lo.size()) * (bound_hi - bound_lo) + bound_lo
     lateral_pos_wrt_surface_center = min_lateral_pos_wrt_surface_center + sampled_lateral_pos_wrt_min
     grasp_position_in_bbox_frame = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     grasp_quat_in_bbox_frame = T.quat_inverse(joint_orientation)
@@ -388,10 +390,11 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         + canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2
     )
     diff_lateral_pos_wrt_surface_center = max_lateral_pos_wrt_surface_center - min_lateral_pos_wrt_surface_center
-    sampled_lateral_pos_wrt_min = np.random.uniform(
+    bound_lo, bound_hi = (
         m.REVOLUTE_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[0] * diff_lateral_pos_wrt_surface_center,
         m.REVOLUTE_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[1] * diff_lateral_pos_wrt_surface_center,
     )
+    sampled_lateral_pos_wrt_min = th.rand(bound_lo.size()) * (bound_hi - bound_lo) + bound_lo
     lateral_pos_wrt_surface_center = min_lateral_pos_wrt_surface_center + sampled_lateral_pos_wrt_min
     grasp_position = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     # Get the appropriate rotation

@@ -840,7 +840,8 @@ class KeyboardRobotController:
         Returns:
             n-array: Generated random action vector (normalized)
         """
-        return np.random.uniform(-1, 1, self.action_dim)
+        action_lo, action_hi = -1, 1
+        return (th.rand(self.action_dim) * (action_hi - action_lo) + action_lo).item()
 
     def get_teleop_action(self):
         """

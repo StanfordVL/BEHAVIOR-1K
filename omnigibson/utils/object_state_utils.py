@@ -295,9 +295,10 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
 
     for _ in range(max_trials):
         # Sample a random position
-        pos = np.random.uniform(low, high)
+        pos = th.rand(low.size()) * (high - low) + low
         # Sample a random orientation in the z-axis
-        orn = T.euler2quat(th.Tensor([0.0, 0.0, np.random.uniform(0, 3.1415 * 2)]))
+        z_lo, z_hi = 0, 3.1415 * 2
+        orn = T.euler2quat(th.Tensor([0.0, 0.0, (th.rand(1) * (z_hi - z_lo) + z_lo).item()]))
 
         obj.set_position_orientation(pos, orn)
         obj.root_link.reset()

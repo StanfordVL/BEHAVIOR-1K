@@ -139,7 +139,7 @@ class TraversableMap(BaseMap):
 
         # If nothing is given, sample a random floor and a random point on that floor
         if floor is None and reference_point is None:
-            floor = np.random.randint(0, self.n_floors)
+            floor = th.randint(0, self.n_floors)
 
         # create a deep copy so that we don't erode the original map
         trav_map = self.floor_map[floor].copy()
@@ -155,7 +155,7 @@ class TraversableMap(BaseMap):
             trav_space = th.where(component_labels == prev_label)
         else:
             trav_space = th.where(trav_map == 255)
-        idx = np.random.randint(0, high=trav_space[0].shape[0])
+        idx = th.randint(0, high=trav_space[0].shape[0])
         xy_map = th.Tensor([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]

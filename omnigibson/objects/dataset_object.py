@@ -180,7 +180,8 @@ class DatasetObject(USDObject):
             )
 
         # Randomize yaw from -pi to pi
-        rot_num = np.random.uniform(-1, 1)
+        rot_lo, rot_hi = -1, 1
+        rot_num = (th.rand(1) * (rot_hi - rot_lo) + rot_lo).item()
         rot_matrix = th.Tensor(
             [
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],

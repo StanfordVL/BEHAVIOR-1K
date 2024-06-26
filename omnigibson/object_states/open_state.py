@@ -226,7 +226,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
-                num_to_open = np.random.randint(1, len(relevant_joints) + 1)
+                num_to_open = th.randint(1, len(relevant_joints) + 1)
                 random_indices = np.random.choice(range(len(relevant_joints)), size=num_to_open, replace=False)
                 relevant_joints = [relevant_joints[i] for i in random_indices]
                 joint_directions = [joint_directions[i] for i in random_indices]
@@ -249,7 +249,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
                     high = max(joint_range)
 
                     # Sample a position.
-                    joint_pos = np.random.uniform(low, high)
+                    joint_pos = (th.rand(1) * (high - low) + low).item()
 
                 # Save sampled position.
                 joint.set_pos(joint_pos)

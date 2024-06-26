@@ -56,7 +56,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
-        env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
+        action_lo, action_hi = -1, 1
+        env.step(th.rand(env.robots[0].action_dim) * (action_hi - action_lo) + action_lo)
 
     print("Completed scene modification, saving scene...")
     save_path = os.path.join(TEST_OUT_PATH, "saved_stage.json")

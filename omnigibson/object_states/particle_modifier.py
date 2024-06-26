@@ -1446,8 +1446,8 @@ class ParticleApplier(ParticleModifier):
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position()
         start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
-        end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
-        sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
+        end_points = th.rand(n_samples, 3) * (upper - lower) + lower
+        sides, axes = th.randint(2, size=(n_samples,)), th.randint(3, size=(n_samples,))
         end_points[th.arange(n_samples), axes] = lower_upper[sides, axes]
 
         return start_points, end_points

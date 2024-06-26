@@ -226,7 +226,7 @@ class BaseSystem(Serializable):
         Returns:
             (n, 3) array: Array of sampled scales
         """
-        return np.random.uniform(self.min_scale, self.max_scale, (n, 3))
+        return th.rand(n, 3) * (self.max_scale - self.min_scale) + self.min_scale
 
     def get_particles_position_orientation(self):
         """
@@ -616,7 +616,7 @@ class VisualParticleSystem(BaseSystem):
 
         # Sample based on whether we're scaling relative to parent or not
         scales = (
-            np.random.uniform(*self._group_scales[group], (n, 3))
+            th.rand(n, 3) * (self._group_scales[group][1] - self._group_scales[group][0]) + self._group_scales[group][0]
             if self._scale_relative_to_parent
             else self.sample_scales(n=n)
         )

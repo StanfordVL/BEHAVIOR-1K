@@ -359,7 +359,8 @@ def land_object(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
-    quat = T.euler2quat([0, 0, np.random.uniform(0, 3.1415 * 2)]) if quat is None else quat
+    quat_lo, quat_hi = 0, 3.1415 * 2
+    quat = T.euler2quat([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]) if quat is None else quat
     place_base_pose(obj, pos, quat, z_offset)
     obj.keep_still()
 

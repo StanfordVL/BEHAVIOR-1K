@@ -123,7 +123,7 @@ class SegmentationMap(BaseMap):
 
         sem_id = self.room_sem_name_to_sem_id[room_type]
         valid_idx = th.Tensor(th.where(self.room_sem_map == sem_id))
-        random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
+        random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
@@ -149,7 +149,7 @@ class SegmentationMap(BaseMap):
 
         ins_id = self.room_ins_name_to_ins_id[room_instance]
         valid_idx = th.Tensor(th.where(self.room_ins_map == ins_id))
-        random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
+        random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor

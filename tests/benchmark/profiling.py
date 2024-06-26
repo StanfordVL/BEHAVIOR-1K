@@ -158,8 +158,11 @@ def main():
 
     for i in range(300):
         if args.robot:
+            action_lo, action_hi = -0.3, 0.3
             result = env.step(
-                th.Tensor([np.random.uniform(-0.3, 0.3, env.robots[i].action_dim) for i in range(args.robot)]).flatten()
+                th.Tensor(
+                    [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
+                ).flatten()
             )[4]
         else:
             result = env.step(None)[4]

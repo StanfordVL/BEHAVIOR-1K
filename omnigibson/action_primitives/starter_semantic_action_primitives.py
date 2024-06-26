@@ -1718,8 +1718,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     pos_on_obj = self._sample_position_on_aabb_side(obj)
                     pose_on_obj = [pos_on_obj, th.Tensor([0, 0, 0, 1])]
 
-                distance = np.random.uniform(0.0, 5.0)
-                yaw = np.random.uniform(-3.1415, 3.1415)
+                distance_lo, distance_hi = 0.0, 5.0
+                distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
+                yaw_lo, yaw_hi = -3.1415, 3.1415
+                yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.Tensor(
                     [
@@ -1770,7 +1772,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         face_vertical_half_extent = th.eye(3)[2] * aabb_extent / 2
         face_min = face_center - face_vertical_half_extent - face_lateral_half_extent
         face_max = face_center + face_vertical_half_extent + face_lateral_half_extent
-        return np.random.uniform(face_min, face_max)
+        return th.rand(face_min.size()) * (face_max - face_min) + face_min
 
     # def _sample_pose_in_room(self, room: str):
     #     """
@@ -1787,7 +1789,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     #     # TODO(MP): Bias the sampling near the agent.
     #     for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
     #         _, pos = self.env.scene.get_random_point_by_room_instance(room)
-    #         yaw = np.random.uniform(-3.1415, 3.1415)
+    #         yaw_lo, yaw_hi = -3.1415, 3.1415
+    #         yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
     #         pose = (pos[0], pos[1], yaw)
     #         if self._test_pose(pose):
     #             return pose

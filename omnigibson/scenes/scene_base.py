@@ -690,7 +690,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             int: an integer between 0 and self.n_floors-1
         """
-        return np.random.randint(0, self.n_floors)
+        return th.randint(0, self.n_floors)
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
         """

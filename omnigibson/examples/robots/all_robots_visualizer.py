@@ -56,9 +56,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Then apply random actions for a bit
         for _ in range(30):
-            action = np.random.uniform(-1, 1, robot.action_dim)
+            action_lo, action_hi = -1, 1
+            action = th.rand(robot.action_dim) * (action_hi - action_lo) + action_lo
             if robot_name == "Tiago":
-                action[robot.base_action_idx] = np.random.uniform(-0.1, 0.1, len(robot.base_action_idx))
+                tiago_lo, tiago_hi = -0.1, 0.1
+                action[robot.base_action_idx] = th.rand(len(robot.base_action_idx)) * (tiago_hi - tiago_lo) + tiago_lo
             for _ in range(10):
                 env.step(action)
 
