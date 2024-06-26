@@ -1295,7 +1295,7 @@ def check_extent_radius_ratio(geom_prim, com):
         return False
 
     max_radius = extent.max() / 2.0
-    min_radius = np.min(np.linalg.norm(geom_prim.points - com, dim=-1), dim=0)
+    min_radius = th.min(np.linalg.norm(geom_prim.points - com, dim=-1), dim=0)
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.

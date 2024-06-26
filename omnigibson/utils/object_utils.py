@@ -89,8 +89,8 @@ def compute_base_aligned_bboxes(obj):
                 local_pos, local_orn = mesh.get_local_pose()
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
             pts_in_link_frame = th.cat(pts_in_link_frame, dim=0)
-            max_pt = np.max(pts_in_link_frame, dim=0)
-            min_pt = np.min(pts_in_link_frame, dim=0)
+            max_pt = th.max(pts_in_link_frame, dim=0)
+            min_pt = th.min(pts_in_link_frame, dim=0)
             extent = max_pt - min_pt
             center = (max_pt + min_pt) / 2.0
             transform = T.pose2mat((center, th.Tensor([0, 0, 0, 1.0])))

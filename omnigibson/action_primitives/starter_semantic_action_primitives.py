@@ -1063,11 +1063,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = th.Tensor(joint_pos) - th.Tensor(current_joint_pos)
-            if np.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
+            if th.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if np.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
+            if th.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
                 # We're stuck!
                 break
 
@@ -1186,7 +1186,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = np.linalg.norm(target_pose[0] - start_pos)
-        num_poses = np.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
+        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
         pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations

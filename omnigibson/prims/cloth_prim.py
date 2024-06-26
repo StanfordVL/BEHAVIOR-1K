@@ -118,7 +118,7 @@ class ClothPrim(GeomPrim):
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
 
         # Compute centroid particle idx based on AABB
-        aabb_min, aabb_max = np.min(positions, dim=0), np.max(positions, dim=0)
+        aabb_min, aabb_max = th.min(positions, dim=0), th.max(positions, dim=0)
         aabb_center = (aabb_min + aabb_max) / 2.0
         dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = np.argmin(dists)

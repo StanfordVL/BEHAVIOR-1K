@@ -1339,14 +1339,14 @@ class EntityPrim(XFormPrim):
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
             aabb_lo, aabb_hi = (
-                np.min(particle_positions, dim=0) - particle_contact_offset,
-                np.max(particle_positions, dim=0) + particle_contact_offset,
+                th.min(particle_positions, dim=0) - particle_contact_offset,
+                th.max(particle_positions, dim=0) + particle_contact_offset,
             )
         else:
             points_world = [link.collision_boundary_points_world for link in self._links.values()]
             all_points = th.cat([p for p in points_world if p is not None], dim=0)
-            aabb_lo = np.min(all_points, dim=0)
-            aabb_hi = np.max(all_points, dim=0)
+            aabb_lo = th.min(all_points, dim=0)
+            aabb_hi = th.max(all_points, dim=0)
         return aabb_lo, aabb_hi
 
     @property

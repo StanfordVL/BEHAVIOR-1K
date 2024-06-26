@@ -77,7 +77,7 @@ def benchmark_scene(sim):
             step_freqs.append(1 / (end - start))
 
         xs.append(i * NUM_OBJS_PER_ITER)
-        max_freq, min_freq = np.max(step_freqs), np.min(step_freqs)
+        max_freq, min_freq = th.max(step_freqs), th.min(step_freqs)
         ys.append(np.mean((max_freq, min_freq)))
         yerrs.append(max_freq - ys[-1])
 

@@ -699,8 +699,8 @@ class RigidPrim(XFormPrim):
             # When there's no points on the collision meshes
             return position, position
 
-        aabb_lo = np.min(hull_points, dim=0)
-        aabb_hi = np.max(hull_points, dim=0)
+        aabb_lo = th.min(hull_points, dim=0)
+        aabb_hi = th.max(hull_points, dim=0)
         return aabb_lo, aabb_hi
 
     @property
@@ -731,8 +731,8 @@ class RigidPrim(XFormPrim):
         assert hull_points is not None, "No visual boundary points found for this rigid prim"
 
         # Calculate and return the AABB
-        aabb_lo = np.min(hull_points, dim=0)
-        aabb_hi = np.max(hull_points, dim=0)
+        aabb_lo = th.min(hull_points, dim=0)
+        aabb_hi = th.max(hull_points, dim=0)
 
         return aabb_lo, aabb_hi
 

@@ -33,7 +33,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
         visual=False
     )
 
-    grasp_center_pos = bbox_center_in_world + th.Tensor([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
+    grasp_center_pos = bbox_center_in_world + th.Tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
@@ -183,7 +183,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
-    assert np.isclose(np.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
+    assert np.isclose(th.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = np.argmax(np.abs(push_axis))
     canonical_push_axis = np.eye(3)[push_axis_idx]
 
@@ -296,7 +296,7 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     travel_distance = np.linalg.norm(end_pose[0] - start_pos)
 
     if num_waypoints == "default":
-        num_waypoints = np.max([2, int(travel_distance / 0.01) + 1])
+        num_waypoints = th.max([2, int(travel_distance / 0.01) + 1])
     pos_waypoints = np.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations

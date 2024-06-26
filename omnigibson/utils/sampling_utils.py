@@ -1179,7 +1179,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
 
     # Choose the minimum of these multiples, e.g. how many times the ray direction should be multiplied
     # to reach the nearest boundary.
-    multiple_to_face = np.min(multiple_to_face_on_each_axis[np.isfinite(multiple_to_face_on_each_axis)])
+    multiple_to_face = th.min(multiple_to_face_on_each_axis[np.isfinite(multiple_to_face_on_each_axis)])
 
     # Finally, use the multiple we found to calculate the point on the AABB boundary that we want to cast our
     # ray until.
