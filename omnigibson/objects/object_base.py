@@ -365,7 +365,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
-            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
             xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
                 translate=translate, angles=[0, 0, rotation_around_Z_axis]
             )

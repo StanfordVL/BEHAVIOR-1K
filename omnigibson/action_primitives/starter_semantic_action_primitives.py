@@ -1381,7 +1381,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         obj_in_base = T.relative_pose_transform(*target_obj_pose, *robot_pose)
 
         # compute angle between base and object in xy plane (parallel to floor)
-        theta = np.arctan2(obj_in_base[0][1], obj_in_base[0][0])
+        theta = th.arctan2(obj_in_base[0][1], obj_in_base[0][0])
 
         # if it is possible to get object in view, compute both head joint positions
         if head1_joint_limits[0] < theta < head1_joint_limits[1]:
@@ -1391,7 +1391,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             head2_pose = self.robot.links["head_2_link"].get_position_orientation()
             head2_in_base = T.relative_pose_transform(*head2_pose, *robot_pose)
 
-            phi = np.arctan2(obj_in_base[0][2] - head2_in_base[0][2], obj_in_base[0][0])
+            phi = th.arctan2(obj_in_base[0][2] - head2_in_base[0][2], obj_in_base[0][0])
             if head2_joint_limits[0] < phi < head2_joint_limits[1]:
                 head2_joint_goal = phi
 
@@ -1633,7 +1633,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 break
 
             diff_pos = end_pose[0] - self.robot.get_position()
-            intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
+            intermediate_pose = (end_pose[0], T.euler2quat([0, 0, th.arctan2(diff_pos[1], diff_pos[0])]))
             body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2]
             if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:

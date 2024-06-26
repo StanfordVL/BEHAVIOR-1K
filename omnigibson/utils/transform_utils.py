@@ -962,7 +962,7 @@ def get_orientation_diff_in_radian(orn0, orn1):
     vec0 /= th.norm(vec0)
     vec1 = quat2axisangle(orn1)
     vec1 /= th.norm(vec1)
-    return np.arccos(th.dot(vec0, vec1))
+    return th.arccos(th.dot(vec0, vec1))
 
 
 def get_pose_error(target_pose, current_pose):
@@ -1025,7 +1025,7 @@ def vecs2axisangle(vec0, vec1):
     vec1 = normalize(vec1, dim=-1)
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return th.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
+    return th.cross(vec0, vec1) * th.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
 def vecs2quat(vec0, vec1, normalized=False):
@@ -1115,7 +1115,7 @@ def normalize(v, dim=None, eps=1e-10):
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
     rho = th.sqrt(x**2 + y**2)
-    phi = np.arctan2(y, x)
+    phi = th.arctan2(y, x)
     return rho, phi
 
 
@@ -1147,7 +1147,7 @@ def check_quat_right_angle(quat, atol=5e-2):
 def z_angle_from_quat(quat):
     """Get the angle around the Z axis produced by the quaternion."""
     rotated_X_axis = R.from_quat(quat).apply([1, 0, 0])
-    return np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+    return th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
 
 
 def z_rotation_from_quat(quat):
@@ -1187,4 +1187,4 @@ def calculate_xy_plane_angle(quaternion):
         return 0.0
 
     fwd /= th.norm(fwd)
-    return np.arctan2(fwd[1], fwd[0])
+    return th.arctan2(fwd[1], fwd[0])

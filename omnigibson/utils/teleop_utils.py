@@ -468,5 +468,5 @@ class OVXRSystem(TeleopSystem):
                         v2 = next_joint_pos - cur_joint_pos
                         v1 /= th.norm(v1)
                         v2 /= th.norm(v2)
-                        joint_angles[i, j] = np.arccos(v1 @ v2)
+                        joint_angles[i, j] = th.arccos(v1 @ v2)
                 self.teleop_action.hand_data[hand_name] = joint_angles

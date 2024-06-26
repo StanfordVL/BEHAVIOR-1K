@@ -106,7 +106,7 @@ def plan_base_motion(
             segment = []
             segment.append(p2[0] - p1[0])
             segment.append(p2[1] - p1[1])
-            return np.arctan2(segment[1], segment[0])
+            return th.arctan2(segment[1], segment[0])
 
     def create_state(space, x, y, yaw):
         x = float(x)

@@ -483,8 +483,8 @@ class CameraMover:
                 # Infer tilt and pan angles from this direction
                 xy_direction = direction[:2] / th.norm(direction[:2])
                 z = direction[2]
-                pan_angle = np.arctan2(-xy_direction[0], xy_direction[1])
-                tilt_angle = np.arcsin(z)
+                pan_angle = th.arctan2(-xy_direction[0], xy_direction[1])
+                tilt_angle = th.arcsin(z)
                 # Infer global quat orientation from these angles
                 quat = T.euler2quat([3.1415 / 2 + tilt_angle, 0.0, pan_angle])
                 poses.append([positions[j], quat])
