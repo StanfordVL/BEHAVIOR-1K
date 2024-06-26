@@ -316,7 +316,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Sanity check scale if requested
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
-            if self.method == ParticleModifyMethod.PROJECTION and not np.isclose(
+            if self.method == ParticleModifyMethod.PROJECTION and not th.isclose(
                 self.obj.scale.max(), self.obj.scale.min(), atol=1e-04
             ):
                 raise ValueError(
@@ -1093,10 +1093,10 @@ class ParticleApplier(ParticleModifier):
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_local_pose()
             assert th.all(
-                np.isclose(local_pos + th.Tensor([0, 0, height / 2.0]), 0.0)
+                th.isclose(local_pos + th.Tensor([0, 0, height / 2.0]), 0.0)
             ), "Projection mesh tip should align with metalink position!"
             assert th.all(
-                np.isclose(T.quat2euler(local_quat), 0.0)
+                th.isclose(T.quat2euler(local_quat), 0.0)
             ), "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations

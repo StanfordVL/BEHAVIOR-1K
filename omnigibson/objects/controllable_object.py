@@ -168,7 +168,7 @@ class ControllableObject(BaseObject):
             )
             self._control_freq = expected_control_freq
         else:
-            assert np.isclose(
+            assert th.isclose(
                 expected_control_freq, self._control_freq
             ), "Stored control frequency does not match environment's render timestep."
 

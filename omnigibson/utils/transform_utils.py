@@ -1141,7 +1141,7 @@ def check_quat_right_angle(quat, atol=5e-2):
     Returns:
         bool: Whether the quaternion is a right angle or not
     """
-    return th.any(np.isclose(th.abs(quat).sum(), th.Tensor([1.0, 1.414, 2.0]), atol=atol))
+    return th.any(th.isclose(th.abs(quat).sum(), th.Tensor([1.0, 1.414, 2.0]), atol=atol))
 
 
 def z_angle_from_quat(quat):

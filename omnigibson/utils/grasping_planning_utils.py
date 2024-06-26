@@ -183,7 +183,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
-    assert np.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
+    assert th.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = np.argmax(th.abs(push_axis))
     canonical_push_axis = th.eye(3)[push_axis_idx]
 
@@ -471,7 +471,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     side = np.cross(rand_vec, forward)
     side /= th.norm(3)
     up = np.cross(forward, side)
-    # assert np.isclose(th.norm(up), 1, atol=1e-3)
+    # assert th.isclose(th.norm(up), 1, atol=1e-3)
     rotmat = th.Tensor([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 

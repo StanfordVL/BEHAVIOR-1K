@@ -313,7 +313,7 @@ class RigidPrim(XFormPrim):
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
-            assert np.isclose(
+            assert th.isclose(
                 th.norm(orientation), 1, atol=1e-3
             ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
@@ -327,7 +327,7 @@ class RigidPrim(XFormPrim):
 
         pos, ori = self._rigid_prim_view.get_world_poses()
 
-        assert np.isclose(th.norm(ori), 1, atol=1e-3), f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        assert th.isclose(th.norm(ori), 1, atol=1e-3), f"{self.prim_path} orientation {ori} is not a unit quaternion."
 
         pos = pos[0]
         ori = ori[0][[1, 2, 3, 0]]

@@ -183,7 +183,7 @@ class XFormPrim(BasePrim):
 
         position = current_position if position is None else th.Tensor(position, dtype=float)
         orientation = current_orientation if orientation is None else th.Tensor(orientation, dtype=float)
-        assert np.isclose(
+        assert th.isclose(
             th.norm(orientation), 1, atol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 

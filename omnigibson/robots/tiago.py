@@ -708,7 +708,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         if orientation is None:
             orientation = current_orientation
         position, orientation = th.Tensor(position), th.Tensor(orientation)
-        assert np.isclose(
+        assert th.isclose(
             th.norm(orientation), 1, atol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
