@@ -1,5 +1,5 @@
-import numpy as np
 import pytest
+import torch as th
 from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
 
 import omnigibson as og

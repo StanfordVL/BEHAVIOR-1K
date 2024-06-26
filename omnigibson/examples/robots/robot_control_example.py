@@ -4,7 +4,7 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

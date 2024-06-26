@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-import numpy as np
+import torch as th
 from scipy.spatial import ConvexHull, QhullError, distance_matrix
 
 from omnigibson.macros import create_module_macros

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask

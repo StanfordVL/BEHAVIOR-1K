@@ -2,7 +2,7 @@
 Example script demo'ing robot manipulation control with grasping.
 """
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm

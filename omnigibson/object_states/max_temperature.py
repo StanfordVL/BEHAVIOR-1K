@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState

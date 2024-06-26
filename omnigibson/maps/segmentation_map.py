@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 from PIL import Image
 
 # Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError

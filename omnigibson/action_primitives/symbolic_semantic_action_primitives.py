@@ -4,7 +4,7 @@ A set of action primitives that work without executing low-level physics but ins
 objects directly into their post-condition states. Useful for learning high-level methods.
 """
 
-import numpy as np
+import torch as th
 from aenum import IntEnum, auto
 
 from omnigibson import object_states

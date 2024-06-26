@@ -2,7 +2,7 @@ import itertools
 import os
 
 import networkx as nx
-import numpy as np
+import torch as th
 from matplotlib import pyplot as plt
 from PIL import Image
 

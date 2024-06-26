@@ -1,7 +1,7 @@
 import sys
 from collections import defaultdict
 
-import numpy as np
+import torch as th
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og

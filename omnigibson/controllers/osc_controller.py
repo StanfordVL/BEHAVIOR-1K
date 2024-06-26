@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 from numba import jit
 
 import omnigibson.utils.transform_utils as T

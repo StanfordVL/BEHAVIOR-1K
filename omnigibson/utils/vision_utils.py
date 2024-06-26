@@ -1,6 +1,6 @@
 import colorsys
 
-import numpy as np
+import torch as th
 from PIL import Image, ImageDraw
 
 import omnigibson as og

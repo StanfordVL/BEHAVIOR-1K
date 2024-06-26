@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from enum import IntEnum
 
-import numpy as np
+import torch as th
 
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 

@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 import cv2
-import numpy as np
+import torch as th
 from transforms3d.quaternions import quat2mat
 
 import omnigibson.lazy as lazy

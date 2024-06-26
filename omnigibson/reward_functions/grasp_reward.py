@@ -1,6 +1,6 @@
 import math
 
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson.utils.transform_utils as T

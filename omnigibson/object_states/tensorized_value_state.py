@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin

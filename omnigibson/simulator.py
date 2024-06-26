@@ -12,7 +12,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

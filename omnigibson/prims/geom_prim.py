@@ -1,6 +1,6 @@
 from functools import cached_property
 
-import numpy as np
+import torch as th
 import trimesh
 
 import omnigibson as og

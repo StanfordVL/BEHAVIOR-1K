@@ -6,7 +6,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 from omnigibson import app, launch_simulator
 from omnigibson.objects.primitive_object import PrimitiveObject

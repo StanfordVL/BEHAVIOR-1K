@@ -14,7 +14,7 @@ from math import ceil
 
 import cv2
 import gymnasium as gym
-import numpy as np
+import torch as th
 from aenum import IntEnum, auto
 from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation, Slerp

@@ -1,5 +1,5 @@
-import numpy as np
 import pytest
+import torch as th
 from telemoma.human_interface.teleop_core import TeleopAction
 
 import omnigibson as og

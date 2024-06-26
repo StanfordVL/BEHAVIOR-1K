@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition

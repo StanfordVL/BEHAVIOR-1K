@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes

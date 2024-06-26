@@ -4,7 +4,7 @@ from abc import ABC
 from collections import OrderedDict
 from typing import Iterable, List, Tuple
 
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og

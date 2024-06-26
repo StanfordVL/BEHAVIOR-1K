@@ -1,7 +1,7 @@
 import copy
 import time
 
-import numpy as np
+import torch as th
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn
 from tqdm import trange

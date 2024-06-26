@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import namedtuple
 
 import networkx as nx
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

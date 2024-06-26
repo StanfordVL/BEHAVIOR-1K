@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import bddl
 import networkx as nx
-import numpy as np
+import torch as th
 from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation

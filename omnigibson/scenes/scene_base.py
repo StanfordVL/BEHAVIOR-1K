@@ -5,7 +5,7 @@ import tempfile
 from abc import ABC
 from itertools import combinations
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

@@ -1,6 +1,6 @@
 from abc import ABCMeta
 
-import numpy as np
+import torch as th
 
 import omnigibson.lazy as lazy
 

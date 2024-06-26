@@ -1,7 +1,7 @@
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 import trimesh
 from scipy.spatial.transform import Rotation as R
 

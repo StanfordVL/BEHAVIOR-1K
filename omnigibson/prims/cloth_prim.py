@@ -9,7 +9,7 @@
 
 from collections.abc import Iterable
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

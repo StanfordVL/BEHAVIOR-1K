@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
 import gymnasium as gym
-import numpy as np
+import torch as th
 
 from omnigibson.utils.ui_utils import create_module_logger
 

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.sensors.sensor_noise_base import BaseSensorNoise
 

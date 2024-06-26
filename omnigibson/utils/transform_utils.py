@@ -6,7 +6,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 
 import math
 
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 
 PI = np.pi

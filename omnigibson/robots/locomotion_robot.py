@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-import numpy as np
+import torch as th
 from transforms3d.euler import euler2quat
 from transforms3d.quaternions import qmult, quat2mat
 

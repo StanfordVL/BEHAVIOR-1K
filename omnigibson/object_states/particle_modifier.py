@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections import defaultdict
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy

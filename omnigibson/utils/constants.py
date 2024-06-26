@@ -7,7 +7,7 @@ import os
 from enum import Enum, IntEnum
 from functools import cache
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm

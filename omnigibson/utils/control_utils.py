@@ -2,7 +2,7 @@
 Set of utilities for helping to execute robot control
 """
 
-import numpy as np
+import torch as th
 from numba import jit
 
 import omnigibson.lazy as lazy

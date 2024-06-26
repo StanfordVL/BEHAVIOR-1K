@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-import numpy as np
+import torch as th
 import trimesh.transformations
 from scipy.spatial.transform import Rotation as R
 

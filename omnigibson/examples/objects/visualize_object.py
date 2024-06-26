@@ -1,6 +1,6 @@
 import argparse
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T

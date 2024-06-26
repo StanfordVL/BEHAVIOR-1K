@@ -1,6 +1,6 @@
 from math import ceil
 
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 

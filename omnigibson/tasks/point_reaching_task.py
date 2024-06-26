@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.tasks.point_navigation_task import PointNavigationTask

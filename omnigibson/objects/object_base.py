@@ -2,7 +2,7 @@ from abc import ABCMeta
 from collections.abc import Iterable
 from functools import cached_property
 
-import numpy as np
+import torch as th
 import trimesh
 from scipy.spatial.transform import Rotation
 

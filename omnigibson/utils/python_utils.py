@@ -10,7 +10,7 @@ from copy import deepcopy
 from functools import cache, wraps
 from importlib import import_module
 
-import numpy as np
+import torch as th
 
 # Global dictionary storing all unique names
 NAMES = set()

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 import yaml
 
 import omnigibson as og

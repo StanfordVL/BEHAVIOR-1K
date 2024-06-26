@@ -4,7 +4,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm

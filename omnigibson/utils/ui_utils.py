@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import imageio
-import numpy as np
+import torch as th
 from IPython import embed
 from PIL import Image
 from scipy.integrate import quad

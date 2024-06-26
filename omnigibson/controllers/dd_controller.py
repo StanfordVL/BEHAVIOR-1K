@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.controllers import ControlType, LocomotionController
 

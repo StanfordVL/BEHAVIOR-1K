@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
-import numpy as np
+import torch as th
 
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import Registerable, classproperty

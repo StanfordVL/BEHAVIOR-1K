@@ -2,7 +2,7 @@
 A set of helper utility functions for dealing with 3D geometry
 """
 
-import numpy as np
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh

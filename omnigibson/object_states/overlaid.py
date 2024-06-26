@@ -1,6 +1,6 @@
 import itertools
 
-import numpy as np
+import torch as th
 import trimesh
 from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
 

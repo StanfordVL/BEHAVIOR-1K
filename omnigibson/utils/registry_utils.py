@@ -5,7 +5,7 @@ A set of utility functions for registering and tracking objects
 from collections.abc import Iterable
 from inspect import isclass
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance

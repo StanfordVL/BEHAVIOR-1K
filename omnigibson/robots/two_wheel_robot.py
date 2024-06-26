@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 import gymnasium as gym
-import numpy as np
+import torch as th
 
 from omnigibson.controllers import DifferentialDriveController
 from omnigibson.robots.locomotion_robot import LocomotionRobot

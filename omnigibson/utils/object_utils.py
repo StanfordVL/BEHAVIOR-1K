@@ -2,7 +2,7 @@
 Helper utility functions for computing relevant object information
 """
 
-import numpy as np
+import torch as th
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og

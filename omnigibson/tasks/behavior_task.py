@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,

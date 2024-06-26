@@ -1,6 +1,6 @@
 from functools import cached_property
 
-import numpy as np
+import torch as th
 from scipy.spatial import ConvexHull, QhullError
 
 import omnigibson as og

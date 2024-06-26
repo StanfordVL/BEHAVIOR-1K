@@ -5,7 +5,7 @@ import os
 import re
 from collections.abc import Iterable
 
-import numpy as np
+import torch as th
 import trimesh
 
 import omnigibson as og

@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from pathlib import Path
 
-import numpy as np
+import torch as th
 import trimesh
 
 import omnigibson as og

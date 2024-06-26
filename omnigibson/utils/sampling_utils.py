@@ -2,7 +2,7 @@ import itertools
 import time
 from collections import Counter, defaultdict
 
-import numpy as np
+import torch as th
 import trimesh
 from scipy.spatial.transform import Rotation as R
 from scipy.stats import truncnorm

@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros

@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.franka import FrankaPanda

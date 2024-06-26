@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-import numpy as np
+import torch as th
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty

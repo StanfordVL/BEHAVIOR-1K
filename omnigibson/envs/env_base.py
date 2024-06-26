@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import gymnasium as gym
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm

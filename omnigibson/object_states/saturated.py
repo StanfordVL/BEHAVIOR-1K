@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState

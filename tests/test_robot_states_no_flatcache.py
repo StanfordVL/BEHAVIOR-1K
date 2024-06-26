@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 from test_robot_states_flatcache import camera_pose_test, setup_environment
 
 import omnigibson as og
