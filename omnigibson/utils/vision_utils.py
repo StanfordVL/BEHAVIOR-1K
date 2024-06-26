@@ -105,7 +105,7 @@ class Remapper:
         if image_max_key > key_array_max_key:
             prev_key_array = self.key_array.copy()
             # We build a new key array and use max uint32 as the default value.
-            self.key_array = np.full(image_max_key + 1, np.iinfo(th.uint32).max, dtype=th.uint32)
+            self.key_array = th.full(image_max_key + 1, np.iinfo(th.uint32).max, dtype=th.uint32)
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 

@@ -199,8 +199,8 @@ class JointPrim(BasePrim):
             kp, kd = 0.0, 0.0
 
         # Set values
-        kps = np.full((1, self._n_dof), kp)
-        kds = np.full((1, self._n_dof), kd)
+        kps = th.full((1, self._n_dof), kp)
+        kds = th.full((1, self._n_dof), kd)
         self._articulation_view.set_gains(kps=kps, kds=kds, joint_indices=self.dof_indices)
 
         # Update control type
