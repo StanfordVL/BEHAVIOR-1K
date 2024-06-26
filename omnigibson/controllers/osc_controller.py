@@ -483,7 +483,7 @@ def _compute_osc_torques(
     if decouple_pos_ori:
         # # More efficient, but numba doesn't support 3D tensor operations yet
         # j_eef_batch = j_eef.reshape(2, 3, -1)
-        # m_eef_pose_inv = th.matmul(th.matmul(j_eef_batch, np.expand_dims(mm_inv, dim=0)), np.transpose(j_eef_batch, (0, 2, 1)))
+        # m_eef_pose_inv = th.matmul(th.matmul(j_eef_batch, np.expand_dims(mm_inv, dim=0)), th.transpose(j_eef_batch, (0, 2, 1)))
         # m_eef_pose = th.linalg.inv_ex(m_eef_pose_inv)  # Shape (2, 3, 3)
         # wrench = th.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
         m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
