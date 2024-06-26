@@ -152,9 +152,9 @@ class TraversableMap(BaseMap):
             # If previous point is given, sample a point in the same connected component
             prev_xy_map = self.world_to_map(reference_point[:2])
             prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
-            trav_space = np.where(component_labels == prev_label)
+            trav_space = th.where(component_labels == prev_label)
         else:
-            trav_space = np.where(trav_map == 255)
+            trav_space = th.where(trav_map == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
         xy_map = th.Tensor([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)

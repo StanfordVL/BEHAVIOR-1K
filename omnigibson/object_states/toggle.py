@@ -69,7 +69,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
             n_bodies = len(finger_impulses)
             touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
-            touching_bodies_idxs = np.where(touching_bodies)[0]
+            touching_bodies_idxs = th.where(touching_bodies)[0]
             if len(touching_bodies_idxs) > 0:
                 for idx in touching_bodies_idxs:
                     body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)

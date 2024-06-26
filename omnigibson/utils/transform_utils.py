@@ -1045,7 +1045,7 @@ def vecs2quat(vec0, vec1, normalized=False):
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = th.sum(vec0 * vec1, dim=-1, keepdims=True)
-    quat_unnormalized = np.where(
+    quat_unnormalized = th.where(
         cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
     return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdims=True)
@@ -1109,7 +1109,7 @@ def anorm(x, dim=None, keepdims=False):
 def normalize(v, dim=None, eps=1e-10):
     """L2 Normalize along specified axes."""
     norm = anorm(v, dim=axis, keepdims=True)
-    return v / np.where(norm < eps, eps, norm)
+    return v / th.where(norm < eps, eps, norm)
 
 
 def cartesian_to_polar(x, y):

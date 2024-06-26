@@ -1171,7 +1171,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
     point_to_max = aabb_max - start_pos
 
     # Then choose the distance to the point in the correct direction on each axis.
-    closer_point_on_each_axis = np.where(ray_direction < 0, point_to_min, point_to_max)
+    closer_point_on_each_axis = th.where(ray_direction < 0, point_to_min, point_to_max)
 
     # For each axis, find how many times the ray direction should be multiplied to reach the AABB's boundary.
     multiple_to_face_on_each_axis = closer_point_on_each_axis / ray_direction

@@ -684,7 +684,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
     semantic_id_list_np = np.unique(th.Tensor(semantic_id_list))
     color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
     for bbox_2d in bbox_2d_list:
-        index = np.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
+        index = th.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
         bbox_color = color_list[index]
         outline = (bbox_color[0], bbox_color[1], bbox_color[2])
         if num_channels == 4:

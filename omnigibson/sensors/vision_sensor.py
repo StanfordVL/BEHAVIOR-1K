@@ -423,7 +423,7 @@ class VisionSensor(BaseSensor):
                 # we will label this as "unlabelled" for now
                 # This only happens with a very small number of pixels, e.g. 0.1% of the image
                 else:
-                    num_of_pixels = len(np.where(img == key)[0])
+                    num_of_pixels = len(th.where(img == key)[0])
                     resolution = (self._load_config["image_width"], self._load_config["image_height"])
                     percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
                     if percentage > 2:

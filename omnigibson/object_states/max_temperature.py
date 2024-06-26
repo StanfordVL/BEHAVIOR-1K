@@ -32,7 +32,7 @@ class MaxTemperature(TensorizedValueState):
             # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
             # subtract 1 from all downstream indices
             deleted_idx = Temperature.OBJ_IDXS[obj]
-            cls.TEMPERATURE_IDXS = np.where(
+            cls.TEMPERATURE_IDXS = th.where(
                 cls.TEMPERATURE_IDXS >= deleted_idx, cls.TEMPERATURE_IDXS - 1, cls.TEMPERATURE_IDXS
             )
 

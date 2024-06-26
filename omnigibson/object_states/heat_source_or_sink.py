@@ -236,7 +236,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
-                    for idx in np.where(
+                    for idx in th.where(
                         th.all(
                             (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
                             dim=-1,
@@ -267,7 +267,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
-                    for idx in np.where(
+                    for idx in th.where(
                         th.norm(heat_source_pos.reshape(1, 3) - cloth_positions, dim=-1) <= self.distance_threshold
                     )[0]:
                         affected_objects.add(cloth_objs[idx])

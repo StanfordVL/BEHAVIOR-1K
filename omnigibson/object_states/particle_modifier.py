@@ -1162,7 +1162,7 @@ class ParticleApplier(ParticleModifier):
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
         points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         pos, quat = self.link.get_position_orientation()
-        points = points[np.where(self._check_in_mesh(points))[0]]
+        points = points[th.where(self._check_in_mesh(points))[0]]
         # Convert the points into local frame
         points_in_local_frame = get_particle_positions_in_frame(
             pos=pos,

@@ -884,11 +884,11 @@ class PhysicalParticleSystem(BaseSystem):
         # Generate 3D-rectangular grid of points
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
-        particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
+        particle_positions = particle_positions[th.where(check_in_volume(particle_positions))[0]]
 
         # Also prune any that in contact with anything if requested
         if check_contact:
-            particle_positions = particle_positions[np.where(self.check_in_contact(particle_positions) == 0)[0]]
+            particle_positions = particle_positions[th.where(self.check_in_contact(particle_positions) == 0)[0]]
 
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:

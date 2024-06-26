@@ -2011,7 +2011,7 @@ class CookingPhysicalParticleRule(RecipeRule):
     def _execute_recipe(cls, container, recipe, container_info):
         system = get_system(recipe["input_systems"][0])
         contained_particles_state = container.states[ContainedParticles].get_value(system)
-        in_volume_idx = np.where(contained_particles_state.in_volume)[0]
+        in_volume_idx = th.where(contained_particles_state.in_volume)[0]
         assert len(in_volume_idx) > 0, "No particles found in the container when executing recipe!"
 
         # Remove uncooked particles

@@ -74,7 +74,7 @@ class SegmentationMap(BaseMap):
         unique_ins_ids = np.delete(unique_ins_ids, 0)
         for ins_id in unique_ins_ids:
             # find one pixel for each ins id
-            x, y = np.where(img_ins == ins_id)
+            x, y = th.where(img_ins == ins_id)
             # retrieve the correspounding sem id
             sem_id = img_sem[x[0], y[0]]
             if sem_id not in sem_id_to_ins_id:
@@ -122,7 +122,7 @@ class SegmentationMap(BaseMap):
             return None, None
 
         sem_id = self.room_sem_name_to_sem_id[room_type]
-        valid_idx = th.Tensor(np.where(self.room_sem_map == sem_id))
+        valid_idx = th.Tensor(th.where(self.room_sem_map == sem_id))
         random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
@@ -148,7 +148,7 @@ class SegmentationMap(BaseMap):
             return None, None
 
         ins_id = self.room_ins_name_to_ins_id[room_instance]
-        valid_idx = th.Tensor(np.where(self.room_ins_map == ins_id))
+        valid_idx = th.Tensor(th.where(self.room_ins_map == ins_id))
         random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
