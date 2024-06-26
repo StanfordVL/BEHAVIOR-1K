@@ -1311,7 +1311,7 @@ class RecipeRule(BaseTransitionRule):
     def _validate_recipe_objects_non_multi_instance(cls, recipe, category_to_valid_indices, in_volume):
         # Check if sufficiently number of objects are contained
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            if np.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
+            if th.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
                 return False
         return True
 
@@ -1389,7 +1389,7 @@ class RecipeRule(BaseTransitionRule):
             # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
             # container, then 2 instance of the recipe can be produced.
             for obj_category, obj_quantity in recipe["input_objects"].items():
-                quantity_in_volume = np.sum(in_volume[category_to_valid_indices[obj_category]])
+                quantity_in_volume = th.sum(in_volume[category_to_valid_indices[obj_category]])
                 num_inst = quantity_in_volume // obj_quantity
                 if num_inst < 1:
                     return False

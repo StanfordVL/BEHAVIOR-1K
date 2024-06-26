@@ -1348,7 +1348,7 @@ class ManipulationRobot(BaseRobot):
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03
         gripper_finger_pos = self.get_joint_positions()[self.gripper_control_idx[arm]]
-        gripper_finger_close = np.sum(gripper_finger_pos) < GRIPPER_FINGER_CLOSE_THRESHOLD
+        gripper_finger_close = th.sum(gripper_finger_pos) < GRIPPER_FINGER_CLOSE_THRESHOLD
         if not gripper_finger_close:
             return None
 

@@ -115,7 +115,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(np.sum([np.product(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(th.sum([np.product(shape) for shape in self._goal_shapes.values()]))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None

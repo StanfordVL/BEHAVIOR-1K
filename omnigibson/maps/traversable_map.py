@@ -192,7 +192,7 @@ class TraversableMap(BaseMap):
             # No traversable path found
             return None, None
         path_world = self.map_to_world(path_map)
-        geodesic_distance = np.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
+        geodesic_distance = th.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
         path_world = path_world[:: self.waypoint_interval]
 
         if not entire_path:

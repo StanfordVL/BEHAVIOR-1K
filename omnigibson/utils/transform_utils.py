@@ -914,7 +914,7 @@ def unit_vector(data, dim=None, out=None):
         if out is not data:
             out[:] = th.Tensor(data, copy=False)
         data = out
-    length = np.atleast_1d(np.sum(data * data, axis))
+    length = np.atleast_1d(th.sum(data * data, axis))
     np.sqrt(length, length)
     if axis is not None:
         length = np.expand_dims(length, axis)
@@ -1044,7 +1044,7 @@ def vecs2quat(vec0, vec1, normalized=False):
         vec1 = normalize(vec1, dim=-1)
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
-    cos_theta = np.sum(vec0 * vec1, dim=-1, keepdims=True)
+    cos_theta = th.sum(vec0 * vec1, dim=-1, keepdims=True)
     quat_unnormalized = np.where(
         cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )

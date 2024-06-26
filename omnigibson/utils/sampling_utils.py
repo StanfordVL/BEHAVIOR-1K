@@ -1044,9 +1044,9 @@ def compute_rotation_from_grid_sample(
         None or scipy.Rotation: If successfully hit, returns relative rotation from two_d_grid to
             generated hit plane. Otherwise, returns None
     """
-    if np.sum(hits) < 3:
+    if th.sum(hits) < 3:
         if m.DEBUG_SAMPLING:
-            refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {np.sum(hits)}")
+            refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {th.sum(hits)}")
         return None
 
     grid_in_planar_coordinates = two_d_grid.reshape(-1, 2)

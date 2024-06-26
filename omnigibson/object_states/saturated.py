@@ -183,7 +183,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             # We want diffuse_tint to sum to 2.5 to result in the final RGB to sum to 1.5 on average
             # This is because an average RGB color sum to 1.5 (i.e. [0.5, 0.5, 0.5])
             # (0.5 [original avg RGB per channel] + 0.1 [albedo_add]) * 2.5 = 1.5
-            diffuse_tint = th.Tensor([0.5, 0.5, 0.5]) + avg_color / np.sum(avg_color)
+            diffuse_tint = th.Tensor([0.5, 0.5, 0.5]) + avg_color / th.sum(avg_color)
             diffuse_tint = diffuse_tint.tolist()
 
         return albedo_add, diffuse_tint

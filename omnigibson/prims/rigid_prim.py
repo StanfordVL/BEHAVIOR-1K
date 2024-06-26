@@ -226,7 +226,7 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
         if len(coms) > 0:
-            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(dim=0) / np.sum(vols)
+            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(dim=0) / th.sum(vols)
             self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
 
     def enable_collisions(self):

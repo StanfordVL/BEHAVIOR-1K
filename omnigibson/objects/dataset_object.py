@@ -174,7 +174,7 @@ class DatasetObject(USDObject):
             chosen_orientation = th.Tensor([0, 0, 0, 1.0])
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = th.Tensor(probabilities) / np.sum(probabilities)
+            probabilities = th.Tensor(probabilities) / th.sum(probabilities)
             chosen_orientation = th.Tensor(
                 np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
             )

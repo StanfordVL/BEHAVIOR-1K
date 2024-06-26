@@ -24,7 +24,7 @@ class Pose(AbsoluteObjectState):
         # Get current pose
         current_pos, current_quat = self.get_value()
         # Check position and orientation -- either changing means we've changed poses
-        dist_squared = np.sum(np.square(current_pos - old_pos))
+        dist_squared = th.sum(np.square(current_pos - old_pos))
         if dist_squared > m.POSITIONAL_VALIDATION_EPSILON:
             return True
         # Calculate quat distance simply as the dot product
