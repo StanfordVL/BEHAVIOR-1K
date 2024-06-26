@@ -187,7 +187,7 @@ class MultiFingerGripperController(GripperController):
             violate_lower_limit = (
                 joint_pos < self._control_limits[ControlType.POSITION][0][self.dof_idx] + self._limit_tolerance
             )
-            violation = np.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
+            violation = th.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
             u *= ~violation
 
         # Update whether we're grasping or not
