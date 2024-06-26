@@ -49,8 +49,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         outer_object_aabb_lo, outer_object_aabb_hi = other.states[AABB].get_value()
 
         if not (
-            np.less_equal(outer_object_aabb_lo, inner_object_pos).all()
-            and np.less_equal(inner_object_pos, outer_object_aabb_hi).all()
+            th.le(outer_object_aabb_lo, inner_object_pos).all() and th.le(inner_object_pos, outer_object_aabb_hi).all()
         ):
             return False
 
