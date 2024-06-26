@@ -69,7 +69,7 @@ class MacroParticleSystem(BaseSystem):
         og.sim.post_import_object(particle_template)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via self.min/max_scale
-        assert np.all(particle_template.scale == 1.0)
+        assert th.all(particle_template.scale == 1.0)
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"

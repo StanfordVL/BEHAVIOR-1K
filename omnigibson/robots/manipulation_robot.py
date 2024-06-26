@@ -1278,9 +1278,9 @@ class ManipulationRobot(BaseRobot):
             if controller.control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
-                applying_grasp = np.any(controller.control < threshold)
+                applying_grasp = th.any(controller.control < threshold)
             else:
-                applying_grasp = np.any(controller.control > threshold)
+                applying_grasp = th.any(controller.control > threshold)
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
                 if self._ag_release_counter[arm] is not None:

@@ -1092,10 +1092,10 @@ class ParticleApplier(ParticleModifier):
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_local_pose()
-            assert np.all(
+            assert th.all(
                 np.isclose(local_pos + th.Tensor([0, 0, height / 2.0]), 0.0)
             ), "Projection mesh tip should align with metalink position!"
-            assert np.all(
+            assert th.all(
                 np.isclose(T.quat2euler(local_quat), 0.0)
             ), "Projection mesh orientation should align with metalink orientation!"
 
@@ -1151,7 +1151,7 @@ class ParticleApplier(ParticleModifier):
         h = extent[2]
         low, high = self.obj.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int)
-        assert np.all(
+        assert th.all(
             n_particles_per_axis
         ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
         # 1e-10 is added because the extent might be an exact multiple of particle radius
@@ -1197,7 +1197,7 @@ class ParticleApplier(ParticleModifier):
         # If we're about to check for modification, update whether it the visualization should be active or not
         if self.visualize and self._current_step == 0:
             # Only one system in our conditions, so next(iter()) suffices
-            # is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
+            # is_active = bool(th.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
             is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
             self.projection_emitter.GetProperty("inputs:active").Set(is_active)
 

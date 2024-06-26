@@ -79,7 +79,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         currently_touching_sliceables = cls._currently_touching_sliceables()
 
         # If any of our values are False, we need to consider reverting back.
-        if not np.all(values):
+        if not th.all(values):
             not_active_not_touching = ~values & ~currently_touching_sliceables
             not_active_is_touching = ~values & currently_touching_sliceables
 
@@ -129,7 +129,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             # TODO: This can be vectorized. No point in doing this tensorized state to then compute this in a loop.
             # Batch check each slicer against all sliceables
             for i, slicer_idxs in enumerate(all_slicer_idxs):
-                if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
+                if th.any(impulses[slicer_idxs][:, sliceable_idxs]):
                     # We are touching at least one sliceable
                     currently_touching[i] = True
 

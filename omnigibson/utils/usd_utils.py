@@ -366,7 +366,7 @@ class RigidContactAPIImpl:
         assert (
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
-        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, dim=1))[0]
+        interesting_row_idxes = np.nonzero(th.any(interesting_impulse_columns > 0, dim=1))[0]
         interesting_row_paths = [
             GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
         ]
@@ -383,7 +383,7 @@ class RigidContactAPIImpl:
         assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
 
         # Early return if not in contact.
-        if not np.any(interesting_impulses > 0):
+        if not th.any(interesting_impulses > 0):
             return set()
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
@@ -406,7 +406,7 @@ class RigidContactAPIImpl:
             else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
         )
         relevant_impulses = impulses[row_idx][:, col_idx]
-        if not np.any(relevant_impulses > 0):
+        if not th.any(relevant_impulses > 0):
             return []
 
         # Get the contact data
@@ -471,7 +471,7 @@ class RigidContactAPIImpl:
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
         if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-            self._CONTACT_CACHE[key] = np.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+            self._CONTACT_CACHE[key] = th.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
         return self._CONTACT_CACHE[key]
 
     def clear(self):

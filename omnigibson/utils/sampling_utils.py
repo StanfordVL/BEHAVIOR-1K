@@ -73,7 +73,7 @@ def check_distance_to_plane(points, plane_centroid, plane_normal, hit_to_plane_t
         bool: True if all points are within @hit_to_plane_threshold distance to plane, otherwise False
     """
     distances = get_distance_to_plane(points, plane_centroid, plane_normal)
-    if np.any(distances > hit_to_plane_threshold):
+    if th.any(distances > hit_to_plane_threshold):
         if m.DEBUG_SAMPLING:
             refusal_log.append("distances to plane: %r" % distances)
         return False
@@ -160,7 +160,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     orthogonal_vector_2 /= np.linalg.norm(orthogonal_vector_2)
 
     orthogonal_vectors = th.Tensor([orthogonal_vector_1, orthogonal_vector_2])
-    assert np.all(np.isfinite(orthogonal_vectors))
+    assert th.all(np.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
     offset = th.Tensor([1, 1]) * offset
@@ -825,7 +825,7 @@ def sample_cuboid_on_object(
     num_samples = start_points.shape[0]
 
     cuboid_dimensions = th.Tensor(cuboid_dimensions)
-    if np.any(cuboid_dimensions > 50.0):
+    if th.any(cuboid_dimensions > 50.0):
         log.warning(
             "WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50). "
             "Terminating immediately, no hits will be registered."
@@ -1083,7 +1083,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
         1.0,
     )
     parallel_hit_normal_angles_to_hit_normal = np.arccos(parallel_hit_main_hit_dot_products)
-    all_rays_hit_with_similar_normal = np.all(parallel_hit_normal_angles_to_hit_normal < tolerance)
+    all_rays_hit_with_similar_normal = th.all(parallel_hit_normal_angles_to_hit_normal < tolerance)
     if not all_rays_hit_with_similar_normal:
         if m.DEBUG_SAMPLING:
             refusal_log.append("angles %r" % (np.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
@@ -1186,7 +1186,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
     point_on_face = start_pos + ray_direction * multiple_to_face
 
     # Make sure that we did not end up with all NaNs or infinities due to division issues.
-    assert not np.any(np.isnan(point_on_face)) and not np.any(np.isinf(point_on_face))
+    assert not th.any(np.isnan(point_on_face)) and not th.any(np.isinf(point_on_face))
 
     return point_on_face
 

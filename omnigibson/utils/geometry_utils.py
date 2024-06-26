@@ -416,7 +416,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         sampling_distance = np.cbrt(aabb_volume / min_n_particles)
         low, high = volume_link.visual_aabb
         n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
-        assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
+        assert th.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [np.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh

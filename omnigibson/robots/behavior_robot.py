@@ -433,7 +433,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         self._part_is_in_contact["body"] = len(self.links["body"].contact_list()) > 0
         for hand_name in self.arm_names:
-            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or np.any(
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or th.any(
                 [len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]]
             )
 

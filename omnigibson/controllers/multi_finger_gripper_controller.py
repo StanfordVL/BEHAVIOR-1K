@@ -218,7 +218,7 @@ class MultiFingerGripperController(GripperController):
             is_grasping = IsGraspingState.FALSE
 
         else:
-            assert np.all(
+            assert th.all(
                 self._control == self._control[0]
             ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
             assert m.POS_TOLERANCE > self._limit_tolerance, (
@@ -243,7 +243,7 @@ class MultiFingerGripperController(GripperController):
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                assert np.all((min_pos <= finger_pos) * (finger_pos <= max_pos)), (
+                assert th.all((min_pos <= finger_pos) * (finger_pos <= max_pos)), (
                     f"Got invalid finger joint positions when checking for grasp! "
                     f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
                 )
@@ -259,7 +259,7 @@ class MultiFingerGripperController(GripperController):
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
-                valid_grasp_vel = np.all(th.abs(finger_vel) < m.VEL_TOLERANCE)
+                valid_grasp_vel = th.all(th.abs(finger_vel) < m.VEL_TOLERANCE)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
                 is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE

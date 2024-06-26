@@ -1413,7 +1413,7 @@ class BDDLSampler:
 
                             # If any scales are equal or less than the lower threshold, terminate immediately
                             new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
-                            if np.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                            if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
                                 break
 
                             # Re-scale and re-attempt
@@ -1453,8 +1453,8 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         error_msg, problematic_objs = "", []
-        while not np.any(
-            [np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
+        while not th.any(
+            [th.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
         ):
             filtered_object_scope, problematic_objs = self._filter_object_scope(
                 input_object_scope, conditions, condition_type
@@ -1471,7 +1471,7 @@ class BDDLSampler:
                 if obj_inst in self._attached_objects or "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
                     og.sim.play()
                     return error_msg, None
-                assert np.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
+                assert th.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
                 obj.scale -= m.DYNAMIC_SCALE_INCREMENT
             og.sim.play()
 

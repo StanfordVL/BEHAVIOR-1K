@@ -97,7 +97,7 @@ class Remapper:
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
-        assert np.all(
+        assert th.all(
             th.Tensor(list(new_mapping.keys())) != np.iinfo(np.uint32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = th.max(image)
@@ -131,7 +131,7 @@ class Remapper:
         # Apply remapping
         remapped_img = self.key_array[image]
         # Make sure all values are correctly remapped and not equal to the default value
-        assert np.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
+        assert th.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
         for key in np.unique(remapped_img):
             remapped_labels[key] = new_mapping[key]

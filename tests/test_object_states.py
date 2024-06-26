@@ -235,14 +235,14 @@ def test_aabb(env):
     og.sim.step()
 
     assert np.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
-    assert np.all(
+    assert th.all(
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
     pp = dishtowel.root_link.compute_particle_positions()
     offset = dishtowel.root_link.cloth_system.particle_contact_offset
     assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(dim=0) - offset, pp.max(dim=0) + offset))
-    assert np.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
+    assert th.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
     with pytest.raises(NotImplementedError):
         breakfast_table.states[AABB].set_value(None)

@@ -762,7 +762,7 @@ class PhysicalParticleSystem(BaseSystem):
         super().initialize(scene)
 
         # Make sure min and max scale are identical
-        assert np.all(
+        assert th.all(
             self.min_scale == self.max_scale
         ), "Min and max scale should be identical for PhysicalParticleSystem!"
 
@@ -872,7 +872,7 @@ class PhysicalParticleSystem(BaseSystem):
         # We sample the range of each extent minus
         sampling_distance = 2 * self.particle_radius if sampling_distance is None else sampling_distance
         n_particles_per_axis = (extent / sampling_distance).astype(int)
-        assert np.all(
+        assert th.all(
             n_particles_per_axis
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
 

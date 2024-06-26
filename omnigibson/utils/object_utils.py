@@ -25,7 +25,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
         n-array: (N, 4) array, where each of the N rows are sampled (x,y,z,w) stable orientations
     """
     og.sim.play()
-    assert np.all(obj.scale == 1.0)
+    assert th.all(obj.scale == 1.0)
     aabb_extent = obj.aabb_extent
     radius = np.linalg.norm(aabb_extent) / 2.0
     drop_pos = th.Tensor([0, 0, radius + drop_aabb_offset])
@@ -56,7 +56,7 @@ def compute_bbox_offset(obj):
         n-array: (x,y,z) offset specifying the relative position from the root link to @obj's bounding box center
     """
     og.sim.stop()
-    assert np.all(obj.scale == 1.0)
+    assert th.all(obj.scale == 1.0)
     obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_center - obj.get_position()
 
@@ -73,7 +73,7 @@ def compute_native_bbox_extent(obj):
         n-array: (x,y,z) native bounding box extent
     """
     og.sim.stop()
-    assert np.all(obj.scale == 1.0)
+    assert th.all(obj.scale == 1.0)
     obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_extent
 
@@ -121,7 +121,7 @@ def compute_obj_kinematic_metadata(obj):
     assert obj.scene is not None
     assert og.sim.floor_plane is not None
     assert type(obj.scene) == Scene, "An empty scene must be used in order to compute kinematic metadata!"
-    assert np.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
+    assert th.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
     og.sim.stop()
 
     return {

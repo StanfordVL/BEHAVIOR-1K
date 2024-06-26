@@ -373,7 +373,7 @@ class OVXRSystem(TeleopSystem):
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """
-        return np.any(np.not_equal(transform[0], np.zeros(3))) and np.any(
+        return th.any(np.not_equal(transform[0], np.zeros(3))) and th.any(
             np.not_equal(transform[1], self.og2xr_orn_offset)
         )
 

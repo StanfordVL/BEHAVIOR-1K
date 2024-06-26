@@ -237,7 +237,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
                     for idx in np.where(
-                        np.all(
+                        th.all(
                             (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
                             dim=-1,
                         )

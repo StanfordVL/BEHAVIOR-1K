@@ -531,7 +531,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return np.all(
+        return th.all(
             th.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD
         )
 

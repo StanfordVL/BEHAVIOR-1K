@@ -1570,7 +1570,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         ), "GranularSystem particle template has more than one visual mesh"
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via self.min/max_scale
-        assert np.all(particle_template.scale == 1.0)
+        assert th.all(particle_template.scale == 1.0)
 
         # The prototype is assumed to be the first and only visual mesh belonging to the root link
         visual_geom = list(particle_template.root_link.visual_meshes.values())[0]

@@ -370,7 +370,7 @@ class TouchingAnyCondition(RuleCondition):
     def refresh(self, object_candidates):
         # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
         # in our collision set are kinematic only
-        self._optimized = not np.any(
+        self._optimized = not th.any(
             [
                 obj.kinematic_only or obj.prim_type == PrimType.CLOTH
                 for f in (self._filter_1_name, self._filter_2_name)
@@ -407,7 +407,7 @@ class TouchingAnyCondition(RuleCondition):
                         if obj2.scene == obj.scene
                     ]
                 )
-                if np.any(RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                if th.any(RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check]):
                     objs.append(obj)
         else:
             # Manually check contact
@@ -1472,7 +1472,7 @@ class RecipeRule(BaseTransitionRule):
                 th.cat([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
             )
         )
-        return not np.any(nonrecipe_objects_in_volume)
+        return not th.any(nonrecipe_objects_in_volume)
 
     @classmethod
     def _validate_recipe_systems_exist(cls, recipe):

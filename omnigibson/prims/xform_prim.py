@@ -363,7 +363,7 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         scale = th.Tensor(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
-        assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
