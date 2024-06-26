@@ -153,7 +153,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if command_input_limits == "default":
+                if type(command_input_limits) == str and command_input_limits == "default":
                     command_input_limits = [
                         [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
                         [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],
@@ -162,7 +162,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                     command_input_limits[0][3:] = -np.pi
                     command_input_limits[1][3:] = np.pi
             if command_output_limits is not None:
-                if command_output_limits == "default":
+                if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
                         [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
                         [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],

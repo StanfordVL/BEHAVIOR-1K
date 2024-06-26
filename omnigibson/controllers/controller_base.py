@@ -125,13 +125,17 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._command_input_transform = None
 
         # Standardize command input / output limits to be (min_array, max_array)
-        command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
+        command_input_limits = (
+            (-1.0, 1.0)
+            if type(command_input_limits) == str and command_input_limits == "default"
+            else command_input_limits
+        )
         command_output_limits = (
             (
                 np.array(self._control_limits[self.control_type][0])[self.dof_idx],
                 np.array(self._control_limits[self.control_type][1])[self.dof_idx],
             )
-            if command_output_limits == "default"
+            if type(command_input_limits) == str and command_input_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (

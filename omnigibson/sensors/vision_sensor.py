@@ -596,14 +596,16 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        old_render_product = self._render_product
-        new_render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, (width, height))
         for annotator in self._annotators.values():
-            annotator.detach([old_render_product.path])
-            annotator.attach([new_render_product])
+            annotator.detach([self._render_product.path])
 
-        old_render_product.destroy()
-        self._render_product = new_render_product
+        self._render_product.destroy()
+        self._render_product = lazy.omni.replicator.core.create.render_product(
+            self.prim_path, (width, height), force_new=True
+        )
+
+        for annotator in self._annotators.values():
+            annotator.attach([self._render_product])
 
         # Requires 3 updates to propagate changes
         for i in range(3):
@@ -629,14 +631,16 @@ class VisionSensor(BaseSensor):
         self._viewport.viewport_api.set_texture_resolution((width, height))
 
         # Also update render product and update all annotators
-        old_render_product = self._render_product
-        new_render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, (width, height))
         for annotator in self._annotators.values():
-            annotator.detach([old_render_product.path])
-            annotator.attach([new_render_product])
+            annotator.detach([self._render_product.path])
 
-        old_render_product.destroy()
-        self._render_product = new_render_product
+        self._render_product.destroy()
+        self._render_product = lazy.omni.replicator.core.create.render_product(
+            self.prim_path, (width, height), force_new=True
+        )
+
+        for annotator in self._annotators.values():
+            annotator.attach([self._render_product])
 
         # Requires 3 updates to propagate changes
         for i in range(3):

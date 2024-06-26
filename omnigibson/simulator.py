@@ -35,7 +35,8 @@ from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
-from omnigibson.utils.python_utils import create_object_from_init_info, meets_minimum_version
+from omnigibson.utils.python_utils import create_object_from_init_info
+from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from omnigibson.utils.ui_utils import (
     CameraMover,
     create_module_logger,
@@ -120,8 +121,8 @@ def _launch_app():
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
         isaac_version = version_content.split("-")[0]
-        assert meets_minimum_version(
-            isaac_version, "2023.1.1"
+        assert meets_minimum_isaac_version(
+            "2023.1.1", current_version=isaac_version
         ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
 
     with launch_context(None):

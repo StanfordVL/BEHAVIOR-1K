@@ -42,8 +42,6 @@ def main():
         print("fps", fps)
         print("effective fps", effective_fps)
 
-        i += 1
-
 
 if __name__ == "__main__":
     main()
