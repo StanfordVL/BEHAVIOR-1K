@@ -1272,7 +1272,7 @@ class ManipulationRobot(BaseRobot):
             # a zero action will actually keep the AG setting where it already is.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
-            threshold = np.mean(
+            threshold = th.mean(
                 [self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]], dim=0
             )
             if controller.control is None:

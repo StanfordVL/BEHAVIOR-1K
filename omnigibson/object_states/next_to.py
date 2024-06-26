@@ -34,7 +34,7 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         distance = th.norm(th.Tensor(distance_vec))
         objA_dims = objA_upper - objA_lower
         objB_dims = objB_upper - objB_lower
-        avg_aabb_length = np.mean(objA_dims + objB_dims)
+        avg_aabb_length = th.mean(objA_dims + objB_dims)
 
         # If the distance is longer than acceptable, return False.
         if distance > avg_aabb_length * (1.0 / 6.0):

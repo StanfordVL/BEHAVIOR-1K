@@ -53,6 +53,6 @@ class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothState
                 contact_positions.append(contact.position)
 
         # The center of mass of the cloth needs to be below the average position of the contact points
-        mean_contact_position = np.mean(contact_positions, dim=0)
-        center_of_mass = np.mean(self.obj.root_link.keypoint_particle_positions, dim=0)
+        mean_contact_position = th.mean(contact_positions, dim=0)
+        center_of_mass = th.mean(self.obj.root_link.keypoint_particle_positions, dim=0)
         return center_of_mass[2] < mean_contact_position[2]

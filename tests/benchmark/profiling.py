@@ -180,7 +180,7 @@ def main():
     results = th.Tensor(results)
     for i, title in enumerate(PROFILING_FIELDS):
         unit = "time (ms)" if "time" in title else "GB"
-        value = np.mean(results[:, i])
+        value = th.mean(results[:, i])
         if title == "FPS":
             value = 1000 / value
             unit = "fps"

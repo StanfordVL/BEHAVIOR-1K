@@ -229,11 +229,11 @@ class MultiFingerGripperController(GripperController):
             finger_pos = control_dict["joint_position"][self.dof_idx]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
-            if self._motor_type == "position" and np.mean(th.abs(finger_pos - self._control)) < m.POS_TOLERANCE:
+            if self._motor_type == "position" and th.mean(th.abs(finger_pos - self._control)) < m.POS_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-            elif self._motor_type in {"velocity", "torque"} and np.mean(th.abs(self._control)) < m.VEL_TOLERANCE:
+            elif self._motor_type in {"velocity", "torque"} and th.mean(th.abs(self._control)) < m.VEL_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # Otherwise, the last control signal intends to "move" the gripper
@@ -254,8 +254,8 @@ class MultiFingerGripperController(GripperController):
 
                 # If the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                    np.mean(dist_from_lower_limit) > m.POS_TOLERANCE
-                    and np.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                    th.mean(dist_from_lower_limit) > m.POS_TOLERANCE
+                    and th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)

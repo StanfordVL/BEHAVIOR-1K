@@ -1066,7 +1066,7 @@ class BDDLSampler:
         else:
             problematic_objs_by_proportion = defaultdict(list)
             for child_scope_name, parent_obj_names in problematic_objs.items():
-                problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+                problematic_objs_by_proportion[th.mean(list(parent_obj_names.values()))].append(child_scope_name)
             max_problematic_objs = problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
         return filtered_object_scope, max_problematic_objs

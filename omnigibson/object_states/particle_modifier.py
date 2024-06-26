@@ -134,7 +134,7 @@ def create_projection_visualization(
     # the source sphere is already scaled by its own parent frame
     # NOTE: The generated projection visualization will NOT match the underlying projection mesh if the parent link is
     # scaled non-uniformly!!
-    projection_radius *= np.mean(parent_scale[:2])
+    projection_radius *= th.mean(parent_scale[:2])
     projection_height *= parent_scale[2]
 
     # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
@@ -1035,7 +1035,7 @@ class ParticleApplier(ParticleModifier):
                 "Cone",
             }, f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
             radius, height = (
-                np.mean(self._projection_mesh_params["extents"][:2]) / 2.0,
+                th.mean(self._projection_mesh_params["extents"][:2]) / 2.0,
                 self._projection_mesh_params["extents"][2],
             )
             # Generate the projection visualization

@@ -1719,7 +1719,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 distance = np.random.uniform(0.0, 5.0)
                 yaw = np.random.uniform(-3.1415, 3.1415)
-                avg_arm_workspace_range = np.mean(self.robot.arm_workspace_range[self.arm])
+                avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.Tensor(
                     [
                         pose_on_obj[0][0] + distance * np.cos(yaw),

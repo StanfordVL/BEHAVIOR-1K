@@ -386,7 +386,7 @@ class StatefulObject(BaseObject):
             else:
                 bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
                 # Radius is the average x-y half-extent of the object
-                radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
+                radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
             emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
             smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)

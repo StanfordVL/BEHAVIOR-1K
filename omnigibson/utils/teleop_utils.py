@@ -66,7 +66,7 @@ class TeleopSystem(TeleopPolicy):
                 self.robot.arm_names[self.robot_arms.index(arm)]
             ].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn)
-            gripper_pos = np.mean(
+            gripper_pos = th.mean(
                 self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[i]]]
             )
             # if we are grasping, we manually set the gripper position to be at most 0.5
