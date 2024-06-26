@@ -279,14 +279,14 @@ class RigidPrim(XFormPrim):
         Sets the linear velocity of the prim in stage.
 
         Args:
-            velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
+            velocity (th.Tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
         self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self):
         """
         Returns:
-            np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
+            th.Tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
         return self._rigid_prim_view.get_linear_velocities()[0]
 
@@ -295,14 +295,14 @@ class RigidPrim(XFormPrim):
         Sets the angular velocity of the prim in stage.
 
         Args:
-            velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
+            velocity (th.Tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
         self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self):
         """
         Returns:
-            np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
+            th.Tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
         return self._rigid_prim_view.get_angular_velocities()[0]
 
@@ -627,7 +627,7 @@ class RigidPrim(XFormPrim):
     def _compute_points_on_convex_hull(self, visual):
         """
         Returns:
-            np.ndarray or None: points on the convex hull of all points from child geom prims
+            th.Tensor or None: points on the convex hull of all points from child geom prims
         """
         meshes = self._visual_meshes if visual else self._collision_meshes
         points = []
@@ -654,7 +654,7 @@ class RigidPrim(XFormPrim):
     def visual_boundary_points_local(self):
         """
         Returns:
-            np.ndarray: local coords of points on the convex hull of all points from child geom prims
+            th.Tensor: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=True)
 
@@ -662,7 +662,7 @@ class RigidPrim(XFormPrim):
     def visual_boundary_points_world(self):
         """
         Returns:
-            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+            th.Tensor: world coords of points on the convex hull of all points from child geom prims
         """
         local_points = self.visual_boundary_points_local
         if local_points is None:
@@ -673,7 +673,7 @@ class RigidPrim(XFormPrim):
     def collision_boundary_points_local(self):
         """
         Returns:
-            np.ndarray: local coords of points on the convex hull of all points from child geom prims
+            th.Tensor: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=False)
 
@@ -681,7 +681,7 @@ class RigidPrim(XFormPrim):
     def collision_boundary_points_world(self):
         """
         Returns:
-            np.ndarray: world coords of points on the convex hull of all points from child geom prims
+            th.Tensor: world coords of points on the convex hull of all points from child geom prims
         """
         local_points = self.collision_boundary_points_local
         if local_points is None:

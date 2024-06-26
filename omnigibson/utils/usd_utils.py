@@ -105,10 +105,10 @@ def create_joint(
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
         body1 (str or None): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
         enabled (bool): whether to enable this joint or not.
-        joint_frame_in_parent_frame_pos (np.ndarray or None): relative position of the joint frame to the parent frame (body0).
-        joint_frame_in_parent_frame_quat (np.ndarray or None): relative orientation of the joint frame to the parent frame (body0).
-        joint_frame_in_child_frame_pos (np.ndarray or None): relative position of the joint frame to the child frame (body1).
-        joint_frame_in_child_frame_quat (np.ndarray or None): relative orientation of the joint frame to the child frame (body1).
+        joint_frame_in_parent_frame_pos (th.Tensor or None): relative position of the joint frame to the parent frame (body0).
+        joint_frame_in_parent_frame_quat (th.Tensor or None): relative orientation of the joint frame to the parent frame (body0).
+        joint_frame_in_child_frame_pos (th.Tensor or None): relative position of the joint frame to the child frame (body1).
+        joint_frame_in_child_frame_quat (th.Tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
 

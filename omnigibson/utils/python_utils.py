@@ -170,7 +170,7 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
                 base_dict[k] = merge_nested_dicts(base_dict[k], v)
             else:
                 not_equal = base_dict[k] != v
-                if isinstance(not_equal, np.ndarray):
+                if isinstance(not_equal, th.Tensor):
                     not_equal = not_equal.any()
                 if not_equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")

@@ -417,14 +417,14 @@ class ClothPrim(GeomPrim):
     def get_linear_velocity(self):
         """
         Returns:
-            np.ndarray: current average linear velocity of the particles of the cloth prim. Shape (3,).
+            th.Tensor: current average linear velocity of the particles of the cloth prim. Shape (3,).
         """
         return th.Tensor(self._prim.GetAttribute("velocities").Get()).mean(dim=0)
 
     def get_angular_velocity(self):
         """
         Returns:
-            np.ndarray: zero vector as a placeholder because a cloth prim doesn't have an angular velocity. Shape (3,).
+            th.Tensor: zero vector as a placeholder because a cloth prim doesn't have an angular velocity. Shape (3,).
         """
         return np.zeros(3)
 
@@ -433,7 +433,7 @@ class ClothPrim(GeomPrim):
         Sets the linear velocity of all the particles of the cloth prim.
 
         Args:
-            velocity (np.ndarray): linear velocity to set all the particles of the cloth prim to. Shape (3,).
+            velocity (th.Tensor): linear velocity to set all the particles of the cloth prim to. Shape (3,).
         """
         vel = self.particle_velocities
         vel[:] = velocity
@@ -444,7 +444,7 @@ class ClothPrim(GeomPrim):
         Simply returns because a cloth prim doesn't have an angular velocity
 
         Args:
-            velocity (np.ndarray): linear velocity to set all the particles of the cloth prim to. Shape (3,).
+            velocity (th.Tensor): linear velocity to set all the particles of the cloth prim to. Shape (3,).
         """
         return
 
@@ -556,13 +556,13 @@ class ClothPrim(GeomPrim):
         # JSON-serialization
         self.particle_velocities = (
             th.Tensor(state["particle_velocities"])
-            if not isinstance(state["particle_velocities"], np.ndarray)
+            if not isinstance(state["particle_velocities"], th.Tensor)
             else state["particle_velocities"]
         )
         self.set_particle_positions(
             positions=(
                 th.Tensor(state["particle_positions"])
-                if not isinstance(state["particle_positions"], np.ndarray)
+                if not isinstance(state["particle_positions"], th.Tensor)
                 else state["particle_positions"]
             )
         )

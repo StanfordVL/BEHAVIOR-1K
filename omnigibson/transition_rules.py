@@ -1273,7 +1273,7 @@ class RecipeRule(BaseTransitionRule):
     @classmethod
     def _filter_input_objects_by_unary_and_binary_system_states(cls, recipe):
         # Filter input objects based on a subset of input states (unary states and binary system states)
-        # Map object categories (str) to valid indices (np.ndarray)
+        # Map object categories (str) to valid indices (th.Tensor)
         category_to_valid_indices = dict()
         for obj_category in recipe["input_objects"]:
             if obj_category not in recipe["input_states"]:

@@ -174,19 +174,19 @@ class ArticulationView(_ArticulationView):
 
     def set_joint_limits(
         self,
-        values: Union[np.ndarray, torch.Tensor],
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        values: Union[th.Tensor, torch.Tensor],
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
     ) -> None:
         """Sets joint limits for articulation joints in the view.
 
         Args:
-            values (Union[np.ndarray, torch.Tensor, wp.array]): joint limits for articulations in the view. shape (M, K, 2).
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            values (Union[th.Tensor, torch.Tensor, wp.array]): joint limits for articulations in the view. shape (M, K, 2).
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
                                                                                  to manipulate. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
@@ -230,25 +230,25 @@ class ArticulationView(_ArticulationView):
 
     def get_joint_limits(
         self,
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
         clone: bool = True,
-    ) -> Union[np.ndarray, torch.Tensor, wp.array]:
+    ) -> Union[th.Tensor, torch.Tensor, wp.array]:
         """Gets joint limits for articulation in the view.
 
         Args:
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to query. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
                                                                                  to query. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
             clone (Optional[bool]): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
 
         Returns:
-            Union[np.ndarray, torch.Tensor, wp.indexedarray]: joint limits for articulations in the view. shape (M, K).
+            Union[th.Tensor, torch.Tensor, wp.indexedarray]: joint limits for articulations in the view. shape (M, K).
         """
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
@@ -288,19 +288,19 @@ class ArticulationView(_ArticulationView):
 
     def set_max_velocities(
         self,
-        values: Union[np.ndarray, torch.Tensor, wp.array],
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        values: Union[th.Tensor, torch.Tensor, wp.array],
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
     ) -> None:
         """Sets maximum velocities for articulation in the view.
 
         Args:
-            values (Union[np.ndarray, torch.Tensor, wp.array]): maximum velocities for articulations in the view. shape (M, K).
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            values (Union[th.Tensor, torch.Tensor, wp.array]): maximum velocities for articulations in the view. shape (M, K).
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
                                                                                  to manipulate. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
@@ -339,25 +339,25 @@ class ArticulationView(_ArticulationView):
 
     def get_max_velocities(
         self,
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
         clone: bool = True,
-    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+    ) -> Union[th.Tensor, torch.Tensor, wp.indexedarray]:
         """Gets maximum velocities for articulation in the view.
 
         Args:
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to query. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indicies to specify which joints
                                                                                  to query. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
             clone (Optional[bool]): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
 
         Returns:
-            Union[np.ndarray, torch.Tensor, wp.indexedarray]: maximum velocities for articulations in the view. shape (M, K).
+            Union[th.Tensor, torch.Tensor, wp.indexedarray]: maximum velocities for articulations in the view. shape (M, K).
         """
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
@@ -396,9 +396,9 @@ class ArticulationView(_ArticulationView):
 
     def set_joint_positions(
         self,
-        positions: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        positions: Optional[Union[th.Tensor, torch.Tensor, wp.array]],
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
     ) -> None:
         """Set the joint positions of articulations in the view
 
@@ -408,13 +408,13 @@ class ArticulationView(_ArticulationView):
             Use the ``set_joint_position_targets`` or the ``apply_action`` methods to control the articulation joints.
 
         Args:
-            positions (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): joint positions of articulations in the view to be set to in the next frame.
+            positions (Optional[Union[th.Tensor, torch.Tensor, wp.array]]): joint positions of articulations in the view to be set to in the next frame.
                                                                     shape is (M, K).
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indices to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
                                                                                  to manipulate. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
@@ -462,9 +462,9 @@ class ArticulationView(_ArticulationView):
 
     def set_joint_velocities(
         self,
-        velocities: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        velocities: Optional[Union[th.Tensor, torch.Tensor, wp.array]],
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
     ) -> None:
         """Set the joint velocities of articulations in the view
 
@@ -474,13 +474,13 @@ class ArticulationView(_ArticulationView):
             Use the ``set_joint_velocity_targets`` or the ``apply_action`` methods to control the articulation joints.
 
         Args:
-            velocities (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): joint velocities of articulations in the view to be set to in the next frame.
+            velocities (Optional[Union[th.Tensor, torch.Tensor, wp.array]]): joint velocities of articulations in the view to be set to in the next frame.
                                                                     shape is (M, K).
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indices to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
                                                                                  to manipulate. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
@@ -529,9 +529,9 @@ class ArticulationView(_ArticulationView):
 
     def set_joint_efforts(
         self,
-        efforts: Optional[Union[np.ndarray, torch.Tensor, wp.array]],
-        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
-        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        efforts: Optional[Union[th.Tensor, torch.Tensor, wp.array]],
+        indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[th.Tensor, List, torch.Tensor, wp.array]] = None,
     ) -> None:
         """Set the joint efforts of articulations in the view
 
@@ -541,13 +541,13 @@ class ArticulationView(_ArticulationView):
             or the stiffness and damping must be set to zero.
 
         Args:
-            efforts (Optional[Union[np.ndarray, torch.Tensor, wp.array]]): efforts of articulations in the view to be set to in the next frame.
+            efforts (Optional[Union[th.Tensor, torch.Tensor, wp.array]]): efforts of articulations in the view to be set to in the next frame.
                                                                     shape is (M, K).
-            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+            indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): indices to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
-            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+            joint_indices (Optional[Union[th.Tensor, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
                                                                                  to manipulate. Shape (K,).
                                                                                  Where K <= num of dofs.
                                                                                  Defaults to None (i.e: all dofs).
@@ -605,11 +605,11 @@ class ArticulationView(_ArticulationView):
 
 
 class RigidPrimView(_RigidPrimView):
-    def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
+    def enable_gravities(self, indices: Optional[Union[th.Tensor, list, torch.Tensor, wp.array]] = None) -> None:
         """Enable gravity on rigid bodies (enabled by default).
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            indices (Optional[Union[th.Tensor, list, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
@@ -633,11 +633,11 @@ class RigidPrimView(_RigidPrimView):
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(False)
 
-    def disable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
+    def disable_gravities(self, indices: Optional[Union[th.Tensor, list, torch.Tensor, wp.array]] = None) -> None:
         """Disable gravity on rigid bodies (enabled by default).
 
         Args:
-            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indicies to specify which prims
+            indices (Optional[Union[th.Tensor, list, torch.Tensor, wp.array]], optional): indicies to specify which prims
                                                                                  to manipulate. Shape (M,).
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).

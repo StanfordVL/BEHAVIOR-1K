@@ -1327,7 +1327,7 @@ class ManipulationRobot(BaseRobot):
         """
         Same as _calculate_in_hand_object_rigid, except for cloth. Only one should be used at any given time.
 
-        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, np.ndarray) tuple or
+        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, th.Tensor) tuple or
         None if no valid AG-enabled object can be found.
 
         1) Check if the gripper is closed enough
@@ -1343,7 +1343,7 @@ class ManipulationRobot(BaseRobot):
         Returns:
             None or 3-tuple: If a valid assisted-grasp object is found,
                 returns the corresponding (object, object_link, attachment_point_position), i.e.
-                ((BaseObject, RigidPrim, np.ndarray)) to the contacted in-hand object. Otherwise, returns None
+                ((BaseObject, RigidPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
         """
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03
@@ -1384,7 +1384,7 @@ class ManipulationRobot(BaseRobot):
             arm (str): specific arm to establish grasp.
                 Default is "default" which corresponds to the first entry in self.arm_names
             ag_data (None or 3-tuple): If specified, should be the corresponding
-                (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, np.ndarray)) to the]
+                (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, th.Tensor)) to the]
                 contacted in-hand object
         """
         arm = self.default_arm if arm == "default" else arm
@@ -1525,7 +1525,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: th.Tensor([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper.
@@ -1533,7 +1533,7 @@ class ManipulationRobot(BaseRobot):
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            np.ndarray: array of action data for arm and gripper
+            th.Tensor: array of action data for arm and gripper
         """
         action = super().teleop_data_to_action(teleop_action)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]

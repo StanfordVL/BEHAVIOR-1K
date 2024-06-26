@@ -376,7 +376,7 @@ class PhysxParticleInstancer(BasePrim):
         for key in keys:
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
             # JSON-serialization
-            val = th.Tensor(state[key]) if not isinstance(state[key], np.ndarray) else state[key]
+            val = th.Tensor(state[key]) if not isinstance(state[key], th.Tensor) else state[key]
             setattr(self, key, val)
 
     def serialize(self, state):

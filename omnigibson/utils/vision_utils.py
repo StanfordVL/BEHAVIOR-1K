@@ -89,11 +89,11 @@ class Remapper:
                 e.g. {1: 'desk', 2: 'chair'}.
             new_mapping (dict): The new mapping dictionary that maps another set of image values to labels,
                 e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
-            image (np.ndarray): The 2D image to remap, e.g. [[1, 3], [1, 2]].
-            image_keys (np.ndarray): The unique keys in the image, e.g. [1, 2, 3].
+            image (th.Tensor): The 2D image to remap, e.g. [[1, 3], [1, 2]].
+            image_keys (th.Tensor): The unique keys in the image, e.g. [1, 2, 3].
 
         Returns:
-            np.ndarray: The remapped image, e.g. [[5,100],[5,7]].
+            th.Tensor: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
@@ -211,12 +211,12 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
 
     Args:
-        bbox_3d_data (np.ndarray): 3D bounding box data
-        rgb_image (np.ndarray): RGB image
+        bbox_3d_data (th.Tensor): 3D bounding box data
+        rgb_image (th.Tensor): RGB image
         camera_params (dict): Camera parameters
 
     Returns:
-        np.ndarray: RGB image with 3D bounding boxes drawn
+        th.Tensor: RGB image with 3D bounding boxes drawn
     """
 
     def world_to_image_pinhole(world_points, camera_params):

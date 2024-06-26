@@ -460,10 +460,10 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     axes to be random.
 
     Args:
-        vector (np.ndarray): The vector to face.
+        vector (th.Tensor): The vector to face.
 
     Returns:
-        np.ndarray: A quaternion representing the orientation.
+        th.Tensor: A quaternion representing the orientation.
     """
     forward = vector / th.norm(vector)
     rand_vec = np.random.rand(3)
@@ -485,7 +485,7 @@ def _rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_ori
     Args:
         point_wrt_arbitrary_frame (tuple): The point in the arbitrary frame.
         arbitrary_frame_wrt_origin (tuple): The pose of the arbitrary frame in the origin frame.
-        joint_axis (np.ndarray): The axis to rotate around.
+        joint_axis (th.Tensor): The axis to rotate around.
         yaw_change (float): The amount to rotate by.
 
     Returns:

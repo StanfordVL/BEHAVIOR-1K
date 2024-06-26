@@ -313,10 +313,10 @@ class VisionSensor(BaseSensor):
         Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
 
         Args:
-            img (np.ndarray): Semantic segmentation image to remap
+            img (th.Tensor): Semantic segmentation image to remap
             id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
-            np.ndarray: Remapped semantic segmentation image
+            th.Tensor: Remapped semantic segmentation image
             dict: Corrected id_to_labels dictionary
         """
         # Preprocess id_to_labels to feed into the remapper
@@ -354,13 +354,13 @@ class VisionSensor(BaseSensor):
         Also, correct the id_to_labels input with our new labels and return it.
 
         Args:
-            img (np.ndarray): Instance segmentation image to remap
+            img (th.Tensor): Instance segmentation image to remap
             id_to_labels (dict): Dictionary of instance IDs to class labels
-            semantic_img (np.ndarray): Semantic segmentation image to use for instance registry
+            semantic_img (th.Tensor): Semantic segmentation image to use for instance registry
             semantic_labels (dict): Dictionary of semantic IDs to class labels
             id (bool): Whether to remap for instance ID segmentation
         Returns:
-            np.ndarray: Remapped instance segmentation image
+            th.Tensor: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
         """
         # Sometimes 0 and 1 show up in the image, but they are not in the id_to_labels mapping
@@ -524,24 +524,24 @@ class VisionSensor(BaseSensor):
         Returns a dictionary of keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
         The returned dictionary includes the following keys and their corresponding data types:
 
-        - "cameraAperture": np.ndarray (float32) - Camera aperture dimensions.
-        - "cameraApertureOffset": np.ndarray (float32) - Offset of the camera aperture.
-        - "cameraFisheyeLensP": np.ndarray (float32) - Fisheye lens P parameter.
-        - "cameraFisheyeLensS": np.ndarray (float32) - Fisheye lens S parameter.
+        - "cameraAperture": th.Tensor (float32) - Camera aperture dimensions.
+        - "cameraApertureOffset": th.Tensor (float32) - Offset of the camera aperture.
+        - "cameraFisheyeLensP": th.Tensor (float32) - Fisheye lens P parameter.
+        - "cameraFisheyeLensS": th.Tensor (float32) - Fisheye lens S parameter.
         - "cameraFisheyeMaxFOV": float - Maximum field of view for fisheye lens.
         - "cameraFisheyeNominalHeight": int - Nominal height for fisheye lens.
         - "cameraFisheyeNominalWidth": int - Nominal width for fisheye lens.
-        - "cameraFisheyeOpticalCentre": np.ndarray (float32) - Optical center for fisheye lens.
-        - "cameraFisheyePolynomial": np.ndarray (float32) - Polynomial parameters for fisheye lens distortion.
+        - "cameraFisheyeOpticalCentre": th.Tensor (float32) - Optical center for fisheye lens.
+        - "cameraFisheyePolynomial": th.Tensor (float32) - Polynomial parameters for fisheye lens distortion.
         - "cameraFocalLength": float - Focal length of the camera.
         - "cameraFocusDistance": float - Focus distance of the camera.
         - "cameraFStop": float - F-stop value of the camera.
         - "cameraModel": str - Camera model identifier.
-        - "cameraNearFar": np.ndarray (float32) - Near and far plane distances.
-        - "cameraProjection": np.ndarray (float32) - Camera projection matrix.
-        - "cameraViewTransform": np.ndarray (float32) - Camera view transformation matrix.
+        - "cameraNearFar": th.Tensor (float32) - Near and far plane distances.
+        - "cameraProjection": th.Tensor (float32) - Camera projection matrix.
+        - "cameraViewTransform": th.Tensor (float32) - Camera view transformation matrix.
         - "metersPerSceneUnit": float - Scale factor from scene units to meters.
-        - "renderProductResolution": np.ndarray (int32) - Resolution of the rendered product.
+        - "renderProductResolution": th.Tensor (int32) - Resolution of the rendered product.
 
         Returns:
             dict: Keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.

@@ -654,7 +654,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
                     real_obs = dict()
                     for key, value in recursively_generate_flat_dict(dic=check_obs).items():
-                        if isinstance(value, np.ndarray):
+                        if isinstance(value, th.Tensor):
                             real_obs[key] = ("obs", key, value.dtype, value.shape)
                         else:
                             real_obs[key] = ("obs", key, type(value), "()")

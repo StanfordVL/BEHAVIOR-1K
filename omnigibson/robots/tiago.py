@@ -741,7 +741,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                     lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                 )
 
-    def set_linear_velocity(self, velocity: np.ndarray):
+    def set_linear_velocity(self, velocity: th.Tensor):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
@@ -751,11 +751,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
-    def get_linear_velocity(self) -> np.ndarray:
+    def get_linear_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_linear_velocity()
 
-    def set_angular_velocity(self, velocity: np.ndarray) -> None:
+    def set_angular_velocity(self, velocity: th.Tensor) -> None:
         # See comments of self.set_linear_velocity
         orn = self.root_link.get_orientation()
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
@@ -763,7 +763,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
-    def get_angular_velocity(self) -> np.ndarray:
+    def get_angular_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
 
@@ -774,7 +774,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             for arm in self.arm_names
         }
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
         action[self.base_action_idx] = teleop_action.base * 0.1
         return action

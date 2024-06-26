@@ -324,7 +324,7 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the world's frame.
 
         Returns:
-            np.ndarray: scale applied to the prim's dimensions in the world frame. shape is (3, ).
+            th.Tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
         """
         prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         transform = lazy.pxr.Gf.Transform()
@@ -347,7 +347,7 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the local frame (the parent's frame).
 
         Returns:
-            np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
+            th.Tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
@@ -359,7 +359,7 @@ class XFormPrim(BasePrim):
         Sets prim's scale with respect to the local frame (the prim's parent frame).
 
         Args:
-            scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
+            scale (float or th.Tensor): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
         scale = th.Tensor(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale

@@ -151,7 +151,7 @@ class TwoWheelRobot(LocomotionRobot):
         classes.add("TwoWheelRobot")
         return classes
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports DifferentialDriveController.
@@ -159,7 +159,7 @@ class TwoWheelRobot(LocomotionRobot):
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            np.ndarray: array of action data
+            th.Tensor: array of action data
         """
         action = super().teleop_data_to_action(teleop_action)
         assert isinstance(

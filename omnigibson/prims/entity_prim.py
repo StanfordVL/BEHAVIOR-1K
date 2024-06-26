@@ -650,7 +650,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            positions (np.ndarray): positions to set. This should be n-DOF length if all joints are being set,
+            positions (th.Tensor): positions to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @positions must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF positions to set.
@@ -681,7 +681,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            velocities (np.ndarray): velocities to set. This should be n-DOF length if all joints are being set,
+            velocities (th.Tensor): velocities to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @velocities must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF velocities to set.
@@ -711,7 +711,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            efforts (np.ndarray): efforts to set. This should be n-DOF length if all joints are being set,
+            efforts (th.Tensor): efforts to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @efforts must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF efforts to set.
@@ -914,12 +914,12 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
-    def set_linear_velocity(self, velocity: np.ndarray):
+    def set_linear_velocity(self, velocity: th.Tensor):
         """
         Sets the linear velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.Tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
@@ -928,7 +928,7 @@ class EntityPrim(XFormPrim):
         Gets the linear velocity of the root prim in stage.
 
         Returns:
-            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.Tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
@@ -937,7 +937,7 @@ class EntityPrim(XFormPrim):
         Sets the angular velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.Tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
@@ -945,7 +945,7 @@ class EntityPrim(XFormPrim):
         """Gets the angular velocity of the root prim in stage.
 
         Returns:
-            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.Tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
 

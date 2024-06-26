@@ -17,10 +17,10 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # int: Keep track of how many steps each object is waiting for
     STEPS_TO_WAIT = None
 
-    # np.ndarray: Keep track of the current delay for a given slicer
+    # th.Tensor: Keep track of the current delay for a given slicer
     DELAY_COUNTER = None
 
-    # np.ndarray: Keep track of whether we touched a sliceable in the previous timestep
+    # th.Tensor: Keep track of whether we touched a sliceable in the previous timestep
     PREVIOUSLY_TOUCHING = None
 
     # list of list of str: Body prim paths belonging to each slicer obj

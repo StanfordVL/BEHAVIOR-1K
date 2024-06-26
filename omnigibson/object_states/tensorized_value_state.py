@@ -179,7 +179,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # If the state value is not an iterable, wrap it in a numpy array
         val = (
             state[self.value_name]
-            if isinstance(state[self.value_name], np.ndarray)
+            if isinstance(state[self.value_name], th.Tensor)
             else th.Tensor([state[self.value_name]])
         )
         return val.flatten().astype(float)

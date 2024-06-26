@@ -437,7 +437,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 [len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]]
             )
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 

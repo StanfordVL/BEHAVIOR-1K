@@ -122,7 +122,7 @@ class GeomPrim(XFormPrim):
     def points(self):
         """
         Returns:
-            np.ndarray: Local poses of all points
+            th.Tensor: Local poses of all points
         """
         # If the geom is a mesh we can directly return its points.
         mesh = self.prim
@@ -185,7 +185,7 @@ class GeomPrim(XFormPrim):
     def extent(self):
         """
         Returns:
-            np.ndarray: The unscaled 3d extent of the mesh in its local frame.
+            th.Tensor: The unscaled 3d extent of the mesh in its local frame.
         """
         points = self.points
         return th.max(points, dim=0) - th.min(points, dim=0)
