@@ -461,7 +461,7 @@ def _compute_osc_torques(
     base_ang_vel,
 ):
     # Compute the inverse
-    mm_inv = np.linalg.inv(mm)
+    mm_inv = th.linalg.inv_ex(mm)
 
     # Calculate error
     pos_err = goal_pos - ee_pos
@@ -478,18 +478,18 @@ def _compute_osc_torques(
     # Determine desired wrench
     err = np.expand_dims(kp * err + kd * vel_err, dim=-1)
     m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = np.linalg.inv(m_eef_inv)
+    m_eef = th.linalg.inv_ex(m_eef_inv)
 
     if decouple_pos_ori:
         # # More efficient, but numba doesn't support 3D tensor operations yet
         # j_eef_batch = j_eef.reshape(2, 3, -1)
         # m_eef_pose_inv = np.matmul(np.matmul(j_eef_batch, np.expand_dims(mm_inv, dim=0)), np.transpose(j_eef_batch, (0, 2, 1)))
-        # m_eef_pose = np.linalg.inv(m_eef_pose_inv)  # Shape (2, 3, 3)
+        # m_eef_pose = th.linalg.inv_ex(m_eef_pose_inv)  # Shape (2, 3, 3)
         # wrench = np.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
         m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
         m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = np.linalg.inv(m_eef_pos_inv)
-        m_eef_ori = np.linalg.inv(m_eef_ori_inv)
+        m_eef_pos = th.linalg.inv_ex(m_eef_pos_inv)
+        m_eef_ori = th.linalg.inv_ex(m_eef_ori_inv)
         wrench_pos = m_eef_pos @ err[:3, :]
         wrench_ori = m_eef_ori @ err[3:, :]
         wrench = th.cat((wrench_pos, wrench_ori))
