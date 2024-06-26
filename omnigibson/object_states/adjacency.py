@@ -48,7 +48,7 @@ def get_equidistant_coordinate_planes(n_planes):
     """
     # Compute the positive directions of the 1st axis of each plane.
     first_axis_angles = th.linspace(0, 3.1415 / 2, n_planes)
-    first_axes = np.stack(
+    first_axes = th.stack(
         [th.cos(first_axis_angles), th.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
     )
 
@@ -57,7 +57,7 @@ def get_equidistant_coordinate_planes(n_planes):
     second_axes = th.cross([0, 0, 1], first_axes)
 
     # Return the axes in the shape (n_planes, 2, 3)
-    return np.stack([first_axes[:, None, :], second_axes[:, None, :]], dim=1)
+    return th.stack([first_axes[:, None, :], second_axes[:, None, :]], dim=1)
 
 
 def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):

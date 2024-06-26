@@ -1160,7 +1160,7 @@ class ParticleApplier(ParticleModifier):
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        points = th.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         pos, quat = self.link.get_position_orientation()
         points = points[th.where(self._check_in_mesh(points))[0]]
         # Convert the points into local frame
@@ -1390,7 +1390,7 @@ class ParticleApplier(ParticleModifier):
         sampled_r_theta = np.random.rand(n_samples, 2)
         sampled_r_theta = sampled_r_theta * th.Tensor([r, 3.1415 * 2]).reshape(1, 2)
         # Get start, end points in local link frame, start points to end points along the -z direction
-        end_points = np.stack(
+        end_points = th.stack(
             [
                 sampled_r_theta[:, 0] * th.cos(sampled_r_theta[:, 1]),
                 sampled_r_theta[:, 0] * th.sin(sampled_r_theta[:, 1]),

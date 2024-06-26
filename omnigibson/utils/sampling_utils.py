@@ -490,7 +490,7 @@ def sample_raytest_start_end_full_grid_topdown(
     )
     n_rays = len(x) * len(y)
 
-    start_points = np.stack(
+    start_points = th.stack(
         [
             np.tile(x, len(y)),
             np.repeat(y, len(x)),
