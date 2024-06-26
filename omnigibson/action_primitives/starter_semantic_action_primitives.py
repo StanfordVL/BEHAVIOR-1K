@@ -995,7 +995,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         eef_pos = eef_pose[0]
         eef_ori = T.quat2axisangle(eef_pose[1])
-        end_conf = np.append(eef_pos, eef_ori)
+        end_conf = th.cat((eef_pos, eef_ori))
 
         with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion_ik(

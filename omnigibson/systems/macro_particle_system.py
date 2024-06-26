@@ -1062,7 +1062,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_idns.append(info["particle_idns"])
                 particle_attached_references.append(info["particle_attached_references"])
             else:
-                indices_to_remove = np.append(indices_to_remove, th.Tensor(info["particle_indices"], dtype=int))
+                indices_to_remove = th.cat((indices_to_remove, th.Tensor(info["particle_indices"], dtype=int)))
         self._sync_particle_groups(
             group_objects=group_objects,
             particle_idns=particle_idns,
