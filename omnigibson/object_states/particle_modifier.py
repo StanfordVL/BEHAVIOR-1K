@@ -1182,7 +1182,7 @@ class ParticleApplier(ParticleModifier):
         projection_type = self._projection_mesh_params["type"]
         if projection_type == "Cone":
             # Particles point from source ([0, 0, 0]) to point location
-            directions = np.copy(self._in_mesh_local_particle_positions)
+            directions = th.clone(self._in_mesh_local_particle_positions)
         elif projection_type == "Cylinder":
             # All particle points in the same parallel direction towards the -z direction
             directions = th.zeros_like(self._in_mesh_local_particle_positions)

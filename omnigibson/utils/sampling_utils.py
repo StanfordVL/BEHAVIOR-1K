@@ -498,7 +498,7 @@ def sample_raytest_start_end_full_grid_topdown(
         ]
     ).T
 
-    end_points = np.copy(start_points)
+    end_points = th.clone(start_points)
     end_points[:, 2] = -half_extent_with_offset[2]
 
     # Convert the points into the world frame

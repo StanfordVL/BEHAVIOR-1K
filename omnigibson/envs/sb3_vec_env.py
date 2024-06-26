@@ -87,8 +87,8 @@ class SB3VectorEnvironment(DummyVecEnv):
 
             return (
                 self._obs_from_buf(),
-                np.copy(self.buf_rews),
-                np.copy(self.buf_dones),
+                th.clone(self.buf_rews),
+                th.clone(self.buf_dones),
                 copy.deepcopy(self.buf_infos),
             )
 

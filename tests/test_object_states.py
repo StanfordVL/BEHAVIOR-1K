@@ -1031,14 +1031,14 @@ def test_folded_unfolded(env):
     x_extent = x_max - x_min
     # Get indices for the bottom 10 percent vertices in the x-axis
     indices = np.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
-    start = np.copy(pos[indices])
+    start = th.clone(pos[indices])
 
     # lift up a bit
-    mid = np.copy(start)
+    mid = th.clone(start)
     mid[:, 2] += x_extent * 0.2
 
     # move towards x_max
-    end = np.copy(mid)
+    end = th.clone(mid)
     end[:, 0] += x_extent * 0.9
 
     increments = 25
