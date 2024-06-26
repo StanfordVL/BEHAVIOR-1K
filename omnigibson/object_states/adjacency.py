@@ -47,7 +47,7 @@ def get_equidistant_coordinate_planes(n_planes):
             corresponding to the axis.
     """
     # Compute the positive directions of the 1st axis of each plane.
-    first_axis_angles = np.linspace(0, 3.1415 / 2, n_planes)
+    first_axis_angles = th.linspace(0, 3.1415 / 2, n_planes)
     first_axes = np.stack(
         [np.cos(first_axis_angles), np.sin(first_axis_angles), np.zeros_like(first_axis_angles)], dim=1
     )

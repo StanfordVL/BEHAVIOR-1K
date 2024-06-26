@@ -73,8 +73,8 @@ def plan_base_motion(
             # Navigation
             dist = th.norm(goal[:2] - start[:2])
             num_points = ceil(dist / m.DIST_DIFF) + 1
-            nav_x = np.linspace(start[0], goal[0], num_points).tolist()
-            nav_y = np.linspace(start[1], goal[1], num_points).tolist()
+            nav_x = th.linspace(start[0], goal[0], num_points).tolist()
+            nav_y = th.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
                 state = create_state(self.si, nav_x[i], nav_y[i], segment_theta)
                 if not self.si.isValid(state()):
@@ -92,7 +92,7 @@ def plan_base_motion(
             direction = np.sign(diff)
             diff = abs(diff)
             num_points = ceil(diff / m.ANGLE_DIFF) + 1
-            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            nav_angle = th.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start_conf[2]
             for i in range(num_points):
                 state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])

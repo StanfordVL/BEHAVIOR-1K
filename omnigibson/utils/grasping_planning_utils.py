@@ -297,12 +297,12 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
 
     if num_waypoints == "default":
         num_waypoints = th.max([2, int(travel_distance / 0.01) + 1])
-    pos_waypoints = np.linspace(start_pos, end_pose[0], num_waypoints)
+    pos_waypoints = th.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
     combined_rotation = R.from_quat(th.Tensor([start_orn, end_pose[1]]))
     slerp = Slerp([0, 1], combined_rotation)
-    orn_waypoints = slerp(np.linspace(0, 1, num_waypoints))
+    orn_waypoints = slerp(th.linspace(0, 1, num_waypoints))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
     return [waypoint for waypoint in zip(pos_waypoints, quat_waypoints)]
 

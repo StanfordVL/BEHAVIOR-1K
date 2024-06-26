@@ -111,7 +111,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             end[:, 0] += x_extent * 0.9
 
             increments = 25
-            for ctrl_pts in th.cat([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+            for ctrl_pts in th.cat([th.linspace(start, mid, increments), th.linspace(mid, end, increments)]):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
                 og.sim.step()
                 print_state()
@@ -137,7 +137,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             end[:, 1] += direction * y_extent * 0.4
 
             increments = 25
-            for ctrl_pts in th.cat([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+            for ctrl_pts in th.cat([th.linspace(start, mid, increments), th.linspace(mid, end, increments)]):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
                 env.step(th.Tensor([]))
                 print_state()

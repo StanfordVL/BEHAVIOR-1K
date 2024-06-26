@@ -1038,7 +1038,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for i in range(len(plan) - 1):
             max_diff = max(plan[i + 1] - plan[i])
             num_intervals = ceil(max_diff / max_inter_dist)
-            interpolated_plan += np.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
+            interpolated_plan += th.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
 
@@ -1187,12 +1187,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = th.norm(target_pose[0] - start_pos)
         num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
-        pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)
+        pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
         combined_rotation = Rotation.from_quat(th.Tensor([start_orn, target_pose[1]]))
         slerp = Slerp([0, 1], combined_rotation)
-        orn_waypoints = slerp(np.linspace(0, 1, num_poses))
+        orn_waypoints = slerp(th.linspace(0, 1, num_poses))
         quat_waypoints = [x.as_quat() for x in orn_waypoints]
 
         controller_config = self.robot._controller_config["arm_" + self.arm]

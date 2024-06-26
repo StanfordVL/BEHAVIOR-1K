@@ -1042,7 +1042,7 @@ def test_folded_unfolded(env):
     end[:, 0] += x_extent * 0.9
 
     increments = 25
-    for ctrl_pts in th.cat([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+    for ctrl_pts in th.cat([th.linspace(start, mid, increments), th.linspace(mid, end, increments)]):
         carpet.root_link.set_particle_positions(ctrl_pts, idxs=indices)
         og.sim.step()
 

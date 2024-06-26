@@ -168,8 +168,8 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     # Compute the grid of rays
     steps = (offset / new_ray_per_horizontal_distance).astype(int) * 2 + 1
     steps = np.maximum(steps, 3)
-    x_range = np.linspace(-offset[0], offset[0], steps[0])
-    y_range = np.linspace(-offset[1], offset[1], steps[1])
+    x_range = th.linspace(-offset[0], offset[0], steps[0])
+    y_range = th.linspace(-offset[1], offset[1], steps[1])
     ray_grid = np.dstack(np.meshgrid(x_range, y_range, indexing="ij"))
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
@@ -482,10 +482,10 @@ def sample_raytest_start_end_full_grid_topdown(
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
 
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
-    x = np.linspace(
+    x = th.linspace(
         -half_extent_with_offset[0], half_extent_with_offset[0], int(half_extent_with_offset[0] * 2 / ray_spacing) + 1
     )
-    y = np.linspace(
+    y = th.linspace(
         -half_extent_with_offset[1], half_extent_with_offset[1], int(half_extent_with_offset[1] * 2 / ray_spacing) + 1
     )
     n_rays = len(x) * len(y)
