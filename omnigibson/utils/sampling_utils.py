@@ -119,7 +119,7 @@ def draw_debug_markers(hit_positions, radius=0.01):
         hit_positions ((n, 3)-array): Desired positions to place markers at
         radius (float): Radius of the generated virtual marker
     """
-    color = np.concatenate([np.random.rand(3), [1]])
+    color = th.cat([np.random.rand(3), [1]])
     for vec in hit_positions:
         for dim in range(3):
             start_point = vec + np.eye(3)[dim] * radius

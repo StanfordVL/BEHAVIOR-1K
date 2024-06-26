@@ -400,7 +400,7 @@ class TouchingAnyCondition(RuleCondition):
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
                 # Get all impulses
-                idxs_to_check = np.concatenate(
+                idxs_to_check = th.cat(
                     [
                         self._filter_2_idxs[obj2]
                         for obj2 in object_candidates[self._filter_2_name]
@@ -1469,7 +1469,7 @@ class RecipeRule(BaseTransitionRule):
             if len(recipe["input_objects"]) == 0
             else np.delete(
                 in_volume,
-                np.concatenate([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
+                th.cat([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
             )
         )
         return not np.any(nonrecipe_objects_in_volume)

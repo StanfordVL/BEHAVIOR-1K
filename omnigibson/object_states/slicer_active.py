@@ -49,8 +49,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super()._add_obj(obj=obj)
 
         # Add to previously touching and delay counter
-        cls.DELAY_COUNTER = np.concatenate([cls.DELAY_COUNTER, [0]])
-        cls.PREVIOUSLY_TOUCHING = np.concatenate([cls.PREVIOUSLY_TOUCHING, [False]])
+        cls.DELAY_COUNTER = th.cat([cls.DELAY_COUNTER, [0]])
+        cls.PREVIOUSLY_TOUCHING = th.cat([cls.PREVIOUSLY_TOUCHING, [False]])
 
         # Add this object's prim paths to slicer paths
         cls.SLICER_LINK_PATHS.append([link.prim_path for link in obj.links.values()])
@@ -173,7 +173,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     def serialize(self, state):
         state_flat = super().serialize(state=state)
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 [state["previously_touching"], state["delay_counter"]],

@@ -430,7 +430,7 @@ class XFormPrim(BasePrim):
         self.set_position_orientation(pos, orn)
 
     def serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"]]).astype(float)
+        return th.cat([state["pos"], state["ori"]]).astype(float)
 
     def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori

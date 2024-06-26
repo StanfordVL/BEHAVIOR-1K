@@ -144,9 +144,7 @@ class PlanningContext(object):
             joint_control_idx = self.robot.arm_control_idx["left"]
             joint_pos = th.Tensor(self.robot.get_joint_positions()[joint_control_idx])
         else:
-            joint_combined_idx = np.concatenate(
-                [self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]]
-            )
+            joint_combined_idx = th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
             joint_pos = th.Tensor(self.robot.get_joint_positions()[joint_combined_idx])
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
@@ -891,9 +889,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 assert self.arm == "left", "Fixed torso mode only supports left arm!"
                 return self.robot.arm_control_idx["left"]
             else:
-                return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+                return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
         elif isinstance(self.robot, Fetch):
-            return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+            return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
@@ -1160,7 +1158,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             prev_pos = current_pos
             prev_orn = current_orn
 
-            action[control_idx] = np.concatenate([delta_pos, target_orn_axisangle])
+            action[control_idx] = th.cat([delta_pos, target_orn_axisangle])
             yield self._postprocess_action(action)
 
         if not ignore_failure:

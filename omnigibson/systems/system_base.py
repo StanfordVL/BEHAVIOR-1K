@@ -364,7 +364,7 @@ class BaseSystem(Serializable):
 
     def serialize(self, state):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
-        return np.concatenate(
+        return th.cat(
             [
                 [state["n_particles"]],
                 state["min_scale"],

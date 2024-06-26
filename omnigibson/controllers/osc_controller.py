@@ -199,12 +199,12 @@ class OperationalSpaceController(ManipulationController):
                 # Add this to input / output limits
                 if is_input_limits_numeric:
                     command_input_limits = [
-                        np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
                         for lim, val in zip(command_input_limits, (-1, 1))
                     ]
                 if is_output_limits_numeric:
                     command_output_limits = [
-                        np.concatenate([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
                         for lim, val in zip(command_output_limits, gain_limits)
                     ]
                 # Update command dim
@@ -380,7 +380,7 @@ class OperationalSpaceController(ManipulationController):
         j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
-        ee_vel = np.concatenate(
+        ee_vel = th.cat(
             [control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]]
         )
         base_lin_vel = control_dict["root_rel_lin_vel"]
@@ -468,14 +468,14 @@ def _compute_osc_torques(
     # Calculate error
     pos_err = goal_pos - ee_pos
     ori_err = orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
-    err = np.concatenate((pos_err, ori_err))
+    err = th.cat((pos_err, ori_err))
 
     # Vel target is the base velocity as experienced by the end effector
     # For angular velocity, this is just the base angular velocity
     # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
     #   due to the base linear velocity
     lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos)
-    vel_err = np.concatenate((lin_vel_err, base_ang_vel)) - ee_vel
+    vel_err = th.cat((lin_vel_err, base_ang_vel)) - ee_vel
 
     # Determine desired wrench
     err = np.expand_dims(kp * err + kd * vel_err, dim=-1)
@@ -494,7 +494,7 @@ def _compute_osc_torques(
         m_eef_ori = np.linalg.inv(m_eef_ori_inv)
         wrench_pos = m_eef_pos @ err[:3, :]
         wrench_ori = m_eef_ori @ err[3:, :]
-        wrench = np.concatenate((wrench_pos, wrench_ori))
+        wrench = th.cat((wrench_pos, wrench_ori))
     else:
         wrench = m_eef @ err
 

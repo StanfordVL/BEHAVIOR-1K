@@ -864,7 +864,7 @@ class JointPrim(BasePrim):
                 self.set_vel(state["target_vel"], drive=True)
 
     def serialize(self, state):
-        return np.concatenate(
+        return th.cat(
             [
                 state["pos"],
                 state["vel"],

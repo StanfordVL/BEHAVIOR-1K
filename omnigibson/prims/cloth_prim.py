@@ -571,7 +571,7 @@ class ClothPrim(GeomPrim):
         # Run super first
         state_flat = super().serialize(state=state)
 
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 [state["particle_group"], state["n_particles"]],

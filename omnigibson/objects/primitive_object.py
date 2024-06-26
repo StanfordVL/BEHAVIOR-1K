@@ -373,7 +373,7 @@ class PrimitiveObject(StatefulObject):
         # Run super first
         state_flat = super().serialize(state=state)
 
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 th.Tensor([state["radius"], state["height"], state["size"]]),

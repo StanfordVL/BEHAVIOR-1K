@@ -381,7 +381,7 @@ class PhysxParticleInstancer(BasePrim):
 
     def serialize(self, state):
         # Compress into a 1D array
-        return np.concatenate(
+        return th.cat(
             [
                 [state["idn"], state["particle_group"], state["n_particles"]],
                 state["particle_positions"].reshape(-1),
@@ -1289,7 +1289,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     def serialize(self, state):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
-        return np.concatenate(
+        return th.cat(
             [
                 [state["n_instancers"]],
                 state["instancer_idns"],

@@ -384,7 +384,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate(
+            particles_in_world_frame = th.cat(
                 [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], dim=0
             )
             points_in_world.extend(particles_in_world_frame)

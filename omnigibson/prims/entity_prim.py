@@ -1032,7 +1032,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: joint damping values for this prim
         """
-        return np.concatenate([joint.damping for joint in self._joints.values()])
+        return th.cat([joint.damping for joint in self._joints.values()])
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1344,7 +1344,7 @@ class EntityPrim(XFormPrim):
             )
         else:
             points_world = [link.collision_boundary_points_world for link in self._links.values()]
-            all_points = np.concatenate([p for p in points_world if p is not None], dim=0)
+            all_points = th.cat([p for p in points_world if p is not None], dim=0)
             aabb_lo = np.min(all_points, dim=0)
             aabb_hi = np.max(all_points, dim=0)
         return aabb_lo, aabb_hi
@@ -1552,12 +1552,10 @@ class EntityPrim(XFormPrim):
         state_flat = [self.root_link.serialize(state=state["root_link"])]
         if self.n_joints > 0:
             state_flat.append(
-                np.concatenate(
-                    [prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()]
-                )
+                th.cat([prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()])
             )
 
-        return np.concatenate(state_flat).astype(float)
+        return th.cat(state_flat).astype(float)
 
     def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and

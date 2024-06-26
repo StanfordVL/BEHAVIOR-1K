@@ -387,7 +387,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 ), "Can only flatten action space where all individual spaces are 1D instances!"
                 lows.append(space.low)
                 highs.append(space.high)
-            action_space = gym.spaces.Box(np.concatenate(lows), np.concatenate(highs), dtype=np.float32)
+            action_space = gym.spaces.Box(th.cat(lows), th.cat(highs), dtype=np.float32)
 
         # Store action space
         self.action_space = action_space
@@ -619,7 +619,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
-        return np.concatenate(rgb_images, dim=1)[:, :, :3]
+        return th.cat(rgb_images, dim=1)[:, :, :3]
 
     def _reset_variables(self):
         """

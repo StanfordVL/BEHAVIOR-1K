@@ -1415,7 +1415,7 @@ class ParticleApplier(ParticleModifier):
         # Convert sampled normalized radius and angle into 3D points
         # We convert r, theta --> 3D point in local link frame --> 3D point in global world frame
         # We also combine start and end points for efficiency when doing the transform, then split them up again
-        points = np.concatenate([start_points, end_points], dim=0)
+        points = th.cat([start_points, end_points], dim=0)
         pos, quat = self.link.get_position_orientation()
         points = get_particle_positions_from_frame(
             pos=pos,
@@ -1443,7 +1443,7 @@ class ParticleApplier(ParticleModifier):
         lower, upper = self.link.visual_aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-        lower_upper = np.concatenate([lower, upper], dim=0)
+        lower_upper = th.cat([lower, upper], dim=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position()

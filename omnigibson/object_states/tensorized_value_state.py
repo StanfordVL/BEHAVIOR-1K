@@ -71,7 +71,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
         # Add this object to the tracked global state
         cls.OBJ_IDXS[obj] = len(cls.VALUES)
-        cls.VALUES = np.concatenate([cls.VALUES, np.zeros((1, *cls.value_shape), dtype=cls.value_type)], dim=0)
+        cls.VALUES = th.cat([cls.VALUES, np.zeros((1, *cls.value_shape), dtype=cls.value_type)], dim=0)
 
     @classmethod
     def _remove_obj(cls, obj):

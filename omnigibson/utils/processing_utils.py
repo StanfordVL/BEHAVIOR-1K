@@ -123,7 +123,7 @@ class MovingAverageFilter(Filter):
         state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 state["past_samples"].flatten(),
@@ -208,7 +208,7 @@ class ExponentialAverageFilter(Filter):
         state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 state["avg"],

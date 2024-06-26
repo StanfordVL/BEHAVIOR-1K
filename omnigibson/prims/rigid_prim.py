@@ -642,7 +642,7 @@ class RigidPrim(XFormPrim):
         if not points:
             return None
 
-        points = np.concatenate(points, dim=0)
+        points = th.cat(points, dim=0)
 
         try:
             hull = ConvexHull(points)
@@ -818,7 +818,7 @@ class RigidPrim(XFormPrim):
         # Run super first
         state_flat = super().serialize(state=state)
 
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 state["lin_vel"],

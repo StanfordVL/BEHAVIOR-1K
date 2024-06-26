@@ -274,7 +274,7 @@ class OVXRSystem(TeleopSystem):
             # update right hand related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
-                    self.teleop_action[arm_name] = np.concatenate(
+                    self.teleop_action[arm_name] = th.cat(
                         (
                             self.raw_data["transforms"]["controllers"][arm][0],
                             T.quat2euler(

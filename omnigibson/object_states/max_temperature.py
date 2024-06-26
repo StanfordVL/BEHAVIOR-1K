@@ -46,7 +46,7 @@ class MaxTemperature(TensorizedValueState):
         super()._add_obj(obj=obj)
 
         # Add to temperature index
-        cls.TEMPERATURE_IDXS = np.concatenate([cls.TEMPERATURE_IDXS, [Temperature.OBJ_IDXS[obj]]])
+        cls.TEMPERATURE_IDXS = th.cat([cls.TEMPERATURE_IDXS, [Temperature.OBJ_IDXS[obj]]])
 
     @classmethod
     def _remove_obj(cls, obj):

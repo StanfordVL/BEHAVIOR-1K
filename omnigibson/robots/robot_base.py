@@ -341,7 +341,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
-        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
+        return th.cat([proprio_dict[obs] for obs in self._proprio_obs]), {}
 
     def _get_proprioception_dict(self):
         """

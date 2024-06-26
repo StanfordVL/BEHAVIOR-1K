@@ -320,12 +320,12 @@ class BaseController(Serializable, Registerable, Recreatable):
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])
+            th.cat([goal_state.flatten() for goal_state in self._goal.values()])
             if (state)["goal_is_valid"]
             else np.zeros(self.goal_dim)
         )
 
-        return np.concatenate(
+        return th.cat(
             [
                 [state["goal_is_valid"]],
                 goal_state_flattened,

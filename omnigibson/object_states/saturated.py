@@ -72,10 +72,10 @@ class ModifiedParticles(RelativeObjectState):
         state_flat = th.Tensor([state["n_systems"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
-            state_flat = np.concatenate(
+            state_flat = th.cat(
                 [
                     state_flat,
-                    np.concatenate(
+                    th.cat(
                         [
                             (
                                 self.obj.scene.system_registry("name", system_name).uuid,
@@ -230,10 +230,10 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         state_flat = th.Tensor([state["n_systems"], state["default_limit"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]
-            state_flat = np.concatenate(
+            state_flat = th.cat(
                 [
                     state_flat,
-                    np.concatenate(
+                    th.cat(
                         [
                             (
                                 self.obj.scene.system_registry("name", system_name).uuid,

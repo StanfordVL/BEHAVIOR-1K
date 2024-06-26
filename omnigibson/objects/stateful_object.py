@@ -553,7 +553,7 @@ class StatefulObject(BaseObject):
 
         # Iterate over all states and serialize them individually
         non_kin_state_flat = (
-            np.concatenate(
+            th.cat(
                 [
                     self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
                     for state_name, state_dict in state["non_kin"].items()
@@ -564,7 +564,7 @@ class StatefulObject(BaseObject):
         )
 
         # Combine these two arrays
-        return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
+        return th.cat([state_flat, non_kin_state_flat]).astype(float)
 
     def deserialize(self, state):
         # Call super method first

@@ -181,7 +181,7 @@ class MacroParticleSystem(BaseSystem):
         states_flat = super().serialize(state=state)
 
         # Add particle scales, then the template info
-        return np.concatenate(
+        return th.cat(
             [
                 states_flat,
                 state["scales"].flatten(),
@@ -287,8 +287,8 @@ class MacroParticleSystem(BaseSystem):
         orientations = R.random(num=n_particles).as_quat() if orientations is None else orientations
         scales = self.sample_scales(n=n_particles) if scales is None else scales
 
-        positions = np.concatenate([current_positions, positions], dim=0)
-        orientations = np.concatenate([current_orientations, orientations], dim=0)
+        positions = th.cat([current_positions, positions], dim=0)
+        orientations = th.cat([current_orientations, orientations], dim=0)
 
         # Add particles
         for scale in scales:
@@ -1098,7 +1098,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 ),
             ]
 
-        return np.concatenate([*state_group_flat, state_flat]).astype(float)
+        return th.cat([*state_group_flat, state_flat]).astype(float)
 
     def deserialize(self, state):
         # Synchronize the particle groups
@@ -1316,9 +1316,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = self.get_particles_position_orientation()
             orientations = ori if orientations is None else orientations
             positions = pos if positions is None else (positions - T.quat2mat(orientations) @ self._particle_offset)
-        self.particles_view.set_transforms(
-            np.concatenate([positions, orientations], dim=1), indices=np.arange(len(positions))
-        )
+        self.particles_view.set_transforms(th.cat([positions, orientations], dim=1), indices=np.arange(len(positions)))
 
     def set_particles_local_pose(self, positions=None, orientations=None):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
@@ -1331,9 +1329,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = self.get_particle_position_orientation(idx=idx)
             orientation = ori if orientation is None else orientation
             position = pos if position is None else (position - T.quat2mat(orientation) @ self._particle_offset)
-        self.particles_view.set_transforms(
-            np.concatenate([position, orientation]).reshape(1, -1), indices=th.Tensor([idx])
-        )
+        self.particles_view.set_transforms(th.cat([position, orientation]).reshape(1, -1), indices=th.Tensor([idx]))
 
     def set_particle_local_pose(self, idx, position=None, orientation=None):
         self.set_particle_position_orientation(idx=idx, position=position, orientation=orientation)
@@ -1377,9 +1373,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             l_vels, a_vels = self.get_particles_velocities()
             lin_vels = l_vels if lin_vels is None else lin_vels
             ang_vels = a_vels if ang_vels is None else ang_vels
-        self.particles_view.set_velocities(
-            np.concatenate([lin_vels, ang_vels], dim=1), indices=np.arange(len(lin_vels))
-        )
+        self.particles_view.set_velocities(th.cat([lin_vels, ang_vels], dim=1), indices=np.arange(len(lin_vels)))
 
     def set_particle_velocities(self, idx, lin_vel=None, ang_vel=None):
         assert (
@@ -1389,7 +1383,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             l_vel, a_vel = self.get_particles_velocities()
             lin_vel = l_vel if lin_vel is None else lin_vel
             ang_vel = a_vel if ang_vel is None else ang_vel
-        self.particles_view.set_velocities(np.concatenate([lin_vel, ang_vel]).reshape(1, -1), indices=th.Tensor([idx]))
+        self.particles_view.set_velocities(th.cat([lin_vel, ang_vel]).reshape(1, -1), indices=th.Tensor([idx]))
 
     @property
     def particle_radius(self):
@@ -1451,8 +1445,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         velocities = np.zeros((n_particles, 3)) if velocities is None else velocities
         angular_velocities = np.zeros_like(velocities) if angular_velocities is None else angular_velocities
 
-        velocities = np.concatenate([current_lin_vels[:-n_particles], velocities], dim=0)
-        angular_velocities = np.concatenate([current_ang_vels[:-n_particles], angular_velocities], dim=0)
+        velocities = th.cat([current_lin_vels[:-n_particles], velocities], dim=0)
+        angular_velocities = th.cat([current_ang_vels[:-n_particles], angular_velocities], dim=0)
 
         # Set the vels
         self.set_particles_velocities(lin_vels=velocities, ang_vels=angular_velocities)
@@ -1513,9 +1507,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         state_flat = super().serialize(state=state)
 
         # Add velocities
-        return np.concatenate(
-            [state_flat, state["lin_velocities"].flatten(), state["ang_velocities"].flatten()], dtype=float
-        )
+        return th.cat([state_flat, state["lin_velocities"].flatten(), state["ang_velocities"].flatten()], dtype=float)
 
     def deserialize(self, state):
         # Sync the number of particles first

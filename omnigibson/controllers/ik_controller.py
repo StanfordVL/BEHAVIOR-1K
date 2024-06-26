@@ -224,7 +224,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         state_flat = super().serialize(state=state)
 
         # Serialize state for this controller
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 self.control_filter.serialize(state=state["control_filter"]),

@@ -304,7 +304,7 @@ class ControllableObject(BaseObject):
             low.append(th.Tensor([-np.inf] * controller.command_dim) if limits is None else limits[0])
             high.append(th.Tensor([np.inf] * controller.command_dim) if limits is None else limits[1])
 
-        return gym.spaces.Box(shape=(self.action_dim,), low=np.concatenate(low), high=np.concatenate(high), dtype=float)
+        return gym.spaces.Box(shape=(self.action_dim,), low=th.cat(low), high=th.cat(high), dtype=float)
 
     def apply_action(self, action):
         """
@@ -610,12 +610,12 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = np.concatenate(
+        controller_states_flat = th.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
         )
 
         # Concatenate and return
-        return np.concatenate([state_flat, controller_states_flat]).astype(float)
+        return th.cat([state_flat, controller_states_flat]).astype(float)
 
     def deserialize(self, state):
         # Run super first

@@ -1046,7 +1046,7 @@ def vecs2quat(vec0, vec1, normalized=False):
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = np.sum(vec0 * vec1, dim=-1, keepdims=True)
     quat_unnormalized = np.where(
-        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
+        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
     return quat_unnormalized / np.linalg.norm(quat_unnormalized, dim=-1, keepdims=True)
 
