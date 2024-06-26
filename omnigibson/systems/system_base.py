@@ -871,7 +871,7 @@ class PhysicalParticleSystem(BaseSystem):
             extent = obj.aabb_extent
         # We sample the range of each extent minus
         sampling_distance = 2 * self.particle_radius if sampling_distance is None else sampling_distance
-        n_particles_per_axis = (extent / sampling_distance).astype(int)
+        n_particles_per_axis = (extent / sampling_distance).int()
         assert th.all(
             n_particles_per_axis
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."

@@ -872,7 +872,7 @@ class JointPrim(BasePrim):
                 state["target_pos"],
                 state["target_vel"],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort

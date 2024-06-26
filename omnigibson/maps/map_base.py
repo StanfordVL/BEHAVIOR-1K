@@ -55,4 +55,4 @@ class BaseMap:
             xy: 2D location in world reference frame (metric)
         :return: 2D location in map reference frame (image)
         """
-        return np.flip((th.Tensor(xy) / self.map_resolution + self.map_size / 2.0)).astype(int)
+        return np.flip((th.Tensor(xy) / self.map_resolution + self.map_size / 2.0)).int()

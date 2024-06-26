@@ -578,7 +578,7 @@ class ClothPrim(GeomPrim):
                 state["particle_positions"].reshape(-1),
                 state["particle_velocities"].reshape(-1),
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Run super first

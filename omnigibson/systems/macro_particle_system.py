@@ -1098,7 +1098,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 ),
             ]
 
-        return th.cat([*state_group_flat, state_flat]).astype(float)
+        return th.cat([*state_group_flat, state_flat]).float()
 
     def deserialize(self, state):
         # Synchronize the particle groups

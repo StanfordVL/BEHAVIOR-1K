@@ -387,7 +387,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 ), "Can only flatten action space where all individual spaces are 1D instances!"
                 lows.append(space.low)
                 highs.append(space.high)
-            action_space = gym.spaces.Box(th.cat(lows), th.cat(highs), dtype=np.float32)
+            action_space = gym.spaces.Box(th.cat(lows), th.cat(highs), dtype=th.float32)
 
         # Store action space
         self.action_space = action_space

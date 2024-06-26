@@ -1016,8 +1016,8 @@ class BatchControlViewAPIImpl:
 
     def get_relative_jacobian(self, prim_path):
         jacobian = self.get_jacobian(prim_path)
-        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.astype(np.float32)
-        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.float()
+        tf = np.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jacobian
@@ -1336,7 +1336,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     # -- i.e.: 2cm-wide mesh
     extents = np.ones(3) * extents if isinstance(extents, float) else th.Tensor(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
-        vals = th.Tensor(attr.Get()).astype(np.float64)
+        vals = th.Tensor(attr.Get()).double()
         attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
     mesh.GetExtentAttr().Set(
         lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))])

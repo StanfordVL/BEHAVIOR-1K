@@ -229,7 +229,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 state_flat,
                 self.control_filter.serialize(state=state["control_filter"]),
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Run super first
@@ -256,9 +256,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = (
-                    quat_relative.astype(np.float32) if (self._goal is None) else self._goal["target_quat"]
-                )
+                self._fixed_quat_target = quat_relative.float() if (self._goal is None) else self._goal["target_quat"]
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation

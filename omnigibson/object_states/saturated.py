@@ -85,7 +85,7 @@ class ModifiedParticles(RelativeObjectState):
                         ]
                     ),
                 ]
-            ).astype(float)
+            ).float()
         return state_flat
 
     def deserialize(self, state):
@@ -243,7 +243,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                         ]
                     ),
                 ]
-            ).astype(float)
+            ).float()
         return state_flat
 
     def deserialize(self, state):

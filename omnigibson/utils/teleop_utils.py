@@ -214,7 +214,7 @@ class OVXRSystem(TeleopSystem):
             th.Tensor: the transform matrix in the Omniverse XR coordinate system
         """
         orn = T.quat_multiply(self.og2xr_orn_offset, orn)
-        return T.pose2mat((pos, orn)).T.astype(np.float64)
+        return T.pose2mat((pos, orn)).T.double()
 
     def reset(self) -> None:
         """
@@ -363,10 +363,10 @@ class OVXRSystem(TeleopSystem):
         """
         if pos_offset is not None:
             # note that x is forward, y is down, z is left for ovxr, but x is forward, y is left, z is up for og
-            pos_offset = th.Tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).astype(np.float64)
+            pos_offset = th.Tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double()
             self.vr_profile.add_move_physical_world_relative_to_device(pos_offset)
         if rot_offset is not None:
-            rot_offset = th.Tensor(rot_offset).astype(np.float64)
+            rot_offset = th.Tensor(rot_offset).double()
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
     def _is_valid_transform(self, transform: Tuple[th.Tensor, th.Tensor]) -> bool:

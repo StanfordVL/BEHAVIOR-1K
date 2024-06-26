@@ -129,13 +129,13 @@ class OperationalSpaceController(ManipulationController):
         control_dim = len(dof_idx)
 
         # Store gains
-        self.kp = nums2array(nums=kp, dim=6, dtype=np.float32) if kp is not None else None
+        self.kp = nums2array(nums=kp, dim=6, dtype=th.float32) if kp is not None else None
         self.damping_ratio = damping_ratio
-        self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=np.float32) if kp_null is not None else None
+        self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=th.float32) if kp_null is not None else None
         self.kd_null = 2 * np.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
-        self.kp_limits = th.Tensor(kp_limits, dtype=np.float32)
-        self.damping_ratio_limits = th.Tensor(damping_ratio_limits, dtype=np.float32)
-        self.kp_null_limits = th.Tensor(kp_null_limits, dtype=np.float32)
+        self.kp_limits = th.Tensor(kp_limits, dtype=th.float32)
+        self.damping_ratio_limits = th.Tensor(damping_ratio_limits, dtype=th.float32)
+        self.kp_null_limits = th.Tensor(kp_null_limits, dtype=th.float32)
 
         # Store settings for whether we're learning gains or not
         self.variable_kp = self.kp is None
@@ -178,12 +178,12 @@ class OperationalSpaceController(ManipulationController):
         is_input_limits_numeric = not (command_input_limits is None or isinstance(command_input_limits, str))
         is_output_limits_numeric = not (command_output_limits is None or isinstance(command_output_limits, str))
         command_input_limits = (
-            [nums2array(lim, dim=6, dtype=np.float32) for lim in command_input_limits]
+            [nums2array(lim, dim=6, dtype=th.float32) for lim in command_input_limits]
             if is_input_limits_numeric
             else command_input_limits
         )
         command_output_limits = (
-            [nums2array(lim, dim=6, dtype=np.float32) for lim in command_output_limits]
+            [nums2array(lim, dim=6, dtype=th.float32) for lim in command_output_limits]
             if is_output_limits_numeric
             else command_output_limits
         )
@@ -199,12 +199,12 @@ class OperationalSpaceController(ManipulationController):
                 # Add this to input / output limits
                 if is_input_limits_numeric:
                     command_input_limits = [
-                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=th.float32)])
                         for lim, val in zip(command_input_limits, (-1, 1))
                     ]
                 if is_output_limits_numeric:
                     command_output_limits = [
-                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=np.float32)])
+                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=th.float32)])
                         for lim, val in zip(command_output_limits, gain_limits)
                     ]
                 # Update command dim
@@ -214,7 +214,7 @@ class OperationalSpaceController(ManipulationController):
         self.decouple_pos_ori = decouple_pos_ori
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
-        self.reset_joint_pos = reset_joint_pos[dof_idx].astype(np.float32)
+        self.reset_joint_pos = reset_joint_pos[dof_idx].float()
 
         # Other variables that will be filled in at runtime
         self._fixed_quat_target = None
@@ -265,13 +265,13 @@ class OperationalSpaceController(ManipulationController):
         """
         idx = 0
         if self.variable_kp:
-            self.kp = gains[:, idx : idx + 6].astype(np.float32)
+            self.kp = gains[:, idx : idx + 6].float()
             idx += 6
         if self.variable_damping_ratio:
-            self.damping_ratio = gains[:, idx : idx + 6].astype(np.float32)
+            self.damping_ratio = gains[:, idx : idx + 6].float()
             idx += 6
         if self.variable_kp_null:
-            self.kp_null = gains[:, idx : idx + self.control_dim].astype(np.float32)
+            self.kp_null = gains[:, idx : idx + self.control_dim].float()
             self.kd_null = 2 * np.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
@@ -308,9 +308,7 @@ class OperationalSpaceController(ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = (
-                    quat_relative.astype(np.float32) if (self._goal is None) else self._goal["target_quat"]
-                )
+                self._fixed_quat_target = quat_relative.float() if (self._goal is None) else self._goal["target_quat"]
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
@@ -333,8 +331,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Set goals and return
         return dict(
-            target_pos=target_pos.astype(np.float32),
-            target_ori_mat=T.quat2mat(target_quat).astype(np.float32),
+            target_pos=target_pos.float(),
+            target_ori_mat=T.quat2mat(target_quat).float(),
         )
 
     def compute_control(self, goal_dict, control_dict):
@@ -392,9 +390,9 @@ class OperationalSpaceController(ManipulationController):
             qd=qd,
             mm=mm,
             j_eef=j_eef,
-            ee_pos=ee_pos.astype(np.float32),
-            ee_mat=T.quat2mat(ee_quat).astype(np.float32),
-            ee_vel=ee_vel.astype(np.float32),
+            ee_pos=ee_pos.float(),
+            ee_mat=T.quat2mat(ee_quat).float(),
+            ee_vel=ee_vel.float(),
             goal_pos=goal_dict["target_pos"],
             goal_ori_mat=goal_dict["target_ori_mat"],
             kp=kp,
@@ -404,8 +402,8 @@ class OperationalSpaceController(ManipulationController):
             rest_qpos=self.reset_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
-            base_lin_vel=base_lin_vel.astype(np.float32),
-            base_ang_vel=base_ang_vel.astype(np.float32),
+            base_lin_vel=base_lin_vel.float(),
+            base_ang_vel=base_ang_vel.float(),
         ).flatten()
 
         # Apply gravity compensation from the control dict
@@ -421,8 +419,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Convert quat into eef ori mat
         return dict(
-            target_pos=target_pos.astype(np.float32),
-            target_ori_mat=T.quat2mat(target_quat).astype(np.float32),
+            target_pos=target_pos.float(),
+            target_ori_mat=T.quat2mat(target_quat).float(),
         )
 
     def _get_goal_shapes(self):
@@ -467,7 +465,7 @@ def _compute_osc_torques(
 
     # Calculate error
     pos_err = goal_pos - ee_pos
-    ori_err = orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
+    ori_err = orientation_error(goal_ori_mat, ee_mat).float()
     err = th.cat((pos_err, ori_err))
 
     # Vel target is the base velocity as experienced by the end effector
@@ -507,7 +505,7 @@ def _compute_osc_torques(
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
         u_null = kd_null * -qd + kp_null * ((rest_qpos - q + 3.1415) % (2 * 3.1415) - 3.1415)
-        u_null = mm @ np.expand_dims(u_null, dim=-1).astype(np.float32)
-        u += (th.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
+        u_null = mm @ np.expand_dims(u_null, dim=-1).float()
+        u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u

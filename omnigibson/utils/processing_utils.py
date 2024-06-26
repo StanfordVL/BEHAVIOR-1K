@@ -130,7 +130,7 @@ class MovingAverageFilter(Filter):
                 [state["current_idx"]],
                 [state["fully_filled"]],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Run super first
@@ -214,7 +214,7 @@ class ExponentialAverageFilter(Filter):
                 state["avg"],
                 [state["num_samples"]],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Run super first

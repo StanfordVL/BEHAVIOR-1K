@@ -144,8 +144,8 @@ class ScanSensor(BaseSensor):
         # Set the remaining modalities' values
         # (obs modality, shape, low, high)
         obs_space_mapping = dict(
-            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
-            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
+            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, th.float32),
+            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, th.float32),
         )
 
         return obs_space_mapping
@@ -192,7 +192,7 @@ class ScanSensor(BaseSensor):
         scan_local[:, 1] *= -1
 
         # Initialize occupancy grid -- default is unknown values
-        occupancy_grid = np.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).astype(np.uint8)
+        occupancy_grid = np.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).to(th.uint8)
         occupancy_grid.fill(int(OccupancyGridState.UNKNOWN * 2.0))
 
         # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since
@@ -200,7 +200,7 @@ class ScanSensor(BaseSensor):
         scan_local_in_map = scan_local / self.occupancy_grid_range * self.occupancy_grid_resolution + (
             self.occupancy_grid_resolution / 2
         )
-        scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).astype(np.int32)
+        scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).int()
 
         # For each scan hit,
         for i in range(scan_local_in_map.shape[1]):
@@ -222,7 +222,7 @@ class ScanSensor(BaseSensor):
             thickness=-1,
         )
 
-        return occupancy_grid[:, :, None].astype(np.float32) / 2.0
+        return occupancy_grid[:, :, None].float() / 2.0
 
     def _get_obs(self):
         # Run super first to grab any upstream obs

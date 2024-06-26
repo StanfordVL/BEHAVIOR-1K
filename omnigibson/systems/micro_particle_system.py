@@ -220,7 +220,7 @@ class PhysxParticleInstancer(BasePrim):
             th.Tensor: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.astype(float)))
+        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.float()))
 
     @property
     def particle_orientations(self):
@@ -244,7 +244,7 @@ class PhysxParticleInstancer(BasePrim):
             quat.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
         # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
-        quat = quat.astype(float)
+        quat = quat.float()
         if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat))
@@ -270,7 +270,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             vel.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel.astype(float)))
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel.float()))
 
     @property
     def particle_scales(self):
@@ -293,7 +293,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             scales.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales.astype(float)))
+        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales.float()))
 
     @property
     def particle_prototype_ids(self):
@@ -316,7 +316,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             prototype_ids.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="protoIndices", val=prototype_ids.astype(np.int32))
+        self.set_attribute(attr="protoIndices", val=prototype_ids.int())
 
     @property
     def state_size(self):
@@ -390,7 +390,7 @@ class PhysxParticleInstancer(BasePrim):
                 state["particle_scales"].reshape(-1),
                 state["particle_prototype_ids"],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Sanity check the identification number
@@ -745,7 +745,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         if self.initialized:
             for instancer in self.particle_instancers.values():
-                instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=np.int32)
+                instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=th.int32)
 
     def initialize(self, scene):
         self._scene = scene
@@ -1300,7 +1300,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                     for name, inst_state in state["particle_states"].items()
                 ],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Synchronize the particle instancers
@@ -1308,7 +1308,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         instancer_info = dict()
         idx = 1
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
-            instancer_info[info_name] = state[idx : idx + n_instancers].astype(int).tolist()
+            instancer_info[info_name] = state[idx : idx + n_instancers].int().tolist()
             idx += n_instancers
 
         # Syncing is needed so that each particle instancer can further deserialize its own state

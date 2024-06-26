@@ -265,7 +265,7 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     (robot_camera_sensor,) = [
         s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities
     ]
-    robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).astype(np.uint8)
+    robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
@@ -278,7 +278,7 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     fig.canvas.draw()
 
     # Convert the canvas to image
-    graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=th.uint8, sep="")
     graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     assert graph_view.shape == robot_view.shape
     plt.close(fig)

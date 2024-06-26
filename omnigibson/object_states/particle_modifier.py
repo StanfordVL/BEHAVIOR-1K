@@ -1150,7 +1150,7 @@ class ParticleApplier(ParticleModifier):
         extent = th.Tensor(self._projection_mesh_params["extents"])
         h = extent[2]
         low, high = self.obj.aabb
-        n_particles_per_axis = ((high - low) / sampling_distance).astype(int)
+        n_particles_per_axis = ((high - low) / sampling_distance).int()
         assert th.all(
             n_particles_per_axis
         ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."

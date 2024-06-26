@@ -127,7 +127,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     def value_type(cls):
         """
         Returns:
-            type: Type of the internal value array, e.g., bool, np.uint, float, etc. Default is float
+            type: Type of the internal value array, e.g., bool, th.uint, float, etc. Default is float
         """
         return float
 
@@ -182,7 +182,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             if isinstance(state[self.value_name], th.Tensor)
             else th.Tensor([state[self.value_name]])
         )
-        return val.flatten().astype(float)
+        return val.flatten().float()
 
     def deserialize(self, state):
         value_length = int(np.product(self.value_shape))

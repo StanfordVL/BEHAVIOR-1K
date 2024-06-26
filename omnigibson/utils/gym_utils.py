@@ -96,7 +96,7 @@ class GymObservable(metaclass=ABCMeta):
         raise NotImplementedError()
 
     @staticmethod
-    def _build_obs_box_space(shape, low, high, dtype=np.float32):
+    def _build_obs_box_space(shape, low, high, dtype=th.float32):
         """
         Helper function that builds individual observation box spaces.
 

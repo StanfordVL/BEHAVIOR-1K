@@ -822,7 +822,7 @@ class RigidPrim(XFormPrim):
                 state["lin_vel"],
                 state["ang_vel"],
             ]
-        ).astype(float)
+        ).float()
 
     def deserialize(self, state):
         # Call supermethod first

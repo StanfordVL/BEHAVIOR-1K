@@ -69,13 +69,13 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.Tensor([], dtype=np.uint32)  # Initialize the key_array as empty
+        self.key_array = th.Tensor([], dtype=th.uint32)  # Initialize the key_array as empty
         self.known_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.Tensor([], dtype=np.uint32)
+        self.key_array = th.Tensor([], dtype=th.uint32)
         self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image, image_keys=None):
@@ -98,14 +98,14 @@ class Remapper:
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
         assert th.all(
-            th.Tensor(list(new_mapping.keys())) != np.iinfo(np.uint32).max
+            th.Tensor(list(new_mapping.keys())) != np.iinfo(th.uint32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = th.max(image)
         key_array_max_key = len(self.key_array) - 1
         if image_max_key > key_array_max_key:
             prev_key_array = self.key_array.copy()
             # We build a new key array and use max uint32 as the default value.
-            self.key_array = np.full(image_max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
+            self.key_array = np.full(image_max_key + 1, np.iinfo(th.uint32).max, dtype=th.uint32)
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 
@@ -131,7 +131,7 @@ class Remapper:
         # Apply remapping
         remapped_img = self.key_array[image]
         # Make sure all values are correctly remapped and not equal to the default value
-        assert th.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
+        assert th.all(remapped_img != np.iinfo(th.uint32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
         for key in np.unique(remapped_img):
             remapped_labels[key] = new_mapping[key]
@@ -200,9 +200,9 @@ def segmentation_to_rgb(seg_im, N, colors=None):
         use_colors = colors
 
     if N <= 256:
-        return (255.0 * use_colors[seg_im]).astype(np.uint8)
+        return (255.0 * use_colors[seg_im]).to(th.uint8)
     else:
-        return (use_colors[seg_im]).astype(np.float)
+        return (use_colors[seg_im]).float()
 
 
 def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):

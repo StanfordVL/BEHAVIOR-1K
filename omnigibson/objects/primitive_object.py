@@ -221,7 +221,7 @@ class PrimitiveObject(StatefulObject):
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = th.Tensor(attr.Get()).astype(np.float64)
+                    vals = th.Tensor(attr.Get()).double()
                     attr_pairs.append([attr, vals])
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
@@ -274,7 +274,7 @@ class PrimitiveObject(StatefulObject):
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = th.Tensor(attr.Get()).astype(np.float64)
+                    vals = th.Tensor(attr.Get()).double()
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
@@ -319,7 +319,7 @@ class PrimitiveObject(StatefulObject):
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
-                    vals = th.Tensor(attr.Get()).astype(np.float64) * scaling_factor
+                    vals = th.Tensor(attr.Get()).double() * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
@@ -378,4 +378,4 @@ class PrimitiveObject(StatefulObject):
                 state_flat,
                 th.Tensor([state["radius"], state["height"], state["size"]]),
             ]
-        ).astype(float)
+        ).float()

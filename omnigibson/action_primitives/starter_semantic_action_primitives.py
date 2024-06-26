@@ -1566,7 +1566,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             fig.canvas.draw()
 
             # Convert the canvas to image
-            img = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+            img = np.fromstring(fig.canvas.tostring_rgb(), dtype=th.uint8, sep="")
             img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
             plt.close(fig)
 

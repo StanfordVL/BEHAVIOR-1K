@@ -1429,8 +1429,8 @@ class EntityPrim(XFormPrim):
                 the world frame)
         """
         jac = self.get_jacobian(clone=clone)
-        ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
-        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        ori_t = T.quat2mat(self.get_orientation()).T.float()
+        tf = np.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jac
@@ -1555,7 +1555,7 @@ class EntityPrim(XFormPrim):
                 th.cat([prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()])
             )
 
-        return th.cat(state_flat).astype(float)
+        return th.cat(state_flat).float()
 
     def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and

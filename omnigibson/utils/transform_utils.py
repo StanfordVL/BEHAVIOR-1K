@@ -70,10 +70,10 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
     data = th.Tensor(data, copy=False)
 
     if dtype is None:
-        if data.dtype == np.float32:
-            dtype = np.float32
+        if data.dtype == th.float32:
+            dtype = th.float32
         else:
-            dtype = np.float64
+            dtype = th.float64
     else:
         dtype = np.dtype(dtype)
 
@@ -94,7 +94,7 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
     if offset is None:
         offset = data[0]
 
-    alpha = th.Tensor(alpha, copy=False).astype(dtype, copy=False)
+    alpha = th.Tensor(alpha, copy=False).to(dtype, copy=False)
 
     # scaling_factors -> 0 as len(data) gets large
     # this leads to divide-by-zeros below
@@ -107,7 +107,7 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
     out /= scaling_factors[-2::-1]
 
     if offset != 0:
-        offset = th.Tensor(offset, copy=False).astype(dtype, copy=False)
+        offset = th.Tensor(offset, copy=False).to(dtype, copy=False)
         # add offsets
         out += offset * scaling_factors[1:]
 
@@ -156,7 +156,7 @@ def quat_multiply(quaternion1, quaternion0):
             x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
             -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
         ),
-        dtype=np.float32,
+        dtype=th.float32,
     )
 
 
@@ -178,7 +178,7 @@ def quat_conjugate(quaternion):
     """
     return th.Tensor(
         (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
-        dtype=np.float32,
+        dtype=th.float32,
     )
 
 
@@ -298,7 +298,7 @@ def random_quat(rand=None):
     t2 = pi2 * rand[2]
     return th.Tensor(
         (np.sin(t1) * r1, np.cos(t1) * r1, np.sin(t2) * r2, np.cos(t2) * r2),
-        dtype=np.float32,
+        dtype=th.float32,
     )
 
 
@@ -346,7 +346,7 @@ def vec(values):
     Returns:
         th.Tensor: vector of given values
     """
-    return th.Tensor(values, dtype=np.float32)
+    return th.Tensor(values, dtype=th.float32)
 
 
 def mat4(array):
@@ -359,7 +359,7 @@ def mat4(array):
     Returns:
         th.Tensor: a 4x4 numpy matrix
     """
-    return th.Tensor(array, dtype=np.float32).reshape((4, 4))
+    return th.Tensor(array, dtype=th.float32).reshape((4, 4))
 
 
 def mat2pose(hmat):
@@ -424,7 +424,7 @@ def euler2mat(euler):
         AssertionError: [Invalid input shape]
     """
 
-    euler = np.asarray(euler, dtype=np.float64)
+    euler = np.asarray(euler, dtype=th.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
     return R.from_euler("xyz", euler).as_matrix()
@@ -440,7 +440,7 @@ def mat2euler(rmat):
     Returns:
         th.Tensor: (r,p,y) converted euler angles in radian vec3 float
     """
-    M = th.Tensor(rmat, dtype=np.float32, copy=False)[:3, :3]
+    M = th.Tensor(rmat, dtype=th.float32, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
 
 
@@ -455,9 +455,9 @@ def pose2mat(pose):
     Returns:
         th.Tensor: 4x4 homogeneous matrix
     """
-    homo_pose_mat = np.zeros((4, 4), dtype=np.float32)
+    homo_pose_mat = np.zeros((4, 4), dtype=th.float32)
     homo_pose_mat[:3, :3] = quat2mat(pose[1])
-    homo_pose_mat[:3, 3] = th.Tensor(pose[0], dtype=np.float32)
+    homo_pose_mat[:3, 3] = th.Tensor(pose[0], dtype=th.float32)
     homo_pose_mat[3, 3] = 1.0
     return homo_pose_mat
 
@@ -764,7 +764,7 @@ def rotation_matrix(angle, direction, point=None):
     cosa = math.cos(angle)
     direction = unit_vector(direction[:3])
     # rotation matrix around unit vector
-    R = th.Tensor(((cosa, 0.0, 0.0), (0.0, cosa, 0.0), (0.0, 0.0, cosa)), dtype=np.float32)
+    R = th.Tensor(((cosa, 0.0, 0.0), (0.0, cosa, 0.0), (0.0, 0.0, cosa)), dtype=th.float32)
     R += np.outer(direction, direction) * (1.0 - cosa)
     direction *= sina
     R += th.Tensor(
@@ -773,13 +773,13 @@ def rotation_matrix(angle, direction, point=None):
             (direction[2], 0.0, -direction[0]),
             (-direction[1], direction[0], 0.0),
         ),
-        dtype=np.float32,
+        dtype=th.float32,
     )
     M = np.identity(4)
     M[:3, :3] = R
     if point is not None:
         # rotation not around origin
-        point = th.Tensor(point[:3], dtype=np.float32, copy=False)
+        point = th.Tensor(point[:3], dtype=th.float32, copy=False)
         M[:3, 3] = point - np.dot(R, point)
     return M
 
@@ -906,7 +906,7 @@ def unit_vector(data, dim=None, out=None):
         None or th.Tensor: If @out is not specified, will return normalized vector. Otherwise, stores the output in @out
     """
     if out is None:
-        data = th.Tensor(data, dtype=np.float32, copy=True)
+        data = th.Tensor(data, dtype=th.float32, copy=True)
         if data.ndim == 1:
             data /= math.sqrt(np.dot(data, data))
             return data
@@ -1062,7 +1062,7 @@ def frustum(left, right, bottom, top, znear, zfar):
     assert bottom != top
     assert znear != zfar
 
-    M = np.zeros((4, 4), dtype=np.float32)
+    M = np.zeros((4, 4), dtype=th.float32)
     M[0, 0] = +2.0 * znear / (right - left)
     M[2, 0] = (right + left) / (right - left)
     M[1, 1] = +2.0 * znear / (top - bottom)
@@ -1081,7 +1081,7 @@ def ortho(left, right, bottom, top, znear, zfar):
     assert bottom != top
     assert znear != zfar
 
-    M = np.zeros((4, 4), dtype=np.float32)
+    M = np.zeros((4, 4), dtype=th.float32)
     M[0, 0] = 2.0 / (right - left)
     M[1, 1] = 2.0 / (top - bottom)
     M[2, 2] = -2.0 / (zfar - znear)

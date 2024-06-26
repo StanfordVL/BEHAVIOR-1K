@@ -166,7 +166,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     offset = th.Tensor([1, 1]) * offset
 
     # Compute the grid of rays
-    steps = (offset / new_ray_per_horizontal_distance).astype(int) * 2 + 1
+    steps = (offset / new_ray_per_horizontal_distance).int() * 2 + 1
     steps = np.maximum(steps, 3)
     x_range = th.linspace(-offset[0], offset[0], steps[0])
     y_range = th.linspace(-offset[1], offset[1], steps[1])

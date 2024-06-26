@@ -615,7 +615,7 @@ class ControllableObject(BaseObject):
         )
 
         # Concatenate and return
-        return th.cat([state_flat, controller_states_flat]).astype(float)
+        return th.cat([state_flat, controller_states_flat]).float()
 
     def deserialize(self, state):
         # Run super first
