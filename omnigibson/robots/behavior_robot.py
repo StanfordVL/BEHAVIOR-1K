@@ -587,7 +587,7 @@ class BRPart(ABC):
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears
-        dist_to_real_controller = np.linalg.norm(pos - self.get_position_orientation()[0])
+        dist_to_real_controller = th.norm(pos - self.get_position_orientation()[0])
         should_visible = dist_to_real_controller > m.HAND_GHOST_HAND_APPEAR_THRESHOLD
 
         # Only toggle visibility if we are transition from hidden to unhidden, or the other way around

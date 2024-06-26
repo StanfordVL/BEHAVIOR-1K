@@ -479,9 +479,9 @@ class CameraMover:
             for j in range(len(positions) - 1):
                 # Get direction vector from the current to the following point
                 direction = positions[j + 1] - positions[j]
-                direction = direction / np.linalg.norm(direction)
+                direction = direction / th.norm(direction)
                 # Infer tilt and pan angles from this direction
-                xy_direction = direction[:2] / np.linalg.norm(direction[:2])
+                xy_direction = direction[:2] / th.norm(direction[:2])
                 z = direction[2]
                 pan_angle = np.arctan2(-xy_direction[0], xy_direction[1])
                 tilt_angle = np.arcsin(z)

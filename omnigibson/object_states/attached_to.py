@@ -224,7 +224,7 @@ class AttachedTo(
                 if other.states[AttachedTo].children[parent_link_name] is None:
                     if bypass_alignment_checking:
                         return child_link, parent_link
-                    pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
+                    pos_diff = th.norm(child_link.get_position() - parent_link.get_position())
                     orn_diff = T.get_orientation_diff_in_radian(
                         child_link.get_orientation(), parent_link.get_orientation()
                     )

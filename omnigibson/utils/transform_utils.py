@@ -331,7 +331,7 @@ def random_axis_angle(angle_limit=None, random_state=None):
     # see (http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/)
     # for why it works.
     random_axis = npr.randn(3)
-    random_axis /= np.linalg.norm(random_axis)
+    random_axis /= th.norm(random_axis)
     random_angle = npr.uniform(low=0.0, high=angle_limit)
     return random_axis, random_angle
 
@@ -403,8 +403,8 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     # See https://stackoverflow.com/questions/15873996/converting-a-direction-vector-to-a-quaternion-rotation
     # Take cross product of @up and @vec to get @s_n, and then cross @vec and @s_n to get @u_n
     # Then compose 3x3 rotation matrix and convert into quaternion
-    vec_n = vec / np.linalg.norm(vec)  # x
-    up_n = up / np.linalg.norm(up)
+    vec_n = vec / th.norm(vec)  # x
+    up_n = up / th.norm(up)
     s_n = np.cross(up_n, vec_n)  # y
     u_n = np.cross(vec_n, s_n)  # z
     return mat2quat(th.Tensor([vec_n, s_n, u_n]).T)
@@ -800,7 +800,7 @@ def clip_translation(dpos, limit):
             - (th.Tensor) Clipped translation (same dimension as inputs)
             - (bool) whether the value was clipped or not
     """
-    input_norm = np.linalg.norm(dpos)
+    input_norm = th.norm(dpos)
     return (dpos * limit / input_norm, True) if input_norm > limit else (dpos, False)
 
 
@@ -823,7 +823,7 @@ def clip_rotation(quat, limit):
     clipped = False
 
     # First, normalize the quaternion
-    quat = quat / np.linalg.norm(quat)
+    quat = quat / th.norm(quat)
 
     den = np.sqrt(max(1 - quat[3] * quat[3], 0))
     if den == 0:
@@ -959,9 +959,9 @@ def get_orientation_diff_in_radian(orn0, orn1):
         orn_diff (float): orientation difference in radian
     """
     vec0 = quat2axisangle(orn0)
-    vec0 /= np.linalg.norm(vec0)
+    vec0 /= th.norm(vec0)
     vec1 = quat2axisangle(orn1)
-    vec1 /= np.linalg.norm(vec1)
+    vec1 /= th.norm(vec1)
     return np.arccos(np.dot(vec0, vec1))
 
 
@@ -1048,12 +1048,12 @@ def vecs2quat(vec0, vec1, normalized=False):
     quat_unnormalized = np.where(
         cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), th.cat([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
-    return quat_unnormalized / np.linalg.norm(quat_unnormalized, dim=-1, keepdims=True)
+    return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdims=True)
 
 
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
-    return np.linalg.norm(th.Tensor(v1) - th.Tensor(v2))
+    return th.norm(th.Tensor(v1) - th.Tensor(v2))
 
 
 def frustum(left, right, bottom, top, znear, zfar):
@@ -1103,7 +1103,7 @@ def perspective(fovy, aspect, znear, zfar):
 
 def anorm(x, dim=None, keepdims=False):
     """Compute L2 norms alogn specified axes."""
-    return np.linalg.norm(x, dim=axis, keepdims=keepdims)
+    return th.norm(x, dim=axis, keepdims=keepdims)
 
 
 def normalize(v, dim=None, eps=1e-10):
@@ -1183,8 +1183,8 @@ def calculate_xy_plane_angle(quaternion):
     fwd = R.from_quat(quaternion).apply([1, 0, 0])
     fwd[2] = 0.0
 
-    if np.linalg.norm(fwd) < 1e-4:
+    if th.norm(fwd) < 1e-4:
         return 0.0
 
-    fwd /= np.linalg.norm(fwd)
+    fwd /= th.norm(fwd)
     return np.arctan2(fwd[1], fwd[0])

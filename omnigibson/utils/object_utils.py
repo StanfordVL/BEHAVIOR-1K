@@ -27,7 +27,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     og.sim.play()
     assert th.all(obj.scale == 1.0)
     aabb_extent = obj.aabb_extent
-    radius = np.linalg.norm(aabb_extent) / 2.0
+    radius = th.norm(aabb_extent) / 2.0
     drop_pos = th.Tensor([0, 0, radius + drop_aabb_offset])
     center_offset = obj.get_position() - obj.aabb_center
     drop_orientations = R.random(n_samples).as_quat()

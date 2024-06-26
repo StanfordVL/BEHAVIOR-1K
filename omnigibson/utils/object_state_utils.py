@@ -237,7 +237,7 @@ def sample_kinematics(
         for i in range(5):
             og.sim.step_physics()
         i = 0
-        while np.linalg.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
+        while th.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
             og.sim.step_physics()
             i += 1
 

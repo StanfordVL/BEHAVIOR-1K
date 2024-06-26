@@ -1191,7 +1191,7 @@ class ParticleApplier(ParticleModifier):
             raise ValueError(
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!"
             )
-        self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, dim=-1).reshape(-1, 1)
+        self._in_mesh_local_particle_directions = directions / th.norm(directions, dim=-1).reshape(-1, 1)
 
     def _update(self):
         # If we're about to check for modification, update whether it the visualization should be active or not

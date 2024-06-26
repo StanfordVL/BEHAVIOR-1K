@@ -35,7 +35,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
 
     grasp_center_pos = bbox_center_in_world + th.Tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
-    towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
+    towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
     grasp_quat = T.euler2quat([0, 3.1415 / 2, 0])
 
@@ -76,17 +76,17 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
         @ T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))  # grasp pose in base frame
     )[0] + th.Tensor([0, 0, 0.02])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
-    towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
+    towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
     # For the grasp, we want the X+ direction to be the direction of the object's surface.
     # The other two directions can be randomized.
     rand_vec = np.random.rand(3)
-    rand_vec /= np.linalg.norm(rand_vec)
+    rand_vec /= th.norm(rand_vec)
     grasp_x = towards_object_in_world_frame
     grasp_y = np.cross(rand_vec, grasp_x)
-    grasp_y /= np.linalg.norm(grasp_y)
+    grasp_y /= th.norm(grasp_y)
     grasp_z = np.cross(grasp_x, grasp_y)
-    grasp_z /= np.linalg.norm(grasp_z)
+    grasp_z /= th.norm(grasp_z)
     grasp_mat = th.Tensor([grasp_x, grasp_y, grasp_z]).T
     grasp_quat = R.from_matrix(grasp_mat).as_quat()
 
@@ -293,7 +293,7 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
         list: A list of tuples representing the interpolated waypoints, where each tuple contains a position and orientation as a quaternion.
     """
     start_pos, start_orn = start_pose
-    travel_distance = np.linalg.norm(end_pose[0] - start_pos)
+    travel_distance = th.norm(end_pose[0] - start_pos)
 
     if num_waypoints == "default":
         num_waypoints = th.max([2, int(travel_distance / 0.01) + 1])
@@ -346,10 +346,10 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
     joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
-    joint_axis /= np.linalg.norm(joint_axis)
+    joint_axis /= th.norm(joint_axis)
     origin_towards_bbox = th.Tensor(bbox_wrt_origin[0])
     open_direction = np.cross(joint_axis, origin_towards_bbox)
-    open_direction /= np.linalg.norm(open_direction)
+    open_direction /= th.norm(open_direction)
     lateral_axis = np.cross(open_direction, joint_axis)
 
     # Match the axes to the canonical axes of the link bb.
@@ -419,7 +419,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     grasp_pose_in_origin_frame = T.pose_transform(*bbox_wrt_origin, *grasp_pose_in_bbox_frame)
 
     # Get the arc length and divide it up to 10cm segments
-    arc_length = abs(required_yaw_change) * np.linalg.norm(grasp_pose_in_origin_frame[0])
+    arc_length = abs(required_yaw_change) * th.norm(grasp_pose_in_origin_frame[0])
     turn_steps = int(ceil(arc_length / m.ROTATION_ARC_SEGMENT_LENGTHS))
     targets = []
 
@@ -465,13 +465,13 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     Returns:
         np.ndarray: A quaternion representing the orientation.
     """
-    forward = vector / np.linalg.norm(vector)
+    forward = vector / th.norm(vector)
     rand_vec = np.random.rand(3)
-    rand_vec /= np.linalg.norm(3)
+    rand_vec /= th.norm(3)
     side = np.cross(rand_vec, forward)
-    side /= np.linalg.norm(3)
+    side /= th.norm(3)
     up = np.cross(forward, side)
-    # assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
+    # assert np.isclose(th.norm(up), 1, atol=1e-3)
     rotmat = th.Tensor([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 
@@ -522,7 +522,7 @@ def _get_closest_point_to_point_in_world_frame(
         ]
     )
 
-    vector_distances_to_point = np.linalg.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], dim=1)
+    vector_distances_to_point = th.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], dim=1)
     closer_option_idx = np.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]

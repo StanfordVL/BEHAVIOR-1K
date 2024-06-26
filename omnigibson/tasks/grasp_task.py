@@ -139,9 +139,9 @@ class GraspTask(BaseTask):
             # Wait for the robot to fully stabilize.
             for _ in range(100):
                 og.sim.step()
-                if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+                if th.norm(robot.get_linear_velocity()) > 1e-2:
                     continue
-                if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+                if th.norm(robot.get_angular_velocity()) > 1e-2:
                     continue
                 break
             else:

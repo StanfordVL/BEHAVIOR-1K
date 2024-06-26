@@ -120,7 +120,7 @@ class ClothPrim(GeomPrim):
         # Compute centroid particle idx based on AABB
         aabb_min, aabb_max = th.min(positions, dim=0), th.max(positions, dim=0)
         aabb_center = (aabb_min + aabb_max) / 2.0
-        dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), dim=-1)
+        dists = th.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = np.argmin(dists)
 
     def _initialize(self):
@@ -333,7 +333,7 @@ class ClothPrim(GeomPrim):
         v1 = positions[:, 2, :] - positions[:, 0, :]
         v2 = positions[:, 1, :] - positions[:, 0, :]
         normals = np.cross(v1, v2)
-        return normals / np.linalg.norm(normals, dim=1).reshape(-1, 1)
+        return normals / th.norm(normals, dim=1).reshape(-1, 1)
 
     def contact_list(self, keypoints_only=True):
         """

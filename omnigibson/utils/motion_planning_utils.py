@@ -71,7 +71,7 @@ def plan_base_motion(
                 return False
 
             # Navigation
-            dist = np.linalg.norm(goal[:2] - start[:2])
+            dist = th.norm(goal[:2] - start[:2])
             num_points = ceil(dist / m.DIST_DIFF) + 1
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()

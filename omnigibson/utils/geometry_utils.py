@@ -112,7 +112,7 @@ def check_points_in_cone(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], dim=-1) < (
+    in_radius = th.norm(particle_positions[:, :-1], dim=-1) < (
         radius * (1 - (particle_positions[:, -1] + height / 2.0) / height)
     )
     return in_height & in_radius
@@ -143,7 +143,7 @@ def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], dim=-1) < radius
+    in_radius = th.norm(particle_positions[:, :-1], dim=-1) < radius
     return in_height & in_radius
 
 
@@ -169,7 +169,7 @@ def check_points_in_sphere(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    return np.linalg.norm(particle_positions, dim=-1) < size
+    return th.norm(particle_positions, dim=-1) < size
 
 
 def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos, quat, scale, particle_positions):

@@ -837,7 +837,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = np.linalg.norm(th.Tensor(candidate_link.get_position()) - th.Tensor(gripper_center_pos))
+            dist = th.norm(th.Tensor(candidate_link.get_position()) - th.Tensor(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:

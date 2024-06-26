@@ -111,7 +111,7 @@ class TraversableMap(BaseMap):
         # Erode the traversability map to account for the robot's size
         if robot:
             robot_chassis_extent = robot.reset_joint_pos_aabb_extent[:2]
-            radius = np.linalg.norm(robot_chassis_extent) / 2.0
+            radius = th.norm(robot_chassis_extent) / 2.0
         else:
             radius = self.default_erosion_radius
         radius_pixel = int(np.ceil(radius / self.map_resolution))
@@ -192,7 +192,7 @@ class TraversableMap(BaseMap):
             # No traversable path found
             return None, None
         path_world = self.map_to_world(path_map)
-        geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], dim=1))
+        geodesic_distance = np.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
         path_world = path_world[:: self.waypoint_interval]
 
         if not entire_path:

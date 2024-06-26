@@ -53,7 +53,7 @@ def fit_plane(points, refusal_log):
     ctr = points.mean(dim=0)
     x = points - ctr
     normal = np.linalg.svd(np.dot(x.T, x))[0][:, -1]
-    normal /= np.linalg.norm(normal)
+    normal /= th.norm(normal)
     return ctr, normal
 
 
@@ -153,11 +153,11 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     # Get an orthogonal vector using a random vector.
     random_vector = np.random.rand(3)
     orthogonal_vector_1 = np.cross(ray_direction, random_vector)
-    orthogonal_vector_1 /= np.linalg.norm(orthogonal_vector_1)
+    orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 
     # Get a second vector orthogonal to both the ray and the first vector.
     orthogonal_vector_2 = -np.cross(ray_direction, orthogonal_vector_1)
-    orthogonal_vector_2 /= np.linalg.norm(orthogonal_vector_2)
+    orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
     orthogonal_vectors = th.Tensor([orthogonal_vector_1, orthogonal_vector_2])
     assert th.all(np.isfinite(orthogonal_vectors))
@@ -328,7 +328,7 @@ def raytest(
     # Make sure start point, end point are numpy arrays
     start_point, end_point = th.Tensor(start_point), th.Tensor(end_point)
     point_diff = end_point - start_point
-    distance = np.linalg.norm(point_diff)
+    distance = th.norm(point_diff)
     direction = point_diff / distance
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
@@ -898,7 +898,7 @@ def sample_cuboid_on_object(
             # Process the hit positions and normals.
             hit_positions = th.Tensor([ray_res["position"] for ray_res in filtered_cast_results])
             hit_normals = th.Tensor([ray_res["normal"] for ray_res in filtered_cast_results])
-            hit_normals /= np.linalg.norm(hit_normals, dim=1, keepdims=True)
+            hit_normals /= th.norm(hit_normals, dim=1, keepdims=True)
 
             assert filtered_center_idx is not None
             hit_link = filtered_cast_results[filtered_center_idx]["rigidBody"]
@@ -1077,8 +1077,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
         bool: Whether the normal similarity is acceptable or not
     """
     parallel_hit_main_hit_dot_products = np.clip(
-        np.dot(hit_normals, center_hit_normal)
-        / (np.linalg.norm(hit_normals, dim=1) * np.linalg.norm(center_hit_normal)),
+        np.dot(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
         -1.0,
         1.0,
     )

@@ -1137,7 +1137,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             current_orn = current_pose[1]
 
             delta_pos = target_pos - current_pos
-            target_pos_diff = np.linalg.norm(delta_pos)
+            target_pos_diff = th.norm(delta_pos)
             target_orn_diff = (Rotation.from_quat(target_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
             reached_goal = target_pos_diff < pos_thresh and target_orn_diff < ori_thresh
             if reached_goal:
@@ -1148,7 +1148,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # if i > 0 and stop_if_stuck and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
             if i > 0 and stop_if_stuck:
-                pos_diff = np.linalg.norm(prev_pos - current_pos)
+                pos_diff = th.norm(prev_pos - current_pos)
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
@@ -1185,7 +1185,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # To make sure that this happens in a roughly linear fashion, we will divide the trajectory
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
-        travel_distance = np.linalg.norm(target_pose[0] - start_pos)
+        travel_distance = th.norm(target_pose[0] - start_pos)
         num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
         pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)
 
@@ -1219,7 +1219,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = np.linalg.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
+                pos_diff = th.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
                 orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
                 if pos_diff < 0.005 and orn_diff < np.deg2rad(0.1):
                     return
@@ -1264,7 +1264,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = np.linalg.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
+                pos_diff = th.norm(th.Tensor(current_pos) - th.Tensor(target_pose[0]))
                 orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
                 if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
                     return
@@ -1628,7 +1628,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
-            if np.linalg.norm(body_target_pose[0][:2]) < dist_threshold:
+            if th.norm(body_target_pose[0][:2]) < dist_threshold:
                 break
 
             diff_pos = end_pose[0] - self.robot.get_position()
@@ -1640,7 +1640,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action = self._empty_action()
                 if self._base_controller_is_joint:
-                    direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
+                    direction_vec = body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
                     base_action = [direction_vec[0], direction_vec[1], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
@@ -1833,7 +1833,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Check that the pose is near one of the poses in the near_poses list if provided.
             if near_poses:
                 sampled_pos = th.Tensor([sampled_obj_pose[0]])
-                if not th.any(np.linalg.norm(near_poses - sampled_pos, dim=1) < near_poses_threshold):
+                if not th.any(th.norm(near_poses - sampled_pos, dim=1) < near_poses_threshold):
                     continue
 
             # Return the pose
@@ -1943,7 +1943,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield self._postprocess_action(empty_action)
 
         for _ in range(m.MAX_STEPS_FOR_SETTLING):
-            if np.linalg.norm(self.robot.get_linear_velocity()) < 0.01:
+            if th.norm(self.robot.get_linear_velocity()) < 0.01:
                 break
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
