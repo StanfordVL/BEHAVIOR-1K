@@ -1160,7 +1160,7 @@ class ParticleApplier(ParticleModifier):
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-        points = th.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        points = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         pos, quat = self.link.get_position_orientation()
         points = points[th.where(self._check_in_mesh(points))[0]]
         # Convert the points into local frame

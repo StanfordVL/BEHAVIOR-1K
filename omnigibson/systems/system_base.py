@@ -882,7 +882,7 @@ class PhysicalParticleSystem(BaseSystem):
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points
-        particle_positions = th.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        particle_positions = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
         particle_positions = particle_positions[th.where(check_in_volume(particle_positions))[0]]
 

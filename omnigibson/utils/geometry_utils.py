@@ -420,7 +420,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [th.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-        points = th.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        points = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
 
         # Re-hide container meshes
         for mesh in container_meshes:

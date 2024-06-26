@@ -170,7 +170,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     steps = np.maximum(steps, 3)
     x_range = th.linspace(-offset[0], offset[0], steps[0])
     y_range = th.linspace(-offset[1], offset[1], steps[1])
-    ray_grid = np.dstack(np.meshgrid(x_range, y_range, indexing="ij"))
+    ray_grid = np.dstack(th.meshgrid(x_range, y_range, indexing="ij"))
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
     # Apply the grid onto the orthogonal vectors to obtain the rays in the world frame.

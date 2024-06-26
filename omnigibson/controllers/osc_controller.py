@@ -371,7 +371,7 @@ class OperationalSpaceController(ManipulationController):
         kd = 2 * th.sqrt(kp) * damping_ratio
 
         # Extract relevant values from the control dict
-        dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))
+        dof_idxs_mat = tuple(th.meshgrid(self.dof_idx, self.dof_idx))
         q = control_dict["joint_position"][self.dof_idx]
         qd = control_dict["joint_velocity"][self.dof_idx]
         mm = control_dict["mass_matrix"][dof_idxs_mat]
