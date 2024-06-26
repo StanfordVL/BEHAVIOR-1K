@@ -62,7 +62,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     # Pick an axis and a direction.
     approach_axis = np.random.choice([0, 1, 2])
     approach_direction = np.random.choice([-1, 1]) if approach_axis != 2 else 1
-    constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * np.eye(3)[approach_axis]
+    constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * th.eye(3)[approach_axis]
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
     random_dimensions_in_base_frame = np.random.uniform(
         [-1, -1, 0], [1, 1, 1]
@@ -185,7 +185,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     assert np.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = np.argmax(th.abs(push_axis))
-    canonical_push_axis = np.eye(3)[push_axis_idx]
+    canonical_push_axis = th.eye(3)[push_axis_idx]
 
     # TODO: Need to figure out how to get the correct push direction.
     push_direction = np.sign(push_axis[push_axis_idx]) if should_open else -1 * np.sign(push_axis[push_axis_idx])
@@ -207,8 +207,8 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     # Pick the other axes.
     all_axes = list(set(range(3)) - {push_axis_idx})
     x_axis_idx, y_axis_idx = tuple(sorted(all_axes))
-    canonical_x_axis = np.eye(3)[x_axis_idx]
-    canonical_y_axis = np.eye(3)[y_axis_idx]
+    canonical_x_axis = th.eye(3)[x_axis_idx]
+    canonical_y_axis = th.eye(3)[y_axis_idx]
 
     # Find the correct side of the lateral axis & go some distance along that direction.
     min_lateral_pos_wrt_surface_center = (canonical_x_axis + canonical_y_axis) * -bbox_extent_in_link_frame / 2
@@ -360,7 +360,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     assert lateral_axis_idx != joint_axis_idx
     assert open_axis_idx != joint_axis_idx
 
-    canonical_open_direction = np.eye(3)[open_axis_idx]
+    canonical_open_direction = th.eye(3)[open_axis_idx]
     points_along_open_axis = (
         th.Tensor([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
     )
@@ -377,8 +377,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     center_of_selected_surface_along_push_axis = points_along_open_axis[open_axis_closer_side_idx]
 
     # Find the correct side of the lateral axis & go some distance along that direction.
-    canonical_joint_axis = np.eye(3)[joint_axis_idx]
-    lateral_away_from_origin = np.eye(3)[lateral_axis_idx] * np.sign(origin_towards_bbox[lateral_axis_idx])
+    canonical_joint_axis = th.eye(3)[joint_axis_idx]
+    lateral_away_from_origin = th.eye(3)[lateral_axis_idx] * np.sign(origin_towards_bbox[lateral_axis_idx])
     min_lateral_pos_wrt_surface_center = (
         lateral_away_from_origin * -th.Tensor(origin_wrt_bbox[0])
         - canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2

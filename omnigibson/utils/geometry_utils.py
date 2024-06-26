@@ -26,7 +26,7 @@ def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose_inv(T.pose2mat((pos, quat)))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = np.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     particle_positions = (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
@@ -55,7 +55,7 @@ def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose2mat((pos, quat))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = np.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     return (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)

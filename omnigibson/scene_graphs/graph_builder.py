@@ -57,8 +57,8 @@ class SceneGraphBuilder(object):
         return self._G.copy()
 
     def _get_desired_frame(self):
-        desired_frame_to_world = np.eye(4)
-        world_to_desired_frame = np.eye(4)
+        desired_frame_to_world = th.eye(4)
+        world_to_desired_frame = th.eye(4)
         if self._egocentric:
             desired_frame_to_world = self._get_robot_to_world_transform()
             world_to_desired_frame = T.pose_inv(desired_frame_to_world)

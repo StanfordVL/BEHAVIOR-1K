@@ -508,6 +508,6 @@ def _compute_osc_torques(
         j_eef_inv = m_eef @ j_eef @ mm_inv
         u_null = kd_null * -qd + kp_null * ((rest_qpos - q + 3.1415) % (2 * 3.1415) - 3.1415)
         u_null = mm @ np.expand_dims(u_null, dim=-1).astype(np.float32)
-        u += (np.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
+        u += (th.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u

@@ -122,8 +122,8 @@ def draw_debug_markers(hit_positions, radius=0.01):
     color = th.cat([np.random.rand(3), [1]])
     for vec in hit_positions:
         for dim in range(3):
-            start_point = vec + np.eye(3)[dim] * radius
-            end_point = vec - np.eye(3)[dim] * radius
+            start_point = vec + th.eye(3)[dim] * radius
+            end_point = vec - th.eye(3)[dim] * radius
             draw_line(start_point, end_point, color)
 
 
