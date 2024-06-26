@@ -579,7 +579,7 @@ def astar(search_map, start, goal, eight_connected=True):
 
     def heuristic(node):
         # Calculate the Euclidean distance from node to goal
-        return np.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
+        return th.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
 
     def get_neighbors(cell):
         if eight_connected:
@@ -608,7 +608,7 @@ def astar(search_map, start, goal, eight_connected=True):
         if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
             return 1
         else:
-            return np.sqrt(2)
+            return th.sqrt(2)
 
     open_set = [(0, start)]
     came_from = {}

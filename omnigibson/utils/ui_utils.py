@@ -459,7 +459,7 @@ class CameraMover:
 
         # Function help get arc derivative
         def arc_derivative(u):
-            return np.sqrt(th.sum([dspline(u) ** 2 for dspline in dsplines]))
+            return th.sqrt(th.sum([dspline(u) ** 2 for dspline in dsplines]))
 
         # Function to help get interpolated positions
         def get_interpolated_positions(step):

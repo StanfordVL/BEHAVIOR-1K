@@ -291,8 +291,8 @@ def random_quat(rand=None):
         rand = np.random.rand(3)
     else:
         assert len(rand) == 3
-    r1 = np.sqrt(1.0 - rand[0])
-    r2 = np.sqrt(rand[0])
+    r1 = th.sqrt(1.0 - rand[0])
+    r2 = th.sqrt(rand[0])
     pi2 = math.pi * 2.0
     t1 = pi2 * rand[1]
     t2 = pi2 * rand[2]
@@ -825,7 +825,7 @@ def clip_rotation(quat, limit):
     # First, normalize the quaternion
     quat = quat / th.norm(quat)
 
-    den = np.sqrt(max(1 - quat[3] * quat[3], 0))
+    den = th.sqrt(max(1 - quat[3] * quat[3], 0))
     if den == 0:
         # This is a zero degree rotation, immediately return
         return quat, clipped
@@ -915,7 +915,7 @@ def unit_vector(data, dim=None, out=None):
             out[:] = th.Tensor(data, copy=False)
         data = out
     length = np.atleast_1d(th.sum(data * data, axis))
-    np.sqrt(length, length)
+    th.sqrt(length, length)
     if axis is not None:
         length = np.expand_dims(length, axis)
     data /= length
@@ -1114,7 +1114,7 @@ def normalize(v, dim=None, eps=1e-10):
 
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
-    rho = np.sqrt(x**2 + y**2)
+    rho = th.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
     return rho, phi
 
@@ -1161,9 +1161,9 @@ def integer_spiral_coordinates(n):
     # Sources:
     # https://www.reddit.com/r/askmath/comments/18vqorf/find_the_nth_coordinate_of_a_square_spiral/
     # https://oeis.org/A174344
-    m = np.floor(np.sqrt(n))
-    x = ((-1) ** m) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n)) % 2) - np.ceil(m / 2))
-    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (np.floor(2 * np.sqrt(n) + 1) % 2) + np.ceil(m / 2))
+    m = np.floor(th.sqrt(n))
+    x = ((-1) ** m) * ((n - m * (m + 1)) * (np.floor(2 * th.sqrt(n)) % 2) - np.ceil(m / 2))
+    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (np.floor(2 * th.sqrt(n) + 1) % 2) + np.ceil(m / 2))
     return int(x), int(y)
 
 

@@ -132,7 +132,7 @@ class OperationalSpaceController(ManipulationController):
         self.kp = nums2array(nums=kp, dim=6, dtype=th.float32) if kp is not None else None
         self.damping_ratio = damping_ratio
         self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=th.float32) if kp_null is not None else None
-        self.kd_null = 2 * np.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
+        self.kd_null = 2 * th.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
         self.kp_limits = th.Tensor(kp_limits, dtype=th.float32)
         self.damping_ratio_limits = th.Tensor(damping_ratio_limits, dtype=th.float32)
         self.kp_null_limits = th.Tensor(kp_null_limits, dtype=th.float32)
@@ -272,7 +272,7 @@ class OperationalSpaceController(ManipulationController):
             idx += 6
         if self.variable_kp_null:
             self.kp_null = gains[:, idx : idx + self.control_dim].float()
-            self.kd_null = 2 * np.sqrt(self.kp_null)  # critically damped
+            self.kd_null = 2 * th.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
     def _update_goal(self, command, control_dict):
@@ -368,7 +368,7 @@ class OperationalSpaceController(ManipulationController):
         # For now, always use internal values
         kp = self.kp
         damping_ratio = self.damping_ratio
-        kd = 2 * np.sqrt(kp) * damping_ratio
+        kd = 2 * th.sqrt(kp) * damping_ratio
 
         # Extract relevant values from the control dict
         dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))

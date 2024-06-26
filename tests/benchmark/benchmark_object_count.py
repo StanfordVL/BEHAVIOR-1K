@@ -22,7 +22,7 @@ RAND_POSITION = True  # True to randomize positions.
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 
 # Internal constants.
-_N_PER_ROW = int(np.sqrt(MAX_NUM_OBJS))
+_N_PER_ROW = int(th.sqrt(MAX_NUM_OBJS))
 _MIN_VAL = -2.0
 _MAX_VAL = 2.0
 _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW

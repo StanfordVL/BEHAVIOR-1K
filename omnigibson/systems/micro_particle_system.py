@@ -1715,7 +1715,7 @@ class Cloth(MicroParticleSystem):
                 cm = ms.current_mesh()
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
-                    particle_distance *= np.sqrt(2)  # halve the number of vertices
+                    particle_distance *= th.sqrt(2)  # halve the number of vertices
                     log.warn(
                         f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
                     )
