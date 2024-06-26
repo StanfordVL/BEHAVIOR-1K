@@ -231,7 +231,7 @@ class PointNavigationTask(BaseTask):
 
         # Possibly sample initial ori
         initial_quat = (
-            T.euler2quat(th.Tensor([0, 0, np.random.uniform(0, np.pi * 2)]))
+            T.euler2quat(th.Tensor([0, 0, np.random.uniform(0, 3.1415 * 2)]))
             if self._randomize_initial_quat
             else self._initial_quat
         )

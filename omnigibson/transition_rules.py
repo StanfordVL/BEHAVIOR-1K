@@ -1781,7 +1781,7 @@ class RecipeRule(BaseTransitionRule):
                     if container.states[Contains].get_value(system):
                         volume += (
                             contained_particles_state.get_value(system).n_in_volume
-                            * np.pi
+                            * 3.1415
                             * (system.particle_radius**3)
                             * 4
                             / 3
@@ -1795,7 +1795,7 @@ class RecipeRule(BaseTransitionRule):
             # Remove the particles that are involved in this execution
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
                 system = get_system(system_name)
-                volume += len(particle_idxs) * np.pi * (system.particle_radius**3) * 4 / 3
+                volume += len(particle_idxs) * 3.1415 * (system.particle_radius**3) * 4 / 3
                 system.remove_particles(idxs=th.Tensor(list(particle_idxs)))
 
         if not cls.is_multi_instance:
@@ -1868,7 +1868,7 @@ class RecipeRule(BaseTransitionRule):
                 # When ignore_nonrecipe_objects is True, we don't necessarily remove all objects in the container.
                 # Therefore, we need to check for contact when generating output systems.
                 check_contact=cls.ignore_nonrecipe_objects,
-                max_samples=int(volume / (np.pi * (out_system.particle_radius**3) * 4 / 3)),
+                max_samples=int(volume / (3.1415 * (out_system.particle_radius**3) * 4 / 3)),
             )
 
         # Return transition results

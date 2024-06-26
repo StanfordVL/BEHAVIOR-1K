@@ -37,7 +37,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
-    grasp_quat = T.euler2quat([0, np.pi / 2, 0])
+    grasp_quat = T.euler2quat([0, 3.1415 / 2, 0])
 
     grasp_pose = (grasp_center_pos, grasp_quat)
     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]

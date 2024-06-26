@@ -500,4 +500,4 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
+        return {self.default_arm: euler2quat([0, 3.1415 / 2, 3.1415])}

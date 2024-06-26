@@ -1086,7 +1086,7 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, np.pi / 2, 0]))
+            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, 3.1415 / 2, 0]))
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
@@ -1390,7 +1390,7 @@ class ParticleApplier(ParticleModifier):
         n_samples = self._get_max_particles_limit_per_step(system=system)
         r, h = self._projection_mesh_params["extents"][0] / 2, self._projection_mesh_params["extents"][2]
         sampled_r_theta = np.random.rand(n_samples, 2)
-        sampled_r_theta = sampled_r_theta * th.Tensor([r, np.pi * 2]).reshape(1, 2)
+        sampled_r_theta = sampled_r_theta * th.Tensor([r, 3.1415 * 2]).reshape(1, 2)
         # Get start, end points in local link frame, start points to end points along the -z direction
         end_points = np.stack(
             [

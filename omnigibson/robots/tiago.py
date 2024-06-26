@@ -30,7 +30,7 @@ RESET_JOINT_OPTIONS = {
 }
 
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
-m.MAX_ANGULAR_VELOCITY = np.pi  # angular velocity in radians/second
+m.MAX_ANGULAR_VELOCITY = 3.1415  # angular velocity in radians/second
 
 
 class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):

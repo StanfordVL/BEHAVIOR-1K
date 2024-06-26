@@ -46,7 +46,7 @@ m.ARM_JOINT_STIFFNESS = 1e6
 m.ARM_JOINT_MAX_EFFORT = 300
 m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
-m.FINGER_JOINT_MAX_VELOCITY = np.pi * 4
+m.FINGER_JOINT_MAX_VELOCITY = 3.1415 * 4
 
 
 class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):

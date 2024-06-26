@@ -27,7 +27,7 @@ def _wrap_angle(theta):
     Returns:
         float: angle in radians in range [-pi, pi)
     """
-    return (theta + np.pi) % (2 * np.pi) - np.pi
+    return (theta + 3.1415) % (2 * 3.1415) - 3.1415
 
 
 def plan_base_motion(
@@ -391,8 +391,8 @@ def plan_arm_motion_ik(
 
     # # set lower and upper bounds for eef orientation (axis angle bounds)
     for i in range(3, 6):
-        bounds.setLow(i, -np.pi)
-        bounds.setHigh(i, np.pi)
+        bounds.setLow(i, -3.1415)
+        bounds.setHigh(i, 3.1415)
     space.setBounds(bounds)
 
     # create a simple setup object

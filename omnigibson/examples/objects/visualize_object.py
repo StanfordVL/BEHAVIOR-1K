@@ -121,7 +121,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     steps_per_joint = steps_per_rotate / 10
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        z_angle = 2 * np.pi * (i % steps_per_rotate) / steps_per_rotate
+        z_angle = 2 * 3.1415 * (i % steps_per_rotate) / steps_per_rotate
         quat = T.euler2quat(th.Tensor([0, 0, z_angle]))
         pos = T.quat2mat(quat) @ center_offset
         if obj.n_dof > 0:

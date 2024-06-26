@@ -9,7 +9,7 @@ import math
 import torch as th
 from scipy.spatial.transform import Rotation as R
 
-PI = np.pi
+PI = 3.1415
 EPS = np.finfo(float).eps * 4.0
 
 # axis sequences for Euler angles
@@ -319,7 +319,7 @@ def random_axis_angle(angle_limit=None, random_state=None):
         AssertionError: [Invalid RNG]
     """
     if angle_limit is None:
-        angle_limit = 2.0 * np.pi
+        angle_limit = 2.0 * 3.1415
 
     if random_state is not None:
         assert isinstance(random_state, np.random.RandomState)
@@ -1096,7 +1096,7 @@ def perspective(fovy, aspect, znear, zfar):
     """Create perspective projection matrix."""
     # fovy is in degree
     assert znear != zfar
-    h = np.tan(fovy / 360.0 * np.pi) * znear
+    h = np.tan(fovy / 360.0 * 3.1415) * znear
     w = h * aspect
     return frustum(-w, w, -h, h, znear, zfar)
 
@@ -1120,11 +1120,11 @@ def cartesian_to_polar(x, y):
 
 
 def deg2rad(deg):
-    return deg * np.pi / 180.0
+    return deg * 3.1415 / 180.0
 
 
 def rad2deg(rad):
-    return rad * 180.0 / np.pi
+    return rad * 180.0 / 3.1415
 
 
 def check_quat_right_angle(quat, atol=5e-2):

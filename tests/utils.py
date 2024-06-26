@@ -205,7 +205,7 @@ def assert_test_env():
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = np.random.uniform(pos_low, pos_hi, 3)
-    orn = T.euler2quat(np.random.uniform(-np.pi, np.pi, 3))
+    orn = T.euler2quat(np.random.uniform(-3.1415, 3.1415, 3))
     return pos, orn
 
 
