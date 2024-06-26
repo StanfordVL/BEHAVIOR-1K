@@ -36,7 +36,7 @@ class Filter(Serializable):
 
     def serialize(self, state):
         # Default is no state, so do nothing
-        return np.array([])
+        return th.Tensor([])
 
     def deserialize(self, state):
         # Default is no state, so do nothing
@@ -76,7 +76,7 @@ class MovingAverageFilter(Filter):
             n-array: New estimate of state.
         """
         # Write the newest observation at the appropriate index
-        self.past_samples[self.current_idx, :] = np.array(observation)
+        self.past_samples[self.current_idx, :] = th.Tensor(observation)
 
         # Compute value based on whether we're fully filled or not
         if not self.fully_filled:
@@ -103,7 +103,7 @@ class MovingAverageFilter(Filter):
         state = super()._dump_state()
 
         # Add info from this filter
-        state["past_samples"] = np.array(self.past_samples)
+        state["past_samples"] = th.Tensor(self.past_samples)
         state["current_idx"] = self.current_idx
         state["fully_filled"] = self.fully_filled
 
@@ -114,7 +114,7 @@ class MovingAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.past_samples = np.array(state["past_samples"])
+        self.past_samples = th.Tensor(state["past_samples"])
         self.current_idx = state["current_idx"]
         self.fully_filled = state["fully_filled"]
 
@@ -178,7 +178,7 @@ class ExponentialAverageFilter(Filter):
         self.avg = self.alpha * observation + (1.0 - self.alpha) * self.avg
         self.num_samples += 1
 
-        return np.array(self.avg)
+        return th.Tensor(self.avg)
 
     def reset(self):
         # Clear internal state
@@ -190,7 +190,7 @@ class ExponentialAverageFilter(Filter):
         state = super()._dump_state()
 
         # Add info from this filter
-        state["avg"] = np.array(self.avg)
+        state["avg"] = th.Tensor(self.avg)
         state["num_samples"] = self.num_samples
 
         return state
@@ -200,7 +200,7 @@ class ExponentialAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.avg = np.array(state["avg"])
+        self.avg = th.Tensor(state["avg"])
         self.num_samples = state["num_samples"]
 
     def serialize(self, state):
@@ -280,6 +280,6 @@ class UniformSubsampler(Subsampler):
 
 if __name__ == "__main__":
     f = MovingAverageFilter(3, 10)
-    a = np.array([1, 1, 1])
+    a = th.Tensor([1, 1, 1])
     for i in range(500):
         print(f.estimate(a + np.random.normal(scale=0.1)))

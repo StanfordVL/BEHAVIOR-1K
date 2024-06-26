@@ -56,8 +56,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([1.7789, -1.68822, 1.13551]),
-        orientation=np.array([0.57065614, 0.20331904, 0.267029, 0.74947212]),
+        position=th.Tensor([1.7789, -1.68822, 1.13551]),
+        orientation=th.Tensor([0.57065614, 0.20331904, 0.267029, 0.74947212]),
     )
 
     # Grab reference to object of interest
@@ -72,7 +72,7 @@ def main():
     def report_states():
         # Make sure states are propagated before printing
         for i in range(5):
-            env.step(np.array([]))
+            env.step(th.Tensor([]))
 
         print("=" * 20)
         print("temperature:", obj.states[object_states.Temperature].get_value())

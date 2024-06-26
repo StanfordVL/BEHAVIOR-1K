@@ -432,13 +432,13 @@ class ArticulationView(_ArticulationView):
 
             >>> # set all the articulation joints.
             >>> # Since there are 5 envs, the joint positions are repeated 5 times
-            >>> positions = np.tile(np.array([0.0, -1.0, 0.0, -2.2, 0.0, 2.4, 0.8, 0.04, 0.04]), (num_envs, 1))
+            >>> positions = np.tile(th.Tensor([0.0, -1.0, 0.0, -2.2, 0.0, 2.4, 0.8, 0.04, 0.04]), (num_envs, 1))
             >>> prims.set_joint_positions(positions)
             >>>
             >>> # set only the fingers in closed position: panda_finger_joint1 (7) and panda_finger_joint2 (8) to 0.0
             >>> # for the first, middle and last of the 5 envs
-            >>> positions = np.tile(np.array([0.0, 0.0]), (3, 1))
-            >>> prims.set_joint_positions(positions, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+            >>> positions = np.tile(th.Tensor([0.0, 0.0]), (3, 1))
+            >>> prims.set_joint_positions(positions, indices=th.Tensor([0, 2, 4]), joint_indices=th.Tensor([7, 8]))
         """
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
@@ -498,13 +498,13 @@ class ArticulationView(_ArticulationView):
 
             >>> # set the velocities for all the articulation joints to the indicated values.
             >>> # Since there are 5 envs, the joint velocities are repeated 5 times
-            >>> velocities = np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]), (num_envs, 1))
+            >>> velocities = np.tile(th.Tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]), (num_envs, 1))
             >>> prims.set_joint_velocities(velocities)
             >>>
             >>> # set the fingers velocities: panda_finger_joint1 (7) and panda_finger_joint2 (8) to -0.1
             >>> # for the first, middle and last of the 5 envs
-            >>> velocities = np.tile(np.array([-0.1, -0.1]), (3, 1))
-            >>> prims.set_joint_velocities(velocities, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+            >>> velocities = np.tile(th.Tensor([-0.1, -0.1]), (3, 1))
+            >>> prims.set_joint_velocities(velocities, indices=th.Tensor([0, 2, 4]), joint_indices=th.Tensor([7, 8]))
         """
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
@@ -565,13 +565,13 @@ class ArticulationView(_ArticulationView):
 
             >>> # set the efforts for all the articulation joints to the indicated values.
             >>> # Since there are 5 envs, the joint efforts are repeated 5 times
-            >>> efforts = np.tile(np.array([10, 20, 30, 40, 50, 60, 70, 80, 90]), (num_envs, 1))
+            >>> efforts = np.tile(th.Tensor([10, 20, 30, 40, 50, 60, 70, 80, 90]), (num_envs, 1))
             >>> prims.set_joint_efforts(efforts)
             >>>
             >>> # set the fingers efforts: panda_finger_joint1 (7) and panda_finger_joint2 (8) to 10
             >>> # for the first, middle and last of the 5 envs
-            >>> efforts = np.tile(np.array([10, 10]), (3, 1))
-            >>> prims.set_joint_efforts(efforts, indices=np.array([0, 2, 4]), joint_indices=np.array([7, 8]))
+            >>> efforts = np.tile(th.Tensor([10, 10]), (3, 1))
+            >>> prims.set_joint_efforts(efforts, indices=th.Tensor([0, 2, 4]), joint_indices=th.Tensor([7, 8]))
         """
         if not self._is_initialized:
             carb.log_warn("ArticulationView needs to be initialized.")
@@ -681,7 +681,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
     for bbox_2d in bboxes_2d_data:
         semantic_id_list.append(bbox_2d["semanticId"])
         bbox_2d_list.append(bbox_2d)
-    semantic_id_list_np = np.unique(np.array(semantic_id_list))
+    semantic_id_list_np = np.unique(th.Tensor(semantic_id_list))
     color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
     for bbox_2d in bbox_2d_list:
         index = np.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
@@ -697,5 +697,5 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         rgb_img_draw.rectangle(
             [(bbox_2d["x_min"], bbox_2d["y_min"]), (bbox_2d["x_max"], bbox_2d["y_max"])], outline=outline, width=2
         )
-    bboxes_2d_rgb = np.array(rgb_img)
+    bboxes_2d_rgb = th.Tensor(rgb_img)
     return bboxes_2d_rgb

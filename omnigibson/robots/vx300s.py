@@ -138,7 +138,7 @@ class VX300S(ManipulationRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.array([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+        return th.Tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
 
     @property
     def finger_lengths(self):

@@ -256,11 +256,11 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
     in_volume = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
         mesh_face_centroids=face_centroids,
         mesh_face_normals=face_normals,
-        pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-        quat=np.array(
+        pos=th.Tensor(mesh.GetAttribute("xformOp:translate").Get()),
+        quat=th.Tensor(
             [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]
         ),
-        scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+        scale=th.Tensor(mesh.GetAttribute("xformOp:scale").Get()),
         particle_positions=particle_positions,
     )
     calc_volume = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
@@ -319,53 +319,53 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=th.Tensor(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=th.Tensor(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=th.Tensor(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cylinder":
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=th.Tensor(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=th.Tensor(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=th.Tensor(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cone":
             fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=th.Tensor(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=th.Tensor(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=th.Tensor(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=th.Tensor(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=th.Tensor(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=th.Tensor(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         else:

@@ -125,8 +125,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([1.46949, -3.97358, 2.21529]),
-        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+        position=th.Tensor([1.46949, -3.97358, 2.21529]),
+        orientation=th.Tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
 
     # Reset environment and robot

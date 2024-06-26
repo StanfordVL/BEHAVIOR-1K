@@ -31,7 +31,7 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             glb = max(objA_lower[dim], objB_lower[dim])
             lub = min(objA_upper[dim], objB_upper[dim])
             distance_vec.append(max(0, glb - lub))
-        distance = np.linalg.norm(np.array(distance_vec))
+        distance = np.linalg.norm(th.Tensor(distance_vec))
         objA_dims = objA_upper - objA_lower
         objB_dims = objB_upper - objB_lower
         avg_aabb_length = np.mean(objA_dims + objB_dims)

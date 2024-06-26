@@ -33,7 +33,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
         visual=False
     )
 
-    grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
+    grasp_center_pos = bbox_center_in_world + th.Tensor([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
@@ -74,7 +74,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_center_pos = T.mat2pose(
         T.pose2mat((bbox_center_in_world, bbox_quat_in_world))  # base frame to world frame
         @ T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))  # grasp pose in base frame
-    )[0] + np.array([0, 0, 0.02])
+    )[0] + th.Tensor([0, 0, 0.02])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
@@ -87,7 +87,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_y /= np.linalg.norm(grasp_y)
     grasp_z = np.cross(grasp_x, grasp_y)
     grasp_z /= np.linalg.norm(grasp_z)
-    grasp_mat = np.array([grasp_x, grasp_y, grasp_z]).T
+    grasp_mat = th.Tensor([grasp_x, grasp_y, grasp_z]).T
     grasp_quat = R.from_matrix(grasp_mat).as_quat()
 
     grasp_pose = (grasp_center_pos, grasp_quat)
@@ -193,7 +193,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Pick the closer of the two faces along the push axis as our favorite.
     points_along_push_axis = (
-        np.array([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
+        th.Tensor([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
     )
     (
         push_axis_closer_side_idx,
@@ -300,7 +300,7 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     pos_waypoints = np.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
-    combined_rotation = R.from_quat(np.array([start_orn, end_pose[1]]))
+    combined_rotation = R.from_quat(th.Tensor([start_orn, end_pose[1]]))
     slerp = Slerp([0, 1], combined_rotation)
     orn_waypoints = slerp(np.linspace(0, 1, num_waypoints))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
@@ -334,7 +334,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     bbox_quat_in_world = link.get_orientation()
-    bbox_extent_in_link_frame = np.array(
+    bbox_extent_in_link_frame = th.Tensor(
         target_obj.native_link_bboxes[link_name]["collision"]["axis_aligned"]["extent"]
     )
     bbox_wrt_origin = T.relative_pose_transform(
@@ -347,7 +347,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )[[1, 2, 3, 0]]
     joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     joint_axis /= np.linalg.norm(joint_axis)
-    origin_towards_bbox = np.array(bbox_wrt_origin[0])
+    origin_towards_bbox = th.Tensor(bbox_wrt_origin[0])
     open_direction = np.cross(joint_axis, origin_towards_bbox)
     open_direction /= np.linalg.norm(open_direction)
     lateral_axis = np.cross(open_direction, joint_axis)
@@ -362,7 +362,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     canonical_open_direction = np.eye(3)[open_axis_idx]
     points_along_open_axis = (
-        np.array([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
+        th.Tensor([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
     )
     current_yaw = relevant_joint.get_state()[0][0]
     closed_yaw = relevant_joint.lower_limit
@@ -380,7 +380,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     canonical_joint_axis = np.eye(3)[joint_axis_idx]
     lateral_away_from_origin = np.eye(3)[lateral_axis_idx] * np.sign(origin_towards_bbox[lateral_axis_idx])
     min_lateral_pos_wrt_surface_center = (
-        lateral_away_from_origin * -np.array(origin_wrt_bbox[0])
+        lateral_away_from_origin * -th.Tensor(origin_wrt_bbox[0])
         - canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2
     )
     max_lateral_pos_wrt_surface_center = (
@@ -442,7 +442,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
-    movement_in_world_frame = np.array(targets[-1][0]) - np.array(offset_grasp_pose_in_world_frame[0])
+    movement_in_world_frame = th.Tensor(targets[-1][0]) - th.Tensor(offset_grasp_pose_in_world_frame[0])
     grasp_required = np.dot(movement_in_world_frame, approach_direction_in_world_frame) < 0
 
     return (
@@ -472,7 +472,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     side /= np.linalg.norm(3)
     up = np.cross(forward, side)
     # assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
-    rotmat = np.array([forward, side, up]).T
+    rotmat = th.Tensor([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 
 
@@ -515,14 +515,14 @@ def _get_closest_point_to_point_in_world_frame(
     Returns:
         tuple: The index of the closest vector, the closest vector in the arbitrary frame, and the closest vector in the world frame.
     """
-    vectors_in_world = np.array(
+    vectors_in_world = th.Tensor(
         [
             T.pose_transform(*arbitrary_frame_to_world_frame, vector, [0, 0, 0, 1])[0]
             for vector in vectors_in_arbitrary_frame
         ]
     )
 
-    vector_distances_to_point = np.linalg.norm(vectors_in_world - np.array(point_in_world)[None, :], axis=1)
+    vector_distances_to_point = np.linalg.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], axis=1)
     closer_option_idx = np.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]

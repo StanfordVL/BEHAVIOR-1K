@@ -82,7 +82,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.J,
         callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
-            waypoints=np.array(waypoints),
+            waypoints=th.Tensor(waypoints),
             per_step_distance=0.02,
             fps=30,
             steps_per_frame=1,

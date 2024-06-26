@@ -44,13 +44,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
     cam.set_position_orientation(
-        position=np.array([-4.62785, -0.418575, 0.933943]),
-        orientation=np.array([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
+        position=th.Tensor([-4.62785, -0.418575, 0.933943]),
+        orientation=th.Tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
     )
 
     def steps(n):
         for _ in range(n):
-            env.step(np.array([]))
+            env.step(th.Tensor([]))
 
     # Take a few steps to let objects settle
     steps(25)

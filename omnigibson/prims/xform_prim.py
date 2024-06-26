@@ -66,7 +66,7 @@ class XFormPrim(BasePrim):
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
-        self.original_scale = np.array(self.get_attribute("xformOp:scale"))
+        self.original_scale = th.Tensor(self.get_attribute("xformOp:scale"))
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -181,8 +181,8 @@ class XFormPrim(BasePrim):
         """
         current_position, current_orientation = self.get_position_orientation()
 
-        position = current_position if position is None else np.array(position, dtype=float)
-        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+        position = current_position if position is None else th.Tensor(position, dtype=float)
+        orientation = current_orientation if orientation is None else th.Tensor(orientation, dtype=float)
         assert np.isclose(
             np.linalg.norm(orientation), 1, atol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
@@ -287,14 +287,14 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
+            position = lazy.pxr.Gf.Vec3d(*th.Tensor(position, dtype=float))
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
-            orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+            orientation = th.Tensor(orientation, dtype=float)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 lazy.carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
@@ -329,7 +329,7 @@ class XFormPrim(BasePrim):
         prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
-        return np.array(transform.GetScale())
+        return th.Tensor(transform.GetScale())
 
     @property
     def scaled_transform(self):
@@ -351,7 +351,7 @@ class XFormPrim(BasePrim):
         """
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
-        return np.array(scale)
+        return th.Tensor(scale)
 
     @scale.setter
     def scale(self, scale):
@@ -362,7 +362,7 @@ class XFormPrim(BasePrim):
             scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
+        scale = th.Tensor(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
         assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
@@ -424,7 +424,7 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        pos, orn = np.array(state["pos"]), np.array(state["ori"])
+        pos, orn = th.Tensor(state["pos"]), th.Tensor(state["ori"])
         if self.scene is not None:
             pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
         self.set_position_orientation(pos, orn)

@@ -171,17 +171,17 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = np.array([0, 0, 0, 1.0])
+            chosen_orientation = th.Tensor([0, 0, 0, 1.0])
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = np.array(probabilities) / np.sum(probabilities)
-            chosen_orientation = np.array(
+            probabilities = th.Tensor(probabilities) / np.sum(probabilities)
+            chosen_orientation = th.Tensor(
                 np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
             )
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
-        rot_matrix = np.array(
+        rot_matrix = th.Tensor(
             [
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
@@ -228,10 +228,10 @@ class DatasetObject(USDObject):
             scale = np.ones(3)
             valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = (
-                np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+                th.Tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
             )
         else:
-            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+            scale = np.ones(3) if self._load_config["scale"] is None else th.Tensor(self._load_config["scale"])
 
         # Assert that the scale does not have too small dimensions
         assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
@@ -362,7 +362,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return np.array(self.get_attribute(attr="ig:nativeBB"))
+        return th.Tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property
     def base_link_offset(self):
@@ -372,7 +372,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return np.array(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.Tensor(self.get_attribute(attr="ig:offsetBaseLink"))
 
     @property
     def metadata(self):
@@ -449,7 +449,7 @@ class DatasetObject(USDObject):
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
+                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ th.Tensor(scale_in_parent_lf))
                         scales[child_name] = scale_in_child_lf
 
         return scales

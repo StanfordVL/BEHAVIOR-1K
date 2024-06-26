@@ -37,7 +37,7 @@ def fit_plane(points, refusal_log):
     Copied from https://stackoverflow.com/a/18968498
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.Tensor of shape (k, 3)
         refusal_log (dict): Debugging dictionary to add error messages to
 
     Returns:
@@ -63,7 +63,7 @@ def check_distance_to_plane(points, plane_centroid, plane_normal, hit_to_plane_t
     and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.Tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
         hit_to_plane_threshold (float): Threshold distance to check between @points and plane
@@ -85,7 +85,7 @@ def get_distance_to_plane(points, plane_centroid, plane_normal):
     Computes distance from @points to plane defined by @plane_centroid and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.Tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
 
@@ -100,7 +100,7 @@ def get_projection_onto_plane(points, plane_centroid, plane_normal):
     Computes @points' projection onto the plane defined by @plane_centroid and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.Tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
 
@@ -159,11 +159,11 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     orthogonal_vector_2 = -np.cross(ray_direction, orthogonal_vector_1)
     orthogonal_vector_2 /= np.linalg.norm(orthogonal_vector_2)
 
-    orthogonal_vectors = np.array([orthogonal_vector_1, orthogonal_vector_2])
+    orthogonal_vectors = th.Tensor([orthogonal_vector_1, orthogonal_vector_2])
     assert np.all(np.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
-    offset = np.array([1, 1]) * offset
+    offset = th.Tensor([1, 1]) * offset
 
     # Compute the grid of rays
     steps = (offset / new_ray_per_horizontal_distance).astype(int) * 2 + 1
@@ -326,7 +326,7 @@ def raytest(
             Note that only "hit" = False exists in the dict if no hit was found
     """
     # Make sure start point, end point are numpy arrays
-    start_point, end_point = np.array(start_point), np.array(end_point)
+    start_point, end_point = th.Tensor(start_point), th.Tensor(end_point)
     point_diff = end_point - start_point
     distance = np.linalg.norm(point_diff)
     direction = point_diff / distance
@@ -350,8 +350,8 @@ def raytest(
                 hits.append(
                     {
                         "hit": True,
-                        "position": np.array(hit.position),
-                        "normal": np.array(hit.normal),
+                        "position": th.Tensor(hit.position),
+                        "normal": th.Tensor(hit.normal),
                         "distance": hit.distance,
                         "collision": hit.collision,
                         "rigidBody": hit.rigid_body,
@@ -824,7 +824,7 @@ def sample_cuboid_on_object(
     ), "the start and end points of raycasting are expected to have the same shape."
     num_samples = start_points.shape[0]
 
-    cuboid_dimensions = np.array(cuboid_dimensions)
+    cuboid_dimensions = th.Tensor(cuboid_dimensions)
     if np.any(cuboid_dimensions > 50.0):
         log.warning(
             "WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50). "
@@ -866,11 +866,11 @@ def sample_cuboid_on_object(
                     this_cuboid_dimensions[:2] / 2.0,
                     new_ray_per_horizontal_distance,
                 )
-                sources = np.array(sources)
-                destinations = np.array(destinations)
+                sources = th.Tensor(sources)
+                destinations = th.Tensor(destinations)
             else:
-                sources = np.array([start_pos])
-                destinations = np.array([end_pos])
+                sources = th.Tensor([start_pos])
+                destinations = th.Tensor([end_pos])
 
             # Time to cast the rays.
             cast_results = raytest_batch(
@@ -896,8 +896,8 @@ def sample_cuboid_on_object(
                         filtered_center_idx = len(filtered_cast_results) - 1
 
             # Process the hit positions and normals.
-            hit_positions = np.array([ray_res["position"] for ray_res in filtered_cast_results])
-            hit_normals = np.array([ray_res["normal"] for ray_res in filtered_cast_results])
+            hit_positions = th.Tensor([ray_res["position"] for ray_res in filtered_cast_results])
+            hit_normals = th.Tensor([ray_res["normal"] for ray_res in filtered_cast_results])
             hit_normals /= np.linalg.norm(hit_normals, axis=1, keepdims=True)
 
             assert filtered_center_idx is not None
@@ -954,7 +954,7 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = np.array([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
+                hit_positions = th.Tensor([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
@@ -978,7 +978,7 @@ def sample_cuboid_on_object(
                     rotation.apply(
                         0.5
                         * this_cuboid_dimensions
-                        * np.array(
+                        * th.Tensor(
                             [
                                 [1, 1, -1],
                                 [-1, 1, -1],
@@ -1136,7 +1136,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = np.arccos(np.clip(np.dot(hit_normal, np.array([0, 0, 1])), -1.0, 1.0))
+    hit_angle_with_z = np.arccos(np.clip(np.dot(hit_normal, th.Tensor([0, 0, 1])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)
@@ -1162,7 +1162,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
         3-array: computed (x,y,z) point on the AABB surface
     """
     # Get the ray casting direction - we want to do it parallel to the sample axis.
-    ray_direction = np.array([0, 0, 0])
+    ray_direction = th.Tensor([0, 0, 0])
     ray_direction[axis] = 1
     ray_direction *= -1 if is_top else 1
 
@@ -1225,7 +1225,7 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     top_pairs = list(itertools.combinations(top_corner_positions, 2))
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
-    all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
+    all_pairs = th.Tensor(top_to_bottom_pairs + bottom_pairs + top_pairs)
     check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
     if any(ray["hit"] for ray in check_cast_results):
         if m.DEBUG_SAMPLING:

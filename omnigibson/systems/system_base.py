@@ -160,7 +160,7 @@ class BaseSystem(Serializable):
         Removes pre-existing particles
 
         Args:
-            idxs (np.array): (n_particles,) shaped array specifying IDs of particles to delete
+            idxs (th.Tensor): (n_particles,) shaped array specifying IDs of particles to delete
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """
         raise NotImplementedError()
@@ -178,10 +178,10 @@ class BaseSystem(Serializable):
 
         Args:
             scene (Scene): Scene object to generate particles in
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+            scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """
@@ -595,8 +595,8 @@ class VisualParticleSystem(BaseSystem):
 
         # Convert these into scaling factors for the x and y axes for our particle object
         particle_bbox = self.particle_object.aabb_extent
-        minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
-        maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+        minimum = th.Tensor([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+        maximum = th.Tensor([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
 
         return minimum, maximum
 
@@ -659,10 +659,10 @@ class VisualParticleSystem(BaseSystem):
 
         Args:
             group (str): Object on which to sample particle locations
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
+            scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
                 local frame. If not specified, all we randomly sampled based on @self.min_scale and @self.max_scale
             link_prim_paths (None or list of str): Determines which link each generated particle will
                 be attached to. If not specified, all will be attached to the group object's prim, NOT a link
@@ -810,7 +810,7 @@ class PhysicalParticleSystem(BaseSystem):
         object physically interacts with its non-uniform geometry.
 
         Args:
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
 
         Returns:
             n-array: (n_particles,) boolean array, True if in contact, otherwise False
@@ -938,13 +938,13 @@ class PhysicalParticleSystem(BaseSystem):
             # assume the particles are extremely small - sample cuboids of size 0 for better performance
             cuboid_dimensions=np.zeros(3),
             # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
-            aabb_offset=np.array([-radius, -radius, radius]),
+            aabb_offset=th.Tensor([-radius, -radius, radius]),
             # bottom padding should be the same as the particle radius
             cuboid_bottom_padding=radius,
             # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
             undo_cuboid_bottom_padding=False,
         )
-        particle_positions = np.array([result[0] for result in results if result[0] is not None])
+        particle_positions = th.Tensor([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
             particle_positions = particle_positions[
@@ -1091,7 +1091,7 @@ def create_system_from_metadata(system_name):
         def generate_customize_particle_material_fcn(mat_kwargs):
             def customize_mat(mat):
                 for attr, val in mat_kwargs.items():
-                    setattr(mat, attr, np.array(val) if isinstance(val, list) else val)
+                    setattr(mat, attr, th.Tensor(val) if isinstance(val, list) else val)
 
             return customize_mat
 

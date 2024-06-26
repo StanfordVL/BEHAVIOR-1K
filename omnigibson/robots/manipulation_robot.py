@@ -441,7 +441,7 @@ class ManipulationRobot(BaseRobot):
                     self.articulation_root_path, self.eef_link_names[arm]
                 )
             )
-            dic["grasp_{}".format(arm)] = np.array([self.is_grasping(arm)])
+            dic["grasp_{}".format(arm)] = th.Tensor([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
 
@@ -837,7 +837,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
+            dist = np.linalg.norm(th.Tensor(candidate_link.get_position()) - th.Tensor(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1005,8 +1005,8 @@ class ManipulationRobot(BaseRobot):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.Tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                    th.Tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
                 "mode": "pose_delta_ori",
                 "smoothing_filter_size": 2,
@@ -1031,8 +1031,8 @@ class ManipulationRobot(BaseRobot):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.Tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                    th.Tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
                 "mode": "pose_delta_ori",
                 "workspace_pose_limiter": None,
@@ -1188,7 +1188,7 @@ class ManipulationRobot(BaseRobot):
                 Default is "default" which corresponds to the first entry in self.arm_names
             ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidPrim)).
                 Otherwise, does a no-op
-            contact_pos (None or np.array): if specified, contact position to use for grasp.
+            contact_pos (None or th.Tensor): if specified, contact position to use for grasp.
         """
         arm = self.default_arm if arm == "default" else arm
 
@@ -1205,7 +1205,7 @@ class ManipulationRobot(BaseRobot):
             force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
             for c_link_prim_path, c_contact_pos in force_data:
                 if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = np.array(c_contact_pos)
+                    contact_pos = th.Tensor(c_contact_pos)
                     break
         assert contact_pos is not None
 
@@ -1213,7 +1213,7 @@ class ManipulationRobot(BaseRobot):
         # Need to find distance between robot and contact point in robot link's local frame and
         # ag link and contact point in ag link's local frame
         joint_frame_pos = contact_pos
-        joint_frame_orn = np.array([0, 0, 0, 1.0])
+        joint_frame_orn = th.Tensor([0, 0, 0, 1.0])
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
             joint_frame_pos, joint_frame_orn, eef_link_pos, eef_link_orn
@@ -1523,7 +1523,7 @@ class ManipulationRobot(BaseRobot):
         Rotational offset that will be applied for teleoperation
         such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
         """
-        return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
+        return {arm: th.Tensor([0, 0, 0, 1]) for arm in self.arm_names}
 
     def teleop_data_to_action(self, teleop_action) -> np.ndarray:
         """

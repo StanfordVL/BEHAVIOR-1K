@@ -88,7 +88,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.value = new_value
 
         # Choose which color to apply to the toggle marker
-        self.visual_marker.color = np.array([0, 1.0, 0]) if self.value else np.array([1.0, 0, 0])
+        self.visual_marker.color = th.Tensor([0, 1.0, 0]) if self.value else th.Tensor([1.0, 0, 0])
 
         return True
 
@@ -114,7 +114,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         else:
             # Infer radius from mesh if not specified as an input
             lazy.omni.isaac.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
-            self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
+            self.scale = th.Tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
@@ -190,7 +190,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
     def serialize(self, state):
-        return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
+        return th.Tensor([state["value"], state["hand_in_marker_steps"]], dtype=float)
 
     def deserialize(self, state):
         return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

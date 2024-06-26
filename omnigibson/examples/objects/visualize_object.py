@@ -94,8 +94,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-0.00913503, -1.95750906, 1.36407314]),
-        orientation=np.array([0.6350064, 0.0, 0.0, 0.77250687]),
+        position=th.Tensor([-0.00913503, -1.95750906, 1.36407314]),
+        orientation=th.Tensor([0.6350064, 0.0, 0.0, 0.77250687]),
     )
 
     # Grab the object references
@@ -107,10 +107,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.stop()
     obj.scale = (np.ones(3) / extents).min()
     og.sim.play()
-    env.step(np.array([]))
+    env.step(th.Tensor([]))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = obj.get_position() - obj.aabb_center + np.array([0, 0, 1.0])
+    center_offset = obj.get_position() - obj.aabb_center + th.Tensor([0, 0, 1.0])
     obj.set_position(center_offset)
 
     # Allow the user to easily move the camera around
@@ -122,7 +122,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
         z_angle = 2 * np.pi * (i % steps_per_rotate) / steps_per_rotate
-        quat = T.euler2quat(np.array([0, 0, z_angle]))
+        quat = T.euler2quat(th.Tensor([0, 0, z_angle]))
         pos = T.quat2mat(quat) @ center_offset
         if obj.n_dof > 0:
             frac = (i % steps_per_joint) / steps_per_joint
@@ -130,7 +130,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, drive=False)
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Shut down at the end
     og.shutdown()

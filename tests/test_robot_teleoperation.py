@@ -52,7 +52,7 @@ def test_teleop():
 
     # test moving robot base
     teleop_action.right = np.zeros(7)
-    teleop_action.base = np.array([0.1, 0, 0.1])
+    teleop_action.base = th.Tensor([0.1, 0, 0.1])
     for _ in range(50):
         action = robot.teleop_data_to_action(teleop_action)
         env.step(action)

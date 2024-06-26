@@ -27,7 +27,7 @@ class Turtlebot(TwoWheelRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return np.array([0, 1])
+        return th.Tensor([0, 1])
 
     @property
     def _default_joint_pos(self):

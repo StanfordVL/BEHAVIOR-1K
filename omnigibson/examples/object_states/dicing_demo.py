@@ -79,17 +79,17 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the table
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.544888, -0.412084, 1.11569]),
-        orientation=np.array([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
+        position=th.Tensor([0.544888, -0.412084, 1.11569]),
+        orientation=th.Tensor([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
     )
 
     # Let apple settle
     for _ in range(50):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     knife.keep_still()
     knife.set_position_orientation(
-        position=apple.get_position() + np.array([-0.15, 0.0, 0.2]),
+        position=apple.get_position() + th.Tensor([-0.15, 0.0, 0.2]),
         orientation=T.euler2quat([-np.pi / 2, 0, 0]),
     )
 
@@ -97,7 +97,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Step simulation for a bit so that apple is diced
     for i in range(1000):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     input("Apple has been diced! Press [ENTER] to terminate the demo.")
 

@@ -361,7 +361,7 @@ class SerializableRegistry(Registry, Serializable):
         return (
             np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects])
             if len(self.objects) > 0
-            else np.array([])
+            else th.Tensor([])
         )
 
     def deserialize(self, state):

@@ -52,8 +52,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
     cam.set_position_orientation(
-        position=np.array([-4.62785, -0.418575, 0.933943]),
-        orientation=np.array([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
+        position=th.Tensor([-4.62785, -0.418575, 0.933943]),
+        orientation=th.Tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
     )
 
     # Add bounding boxes to camera sensor
@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a few steps to let objects settle
     for i in range(100):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Grab observations from viewer camera and write them to disk
     obs, _ = cam.get_obs()

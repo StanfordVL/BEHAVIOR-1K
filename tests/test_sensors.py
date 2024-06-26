@@ -20,15 +20,15 @@ def test_seg(env):
     systems = [env.scene.get_system(system_name) for system_name in SYSTEM_EXAMPLES.keys()]
     for i, system in enumerate(systems):
         # Sample two particles for each system
-        pos = np.array([-0.2 + i * 0.2, 0, 0.55])
+        pos = th.Tensor([-0.2 + i * 0.2, 0, 0.55])
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(scene=env.scene, positions=[pos, pos + np.array([0.1, 0.0, 0.0])])
+            system.generate_particles(scene=env.scene, positions=[pos, pos + th.Tensor([0.1, 0.0, 0.0])])
         else:
             if system.get_group_name(breakfast_table) not in system.groups:
                 system.create_attachment_group(breakfast_table)
             system.generate_group_particles(
                 group=system.get_group_name(breakfast_table),
-                positions=np.array([pos, pos + np.array([0.1, 0.0, 0.0])]),
+                positions=th.Tensor([pos, pos + th.Tensor([0.1, 0.0, 0.0])]),
                 link_prim_paths=[breakfast_table.root_link.prim_path],
             )
 

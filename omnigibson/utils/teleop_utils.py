@@ -178,8 +178,8 @@ class OVXRSystem(TeleopSystem):
         self.hmd = None
         self.controllers = {}
         self.trackers = {}
-        self.xr2og_orn_offset = np.array([0.5, -0.5, -0.5, -0.5])
-        self.og2xr_orn_offset = np.array([-0.5, 0.5, 0.5, -0.5])
+        self.xr2og_orn_offset = th.Tensor([0.5, -0.5, -0.5, -0.5])
+        self.og2xr_orn_offset = th.Tensor([-0.5, 0.5, 0.5, -0.5])
         # setup event subscriptions
         self.reset()
         self.use_hand_tracking = use_hand_tracking
@@ -200,7 +200,7 @@ class OVXRSystem(TeleopSystem):
         Returns:
             tuple(np.ndarray, np.ndarray): the position and orientation in the OmniGibson coordinate system
         """
-        pos, orn = T.mat2pose(np.array(transform).T)
+        pos, orn = T.mat2pose(th.Tensor(transform).T)
         orn = T.quat_multiply(orn, self.xr2og_orn_offset)
         return pos, orn
 
@@ -363,10 +363,10 @@ class OVXRSystem(TeleopSystem):
         """
         if pos_offset is not None:
             # note that x is forward, y is down, z is left for ovxr, but x is forward, y is left, z is up for og
-            pos_offset = np.array([-pos_offset[0], pos_offset[2], -pos_offset[1]]).astype(np.float64)
+            pos_offset = th.Tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).astype(np.float64)
             self.vr_profile.add_move_physical_world_relative_to_device(pos_offset)
         if rot_offset is not None:
-            rot_offset = np.array(rot_offset).astype(np.float64)
+            rot_offset = th.Tensor(rot_offset).astype(np.float64)
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
     def _is_valid_transform(self, transform: Tuple[np.ndarray, np.ndarray]) -> bool:

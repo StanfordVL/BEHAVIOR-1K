@@ -38,8 +38,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-0.0792399, -1.30104, 1.51981]),
-        orientation=np.array([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
+        position=th.Tensor([-0.0792399, -1.30104, 1.51981]),
+        orientation=th.Tensor([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
     )
 
     # Make sure necessary object states are included with the stove
@@ -48,7 +48,7 @@ def main():
 
     # Take a few steps so that visibility propagates
     for _ in range(5):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Heat source is off.
     print("Heat source is OFF.")
@@ -62,33 +62,33 @@ def main():
     assert stove.states[object_states.ToggledOn].get_value()
 
     # Need to take a step to update the state.
-    env.step(np.array([]))
+    env.step(th.Tensor([]))
 
     # Heat source is on
     heat_source_state = stove.states[object_states.HeatSourceOrSink].get_value()
     assert heat_source_state
     for _ in range(500):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Toggle off stove, notify user
     input("Heat source will now turn OFF: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(False)
     assert not stove.states[object_states.ToggledOn].get_value()
     for _ in range(200):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(np.array([0, 1.0, 0.61]))
+    stove.set_position(th.Tensor([0, 1.0, 0.61]))
     for i in range(100):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Toggle on stove again, notify user
     input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
     assert stove.states[object_states.ToggledOn].get_value()
     for i in range(500):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Shutdown environment at end
     env.close()

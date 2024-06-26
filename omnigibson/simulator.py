@@ -364,8 +364,8 @@ def launch_simulator(*args, **kwargs):
             if gm.RENDER_VIEWER_CAMERA:
                 self._set_viewer_camera()
                 self.viewer_camera.set_position_orientation(
-                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                    position=th.Tensor(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=th.Tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
@@ -531,7 +531,7 @@ def launch_simulator(*args, **kwargs):
                 name="ground_plane",
                 z_position=0,
                 size=None,
-                color=None if floor_plane_color is None else np.array(floor_plane_color),
+                color=None if floor_plane_color is None else th.Tensor(floor_plane_color),
                 visible=floor_plane_visible,
                 # TODO: update with new PhysicsMaterial API
                 # static_friction=static_friction,

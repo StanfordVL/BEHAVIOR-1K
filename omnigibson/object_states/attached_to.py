@@ -307,7 +307,7 @@ class AttachedTo(
 
         if joint_type == JointType.JOINT_FIXED:
             # FixedJoint: the parent link, the child link and the joint frame all align.
-            parent_local_quat = np.array([0.0, 0.0, 0.0, 1.0])
+            parent_local_quat = th.Tensor([0.0, 0.0, 0.0, 1.0])
         else:
             # SphericalJoint: the same except that the rotation of the parent link doesn't align with the joint frame.
             # The child link and the joint frame still align.
@@ -338,7 +338,7 @@ class AttachedTo(
             joint_frame_in_parent_frame_pos=np.zeros(3),
             joint_frame_in_parent_frame_quat=parent_local_quat,
             joint_frame_in_child_frame_pos=np.zeros(3),
-            joint_frame_in_child_frame_quat=np.array([0.0, 0.0, 0.0, 1.0]),
+            joint_frame_in_child_frame_quat=th.Tensor([0.0, 0.0, 0.0, 1.0]),
             **kwargs,
         )
 
@@ -436,7 +436,7 @@ class AttachedTo(
                     log.warning(f"parent reference is not updated after attachment")
 
     def serialize(self, state):
-        return np.array([state["attached_obj_uuid"]], dtype=float)
+        return th.Tensor([state["attached_obj_uuid"]], dtype=float)
 
     def deserialize(self, state):
         return dict(attached_obj_uuid=int(state[0])), 1

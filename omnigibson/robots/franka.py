@@ -98,8 +98,8 @@ class FrankaPanda(ManipulationRobot):
             self._eef_link_names = "panda_hand"
             self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
             self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-            self._default_robot_model_joint_pos = np.array([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
-            self._teleop_rotation_offset = np.array([-1, 0, 0, 0])
+            self._default_robot_model_joint_pos = th.Tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
+            self._teleop_rotation_offset = th.Tensor([-1, 0, 0, 0])
             self._ag_start_points = [
                 GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
             ]
@@ -116,7 +116,7 @@ class FrankaPanda(ManipulationRobot):
             self._default_robot_model_joint_pos = np.concatenate(
                 ([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16))
             )
-            self._teleop_rotation_offset = np.array([0, 0.7071, 0, 0.7071])
+            self._teleop_rotation_offset = th.Tensor([0, 0.7071, 0, 0.7071])
             self._ag_start_points = [
                 GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
                 GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
@@ -141,7 +141,7 @@ class FrankaPanda(ManipulationRobot):
             self._default_robot_model_joint_pos = np.concatenate(
                 ([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16))
             )
-            self._teleop_rotation_offset = np.array([-0.7071, 0.7071, 0, 0])
+            self._teleop_rotation_offset = th.Tensor([-0.7071, 0.7071, 0, 0])
             self._ag_start_points = [
                 GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
                 GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
@@ -163,7 +163,7 @@ class FrankaPanda(ManipulationRobot):
             self._default_robot_model_joint_pos = np.concatenate(
                 ([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(12))
             )
-            self._teleop_rotation_offset = np.array([0, 0, 0.707, 0.707])
+            self._teleop_rotation_offset = th.Tensor([0, 0, 0.707, 0.707])
             # TODO: add ag support for inspire hand
             self._ag_start_points = [
                 # GraspingPoint(link_name=f"base_link", position=[0, -0.025, 0.035]),
@@ -258,7 +258,7 @@ class FrankaPanda(ManipulationRobot):
     @property
     def gripper_control_idx(self):
         return {
-            self.default_arm: np.array(
+            self.default_arm: th.Tensor(
                 [list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]]
             )
         }

@@ -78,8 +78,8 @@ class TwoWheelRobot(LocomotionRobot):
         ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
         # Add info
-        dic["dd_base_lin_vel"] = np.array([lin_vel])
-        dic["dd_base_ang_vel"] = np.array([ang_vel])
+        dic["dd_base_lin_vel"] = th.Tensor([lin_vel])
+        dic["dd_base_ang_vel"] = th.Tensor([ang_vel])
 
         return dic
 
@@ -165,5 +165,5 @@ class TwoWheelRobot(LocomotionRobot):
         assert isinstance(
             self._controllers["base"], DifferentialDriveController
         ), "Only DifferentialDriveController is supported!"
-        action[self.base_action_idx] = np.array([teleop_action.base[0], teleop_action.base[2]]) * 0.3
+        action[self.base_action_idx] = th.Tensor([teleop_action.base[0], teleop_action.base[2]]) * 0.3
         return action

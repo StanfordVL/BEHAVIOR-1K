@@ -288,7 +288,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             n-array: 1D-numpy array of flattened low-dim observations
         """
         # By default, we simply concatenate all values in our obs dict
-        return np.concatenate([ob for ob in obs.values()]) if len(obs.values()) > 0 else np.array([])
+        return np.concatenate([ob for ob in obs.values()]) if len(obs.values()) > 0 else th.Tensor([])
 
     def get_obs(self, env, flatten_low_dim=True):
         # Args: env (Environment): environment instance

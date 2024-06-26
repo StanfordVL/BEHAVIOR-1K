@@ -28,7 +28,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     assert np.all(obj.scale == 1.0)
     aabb_extent = obj.aabb_extent
     radius = np.linalg.norm(aabb_extent) / 2.0
-    drop_pos = np.array([0, 0, radius + drop_aabb_offset])
+    drop_pos = th.Tensor([0, 0, radius + drop_aabb_offset])
     center_offset = obj.get_position() - obj.aabb_center
     drop_orientations = R.random(n_samples).as_quat()
     stable_orientations = np.zeros_like(drop_orientations)
@@ -57,7 +57,7 @@ def compute_bbox_offset(obj):
     """
     og.sim.stop()
     assert np.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), np.array([0, 0, 0, 1.0]))
+    obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_center - obj.get_position()
 
 
@@ -74,7 +74,7 @@ def compute_native_bbox_extent(obj):
     """
     og.sim.stop()
     assert np.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), np.array([0, 0, 0, 1.0]))
+    obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_extent
 
 
@@ -93,7 +93,7 @@ def compute_base_aligned_bboxes(obj):
             min_pt = np.min(pts_in_link_frame, axis=0)
             extent = max_pt - min_pt
             center = (max_pt + min_pt) / 2.0
-            transform = T.pose2mat((center, np.array([0, 0, 0, 1.0])))
+            transform = T.pose2mat((center, th.Tensor([0, 0, 0, 1.0])))
             print(pts_in_link_frame.shape)
             link_bounding_boxes[link_name][mesh_type] = {
                 "extent": extent,

@@ -74,29 +74,29 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-0.42246569, -0.34745704, 1.56810353]),
-        orientation=np.array([0.50083786, -0.10407796, -0.17482619, 0.84128772]),
+        position=th.Tensor([-0.42246569, -0.34745704, 1.56810353]),
+        orientation=th.Tensor([0.50083786, -0.10407796, -0.17482619, 0.84128772]),
     )
 
     # Let objects settle
     for _ in range(10):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Turn on the stove
     stove.states[object_states.ToggledOn].set_value(True)
 
     # The first apple will be affected by the stove
-    apples[0].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + np.array([0.11, 0, 0.1]))
+    apples[0].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + th.Tensor([0.11, 0, 0.1]))
 
     # The second apple will NOT be affected by the stove, but will be affected by the first apple once it's on fire.
-    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + np.array([0.32, 0, 0.1]))
+    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + th.Tensor([0.32, 0, 0.1]))
 
     steps = 0
     max_steps = -1 if not short_exec else 1000
 
     # Main recording loop
     while steps != max_steps:
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
         temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
         print(f"{'Apple temperature:':<20}", *temps, end="\r")
         steps += 1

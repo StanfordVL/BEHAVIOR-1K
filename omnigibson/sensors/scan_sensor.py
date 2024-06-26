@@ -172,7 +172,7 @@ class ScanSensor(BaseSensor):
         )
 
         # Convert into 3D unit vectors for each angle
-        unit_vector_laser = np.array([[np.cos(ang), np.sin(ang), 0.0] for ang in angles])
+        unit_vector_laser = th.Tensor([[np.cos(ang), np.sin(ang), 0.0] for ang in angles])
 
         # Scale unit vectors by corresponding laser scan distnaces
         assert ((scan >= 0.0) & (scan <= 1.0)).all(), "scan out of valid range [0, 1]"
@@ -186,7 +186,7 @@ class ScanSensor(BaseSensor):
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
         scan_local = quat2mat(base_ori).T.dot((scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
-        scan_local = np.concatenate([np.array([[0, 0]]), scan_local, np.array([[0, 0]])], axis=0)
+        scan_local = np.concatenate([th.Tensor([[0, 0]]), scan_local, th.Tensor([[0, 0]])], axis=0)
 
         # flip y axis
         scan_local[:, 1] *= -1

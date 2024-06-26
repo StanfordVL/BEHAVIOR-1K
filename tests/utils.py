@@ -222,8 +222,8 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
     target_objA_aabb_pos = (
         objB_aabb_center
-        + np.array([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
-        + np.array([x_offset, y_offset, z_offset])
+        + th.Tensor([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
+        + th.Tensor([x_offset, y_offset, z_offset])
     )
     objA.set_position(target_objA_aabb_pos + objA_aabb_offset)
 
@@ -237,7 +237,7 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj_aabb_center, obj_aabb_extent = obj.aabb_center, obj.aabb_extent
     obj_aabb_offset = obj.get_position() - obj_aabb_center
 
-    target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
+    target_obj_aabb_pos = th.Tensor([0, 0, obj_aabb_extent[2] / 2.0]) + th.Tensor([x_offset, y_offset, z_offset])
     obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
 
 

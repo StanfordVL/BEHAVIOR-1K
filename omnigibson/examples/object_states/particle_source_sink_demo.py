@@ -69,19 +69,19 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.37860532, -0.65396566, 1.4067066]),
-        orientation=np.array([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
+        position=th.Tensor([0.37860532, -0.65396566, 1.4067066]),
+        orientation=th.Tensor([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink
     for _ in range(10):
-        env.step(np.array([]))  # Empty action since no robots are in the scene
+        env.step(th.Tensor([]))  # Empty action since no robots are in the scene
 
     sink = env.scene.object_registry("name", "sink")
     assert sink.states[object_states.ToggledOn].set_value(True)
 
     # Take a step, and save the state
-    env.step(np.array([]))
+    env.step(th.Tensor([]))
     initial_state = og.sim.dump_state()
 
     # Main simulation loop.
@@ -95,7 +95,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             steps = 0
             while steps != max_steps:
                 steps += 1
-                env.step(np.array([]))
+                env.step(th.Tensor([]))
             og.log.info("Max steps reached; resetting.")
 
             # Reset to the initial state

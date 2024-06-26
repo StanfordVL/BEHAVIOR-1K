@@ -28,7 +28,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         super().global_initialize()
 
         # Initialize the global variables
-        cls.VALUES = np.array([], dtype=cls.value_type).reshape(0, *cls.value_shape)
+        cls.VALUES = th.Tensor([], dtype=cls.value_type).reshape(0, *cls.value_shape)
         cls.OBJ_IDXS = dict()
         cls.CALLBACKS_ON_REMOVE = dict()
 
@@ -50,10 +50,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         Updates all internally tracked @values for this object state. Should be implemented by subclass.
 
         Args:
-            values (np.array): Tensorized value array
+            values (th.Tensor): Tensorized value array
 
         Returns:
-            np.array: Updated tensorized value array
+            th.Tensor: Updated tensorized value array
         """
         raise NotImplementedError
 
@@ -180,7 +180,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         val = (
             state[self.value_name]
             if isinstance(state[self.value_name], np.ndarray)
-            else np.array([state[self.value_name]])
+            else th.Tensor([state[self.value_name]])
         )
         return val.flatten().astype(float)
 

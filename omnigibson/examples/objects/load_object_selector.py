@@ -61,13 +61,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Place the object so it rests on the floor
     obj = env.scene.object_registry("name", "obj")
-    center_offset = obj.get_position() - obj.aabb_center + np.array([0, 0, obj.aabb_extent[2] / 2.0])
+    center_offset = obj.get_position() - obj.aabb_center + th.Tensor([0, 0, obj.aabb_extent[2] / 2.0])
     obj.set_position(center_offset)
 
     # Step through the environment
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        env.step(np.array([]))
+        env.step(th.Tensor([]))
 
     # Always close the environment at the end
     env.close()

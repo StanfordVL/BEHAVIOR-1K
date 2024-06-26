@@ -226,7 +226,7 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
         if len(coms) > 0:
-            com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
+            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
             self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
 
     def enable_collisions(self):
@@ -811,8 +811,8 @@ class RigidPrim(XFormPrim):
         super()._load_state(state=state)
 
         # Set velocities if not kinematic
-        self.set_linear_velocity(np.array(state["lin_vel"]))
-        self.set_angular_velocity(np.array(state["ang_vel"]))
+        self.set_linear_velocity(th.Tensor(state["lin_vel"]))
+        self.set_angular_velocity(th.Tensor(state["ang_vel"]))
 
     def serialize(self, state):
         # Run super first

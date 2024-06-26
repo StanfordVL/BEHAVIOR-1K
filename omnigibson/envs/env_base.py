@@ -578,8 +578,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         following OpenAI Gym's convention
 
         Args:
-            action (gym.spaces.Dict or dict or np.array): robot actions. If a dict is specified, each entry should
-                map robot name to corresponding action. If a np.array, it should be the flattened, concatenated set
+            action (gym.spaces.Dict or dict or th.Tensor): robot actions. If a dict is specified, each entry should
+                map robot name to corresponding action. If a th.Tensor, it should be the flattened, concatenated set
                 of actions
 
         Returns:

@@ -25,7 +25,7 @@ class Husky(LocomotionRobot):
 
     @property
     def base_control_idx(self):
-        return np.array([0, 1, 2, 3])
+        return th.Tensor([0, 1, 2, 3])
 
     @property
     def _default_joint_pos(self):

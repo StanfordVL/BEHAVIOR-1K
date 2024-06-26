@@ -271,8 +271,8 @@ class RigidContactAPIImpl:
                     path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
                 }
 
-                self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
-                self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
+                self._ROW_IDX_TO_PATH[scene_idx] = th.Tensor(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
+                self._COL_IDX_TO_PATH[scene_idx] = th.Tensor(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         # n_bodies = len(cls._PATH_TO_COL_IDX)
@@ -376,7 +376,7 @@ class RigidContactAPIImpl:
             interesting_row_idxes, interesting_row_paths = zip(
                 *[(i, p) for i, p in zip(interesting_row_idxes, interesting_row_paths) if p in row_prim_paths]
             )
-            interesting_row_idxes = np.array(list(interesting_row_idxes))
+            interesting_row_idxes = th.Tensor(list(interesting_row_idxes))
 
         # Get the full interesting section of the impulse matrix
         interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
@@ -679,7 +679,7 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_local_pose(link, np.zeros(3), np.array([0, 0, 0, 1.0]))
+                XFormPrim.set_local_pose(link, np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -739,7 +739,7 @@ class PoseAPI:
     def get_world_pose(cls, prim_path):
         cls._refresh()
         position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+        return th.Tensor(position), th.Tensor(orientation)[[1, 2, 3, 0]]
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -748,7 +748,7 @@ class PoseAPI:
         e.g. when converting points in the prim frame to the world frame.
         """
         cls._refresh()
-        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+        return th.Tensor(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
 
 
 class BatchControlViewAPIImpl:
@@ -785,19 +785,19 @@ class BatchControlViewAPIImpl:
 
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
-            pos_indices = np.array(sorted(self._write_idx_cache["dof_position_targets"]))
+            pos_indices = th.Tensor(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
-            self._view.set_dof_position_targets(pos_targets, np.array(pos_indices))
+            self._view.set_dof_position_targets(pos_targets, th.Tensor(pos_indices))
 
         if "dof_velocity_targets" in self._write_idx_cache:
-            vel_indices = np.array(sorted(self._write_idx_cache["dof_velocity_targets"]))
+            vel_indices = th.Tensor(sorted(self._write_idx_cache["dof_velocity_targets"]))
             vel_targets = self._read_cache["dof_velocity_targets"]
-            self._view.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
+            self._view.set_dof_velocity_targets(vel_targets, th.Tensor(vel_indices))
 
         if "dof_actuation_forces" in self._write_idx_cache:
-            eff_indices = np.array(sorted(self._write_idx_cache["dof_actuation_forces"]))
+            eff_indices = th.Tensor(sorted(self._write_idx_cache["dof_actuation_forces"]))
             eff_targets = self._read_cache["dof_actuation_forces"]
-            self._view.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
+            self._view.set_dof_actuation_forces(eff_targets, th.Tensor(eff_indices))
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -1105,9 +1105,9 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
-    vertices = np.array(mesh_prim.GetAttribute("points").Get())
-    face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    face_vertex_counts = th.Tensor(mesh_prim.GetAttribute("faceVertexCounts").Get())
+    vertices = th.Tensor(mesh_prim.GetAttribute("points").Get())
+    face_indices = th.Tensor(mesh_prim.GetAttribute("faceVertexIndices").Get())
 
     faces = []
     i = 0
@@ -1119,12 +1119,12 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
+        kwargs["vertex_normals"] = th.Tensor(mesh_prim.GetAttribute("normals").Get())
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
         if raw_texture is not None:
-            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(raw_texture))
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=th.Tensor(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 
@@ -1246,7 +1246,7 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
         world_frame (bool): Whether to return the volume and CoM in the world frame
 
     Returns:
-        Tuple[float, np.array]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
+        Tuple[float, th.Tensor]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
 
     trimesh_mesh = mesh_prim_to_trimesh_mesh(
@@ -1278,7 +1278,7 @@ def check_extent_radius_ratio(geom_prim, com):
 
     Args:
         geom_prim (GeomPrim): Geom prim to check
-        com (np.array): Center of mass of the mesh. Obtained from get_mesh_volume_and_com
+        com (th.Tensor): Center of mass of the mesh. Obtained from get_mesh_volume_and_com
 
     Returns:
         bool: True if the min extent (world) and the extent radius ratio (local frame) is acceptable, False otherwise
@@ -1334,9 +1334,9 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
     # -- i.e.: 2cm-wide mesh
-    extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
+    extents = np.ones(3) * extents if isinstance(extents, float) else th.Tensor(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
-        vals = np.array(attr.Get()).astype(np.float64)
+        vals = th.Tensor(attr.Get()).astype(np.float64)
         attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
     mesh.GetExtentAttr().Set(
         lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))])

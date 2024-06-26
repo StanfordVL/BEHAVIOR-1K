@@ -174,7 +174,7 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
                     not_equal = not_equal.any()
                 if not_equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")
-                base_dict[k] = np.array(v) if isinstance(v, list) else v
+                base_dict[k] = th.Tensor(v) if isinstance(v, list) else v
 
     # Return new dict
     return base_dict
@@ -390,7 +390,7 @@ class Serializable:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state
         """
         state = self._dump_state()
         return self.serialize(state=state) if serialized else state
@@ -411,7 +411,7 @@ class Serializable:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
@@ -434,7 +434,7 @@ class Serializable:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.Tensor capturing this object's state
         """
         raise NotImplementedError()
 
@@ -444,7 +444,7 @@ class Serializable:
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.Tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -484,7 +484,7 @@ class SerializableNonInstance:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state.
         """
         state = cls._dump_state()
         return cls.serialize(state=state) if serialized else state
@@ -507,7 +507,7 @@ class SerializableNonInstance:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
@@ -531,7 +531,7 @@ class SerializableNonInstance:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.Tensor capturing this object's state
         """
         # Simply returns self.serialize() for now. this is for future proofing
         return NotImplementedError()
@@ -543,7 +543,7 @@ class SerializableNonInstance:
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.Tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -715,7 +715,7 @@ def nums2array(nums, dim, dtype=float):
     # Make sure the inputted nums isn't a string
     assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
 
-    out = np.array(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+    out = th.Tensor(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
 
     return out
 

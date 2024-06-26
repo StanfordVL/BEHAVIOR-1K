@@ -652,7 +652,7 @@ class VisionSensor(BaseSensor):
         Returns:
             2-tuple: [min, max] value of the sensor's clipping range, in meters
         """
-        return np.array(self.get_attribute("clippingRange"))
+        return th.Tensor(self.get_attribute("clippingRange"))
 
     @clipping_range.setter
     def clipping_range(self, limits):
@@ -723,7 +723,7 @@ class VisionSensor(BaseSensor):
         cx = width / 2
         cy = height / 2
 
-        intrinsic_matrix = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = th.Tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
         return intrinsic_matrix
 
     @property

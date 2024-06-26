@@ -133,9 +133,9 @@ class OperationalSpaceController(ManipulationController):
         self.damping_ratio = damping_ratio
         self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=np.float32) if kp_null is not None else None
         self.kd_null = 2 * np.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
-        self.kp_limits = np.array(kp_limits, dtype=np.float32)
-        self.damping_ratio_limits = np.array(damping_ratio_limits, dtype=np.float32)
-        self.kp_null_limits = np.array(kp_null_limits, dtype=np.float32)
+        self.kp_limits = th.Tensor(kp_limits, dtype=np.float32)
+        self.damping_ratio_limits = th.Tensor(damping_ratio_limits, dtype=np.float32)
+        self.kp_null_limits = th.Tensor(kp_null_limits, dtype=np.float32)
 
         # Store settings for whether we're learning gains or not
         self.variable_kp = self.kp is None
@@ -294,8 +294,8 @@ class OperationalSpaceController(ManipulationController):
                         frame to control, computed in its local frame (e.g.: robot base frame)
         """
         # Grab important info from control dict
-        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = th.Tensor(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = th.Tensor(control_dict[f"{self.task_name}_quat_relative"])
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -416,8 +416,8 @@ class OperationalSpaceController(ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
-        target_pos = np.array(control_dict[f"{self.task_name}_pos_relative"])
-        target_quat = np.array(control_dict[f"{self.task_name}_quat_relative"])
+        target_pos = th.Tensor(control_dict[f"{self.task_name}_pos_relative"])
+        target_quat = th.Tensor(control_dict[f"{self.task_name}_quat_relative"])
 
         # Convert quat into eef ori mat
         return dict(

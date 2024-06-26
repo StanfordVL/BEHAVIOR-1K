@@ -85,7 +85,7 @@ class PrimitiveObject(StatefulObject):
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
-        load_config["color"] = np.array(rgba[:3])
+        load_config["color"] = th.Tensor(rgba[:3])
         load_config["opacity"] = rgba[3]
         load_config["radius"] = radius
         load_config["height"] = height
@@ -211,17 +211,17 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = th.Tensor(self._extents)
         self._extents = (
             np.ones(3) * radius * 2.0
             if self._primitive_type == "Sphere"
-            else np.array([radius * 2.0, radius * 2.0, self._extents[2]])
+            else th.Tensor([radius * 2.0, radius * 2.0, self._extents[2]])
         )
         attr_pairs = []
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.Tensor(attr.Get()).astype(np.float64)
                     attr_pairs.append([attr, vals])
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
@@ -266,7 +266,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = th.Tensor(self._extents)
         self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -274,7 +274,7 @@ class PrimitiveObject(StatefulObject):
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.Tensor(attr.Get()).astype(np.float64)
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
@@ -310,7 +310,7 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = th.Tensor(self._extents)
         self._extents = np.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -319,7 +319,7 @@ class PrimitiveObject(StatefulObject):
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
-                    vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
+                    vals = th.Tensor(attr.Get()).astype(np.float64) * scaling_factor
                     attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
@@ -353,7 +353,7 @@ class PrimitiveObject(StatefulObject):
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        # self._extents = np.array(state["extents"])
+        # self._extents = th.Tensor(state["extents"])
         if self._primitive_type in VALID_RADIUS_OBJECTS:
             self.radius = state["radius"]
         if self._primitive_type in VALID_HEIGHT_OBJECTS:
@@ -376,6 +376,6 @@ class PrimitiveObject(StatefulObject):
         return np.concatenate(
             [
                 state_flat,
-                np.array([state["radius"], state["height"], state["size"]]),
+                th.Tensor([state["radius"], state["height"], state["size"]]),
             ]
         ).astype(float)

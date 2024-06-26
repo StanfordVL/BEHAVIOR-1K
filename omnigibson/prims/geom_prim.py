@@ -78,7 +78,7 @@ class GeomPrim(XFormPrim):
             return self.material.diffuse_color_constant
         else:
             color = self.get_attribute("primvars:displayColor")
-            return None if color is None else np.array(color)[0]
+            return None if color is None else th.Tensor(color)[0]
 
     @color.setter
     def color(self, rgb):
@@ -91,7 +91,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:
-            self.set_attribute("primvars:displayColor", np.array(rgb))
+            self.set_attribute("primvars:displayColor", th.Tensor(rgb))
 
     @property
     def opacity(self):
@@ -103,7 +103,7 @@ class GeomPrim(XFormPrim):
             return self.material.opacity_constant
         else:
             opacity = self.get_attribute("primvars:displayOpacity")
-            return None if opacity is None else np.array(opacity)[0]
+            return None if opacity is None else th.Tensor(opacity)[0]
 
     @opacity.setter
     def opacity(self, opacity):
@@ -116,7 +116,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.opacity_constant = opacity
         else:
-            self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+            self.set_attribute("primvars:displayOpacity", th.Tensor([opacity]))
 
     @property
     def points(self):
@@ -129,10 +129,10 @@ class GeomPrim(XFormPrim):
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return np.array(self.prim.GetAttribute("points").Get())
+            return th.Tensor(self.prim.GetAttribute("points").Get())
         else:
             # Return the vertices of the trimesh
-            return np.array(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
+            return th.Tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
 
     @property
     def points_in_parent_frame(self):

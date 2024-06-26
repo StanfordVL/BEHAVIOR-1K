@@ -67,8 +67,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set viewer camera
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.46382895, -2.66703958, 1.22616824]),
-        orientation=np.array([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
+        position=th.Tensor([0.46382895, -2.66703958, 1.22616824]),
+        orientation=th.Tensor([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
     )
 
     def print_state():
@@ -139,11 +139,11 @@ def main(random_selection=False, headless=False, short_exec=False):
             increments = 25
             for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
-                env.step(np.array([]))
+                env.step(th.Tensor([]))
                 print_state()
 
         while True:
-            env.step(np.array([]))
+            env.step(th.Tensor([]))
             print_state()
 
     # Shut down env at the end

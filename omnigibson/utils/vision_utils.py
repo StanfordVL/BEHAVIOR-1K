@@ -69,13 +69,13 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
+        self.key_array = th.Tensor([], dtype=np.uint32)  # Initialize the key_array as empty
         self.known_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = np.array([], dtype=np.uint32)
+        self.key_array = th.Tensor([], dtype=np.uint32)
         self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image, image_keys=None):
@@ -98,7 +98,7 @@ class Remapper:
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
         assert np.all(
-            np.array(list(new_mapping.keys())) != np.iinfo(np.uint32).max
+            th.Tensor(list(new_mapping.keys())) != np.iinfo(np.uint32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = np.max(image)
         key_array_max_key = len(self.key_array) - 1
@@ -172,7 +172,7 @@ def randomize_colors(N, bright=True):
     """
     brightness = 1.0 if bright else 0.5
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
-    colors = np.array(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
+    colors = th.Tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
     rstate = np.random.RandomState(seed=20)
     np.random.shuffle(colors)
     colors[0] = [0, 0, 0]  # First color is black
@@ -287,9 +287,9 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     # Project to image space
     corners_2d = world_to_image_pinhole(corners_3d, camera_params)
     width, height = rgb.size
-    corners_2d *= np.array([[width, height]])
+    corners_2d *= th.Tensor([[width, height]])
 
     # Now, draw all bounding boxes
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
-    return np.array(rgb)
+    return th.Tensor(rgb)

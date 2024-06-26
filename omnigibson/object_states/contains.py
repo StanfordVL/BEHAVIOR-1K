@@ -19,8 +19,8 @@ m.VISUAL_PARTICLE_OFFSET = 0.01  # Offset to visual particles' poses when checki
 """
 ContainedParticlesData contains the following fields:
     n_in_volume (int): number of particles in the container volume
-    positions (np.array): (N, 3) array representing the raw global particle positions
-    in_volume (np.array): (N,) boolean array representing whether each particle is inside the container volume or not
+    positions (th.Tensor): (N, 3) array representing the raw global particle positions
+    in_volume (th.Tensor): (N,) boolean array representing whether each particle is inside the container volume or not
 """
 ContainedParticlesData = namedtuple("ContainedParticlesData", ("n_in_volume", "positions", "in_volume"))
 
@@ -49,16 +49,16 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         Returns:
             ContainedParticlesData: namedtuple with the following keys:
                 - n_in_volume (int): Number of @system's particles inside this object's container volume
-                - positions (np.array): (N, 3) Particle positions of all @system's particles
-                - in_volume (np.array): (N,) boolean array, True if the corresponding particle is inside this
+                - positions (th.Tensor): (N, 3) Particle positions of all @system's particles
+                - in_volume (th.Tensor): (N,) boolean array, True if the corresponding particle is inside this
                     object's container volume, else False
         """
         # Value is false by default
         n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = (
             0,
-            np.array([]),
-            np.array([]),
-            np.array([]),
+            th.Tensor([]),
+            th.Tensor([]),
+            th.Tensor([]),
         )
 
         # Only run additional computations if there are any particles

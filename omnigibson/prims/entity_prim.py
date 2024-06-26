@@ -1042,7 +1042,7 @@ class EntityPrim(XFormPrim):
             n-array: minimum values for this robot's joints. If joint does not have a range, returns -1000
                 for that joint
         """
-        return np.array([joint.lower_limit for joint in self._joints.values()])
+        return th.Tensor([joint.lower_limit for joint in self._joints.values()])
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1052,7 +1052,7 @@ class EntityPrim(XFormPrim):
             n-array: maximum values for this robot's joints. If joint does not have a range, returns 1000
                 for that joint
         """
-        return np.array([joint.upper_limit for joint in self._joints.values()])
+        return th.Tensor([joint.upper_limit for joint in self._joints.values()])
 
     @property
     def joint_range(self):
@@ -1068,7 +1068,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum velocities for this robot's joints
         """
-        return np.array([joint.max_velocity for joint in self._joints.values()])
+        return th.Tensor([joint.max_velocity for joint in self._joints.values()])
 
     @property
     def max_joint_efforts(self):
@@ -1076,7 +1076,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return np.array([joint.max_effort for joint in self._joints.values()])
+        return th.Tensor([joint.max_effort for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):
@@ -1123,7 +1123,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
-        return np.array([j.has_limit for j in self._joints.values()])
+        return th.Tensor([j.has_limit for j in self._joints.values()])
 
     @property
     def disabled_collision_link_names(self):

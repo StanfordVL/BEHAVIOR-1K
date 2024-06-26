@@ -32,7 +32,7 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 
 #         robot_pos = robot.get_position()
 #         object_pos = self.obj.get_position()
-#         return np.linalg.norm(object_pos - np.array(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
+#         return np.linalg.norm(object_pos - th.Tensor(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
 
 
 # class InFOVOfRobot(AbsoluteObjectState, BooleanStateMixin):

@@ -130,7 +130,7 @@ class ClothPrim(GeomPrim):
         self._prim.GetAttribute("primvars:isVolume").Set(False)
 
         # Store the default position of the points in the local frame
-        self._default_positions = np.array(self.get_attribute(attr="points"))
+        self._default_positions = th.Tensor(self.get_attribute(attr="points"))
 
     @property
     def visual_aabb(self):
@@ -172,7 +172,7 @@ class ClothPrim(GeomPrim):
             idxs (n-array or None): If set, will only calculate the requested indexed particle state
 
         Returns:
-            np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to the world frame
         """
         t, r = self.get_position_orientation()
@@ -180,7 +180,7 @@ class ClothPrim(GeomPrim):
         s = self.scale
 
         # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
-        p_local = np.array(self.get_attribute(attr="points"), copy=False)
+        p_local = th.Tensor(self.get_attribute(attr="points"), copy=False)
         p_local = p_local[idxs] if idxs is not None else p_local
         p_world = (r @ (p_local * s).T).T + t
 
@@ -207,7 +207,7 @@ class ClothPrim(GeomPrim):
 
         # Fill the idxs if requested
         if idxs is not None:
-            p_local_old = np.array(self.get_attribute(attr="points"))
+            p_local_old = th.Tensor(self.get_attribute(attr="points"))
             p_local_old[idxs] = p_local
             p_local = p_local_old
 
@@ -235,10 +235,10 @@ class ClothPrim(GeomPrim):
         Grabs particle indexes defining each of the faces for this cloth prim
 
         Returns:
-             np.array: (N, 3) numpy array, where each of the N faces are defined by the 3 particle indices
+             th.Tensor: (N, 3) numpy array, where each of the N faces are defined by the 3 particle indices
                 corresponding to that face's vertices
         """
-        return np.array(self.get_attribute("faceVertexIndices")).reshape(-1, 3)
+        return th.Tensor(self.get_attribute("faceVertexIndices")).reshape(-1, 3)
 
     @property
     def keyfaces(self):
@@ -247,7 +247,7 @@ class ClothPrim(GeomPrim):
         Total number of keyfaces is m.N_CLOTH_KEYFACES
 
         Returns:
-             np.array: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
+             th.Tensor: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
                 corresponding to that face's vertices
         """
         return self.faces[self._keyface_idx]
@@ -259,7 +259,7 @@ class ClothPrim(GeomPrim):
         Total number of keypoints is m.N_CLOTH_KEYPOINTS
 
         Returns:
-            np.array: (N, 3) numpy array, where each of the N keypoint particles' positions are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N keypoint particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to the world frame
         """
         return self.compute_particle_positions(idxs=self._keypoint_idx)
@@ -270,7 +270,7 @@ class ClothPrim(GeomPrim):
         Grabs the individual particle that was pre-computed to be the closest to the centroid of this cloth prim.
 
         Returns:
-            np.array: centroid particle's (x,y,z) cartesian coordinates relative to the world frame
+            th.Tensor: centroid particle's (x,y,z) cartesian coordinates relative to the world frame
         """
         return self.compute_particle_positions(idxs=[self._centroid_idx])[0]
 
@@ -280,11 +280,11 @@ class ClothPrim(GeomPrim):
         Grabs individual particle velocities for this cloth prim
 
         Returns:
-            np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
         """
         # the velocities attribute is w.r.t the world frame already
-        return np.array(self.get_attribute(attr="velocities"))
+        return th.Tensor(self.get_attribute(attr="velocities"))
 
     @particle_velocities.setter
     def particle_velocities(self, vel):
@@ -292,7 +292,7 @@ class ClothPrim(GeomPrim):
         Set the particle velocities of this cloth
 
         Args:
-            np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame
         """
         assert (
@@ -311,7 +311,7 @@ class ClothPrim(GeomPrim):
                 If None, all faces will be used
 
         Returns:
-            np.array: (N, 3) numpy array, where each of the N faces' normals are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N faces' normals are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
         """
         faces = self.faces if face_ids is None else self.faces[face_ids]
@@ -326,7 +326,7 @@ class ClothPrim(GeomPrim):
             positions (n-array): (N, 3, 3) array specifying the per-face particle positions
 
         Returns:
-            np.array: (N, 3) numpy array, where each of the N faces' normals are expressed in (x,y,z)
+            th.Tensor: (N, 3) numpy array, where each of the N faces' normals are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
         """
         # Shape [F, 3]
@@ -419,7 +419,7 @@ class ClothPrim(GeomPrim):
         Returns:
             np.ndarray: current average linear velocity of the particles of the cloth prim. Shape (3,).
         """
-        return np.array(self._prim.GetAttribute("velocities").Get()).mean(axis=0)
+        return th.Tensor(self._prim.GetAttribute("velocities").Get()).mean(axis=0)
 
     def get_angular_velocity(self):
         """
@@ -555,13 +555,13 @@ class ClothPrim(GeomPrim):
         # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
         # JSON-serialization
         self.particle_velocities = (
-            np.array(state["particle_velocities"])
+            th.Tensor(state["particle_velocities"])
             if not isinstance(state["particle_velocities"], np.ndarray)
             else state["particle_velocities"]
         )
         self.set_particle_positions(
             positions=(
-                np.array(state["particle_positions"])
+                th.Tensor(state["particle_positions"])
                 if not isinstance(state["particle_positions"], np.ndarray)
                 else state["particle_positions"]
             )

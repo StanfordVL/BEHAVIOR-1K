@@ -402,7 +402,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def assisted_grasp_start_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.Tensor([1, -1, 1]), "right": th.Tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_BASE_POS),
@@ -417,7 +417,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def assisted_grasp_end_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.Tensor([1, -1, 1]), "right": th.Tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{finger}", position=m.FINGER_TIP_POS * side_coefficients[arm])
@@ -457,8 +457,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Update body action space
         if teleop_action.is_valid["head"]:
             head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])
-            des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
-            des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
+            des_body_pos = head_pos - th.Tensor([0, 0, m.BODY_HEIGHT_OFFSET])
+            des_body_rpy = th.Tensor([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
         else:
             des_body_pos, des_body_orn = self.get_position_orientation()

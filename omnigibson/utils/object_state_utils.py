@@ -136,12 +136,12 @@ def sample_kinematics(
         if hasattr(objA, "orientations") and objA.orientations is not None:
             orientation = objA.sample_orientation()
         else:
-            orientation = np.array([0, 0, 0, 1.0])
+            orientation = th.Tensor([0, 0, 0, 1.0])
 
         # Orientation needs to be set for stable_z_on_aabb to work correctly
         # Position needs to be set to be very far away because the object's
         # original position might be blocking rays (use_ray_casting_method=True)
-        old_pos = np.array([100, 100, 10])
+        old_pos = th.Tensor([100, 100, 10])
         objA.set_position_orientation(old_pos, orientation)
         objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
@@ -161,7 +161,7 @@ def sample_kinematics(
         else:
             aabb_lower, aabb_upper = objA.states[AABB].get_value()
             parallel_bbox_center = (aabb_lower + aabb_upper) / 2.0
-            parallel_bbox_orn = np.array([0.0, 0.0, 0.0, 1.0])
+            parallel_bbox_orn = th.Tensor([0.0, 0.0, 0.0, 1.0])
             parallel_bbox_extents = aabb_upper - aabb_lower
 
         sampling_results = sample_cuboid_for_predicate(predicate, objB, parallel_bbox_extents)
@@ -284,11 +284,11 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
 
     if randomize_xy:
         # Sample a random position in the x-y plane within the other object's AABB
-        low = np.array([other_aabb_low[0], other_aabb_low[1], z_value])
-        high = np.array([other_aabb_high[0], other_aabb_high[1], z_value])
+        low = th.Tensor([other_aabb_low[0], other_aabb_low[1], z_value])
+        high = th.Tensor([other_aabb_high[0], other_aabb_high[1], z_value])
     else:
         # Always sample the center of the other object's AABB
-        low = np.array(
+        low = th.Tensor(
             [(other_aabb_low[0] + other_aabb_high[0]) / 2.0, (other_aabb_low[1] + other_aabb_high[1]) / 2.0, z_value]
         )
         high = low
@@ -297,7 +297,7 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         # Sample a random position
         pos = np.random.uniform(low, high)
         # Sample a random orientation in the z-axis
-        orn = T.euler2quat(np.array([0.0, 0.0, np.random.uniform(0, np.pi * 2)]))
+        orn = T.euler2quat(th.Tensor([0.0, 0.0, np.random.uniform(0, np.pi * 2)]))
 
         obj.set_position_orientation(pos, orn)
         obj.root_link.reset()

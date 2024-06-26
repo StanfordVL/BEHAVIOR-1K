@@ -76,9 +76,9 @@ class TraversableMap(BaseMap):
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
+                trav_map = th.Tensor(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
             else:
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+                trav_map = th.Tensor(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the
@@ -156,10 +156,10 @@ class TraversableMap(BaseMap):
         else:
             trav_space = np.where(trav_map == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
-        xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
+        xy_map = th.Tensor([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
-        return floor, np.array([x, y, z])
+        return floor, th.Tensor([x, y, z])
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         """
