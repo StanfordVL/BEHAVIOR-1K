@@ -50,7 +50,7 @@ def fit_plane(points, refusal_log):
             refusal_log.append(f"insufficient points to fit a 3D plane: needs 3, has {points.shape[0]}.")
         return None, None
 
-    ctr = points.mean(axis=0)
+    ctr = points.mean(dim=0)
     x = points - ctr
     normal = np.linalg.svd(np.dot(x.T, x))[0][:, -1]
     normal /= np.linalg.norm(normal)
@@ -506,8 +506,8 @@ def sample_raytest_start_end_full_grid_topdown(
     start_points = trimesh.transformations.transform_points(start_points, to_wf_transform)
     end_points = trimesh.transformations.transform_points(end_points, to_wf_transform)
 
-    start_points = np.expand_dims(start_points, axis=1)
-    end_points = np.expand_dims(end_points, axis=1)
+    start_points = np.expand_dims(start_points, dim=1)
+    end_points = np.expand_dims(end_points, dim=1)
 
     return start_points, end_points
 
@@ -898,7 +898,7 @@ def sample_cuboid_on_object(
             # Process the hit positions and normals.
             hit_positions = th.Tensor([ray_res["position"] for ray_res in filtered_cast_results])
             hit_normals = th.Tensor([ray_res["normal"] for ray_res in filtered_cast_results])
-            hit_normals /= np.linalg.norm(hit_normals, axis=1, keepdims=True)
+            hit_normals /= np.linalg.norm(hit_normals, dim=1, keepdims=True)
 
             assert filtered_center_idx is not None
             hit_link = filtered_cast_results[filtered_center_idx]["rigidBody"]
@@ -1078,7 +1078,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     """
     parallel_hit_main_hit_dot_products = np.clip(
         np.dot(hit_normals, center_hit_normal)
-        / (np.linalg.norm(hit_normals, axis=1) * np.linalg.norm(center_hit_normal)),
+        / (np.linalg.norm(hit_normals, dim=1) * np.linalg.norm(center_hit_normal)),
         -1.0,
         1.0,
     )

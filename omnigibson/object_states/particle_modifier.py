@@ -445,7 +445,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 # Add the margin
                 lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
                 upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                return ((lower < particle_positions) & (particle_positions < upper)).all(axis=-1)
+                return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
 
             self._check_in_mesh = check_in_adjacency_mesh
 
@@ -1191,7 +1191,7 @@ class ParticleApplier(ParticleModifier):
             raise ValueError(
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!"
             )
-        self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
+        self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, dim=-1).reshape(-1, 1)
 
     def _update(self):
         # If we're about to check for modification, update whether it the visualization should be active or not
@@ -1398,7 +1398,7 @@ class ParticleApplier(ParticleModifier):
                 sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
                 -h * np.ones(n_samples),
             ],
-            axis=1,
+            dim=1,
         )
         projection_type = self._projection_mesh_params["type"]
         if projection_type == "Cone":
@@ -1415,7 +1415,7 @@ class ParticleApplier(ParticleModifier):
         # Convert sampled normalized radius and angle into 3D points
         # We convert r, theta --> 3D point in local link frame --> 3D point in global world frame
         # We also combine start and end points for efficiency when doing the transform, then split them up again
-        points = np.concatenate([start_points, end_points], axis=0)
+        points = np.concatenate([start_points, end_points], dim=0)
         pos, quat = self.link.get_position_orientation()
         points = get_particle_positions_from_frame(
             pos=pos,
@@ -1443,7 +1443,7 @@ class ParticleApplier(ParticleModifier):
         lower, upper = self.link.visual_aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-        lower_upper = np.concatenate([lower, upper], axis=0)
+        lower_upper = np.concatenate([lower, upper], dim=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position()

@@ -478,14 +478,14 @@ def _compute_osc_torques(
     vel_err = np.concatenate((lin_vel_err, base_ang_vel)) - ee_vel
 
     # Determine desired wrench
-    err = np.expand_dims(kp * err + kd * vel_err, axis=-1)
+    err = np.expand_dims(kp * err + kd * vel_err, dim=-1)
     m_eef_inv = j_eef @ mm_inv @ j_eef.T
     m_eef = np.linalg.inv(m_eef_inv)
 
     if decouple_pos_ori:
         # # More efficient, but numba doesn't support 3D tensor operations yet
         # j_eef_batch = j_eef.reshape(2, 3, -1)
-        # m_eef_pose_inv = np.matmul(np.matmul(j_eef_batch, np.expand_dims(mm_inv, axis=0)), np.transpose(j_eef_batch, (0, 2, 1)))
+        # m_eef_pose_inv = np.matmul(np.matmul(j_eef_batch, np.expand_dims(mm_inv, dim=0)), np.transpose(j_eef_batch, (0, 2, 1)))
         # m_eef_pose = np.linalg.inv(m_eef_pose_inv)  # Shape (2, 3, 3)
         # wrench = np.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
         m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
@@ -507,7 +507,7 @@ def _compute_osc_torques(
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
         u_null = kd_null * -qd + kp_null * ((rest_qpos - q + np.pi) % (2 * np.pi) - np.pi)
-        u_null = mm @ np.expand_dims(u_null, axis=-1).astype(np.float32)
+        u_null = mm @ np.expand_dims(u_null, dim=-1).astype(np.float32)
         u += (np.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u

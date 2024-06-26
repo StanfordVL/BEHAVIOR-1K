@@ -155,8 +155,8 @@ class GeomPrim(XFormPrim):
         points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
         points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
 
-        aabb_lo = np.min(points_transformed, axis=0)
-        aabb_hi = np.max(points_transformed, axis=0)
+        aabb_lo = np.min(points_transformed, dim=0)
+        aabb_hi = np.max(points_transformed, dim=0)
         return aabb_lo, aabb_hi
 
     @property
@@ -188,7 +188,7 @@ class GeomPrim(XFormPrim):
             np.ndarray: The unscaled 3d extent of the mesh in its local frame.
         """
         points = self.points
-        return np.max(points, axis=0) - np.min(points, axis=0)
+        return np.max(points, dim=0) - np.min(points, dim=0)
 
 
 class CollisionGeomPrim(GeomPrim):

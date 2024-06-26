@@ -1835,7 +1835,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Check that the pose is near one of the poses in the near_poses list if provided.
             if near_poses:
                 sampled_pos = th.Tensor([sampled_obj_pose[0]])
-                if not np.any(np.linalg.norm(near_poses - sampled_pos, axis=1) < near_poses_threshold):
+                if not np.any(np.linalg.norm(near_poses - sampled_pos, dim=1) < near_poses_threshold):
                     continue
 
             # Return the pose

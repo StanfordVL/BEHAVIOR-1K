@@ -385,7 +385,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
             particles_in_world_frame = np.concatenate(
-                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], axis=0
+                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], dim=0
             )
             points_in_world.extend(particles_in_world_frame)
         else:
@@ -404,8 +404,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, axis=0)
-        aabb_max_in_desired_frame = np.amax(points, axis=0)
+        aabb_min_in_desired_frame = np.amin(points, dim=0)
+        aabb_max_in_desired_frame = np.amax(points, dim=0)
         bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
         bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
 

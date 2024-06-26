@@ -214,7 +214,7 @@ class MacroParticleSystem(BaseSystem):
             else:
                 diffuse_texture = self.particle_object.material.diffuse_texture
                 color = (
-                    plt.imread(diffuse_texture).mean(axis=(0, 1))
+                    plt.imread(diffuse_texture).mean(dim=(0, 1))
                     if diffuse_texture
                     else self.particle_object.material.diffuse_color_constant
                 )
@@ -287,8 +287,8 @@ class MacroParticleSystem(BaseSystem):
         orientations = R.random(num=n_particles).as_quat() if orientations is None else orientations
         scales = self.sample_scales(n=n_particles) if scales is None else scales
 
-        positions = np.concatenate([current_positions, positions], axis=0)
-        orientations = np.concatenate([current_orientations, orientations], axis=0)
+        positions = np.concatenate([current_positions, positions], dim=0)
+        orientations = np.concatenate([current_orientations, orientations], dim=0)
 
         # Add particles
         for scale in scales:
@@ -440,7 +440,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 normals = cloth.compute_face_normals_from_particle_positions(positions=positions)
 
                 # The actual positions we want are the face centroids, or the mean of all the positions
-                positions = positions.mean(axis=1)
+                positions = positions.mean(dim=1)
                 # Orientations are the normals
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
@@ -617,7 +617,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # Positions are the midpoints of each requested face
             normals = cloth.compute_face_normals(face_ids=face_ids)
             positions = (
-                cloth.compute_particle_positions(idxs=cloth.faces[face_ids].flatten()).reshape(-1, 3, 3).mean(axis=1)
+                cloth.compute_particle_positions(idxs=cloth.faces[face_ids].flatten()).reshape(-1, 3, 3).mean(dim=1)
             )
             # Orientations are the normals
             z_up = np.zeros_like(normals)
@@ -1069,9 +1069,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_attached_references=particle_attached_references,
         )
         state["n_particles"] -= len(indices_to_remove)
-        state["positions"] = np.delete(state["positions"], indices_to_remove, axis=0)
-        state["orientations"] = np.delete(state["orientations"], indices_to_remove, axis=0)
-        state["scales"] = np.delete(state["scales"], indices_to_remove, axis=0)
+        state["positions"] = np.delete(state["positions"], indices_to_remove, dim=0)
+        state["orientations"] = np.delete(state["orientations"], indices_to_remove, dim=0)
+        state["scales"] = np.delete(state["scales"], indices_to_remove, dim=0)
 
         # Run super
         super()._load_state(state=state)
@@ -1317,7 +1317,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             orientations = ori if orientations is None else orientations
             positions = pos if positions is None else (positions - T.quat2mat(orientations) @ self._particle_offset)
         self.particles_view.set_transforms(
-            np.concatenate([positions, orientations], axis=1), indices=np.arange(len(positions))
+            np.concatenate([positions, orientations], dim=1), indices=np.arange(len(positions))
         )
 
     def set_particles_local_pose(self, positions=None, orientations=None):
@@ -1378,7 +1378,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             lin_vels = l_vels if lin_vels is None else lin_vels
             ang_vels = a_vels if ang_vels is None else ang_vels
         self.particles_view.set_velocities(
-            np.concatenate([lin_vels, ang_vels], axis=1), indices=np.arange(len(lin_vels))
+            np.concatenate([lin_vels, ang_vels], dim=1), indices=np.arange(len(lin_vels))
         )
 
     def set_particle_velocities(self, idx, lin_vel=None, ang_vel=None):
@@ -1451,8 +1451,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         velocities = np.zeros((n_particles, 3)) if velocities is None else velocities
         angular_velocities = np.zeros_like(velocities) if angular_velocities is None else angular_velocities
 
-        velocities = np.concatenate([current_lin_vels[:-n_particles], velocities], axis=0)
-        angular_velocities = np.concatenate([current_ang_vels[:-n_particles], angular_velocities], axis=0)
+        velocities = np.concatenate([current_lin_vels[:-n_particles], velocities], dim=0)
+        angular_velocities = np.concatenate([current_ang_vels[:-n_particles], angular_velocities], dim=0)
 
         # Set the vels
         self.set_particles_velocities(lin_vels=velocities, ang_vels=angular_velocities)

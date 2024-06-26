@@ -241,7 +241,7 @@ def test_aabb(env):
 
     pp = dishtowel.root_link.compute_particle_positions()
     offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(axis=0) - offset, pp.max(axis=0) + offset))
+    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(dim=0) - offset, pp.max(dim=0) + offset))
     assert np.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
     with pytest.raises(NotImplementedError):
@@ -1027,10 +1027,10 @@ def test_folded_unfolded(env):
     assert carpet.states[Unfolded].get_value()
 
     pos = carpet.root_link.compute_particle_positions()
-    x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+    x_min, x_max = np.min(pos, dim=0)[0], np.max(pos, dim=0)[0]
     x_extent = x_max - x_min
     # Get indices for the bottom 10 percent vertices in the x-axis
-    indices = np.argsort(pos, axis=0)[:, 0][: (pos.shape[0] // 10)]
+    indices = np.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
     start = np.copy(pos[indices])
 
     # lift up a bit

@@ -104,8 +104,8 @@ class ClothPrim(GeomPrim):
             )
 
             keypoint_positions = positions[self._keypoint_idx]
-            keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
-            true_aabb = positions.min(axis=0), positions.max(axis=0)
+            keypoint_aabb = keypoint_positions.min(dim=0), keypoint_positions.max(dim=0)
+            true_aabb = positions.min(dim=0), positions.max(dim=0)
             overlap_vol = (
                 max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0)
                 * max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0)
@@ -118,9 +118,9 @@ class ClothPrim(GeomPrim):
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
 
         # Compute centroid particle idx based on AABB
-        aabb_min, aabb_max = np.min(positions, axis=0), np.max(positions, axis=0)
+        aabb_min, aabb_max = np.min(positions, dim=0), np.max(positions, dim=0)
         aabb_center = (aabb_min + aabb_max) / 2.0
-        dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), axis=-1)
+        dists = np.linalg.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = np.argmin(dists)
 
     def _initialize(self):
@@ -333,7 +333,7 @@ class ClothPrim(GeomPrim):
         v1 = positions[:, 2, :] - positions[:, 0, :]
         v2 = positions[:, 1, :] - positions[:, 0, :]
         normals = np.cross(v1, v2)
-        return normals / np.linalg.norm(normals, axis=1).reshape(-1, 1)
+        return normals / np.linalg.norm(normals, dim=1).reshape(-1, 1)
 
     def contact_list(self, keypoints_only=True):
         """
@@ -419,7 +419,7 @@ class ClothPrim(GeomPrim):
         Returns:
             np.ndarray: current average linear velocity of the particles of the cloth prim. Shape (3,).
         """
-        return th.Tensor(self._prim.GetAttribute("velocities").Get()).mean(axis=0)
+        return th.Tensor(self._prim.GetAttribute("velocities").Get()).mean(dim=0)
 
     def get_angular_velocity(self):
         """

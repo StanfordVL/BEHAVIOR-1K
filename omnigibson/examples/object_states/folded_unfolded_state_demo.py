@@ -96,10 +96,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         for i in range(3):
             obj = objs[i]
             pos = obj.root_link.compute_particle_positions()
-            x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+            x_min, x_max = np.min(pos, dim=0)[0], np.max(pos, dim=0)[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
-            indices = np.argsort(pos, axis=0)[:, 0][: (pos.shape[0] // 10)]
+            indices = np.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
             start = np.copy(pos[indices])
 
             # lift up a bit
@@ -120,12 +120,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         for direction in [-1, 1]:
             obj = shirt
             pos = obj.root_link.compute_particle_positions()
-            y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
+            y_min, y_max = np.min(pos, dim=0)[1], np.max(pos, dim=0)[1]
             y_extent = y_max - y_min
             if direction == 1:
-                indices = np.argsort(pos, axis=0)[:, 1][: (pos.shape[0] // 20)]
+                indices = np.argsort(pos, dim=0)[:, 1][: (pos.shape[0] // 20)]
             else:
-                indices = np.argsort(pos, axis=0)[:, 1][-(pos.shape[0] // 20) :]
+                indices = np.argsort(pos, dim=0)[:, 1][-(pos.shape[0] // 20) :]
             start = np.copy(pos[indices])
 
             # lift up a bit

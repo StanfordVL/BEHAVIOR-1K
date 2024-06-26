@@ -161,11 +161,11 @@ class PhysxParticleInstancer(BasePrim):
         """
         if len(idxs) > 0:
             # Remove all requested indices and write to all the internal data arrays
-            self.particle_positions = np.delete(self.particle_positions, idxs, axis=0)
-            self.particle_velocities = np.delete(self.particle_velocities, idxs, axis=0)
-            self.particle_orientations = np.delete(self.particle_orientations, idxs, axis=0)
-            self.particle_scales = np.delete(self.particle_scales, idxs, axis=0)
-            self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, axis=0)
+            self.particle_positions = np.delete(self.particle_positions, idxs, dim=0)
+            self.particle_velocities = np.delete(self.particle_velocities, idxs, dim=0)
+            self.particle_orientations = np.delete(self.particle_orientations, idxs, dim=0)
+            self.particle_scales = np.delete(self.particle_scales, idxs, dim=0)
+            self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, dim=0)
 
     def remove_all_particles(self):
         self.remove_particles(idxs=np.arange(self.n_particles))

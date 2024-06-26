@@ -522,7 +522,7 @@ def _get_closest_point_to_point_in_world_frame(
         ]
     )
 
-    vector_distances_to_point = np.linalg.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], axis=1)
+    vector_distances_to_point = np.linalg.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], dim=1)
     closer_option_idx = np.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]

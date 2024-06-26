@@ -865,7 +865,7 @@ def make_pose(translation, rotation):
     return pose
 
 
-def unit_vector(data, axis=None, out=None):
+def unit_vector(data, dim=None, out=None):
     """
     Returns ndarray normalized by length, i.e. eucledian norm, along axis.
 
@@ -876,18 +876,18 @@ def unit_vector(data, axis=None, out=None):
         True
 
         >>> v0 = numpy.random.rand(5, 4, 3)
-        >>> v1 = unit_vector(v0, axis=-1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
+        >>> v1 = unit_vector(v0, dim=-1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, dim=2)), 2)
         >>> numpy.allclose(v1, v2)
         True
 
-        >>> v1 = unit_vector(v0, axis=1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
+        >>> v1 = unit_vector(v0, dim=1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, dim=1)), 1)
         >>> numpy.allclose(v1, v2)
         True
 
         >>> v1 = numpy.empty((5, 4, 3), dtype=numpy.float32)
-        >>> unit_vector(v0, axis=1, out=v1)
+        >>> unit_vector(v0, dim=1, out=v1)
         >>> numpy.allclose(v1, v2)
         True
 
@@ -1021,8 +1021,8 @@ def vecs2axisangle(vec0, vec1):
         vec1 (th.Tensor): (..., 3) (x,y,z) 3D vector, possibly unnormalized
     """
     # Normalize vectors
-    vec0 = normalize(vec0, axis=-1)
-    vec1 = normalize(vec1, axis=-1)
+    vec0 = normalize(vec0, dim=-1)
+    vec1 = normalize(vec1, dim=-1)
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
     return np.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
@@ -1040,15 +1040,15 @@ def vecs2quat(vec0, vec1, normalized=False):
     """
     # Normalize vectors if requested
     if not normalized:
-        vec0 = normalize(vec0, axis=-1)
-        vec1 = normalize(vec1, axis=-1)
+        vec0 = normalize(vec0, dim=-1)
+        vec1 = normalize(vec1, dim=-1)
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
-    cos_theta = np.sum(vec0 * vec1, axis=-1, keepdims=True)
+    cos_theta = np.sum(vec0 * vec1, dim=-1, keepdims=True)
     quat_unnormalized = np.where(
-        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1)
+        cos_theta == -1, th.Tensor([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
-    return quat_unnormalized / np.linalg.norm(quat_unnormalized, axis=-1, keepdims=True)
+    return quat_unnormalized / np.linalg.norm(quat_unnormalized, dim=-1, keepdims=True)
 
 
 def l2_distance(v1, v2):
@@ -1101,14 +1101,14 @@ def perspective(fovy, aspect, znear, zfar):
     return frustum(-w, w, -h, h, znear, zfar)
 
 
-def anorm(x, axis=None, keepdims=False):
+def anorm(x, dim=None, keepdims=False):
     """Compute L2 norms alogn specified axes."""
-    return np.linalg.norm(x, axis=axis, keepdims=keepdims)
+    return np.linalg.norm(x, dim=axis, keepdims=keepdims)
 
 
-def normalize(v, axis=None, eps=1e-10):
+def normalize(v, dim=None, eps=1e-10):
     """L2 Normalize along specified axes."""
-    norm = anorm(v, axis=axis, keepdims=True)
+    norm = anorm(v, dim=axis, keepdims=True)
     return v / np.where(norm < eps, eps, norm)
 
 

@@ -226,7 +226,7 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
         if len(coms) > 0:
-            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
+            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(dim=0) / np.sum(vols)
             self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
 
     def enable_collisions(self):
@@ -642,7 +642,7 @@ class RigidPrim(XFormPrim):
         if not points:
             return None
 
-        points = np.concatenate(points, axis=0)
+        points = np.concatenate(points, dim=0)
 
         try:
             hull = ConvexHull(points)
@@ -699,8 +699,8 @@ class RigidPrim(XFormPrim):
             # When there's no points on the collision meshes
             return position, position
 
-        aabb_lo = np.min(hull_points, axis=0)
-        aabb_hi = np.max(hull_points, axis=0)
+        aabb_lo = np.min(hull_points, dim=0)
+        aabb_hi = np.max(hull_points, dim=0)
         return aabb_lo, aabb_hi
 
     @property
@@ -731,8 +731,8 @@ class RigidPrim(XFormPrim):
         assert hull_points is not None, "No visual boundary points found for this rigid prim"
 
         # Calculate and return the AABB
-        aabb_lo = np.min(hull_points, axis=0)
-        aabb_hi = np.max(hull_points, axis=0)
+        aabb_lo = np.min(hull_points, dim=0)
+        aabb_hi = np.max(hull_points, dim=0)
 
         return aabb_lo, aabb_hi
 

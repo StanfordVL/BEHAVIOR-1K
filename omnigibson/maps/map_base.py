@@ -46,7 +46,7 @@ class BaseMap:
             2-array or (N, 2)-array: 2D location(s) in world reference frame (in metric space)
         """
         axis = 0 if len(xy.shape) == 1 else 1
-        return np.flip((xy - self.map_size / 2.0) * self.map_resolution, axis=axis)
+        return np.flip((xy - self.map_size / 2.0) * self.map_resolution, dim=axis)
 
     def world_to_map(self, xy):
         """

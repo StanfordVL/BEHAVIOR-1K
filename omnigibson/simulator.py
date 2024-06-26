@@ -1497,7 +1497,7 @@ def launch_simulator(*args, **kwargs):
 
         def serialize(self, state):
             # Default state is from the scene
-            return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
+            return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], dim=0)
 
         def deserialize(self, state):
             # Default state is from the scene

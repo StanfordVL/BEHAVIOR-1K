@@ -619,7 +619,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
-        return np.concatenate(rgb_images, axis=1)[:, :, :3]
+        return np.concatenate(rgb_images, dim=1)[:, :, :3]
 
     def _reset_variables(self):
         """

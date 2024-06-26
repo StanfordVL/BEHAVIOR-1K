@@ -354,7 +354,7 @@ class RigidContactAPIImpl:
 
     def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         """Get pairs of prim paths that are in contact."""
-        impulses = np.linalg.norm(self.get_all_impulses(scene_idx), axis=-1)
+        impulses = np.linalg.norm(self.get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
@@ -366,7 +366,7 @@ class RigidContactAPIImpl:
         assert (
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
-        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
+        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, dim=1))[0]
         interesting_row_paths = [
             GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
         ]
@@ -1295,7 +1295,7 @@ def check_extent_radius_ratio(geom_prim, com):
         return False
 
     max_radius = extent.max() / 2.0
-    min_radius = np.min(np.linalg.norm(geom_prim.points - com, axis=-1), axis=0)
+    min_radius = np.min(np.linalg.norm(geom_prim.points - com, dim=-1), dim=0)
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.

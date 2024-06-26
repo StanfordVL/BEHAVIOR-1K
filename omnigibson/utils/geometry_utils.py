@@ -84,7 +84,7 @@ def check_points_in_cube(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(axis=-1) == 3
+    return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(dim=-1) == 3
 
 
 def check_points_in_cone(size, pos, quat, scale, particle_positions):
@@ -112,7 +112,7 @@ def check_points_in_cone(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < (
+    in_radius = np.linalg.norm(particle_positions[:, :-1], dim=-1) < (
         radius * (1 - (particle_positions[:, -1] + height / 2.0) / height)
     )
     return in_height & in_radius
@@ -143,7 +143,7 @@ def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < radius
+    in_radius = np.linalg.norm(particle_positions[:, :-1], dim=-1) < radius
     return in_height & in_radius
 
 
@@ -169,7 +169,7 @@ def check_points_in_sphere(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    return np.linalg.norm(particle_positions, axis=-1) < size
+    return np.linalg.norm(particle_positions, dim=-1) < size
 
 
 def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos, quat, scale, particle_positions):
@@ -204,9 +204,9 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     mesh_normals = np.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
     particle_positions = np.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
     # All arrays are now (N, D, 3) shape -- efficient for batching
-    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(axis=-1) < 0  # shape (N, D)
+    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(dim=-1) < 0  # shape (N, D)
     # All D normals must be satisfied for a single point to be considered inside the hull
-    in_range = in_range.sum(axis=-1) == D
+    in_range = in_range.sum(dim=-1) == D
     return in_range
 
 
@@ -247,7 +247,7 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
     assert (
         trimesh_mesh.is_convex
     ), f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
-    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
+    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(dim=1)
     face_normals = trimesh_mesh.face_normals
 
     # This function assumes that:

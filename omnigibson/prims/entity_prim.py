@@ -1339,14 +1339,14 @@ class EntityPrim(XFormPrim):
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
             aabb_lo, aabb_hi = (
-                np.min(particle_positions, axis=0) - particle_contact_offset,
-                np.max(particle_positions, axis=0) + particle_contact_offset,
+                np.min(particle_positions, dim=0) - particle_contact_offset,
+                np.max(particle_positions, dim=0) + particle_contact_offset,
             )
         else:
             points_world = [link.collision_boundary_points_world for link in self._links.values()]
-            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
-            aabb_lo = np.min(all_points, axis=0)
-            aabb_hi = np.max(all_points, axis=0)
+            all_points = np.concatenate([p for p in points_world if p is not None], dim=0)
+            aabb_lo = np.min(all_points, dim=0)
+            aabb_hi = np.max(all_points, dim=0)
         return aabb_lo, aabb_hi
 
     @property
@@ -1415,7 +1415,7 @@ class EntityPrim(XFormPrim):
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        return self._articulation_view.get_jacobians(clone=clone).squeeze(axis=0)
+        return self._articulation_view.get_jacobians(clone=clone).squeeze(dim=0)
 
     def get_relative_jacobian(self, clone=True):
         """
