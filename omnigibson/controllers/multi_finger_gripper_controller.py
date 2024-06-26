@@ -269,7 +269,7 @@ class MultiFingerGripperController(GripperController):
 
     def compute_no_op_goal(self, control_dict):
         # Just use a zero vector
-        return dict(target=np.zeros(self.command_dim))
+        return dict(target=th.zeros(self.command_dim))
 
     def _get_goal_shapes(self):
         return dict(target=(self.command_dim,))

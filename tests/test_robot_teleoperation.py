@@ -43,7 +43,7 @@ def test_teleop():
     start_eef_pose = robot.links[robot.eef_link_names[robot.default_arm]].get_position_orientation()
 
     # test moving robot arm
-    teleop_action.right = th.cat(([0.01], np.zeros(6)))
+    teleop_action.right = th.cat(([0.01], th.zeros(6)))
     for _ in range(50):
         action = robot.teleop_data_to_action(teleop_action)
         env.step(action)
@@ -51,7 +51,7 @@ def test_teleop():
     assert cur_eef_pose[0][0] - start_eef_pose[0][0] > 0.02, "Robot arm not moving forward"
 
     # test moving robot base
-    teleop_action.right = np.zeros(7)
+    teleop_action.right = th.zeros(7)
     teleop_action.base = th.Tensor([0.1, 0, 0.1])
     for _ in range(50):
         action = robot.teleop_data_to_action(teleop_action)

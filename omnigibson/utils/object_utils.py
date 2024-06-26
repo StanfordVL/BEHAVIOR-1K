@@ -31,7 +31,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     drop_pos = th.Tensor([0, 0, radius + drop_aabb_offset])
     center_offset = obj.get_position() - obj.aabb_center
     drop_orientations = R.random(n_samples).as_quat()
-    stable_orientations = np.zeros_like(drop_orientations)
+    stable_orientations = th.zeros_like(drop_orientations)
     for i, drop_orientation in enumerate(drop_orientations):
         # Sample orientation, drop, wait to stabilize, then record
         pos = drop_pos + T.quat2mat(drop_orientation) @ center_offset
@@ -57,7 +57,7 @@ def compute_bbox_offset(obj):
     """
     og.sim.stop()
     assert th.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
+    obj.set_position_orientation(th.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_center - obj.get_position()
 
 
@@ -74,7 +74,7 @@ def compute_native_bbox_extent(obj):
     """
     og.sim.stop()
     assert th.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
+    obj.set_position_orientation(th.zeros(3), th.Tensor([0, 0, 0, 1.0]))
     return obj.aabb_extent
 
 

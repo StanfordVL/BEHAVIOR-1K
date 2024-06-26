@@ -111,7 +111,7 @@ class DifferentialDriveController(LocomotionController):
 
     def compute_no_op_goal(self, control_dict):
         # This is zero-vector, since we want zero linear / angular velocity
-        return dict(vel=np.zeros(2))
+        return dict(vel=th.zeros(2))
 
     def _get_goal_shapes(self):
         # Add (2, )-array representing linear, angular velocity

@@ -466,7 +466,7 @@ class CameraMover:
             assert step < n_waypoints - 1
             dist = quad(func=arc_derivative, a=step, b=step + 1)[0]
             path_length = int(dist / per_step_distance)
-            interpolated_points = np.zeros((path_length, 3))
+            interpolated_points = th.zeros((path_length, 3))
             for i in range(path_length):
                 curr_step = step + (i / path_length)
                 interpolated_points[i, :] = th.Tensor([spline(curr_step) for spline in splines])
@@ -847,7 +847,7 @@ class KeyboardRobotController:
         Returns:
             n-array: Generated action vector based on received user inputs from the keyboard
         """
-        action = np.zeros(self.action_dim)
+        action = th.zeros(self.action_dim)
 
         # Handle the action if any key is actively being pressed
         if self.active_action is not None:

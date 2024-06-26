@@ -679,7 +679,7 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_local_pose(link, np.zeros(3), th.Tensor([0, 0, 0, 1.0]))
+                XFormPrim.set_local_pose(link, th.zeros(3), th.Tensor([0, 0, 0, 1.0]))
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -1017,7 +1017,7 @@ class BatchControlViewAPIImpl:
     def get_relative_jacobian(self, prim_path):
         jacobian = self.get_jacobian(prim_path)
         ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.float()
-        tf = np.zeros((1, 6, 6), dtype=th.float32)
+        tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jacobian
@@ -1264,7 +1264,7 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
         except:
             # if convex hull computation fails, it usually means the mesh is degenerated: use trivial values.
             volume = 0.0
-            com = np.zeros(3)
+            com = th.zeros(3)
 
     return volume, com
 
@@ -1334,7 +1334,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
     # -- i.e.: 2cm-wide mesh
-    extents = np.ones(3) * extents if isinstance(extents, float) else th.Tensor(extents)
+    extents = th.ones(3) * extents if isinstance(extents, float) else th.Tensor(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = th.Tensor(attr.Get()).double()
         attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))

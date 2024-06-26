@@ -226,7 +226,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def controller_order(self):
@@ -453,7 +453,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Total size: 44
         """
         # Actions are stored as 1D numpy array
-        action = np.zeros(self.action_dim)
+        action = th.zeros(self.action_dim)
         # Update body action space
         if teleop_action.is_valid["head"]:
             head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])

@@ -1802,7 +1802,7 @@ class RecipeRule(BaseTransitionRule):
             # Remove either all objects or only the ones specified in the input objects of the recipe
             object_mask = in_volume.copy()
             if cls.ignore_nonrecipe_objects:
-                object_category_mask = np.zeros_like(object_mask, dtype=bool)
+                object_category_mask = th.zeros_like(object_mask, dtype=bool)
                 for obj_category in recipe["input_objects"].keys():
                     object_category_mask[cls._CATEGORY_IDXS[obj_category]] = True
                 object_mask &= object_category_mask
@@ -1853,7 +1853,7 @@ class RecipeRule(BaseTransitionRule):
                     obj=obj,
                     callback=_spawn_object_in_container,
                     states=output_states,
-                    pos=np.ones(3) * (100.0 + i),
+                    pos=th.ones(3) * (100.0 + i),
                 )
                 objs_to_add.append(new_obj_attrs)
 

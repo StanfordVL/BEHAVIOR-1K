@@ -107,12 +107,12 @@ def create_projection_visualization(
     # Modify the radius according to the desired @shape (and also infer the desired spread values)
     if shape == "Cylinder":
         source_radius = projection_radius
-        spread = np.zeros(3)
+        spread = th.zeros(3)
     elif shape == "Cone":
         # Default to close to singular point otherwise
         source_radius = m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS
         spread_ratio = projection_radius * 2.0 / projection_height
-        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
+        spread = th.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
     else:
         raise ValueError(
             f"Invalid shape specified for projection visualization! Valid options are: [Cone, Cylinder], got: {shape}"
@@ -1185,7 +1185,7 @@ class ParticleApplier(ParticleModifier):
             directions = np.copy(self._in_mesh_local_particle_positions)
         elif projection_type == "Cylinder":
             # All particle points in the same parallel direction towards the -z direction
-            directions = np.zeros_like(self._in_mesh_local_particle_positions)
+            directions = th.zeros_like(self._in_mesh_local_particle_positions)
             directions[:, 2] = -h
         else:
             raise ValueError(
@@ -1226,7 +1226,7 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
-                cuboid_dimensions = np.zeros(3)
+                cuboid_dimensions = th.zeros(3)
 
             # Sample the rays to see where particle can be generated
             results = sample_cuboid_on_object(
@@ -1272,7 +1272,7 @@ class ParticleApplier(ParticleModifier):
             assert scales is not None, "applying visual particles at raycast hits requires scales."
             assert len(hits) == len(scales), "length of hits and scales are different when spawning visual particles."
             # Sample potential application points
-            z_up = np.zeros(3)
+            z_up = th.zeros(3)
             z_up[-1] = 1.0
             n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - n_modified_particles)
             # Generate particle info -- maps group name to particle info for that group,
@@ -1396,14 +1396,14 @@ class ParticleApplier(ParticleModifier):
             [
                 sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
                 sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
-                -h * np.ones(n_samples),
+                -h * th.ones(n_samples),
             ],
             dim=1,
         )
         projection_type = self._projection_mesh_params["type"]
         if projection_type == "Cone":
             # All start points are the cone tip, which is the local link origin
-            start_points = np.zeros((n_samples, 3))
+            start_points = th.zeros((n_samples, 3))
         elif projection_type == "Cylinder":
             # All start points are the parallel point for their corresponding end point
             # i.e.: (x, y, 0)
@@ -1447,7 +1447,7 @@ class ParticleApplier(ParticleModifier):
 
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position()
-        start_points = np.ones((n_samples, 3)) * pos.reshape(1, 3)
+        start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
         sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
         end_points[np.arange(n_samples), axes] = lower_upper[sides, axes]

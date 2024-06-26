@@ -411,12 +411,12 @@ class BehaviorTask(BaseTask):
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
                         low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.Tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.zeros(1)
+                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 

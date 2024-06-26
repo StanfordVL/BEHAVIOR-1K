@@ -233,7 +233,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
-                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
                     for idx in np.where(
@@ -264,7 +264,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
-                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position()
                     for idx in np.where(

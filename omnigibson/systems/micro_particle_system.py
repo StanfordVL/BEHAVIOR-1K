@@ -138,12 +138,12 @@ class PhysxParticleInstancer(BasePrim):
         """
         n_new_particles = len(positions)
 
-        velocities = np.zeros((n_new_particles, 3)) if velocities is None else velocities
+        velocities = th.zeros((n_new_particles, 3)) if velocities is None else velocities
         if orientations is None:
-            orientations = np.zeros((n_new_particles, 4))
+            orientations = th.zeros((n_new_particles, 4))
             orientations[:, -1] = 1.0
-        scales = np.ones((n_new_particles, 3)) * np.ones((1, 3)) if scales is None else scales
-        prototype_indices = np.zeros(n_new_particles, dtype=int) if prototype_indices is None else prototype_indices
+        scales = th.ones((n_new_particles, 3)) * th.ones((1, 3)) if scales is None else scales
+        prototype_indices = th.zeros(n_new_particles, dtype=int) if prototype_indices is None else prototype_indices
 
         self.particle_positions = np.vstack([self.particle_positions, positions])
         self.particle_velocities = np.vstack([self.particle_velocities, velocities])
@@ -745,7 +745,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         if self.initialized:
             for instancer in self.particle_instancers.values():
-                instancer.particle_prototype_ids = np.zeros(instancer.n_particles, dtype=th.int32)
+                instancer.particle_prototype_ids = th.zeros(instancer.n_particles, dtype=th.int32)
 
     def initialize(self, scene):
         self._scene = scene
@@ -920,7 +920,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         n_particles = len(positions)
         if prototype_indices is not None:
             prototype_indices = (
-                np.ones(n_particles, dtype=int) * prototype_indices
+                th.ones(n_particles, dtype=int) * prototype_indices
                 if isinstance(prototype_indices, int)
                 else th.Tensor(prototype_indices, dtype=int)
             )
@@ -1017,7 +1017,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_system_path=self.prim_path,
             physx_particle_system_path=self.system_prim_path,
             particle_group=particle_group,
-            positions=np.zeros((n_particles, 3)) if positions is None else positions,
+            positions=th.zeros((n_particles, 3)) if positions is None else positions,
             self_collision=self.self_collision,
             fluid=self.is_fluid,
             particle_mass=None,
@@ -1243,7 +1243,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             count_diff = info["count"] - instancer.n_particles
             if count_diff > 0:
                 # We need to add more particles to this group
-                instancer.add_particles(positions=np.zeros((count_diff, 3)))
+                instancer.add_particles(positions=th.zeros((count_diff, 3)))
             elif count_diff < 0:
                 # We need to remove particles from this group
                 instancer.remove_particles(idxs=np.arange(-count_diff))

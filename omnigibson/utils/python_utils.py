@@ -715,7 +715,7 @@ def nums2array(nums, dim, dtype=float):
     # Make sure the inputted nums isn't a string
     assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
 
-    out = th.Tensor(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+    out = th.Tensor(nums, dtype=dtype) if isinstance(nums, Iterable) else th.ones(dim, dtype=dtype) * nums
 
     return out
 

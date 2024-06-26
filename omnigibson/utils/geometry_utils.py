@@ -392,7 +392,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             particle_positions=particle_positions,
         )
 
-        in_volumes = np.zeros(n_particles).astype(bool)
+        in_volumes = th.zeros(n_particles).bool()
         for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
             in_volumes |= checker_fcn(mesh.prim, particle_positions)
 

@@ -224,7 +224,7 @@ class OVXRSystem(TeleopSystem):
         self.raw_data = {}
         self.teleop_action.is_valid = {"left": False, "right": False, "head": False}
         self.teleop_action.reset = {"left": False, "right": False}
-        self.teleop_action.head = np.zeros(6)
+        self.teleop_action.head = th.zeros(6)
 
     @property
     def is_enabled(self) -> bool:
@@ -269,7 +269,7 @@ class OVXRSystem(TeleopSystem):
         self._update_button_data()
         # Update teleop data based on controller input if not using hand tracking
         if not self.use_hand_tracking:
-            self.teleop_action.base = np.zeros(3)
+            self.teleop_action.base = th.zeros(3)
             self.teleop_action.torso = 0.0
             # update right hand related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
@@ -373,7 +373,7 @@ class OVXRSystem(TeleopSystem):
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """
-        return th.any(np.not_equal(transform[0], np.zeros(3))) and th.any(
+        return th.any(np.not_equal(transform[0], th.zeros(3))) and th.any(
             np.not_equal(transform[1], self.og2xr_orn_offset)
         )
 
@@ -453,7 +453,7 @@ class OVXRSystem(TeleopSystem):
                 ]
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
-                joint_angles = np.zeros((5, 3))
+                joint_angles = th.zeros((5, 3))
                 raw_hand_data = self.raw_data["hand_data"][hand]["pos"]
                 for i in range(5):
                     for j in range(3):

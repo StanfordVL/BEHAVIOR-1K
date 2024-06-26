@@ -207,7 +207,7 @@ class MacroParticleSystem(BaseSystem):
         Perform any necessary processing on the particle object to extract further information.
         """
         # Update color if the particle object has any material
-        color = np.ones(3)
+        color = th.ones(3)
         if self.particle_object.has_material():
             if self.particle_object.material.is_glass:
                 color = self.particle_object.material.glass_color
@@ -442,7 +442,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 # The actual positions we want are the face centroids, or the mean of all the positions
                 positions = positions.mean(dim=1)
                 # Orientations are the normals
-                z_up = np.zeros_like(normals)
+                z_up = th.zeros_like(normals)
                 z_up[:, 2] = 1.0
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
                 if not self._CLIP_INTO_OBJECTS and z_extent > 0:
@@ -539,7 +539,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         n_particles = positions.shape[0]
         if orientations is None:
-            orientations = np.zeros((n_particles, 4))
+            orientations = th.zeros((n_particles, 4))
             orientations[:, -1] = 1.0
         link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
@@ -552,7 +552,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=obj)
 
         # Generate particles
-        z_up = np.zeros((3, 1))
+        z_up = th.zeros((3, 1))
         z_up[-1] = 1.0
         for position, orientation, scale, bbox_extent_local, link_prim_path in zip(
             positions, orientations, scales, bbox_extents_local, link_prim_paths
@@ -620,7 +620,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 cloth.compute_particle_positions(idxs=cloth.faces[face_ids].flatten()).reshape(-1, 3, 3).mean(dim=1)
             )
             # Orientations are the normals
-            z_up = np.zeros_like(normals)
+            z_up = th.zeros_like(normals)
             z_up[:, 2] = 1.0
             orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
             link_prim_paths = None
@@ -688,14 +688,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             return (th.Tensor([]).reshape(0, 3), th.Tensor([]).reshape(0, 4))
 
         if local:
-            poses = np.zeros((n_particles, 4, 4))
+            poses = th.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
                 poses[i] = T.pose2mat(self.particles[name].get_local_pose())
         else:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
-            link_tfs_batch = np.zeros((n_particles, 4, 4))
-            particle_local_poses_batch = np.zeros_like(link_tfs_batch)
+            link_tfs_batch = th.zeros((n_particles, 4, 4))
+            particle_local_poses_batch = th.zeros_like(link_tfs_batch)
             for i, name in enumerate(particles):
                 obj = self._particles_info[name]["obj"]
                 is_cloth = self._is_cloth_obj(obj=obj)
@@ -778,7 +778,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         lens = th.Tensor([len(particles), len(positions), len(orientations)])
         assert lens.min() == lens.max(), "Got mismatched particles, positions, and orientations!"
 
-        particle_local_poses_batch = np.zeros((n_particles, 4, 4))
+        particle_local_poses_batch = th.zeros((n_particles, 4, 4))
         particle_local_poses_batch[:, -1, -1] = 1.0
         particle_local_poses_batch[:, :3, 3] = positions
         particle_local_poses_batch[:, :3, :3] = T.quat2mat(orientations)
@@ -786,7 +786,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if not local:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
-            link_tfs_batch = np.zeros((n_particles, 4, 4))
+            link_tfs_batch = th.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
                 obj = self._particles_info[name]["obj"]
                 is_cloth = self._is_cloth_obj(obj=obj)
@@ -838,7 +838,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             orientation = ori if orientation is None else orientation
 
         name = list(self.particles.keys())[idx]
-        global_mat = np.zeros((4, 4))
+        global_mat = th.zeros((4, 4))
         global_mat[-1, -1] = 1.0
         global_mat[:3, 3] = position
         global_mat[:3, :3] = T.quat2mat(orientation)
@@ -861,7 +861,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             orientation = ori if orientation is None else orientation
 
         name = list(self.particles.keys())[idx]
-        local_mat = np.zeros((4, 4))
+        local_mat = th.zeros((4, 4))
         local_mat[-1, -1] = 1.0
         local_mat[:3, 3] = position
         local_mat[:3, :3] = T.quat2mat(orientation)
@@ -893,7 +893,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         particle = self.particles[name]
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = np.ones(3) if is_cloth else self._particles_info[name]["link"].scale
+        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = particle.get_local_pose()
         local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
@@ -910,7 +910,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         particle = self.particles[name]
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = np.ones(3) if is_cloth else self._particles_info[name]["link"].scale
+        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = T.mat2pose(mat)
         local_pos = local_pos if ignore_scale else local_pos / scale
         particle.set_local_pose(local_pos, local_quat)
@@ -984,7 +984,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle = self.add_particle(
                     scene=obj.scene,
                     relative_prim_path=absolute_prim_path_to_scene_relative(obj.scene, particle_prim_path),
-                    scale=np.ones(3),
+                    scale=th.ones(3),
                     idn=int(particle_idn),
                 )
                 self._group_particles[name][particle.name] = particle
@@ -1442,8 +1442,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         # Update the tensors
         n_particles = len(positions)
-        velocities = np.zeros((n_particles, 3)) if velocities is None else velocities
-        angular_velocities = np.zeros_like(velocities) if angular_velocities is None else angular_velocities
+        velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
+        angular_velocities = th.zeros_like(velocities) if angular_velocities is None else angular_velocities
 
         velocities = th.cat([current_lin_vels[:-n_particles], velocities], dim=0)
         angular_velocities = th.cat([current_ang_vels[:-n_particles], angular_velocities], dim=0)

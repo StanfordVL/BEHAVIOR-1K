@@ -1116,7 +1116,7 @@ class ManipulationRobot(BaseRobot):
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.gripper_control_idx[arm],
-                "default_command": np.zeros(len(self.gripper_control_idx[arm])),
+                "default_command": th.zeros(len(self.gripper_control_idx[arm])),
                 "use_impedances": False,
             }
         return dic

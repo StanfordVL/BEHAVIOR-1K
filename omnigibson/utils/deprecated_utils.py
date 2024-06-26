@@ -267,7 +267,7 @@ class ArticulationView(_ArticulationView):
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             dof_types = self._backend_utils.to_list(self.get_dof_types())
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
-            values = np.zeros(shape=(indices.shape[0], joint_indices.shape[0], 2), dtype="float32")
+            values = th.zeros(shape=(indices.shape[0], joint_indices.shape[0], 2), dtype="float32")
             articulation_write_idx = 0
             indices = self._backend_utils.to_list(indices)
             joint_indices = self._backend_utils.to_list(joint_indices)
@@ -378,7 +378,7 @@ class ArticulationView(_ArticulationView):
         else:
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
-            max_velocities = np.zeros(shape=(indices.shape[0], joint_indices.shape[0]), dtype="float32")
+            max_velocities = th.zeros(shape=(indices.shape[0], joint_indices.shape[0]), dtype="float32")
             indices = self._backend_utils.to_list(indices)
             joint_indices = self._backend_utils.to_list(joint_indices)
             articulation_write_idx = 0

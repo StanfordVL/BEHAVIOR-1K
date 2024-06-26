@@ -417,8 +417,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
 
-    start_points = np.zeros((num_samples, max_sampling_attempts, 3))
-    end_points = np.zeros((num_samples, max_sampling_attempts, 3))
+    start_points = th.zeros((num_samples, max_sampling_attempts, 3))
+    end_points = th.zeros((num_samples, max_sampling_attempts, 3))
     for i in range(num_samples):
         # Sample the starting positions in advance.
         # TODO: Narrow down the sampling domain so that we don't sample scenarios where the center is in-domain but the
@@ -494,7 +494,7 @@ def sample_raytest_start_end_full_grid_topdown(
         [
             np.tile(x, len(y)),
             np.repeat(y, len(x)),
-            np.ones(n_rays) * half_extent_with_offset[2],
+            th.ones(n_rays) * half_extent_with_offset[2],
         ]
     ).T
 
@@ -954,7 +954,7 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = th.Tensor([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
+                hit_positions = th.Tensor([ray_res.get("position", th.zeros(3)) for ray_res in cast_results])
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
@@ -1006,7 +1006,7 @@ def sample_cuboid_on_object(
                 if not undo_cuboid_bottom_padding:
                     padding = cuboid_bottom_padding * center_hit_normal
                     cuboid_centroid += padding
-                plane_normal = np.zeros(3)
+                plane_normal = th.zeros(3)
                 rotation = R.from_quat([0, 0, 0, 1])
 
             # We've found a nice attachment point. Continue onto next point to sample.
@@ -1051,7 +1051,7 @@ def compute_rotation_from_grid_sample(
 
     grid_in_planar_coordinates = two_d_grid.reshape(-1, 2)
     grid_in_planar_coordinates = grid_in_planar_coordinates[hits]
-    grid_in_object_coordinates = np.zeros((len(grid_in_planar_coordinates), 3))
+    grid_in_object_coordinates = th.zeros((len(grid_in_planar_coordinates), 3))
     grid_in_object_coordinates[:, :2] = grid_in_planar_coordinates
     grid_in_object_coordinates[:, 2] = -this_cuboid_dimensions[2] / 2.0
 

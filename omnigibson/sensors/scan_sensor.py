@@ -192,7 +192,7 @@ class ScanSensor(BaseSensor):
         scan_local[:, 1] *= -1
 
         # Initialize occupancy grid -- default is unknown values
-        occupancy_grid = np.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).to(th.uint8)
+        occupancy_grid = th.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).to(th.uint8)
         occupancy_grid.fill(int(OccupancyGridState.UNKNOWN * 2.0))
 
         # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since

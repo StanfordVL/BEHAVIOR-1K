@@ -836,10 +836,10 @@ class JointPrim(BasePrim):
         """
         Zero out all velocities for this prim
         """
-        self.set_vel(np.zeros(self.n_dof))
+        self.set_vel(th.zeros(self.n_dof))
         # If not driven, set torque equal to zero as well
         if not self.driven:
-            self.set_effort(np.zeros(self.n_dof))
+            self.set_effort(th.zeros(self.n_dof))
 
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (th.Tensor([]), th.Tensor([]), th.Tensor([]))

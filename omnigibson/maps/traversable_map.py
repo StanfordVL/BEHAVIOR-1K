@@ -115,7 +115,7 @@ class TraversableMap(BaseMap):
         else:
             radius = self.default_erosion_radius
         radius_pixel = int(np.ceil(radius / self.map_resolution))
-        trav_map = cv2.erode(trav_map, np.ones((radius_pixel, radius_pixel)))
+        trav_map = cv2.erode(trav_map, th.ones((radius_pixel, radius_pixel)))
         return trav_map
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):

@@ -518,7 +518,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Returns:
             th.Tensor: array of action data filled with update value
         """
-        return np.zeros(self.action_dim)
+        return th.zeros(self.action_dim)
 
     def get_generalized_gravity_forces(self, clone=True):
         # Override method based on whether we're using a dummy or not

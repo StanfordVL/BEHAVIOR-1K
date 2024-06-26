@@ -59,7 +59,7 @@ class MovingAverageFilter(Filter):
         self.obs_dim = obs_dim
         assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
         self.filter_width = filter_width
-        self.past_samples = np.zeros((filter_width, obs_dim))
+        self.past_samples = th.zeros((filter_width, obs_dim))
         self.current_idx = 0
         self.fully_filled = False  # Whether the entire filter buffer is filled or not
 
@@ -159,7 +159,7 @@ class ExponentialAverageFilter(Filter):
             alpha (float): The relative weighting of new samples relative to older samples
         """
         self.obs_dim = obs_dim
-        self.avg = np.zeros(obs_dim)
+        self.avg = th.zeros(obs_dim)
         self.num_samples = 0
         self.alpha = alpha
 

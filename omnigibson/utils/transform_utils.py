@@ -455,7 +455,7 @@ def pose2mat(pose):
     Returns:
         th.Tensor: 4x4 homogeneous matrix
     """
-    homo_pose_mat = np.zeros((4, 4), dtype=th.float32)
+    homo_pose_mat = th.zeros((4, 4), dtype=th.float32)
     homo_pose_mat[:3, :3] = quat2mat(pose[1])
     homo_pose_mat[:3, 3] = th.Tensor(pose[0], dtype=th.float32)
     homo_pose_mat[3, 3] = 1.0
@@ -577,7 +577,7 @@ def pose_inv(pose_mat):
     # -t in the original frame, which is -R-1*t in the new frame, and then rotate back by
     # R-1 to align the axis again.
 
-    pose_inv = np.zeros((4, 4))
+    pose_inv = th.zeros((4, 4))
     pose_inv[:3, :3] = pose_mat[:3, :3].T
     pose_inv[:3, 3] = -pose_inv[:3, :3].dot(pose_mat[:3, 3])
     pose_inv[3, 3] = 1.0
@@ -858,7 +858,7 @@ def make_pose(translation, rotation):
     Returns:
         pose (th.Tensor): a 4x4 homogeneous matrix
     """
-    pose = np.zeros((4, 4))
+    pose = th.zeros((4, 4))
     pose[:3, :3] = rotation
     pose[:3, 3] = translation
     pose[3, 3] = 1.0
@@ -939,7 +939,7 @@ def get_orientation_error(target_orn, current_orn):
     current_orn = th.Tensor([current_orn[3], current_orn[0], current_orn[1], current_orn[2]])
     target_orn = th.Tensor([target_orn[3], target_orn[0], target_orn[1], target_orn[2]])
 
-    pinv = np.zeros((3, 4))
+    pinv = th.zeros((3, 4))
     pinv[0, :] = [-current_orn[1], current_orn[0], -current_orn[3], current_orn[2]]
     pinv[1, :] = [-current_orn[2], current_orn[3], current_orn[0], -current_orn[1]]
     pinv[2, :] = [-current_orn[3], -current_orn[2], current_orn[1], current_orn[0]]
@@ -978,7 +978,7 @@ def get_pose_error(target_pose, current_pose):
     Returns:
         th.Tensor: 6-dim pose error.
     """
-    error = np.zeros(6)
+    error = th.zeros(6)
 
     # compute translational error
     target_pos = target_pose[:3, 3]
@@ -1062,7 +1062,7 @@ def frustum(left, right, bottom, top, znear, zfar):
     assert bottom != top
     assert znear != zfar
 
-    M = np.zeros((4, 4), dtype=th.float32)
+    M = th.zeros((4, 4), dtype=th.float32)
     M[0, 0] = +2.0 * znear / (right - left)
     M[2, 0] = (right + left) / (right - left)
     M[1, 1] = +2.0 * znear / (top - bottom)
@@ -1081,7 +1081,7 @@ def ortho(left, right, bottom, top, znear, zfar):
     assert bottom != top
     assert znear != zfar
 
-    M = np.zeros((4, 4), dtype=th.float32)
+    M = th.zeros((4, 4), dtype=th.float32)
     M[0, 0] = 2.0 / (right - left)
     M[1, 1] = 2.0 / (top - bottom)
     M[2, 2] = -2.0 / (zfar - znear)

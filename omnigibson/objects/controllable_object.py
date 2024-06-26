@@ -374,8 +374,8 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self.n_dof)
-        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
+        u_vec = th.zeros(self.n_dof)
+        # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
         u_type_vec = th.Tensor([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx

@@ -355,8 +355,8 @@ class ClothPrim(GeomPrim):
                     body0=self.prim_path,
                     body1=hit.rigid_body,
                     position=pos,
-                    normal=np.zeros(3),  # dummy value
-                    impulse=np.zeros(3),  # dummy value
+                    normal=th.zeros(3),  # dummy value
+                    impulse=th.zeros(3),  # dummy value
                 )
             )
             return True
@@ -426,7 +426,7 @@ class ClothPrim(GeomPrim):
         Returns:
             th.Tensor: zero vector as a placeholder because a cloth prim doesn't have an angular velocity. Shape (3,).
         """
-        return np.zeros(3)
+        return th.zeros(3)
 
     def set_linear_velocity(self, velocity):
         """
@@ -615,4 +615,4 @@ class ClothPrim(GeomPrim):
         """
         if self.initialized:
             self.set_attribute(attr="points", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(self._default_positions))
-            self.particle_velocities = np.zeros((self._n_particles, 3))
+            self.particle_velocities = th.zeros((self._n_particles, 3))

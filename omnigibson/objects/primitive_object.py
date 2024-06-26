@@ -94,7 +94,7 @@ class PrimitiveObject(StatefulObject):
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
-        self._extents = np.ones(3)  # (x,y,z extents)
+        self._extents = th.ones(3)  # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
@@ -213,7 +213,7 @@ class PrimitiveObject(StatefulObject):
         # Update the extents variable
         original_extent = th.Tensor(self._extents)
         self._extents = (
-            np.ones(3) * radius * 2.0
+            th.ones(3) * radius * 2.0
             if self._primitive_type == "Sphere"
             else th.Tensor([radius * 2.0, radius * 2.0, self._extents[2]])
         )
@@ -311,7 +311,7 @@ class PrimitiveObject(StatefulObject):
 
         # Update the extents variable
         original_extent = th.Tensor(self._extents)
-        self._extents = np.ones(3) * size
+        self._extents = th.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = size / original_extent[0]

@@ -322,7 +322,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         goal_state_flattened = (
             th.cat([goal_state.flatten() for goal_state in self._goal.values()])
             if (state)["goal_is_valid"]
-            else np.zeros(self.goal_dim)
+            else th.zeros(self.goal_dim)
         )
 
         return th.cat(
@@ -377,7 +377,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Check if input is an Iterable, if so, we simply convert the input to th.Tensor and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
-        return th.Tensor(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
+        return th.Tensor(nums) if isinstance(nums, Iterable) else th.ones(dim) * nums
 
     @property
     def state_size(self):

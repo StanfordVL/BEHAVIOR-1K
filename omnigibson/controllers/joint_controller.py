@@ -133,7 +133,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
                 # Compute the final rotations in the quaternion space.
                 _, end_quat = T.pose_transform(
-                    np.zeros(3), T.euler2quat(delta_rots), np.zeros(3), T.euler2quat(start_rots)
+                    th.zeros(3), T.euler2quat(delta_rots), th.zeros(3), T.euler2quat(start_rots)
                 )
                 end_rots = T.quat2euler(end_quat)
 
@@ -207,7 +207,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         else:
             # For velocity / effort, directly set to 0
-            target = np.zeros(self.control_dim)
+            target = th.zeros(self.control_dim)
 
         return dict(target=target)
 

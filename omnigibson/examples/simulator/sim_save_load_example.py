@@ -79,7 +79,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Register callback so user knows to press space once they're done manipulating the scene
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
-        env.step(np.zeros(env.robots[0].action_dim))
+        env.step(th.zeros(env.robots[0].action_dim))
 
     # Shutdown omnigibson at the end
     og.shutdown()

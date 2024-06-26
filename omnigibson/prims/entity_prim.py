@@ -304,7 +304,7 @@ class EntityPrim(XFormPrim):
         Helper function to update internal joint limits for prismatic joints based on the object's scale
         """
         # If the scale is [1, 1, 1], we can skip this step
-        if th.allclose(self.scale, np.ones(3)):
+        if th.allclose(self.scale, th.ones(3)):
             return
 
         prismatic_joints = {
@@ -342,7 +342,7 @@ class EntityPrim(XFormPrim):
                         #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
 
                         # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
-                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame = th.zeros(3)
                         axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
 
                         # Compute the joint axis unit vector in the object frame
@@ -641,8 +641,8 @@ class EntityPrim(XFormPrim):
 
         # Otherwise, set all joints to have 0 position and 0 velocity if this object has joints
         elif self.n_joints > 0:
-            self.set_joint_positions(positions=np.zeros(self.n_dof), drive=False)
-            self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
+            self.set_joint_positions(positions=th.zeros(self.n_dof), drive=False)
+            self.set_joint_velocities(velocities=th.zeros(self.n_dof), drive=False)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
@@ -1430,7 +1430,7 @@ class EntityPrim(XFormPrim):
         """
         jac = self.get_jacobian(clone=clone)
         ori_t = T.quat2mat(self.get_orientation()).T.float()
-        tf = np.zeros((1, 6, 6), dtype=th.float32)
+        tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jac
@@ -1461,8 +1461,8 @@ class EntityPrim(XFormPrim):
         """
         Zero out all velocities for this prim
         """
-        self.set_linear_velocity(velocity=np.zeros(3))
-        self.set_angular_velocity(velocity=np.zeros(3))
+        self.set_linear_velocity(velocity=th.zeros(3))
+        self.set_angular_velocity(velocity=th.zeros(3))
         for joint in self._joints.values():
             joint.keep_still()
         # Make sure object is awake

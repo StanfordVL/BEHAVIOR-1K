@@ -195,12 +195,12 @@ def create_physx_particleset_pointinstancer(
     # Set particle instance default data
     prototype_indices = [0] * n_particles if prototype_indices is None else prototype_indices
     if orientations is None:
-        orientations = np.zeros((n_particles, 4))
+        orientations = th.zeros((n_particles, 4))
         orientations[:, -1] = 1.0
     orientations = th.Tensor(orientations)[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
-    velocities = np.zeros((n_particles, 3)) if velocities is None else velocities
-    angular_velocities = np.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
-    scales = np.ones((n_particles, 3)) if scales is None else scales
+    velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
+    angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
+    scales = th.ones((n_particles, 3)) if scales is None else scales
     assert (
         particle_mass is not None or particle_density is not None
     ), "Either particle mass or particle density must be specified when creating particle instancer!"

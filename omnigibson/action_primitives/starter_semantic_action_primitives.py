@@ -1058,7 +1058,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         use_delta = self.robot._controllers[controller_name].use_delta_commands
 
         # Store the previous eef pose for checking if we got stuck
-        prev_eef_pos = np.zeros(3)
+        prev_eef_pos = th.zeros(3)
 
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
@@ -1410,7 +1410,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.Tensor or None: Action array for one step for the robot to do nothing
         """
-        action = np.zeros(self.robot.action_dim)
+        action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]

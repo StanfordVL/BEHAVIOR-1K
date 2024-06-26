@@ -82,7 +82,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         start = time.time()
         if import_robot:
             # Apply random actions.
-            turtlebot.apply_action(np.zeros(2))
+            turtlebot.apply_action(th.zeros(2))
         og.sim.step(render=False)
         physics_end = time.time()
 

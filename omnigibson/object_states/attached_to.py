@@ -335,9 +335,9 @@ class AttachedTo(
             joint_type=joint_type,
             body0=f"{parent_link.prim_path}",
             body1=f"{child_link.prim_path}",
-            joint_frame_in_parent_frame_pos=np.zeros(3),
+            joint_frame_in_parent_frame_pos=th.zeros(3),
             joint_frame_in_parent_frame_quat=parent_local_quat,
-            joint_frame_in_child_frame_pos=np.zeros(3),
+            joint_frame_in_child_frame_pos=th.zeros(3),
             joint_frame_in_child_frame_quat=th.Tensor([0.0, 0.0, 0.0, 1.0]),
             **kwargs,
         )

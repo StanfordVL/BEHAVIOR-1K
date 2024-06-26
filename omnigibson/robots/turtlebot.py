@@ -31,7 +31,7 @@ class Turtlebot(TwoWheelRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def usd_path(self):

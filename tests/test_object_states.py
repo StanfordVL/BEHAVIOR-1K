@@ -25,7 +25,7 @@ def test_on_top(env):
 
         assert obj.states[OnTop].get_value(breakfast_table)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[OnTop].get_value(breakfast_table)
@@ -83,7 +83,7 @@ def test_under(env):
 
         assert obj.states[Under].get_value(breakfast_table)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Under].get_value(breakfast_table)
@@ -110,7 +110,7 @@ def test_touching(env):
         assert obj.states[Touching].get_value(breakfast_table)
         assert breakfast_table.states[Touching].get_value(obj)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Touching].get_value(breakfast_table)
@@ -137,7 +137,7 @@ def test_contact_bodies(env):
             assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
         assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
@@ -162,7 +162,7 @@ def test_next_to(env):
         assert obj.states[NextTo].get_value(bottom_cabinet)
         assert bottom_cabinet.states[NextTo].get_value(obj)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[NextTo].get_value(bottom_cabinet)
@@ -185,7 +185,7 @@ def test_overlaid(env):
 
     assert carpet.states[Overlaid].get_value(breakfast_table)
 
-    carpet.set_position(np.ones(3) * 20.0)
+    carpet.set_position(th.ones(3) * 20.0)
     og.sim.step()
 
     assert not carpet.states[Overlaid].get_value(breakfast_table)
@@ -843,7 +843,7 @@ def test_particle_applier(env):
     # Test adjacency
 
     water_system.remove_all_particles()
-    spray_bottle.set_position_orientation(position=np.ones(3) * 50.0, orientation=th.Tensor([0, 0, 0, 1.0]))
+    spray_bottle.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.Tensor([0, 0, 0, 1.0]))
 
     place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
     og.sim.step()
@@ -905,7 +905,7 @@ def test_particle_remover(env):
 
     # Test adjacency
 
-    vacuum.set_position(np.ones(3) * 50.0)
+    vacuum.set_position(th.ones(3) * 50.0)
     place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
     og.sim.step()
     # Place single particle of water on middle of table
@@ -1092,7 +1092,7 @@ def test_filled(env):
         if not issubclass(system_class, VisualParticleSystem)
     ]
     for system in systems:
-        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        stockpot.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
             og.sim.step()
@@ -1116,7 +1116,7 @@ def test_contains(env):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
-        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        stockpot.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
             og.sim.step()
@@ -1160,7 +1160,7 @@ def test_covered(env):
             sampleable = env.scene.is_visual_particle_system(system.name) or obj != bracelet
             if sampleable:
                 print(f"Testing Covered {obj.name} with {system.name}")
-                obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+                obj.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
                 place_obj_on_floor_plane(obj)
                 for _ in range(5):
                     og.sim.step()
@@ -1178,7 +1178,7 @@ def test_covered(env):
 
                 system.remove_all_particles()
 
-        obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
+        obj.set_position_orientation(position=th.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
 
 def test_clear_sim():
