@@ -67,7 +67,7 @@ class MaxTemperature(TensorizedValueState):
     @classmethod
     def _update_values(cls, values):
         # Value is max between stored values and current temperature values
-        return np.maximum(values, Temperature.VALUES[cls.TEMPERATURE_IDXS])
+        return th.maximum(values, Temperature.VALUES[cls.TEMPERATURE_IDXS])
 
     @classproperty
     def value_name(cls):

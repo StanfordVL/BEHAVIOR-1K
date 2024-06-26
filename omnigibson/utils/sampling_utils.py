@@ -167,7 +167,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
 
     # Compute the grid of rays
     steps = (offset / new_ray_per_horizontal_distance).int() * 2 + 1
-    steps = np.maximum(steps, 3)
+    steps = th.maximum(steps, 3)
     x_range = th.linspace(-offset[0], offset[0], steps[0])
     y_range = th.linspace(-offset[1], offset[1], steps[1])
     ray_grid = np.dstack(th.meshgrid(x_range, y_range, indexing="ij"))
