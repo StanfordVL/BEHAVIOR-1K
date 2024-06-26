@@ -123,7 +123,7 @@ gm.GPU_MAX_RIGID_PATCH_COUNT = 81920 * 4
 gm.ENABLE_OBJECT_STATES = True
 
 # Whether to enable transition rules or not
-gm.ENABLE_TRANSITION_RULES = False
+gm.ENABLE_TRANSITION_RULES = True
 
 # Default settings for the omni UI viewer
 gm.DEFAULT_VIEWER_WIDTH = 1280
