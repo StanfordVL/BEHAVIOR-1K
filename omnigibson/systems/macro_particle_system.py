@@ -715,7 +715,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_local_poses_batch[i] = self._particles_local_mat[name]
 
             # Compute once
-            poses = np.matmul(link_tfs_batch, particle_local_poses_batch)
+            poses = th.matmul(link_tfs_batch, particle_local_poses_batch)
 
         # Decompose back into positions and orientations
         return poses[:, :3, 3], T.mat2quat(poses[:, :3, :3])
@@ -805,7 +805,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                     link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
-            # particle_local_poses_batch = np.matmul(th.linalg.inv_ex(link_tfs_batch), particle_local_poses_batch)
+            # particle_local_poses_batch = th.matmul(th.linalg.inv_ex(link_tfs_batch), particle_local_poses_batch)
             particle_local_poses_batch = np.linalg.solve(link_tfs_batch, particle_local_poses_batch)
 
         for i, name in enumerate(particles):
