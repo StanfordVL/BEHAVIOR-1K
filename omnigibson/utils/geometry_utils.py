@@ -405,7 +405,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         # respect to the volume link's global AABB
 
         # Convert precision to minimum number of particles to sample
-        min_n_particles = int(np.ceil(1.0 / precision))
+        min_n_particles = int(th.ceil(1.0 / precision))
 
         # Make sure container meshes are visible so AABB computation is correct
         for mesh in container_meshes:

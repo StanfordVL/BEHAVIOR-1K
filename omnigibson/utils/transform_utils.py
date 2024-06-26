@@ -1161,9 +1161,9 @@ def integer_spiral_coordinates(n):
     # Sources:
     # https://www.reddit.com/r/askmath/comments/18vqorf/find_the_nth_coordinate_of_a_square_spiral/
     # https://oeis.org/A174344
-    m = np.floor(th.sqrt(n))
-    x = ((-1) ** m) * ((n - m * (m + 1)) * (np.floor(2 * th.sqrt(n)) % 2) - np.ceil(m / 2))
-    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (np.floor(2 * th.sqrt(n) + 1) % 2) + np.ceil(m / 2))
+    m = th.floor(th.sqrt(n))
+    x = ((-1) ** m) * ((n - m * (m + 1)) * (th.floor(2 * th.sqrt(n)) % 2) - th.ceil(m / 2))
+    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (th.floor(2 * th.sqrt(n) + 1) % 2) + th.ceil(m / 2))
     return int(x), int(y)
 
 
