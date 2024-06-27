@@ -775,7 +775,7 @@ def rotation_matrix(angle, direction, point=None):
         ),
         dtype=th.float32,
     )
-    M = np.identity(4)
+    M = th.eye(4)
     M[:3, :3] = R
     if point is not None:
         # rotation not around origin
