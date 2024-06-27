@@ -82,7 +82,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
 
     # For the grasp, we want the X+ direction to be the direction of the object's surface.
     # The other two directions can be randomized.
-    rand_vec = np.random.rand(3)
+    rand_vec = th.rand(3)
     rand_vec /= th.norm(rand_vec)
     grasp_x = towards_object_in_world_frame
     grasp_y = th.cross(rand_vec, grasp_x)
@@ -124,7 +124,7 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
         raise ValueError("Cannot open/close object without relevant joints.")
 
     # Make sure what we got is an appropriately open/close joint.
-    np.random.shuffle(relevant_joints)
+    relevant_joints = relevant_joints[th.randperm(relevant_joints.size(0))]
     selected_joint = None
     for joint in relevant_joints:
         current_position = joint.get_state()[0][0]
@@ -470,7 +470,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
         th.Tensor: A quaternion representing the orientation.
     """
     forward = vector / th.norm(vector)
-    rand_vec = np.random.rand(3)
+    rand_vec = th.rand(3)
     rand_vec /= th.norm(3)
     side = th.cross(rand_vec, forward)
     side /= th.norm(3)

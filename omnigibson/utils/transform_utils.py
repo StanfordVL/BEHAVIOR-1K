@@ -276,7 +276,7 @@ def random_quat(rand=None):
     >>> q = random_quat()
     >>> th.allclose(1.0, vector_norm(q))
     True
-    >>> q = random_quat(np.random.random(3))
+    >>> q = random_quat(th.rand(3))
     >>> q.shape
     (4,)
 
@@ -288,7 +288,7 @@ def random_quat(rand=None):
         th.Tensor: (x,y,z,w) random quaternion
     """
     if rand is None:
-        rand = np.random.rand(3)
+        rand = th.rand(3)
     else:
         assert len(rand) == 3
     r1 = th.sqrt(1.0 - rand[0])
@@ -308,12 +308,12 @@ def random_axis_angle(angle_limit=None, random_state=None):
     and then sampling an angle. If @angle_limit is provided, the size
     of the rotation angle is constrained.
 
-    If @random_state is provided (instance of np.random.RandomState), it
+    If @random_state is provided (instance of torch.Generator), it
     will be used to generate random numbers.
 
     Args:
         angle_limit (None or float): If set, determines magnitude limit of angles to generate
-        random_state (None or RandomState): RNG to use if specified
+        random_state (None or torch.Generator): RNG to use if specified
 
     Raises:
         AssertionError: [Invalid RNG]
@@ -322,18 +322,18 @@ def random_axis_angle(angle_limit=None, random_state=None):
         angle_limit = 2.0 * 3.1415
 
     if random_state is not None:
-        assert isinstance(random_state, np.random.RandomState)
-        npr = random_state
+        assert isinstance(random_state, th.Generator)
+        generator = random_state
     else:
-        npr = np.random
+        generator = None
 
     # sample random axis using a normalized sample from spherical Gaussian.
     # see (http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/)
     # for why it works.
-    random_axis = npr.randn(3)
+    random_axis = th.randn(3, generator=generator)
     random_axis /= th.norm(random_axis)
-    random_angle = npr.uniform(low=0.0, high=angle_limit)
-    return random_axis, random_angle
+    random_angle = th.rand(1, generator=generator) * angle_limit
+    return random_axis, random_angle.item()
 
 
 def vec(values):

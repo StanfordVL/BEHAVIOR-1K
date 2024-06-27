@@ -1210,13 +1210,12 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
     # Set seed if deterministic
     if seed is not None:
-        np.random.seed(seed)
+        th.manual_seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
     tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
     n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
-    faces_flat = tm.faces.flatten()
-    n_vertices = len(faces_flat)
+    faces_flat = th.tensor(tm.faces.flatten(), dtype=th.int32)
 
     # Sample vertices
     unique_vertices = th.unique(faces_flat)

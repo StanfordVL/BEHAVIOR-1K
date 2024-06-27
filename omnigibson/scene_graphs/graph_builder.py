@@ -278,7 +278,7 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     fig.canvas.draw()
 
     # Convert the canvas to image
-    graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=th.uint8, sep="")
+    graph_view = th.frombuffer(fig.canvas.tostring_rgb(), dtype=th.uint8)
     graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     assert graph_view.shape == robot_view.shape
     plt.close(fig)

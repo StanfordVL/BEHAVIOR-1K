@@ -173,8 +173,7 @@ def randomize_colors(N, bright=True):
     brightness = 1.0 if bright else 0.5
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
     colors = th.Tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
-    rstate = np.random.RandomState(seed=20)
-    np.random.shuffle(colors)
+    colors = colors[th.randperm(colors.size(0))]
     colors[0] = [0, 0, 0]  # First color is black
     return colors
 

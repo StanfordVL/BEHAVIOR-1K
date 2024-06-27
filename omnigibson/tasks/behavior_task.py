@@ -269,7 +269,8 @@ class BehaviorTask(BaseTask):
 
         # Demo attributes
         self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
-        np.random.shuffle(self.instruction_order)
+        self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
+
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
         self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)

@@ -120,7 +120,7 @@ def draw_debug_markers(hit_positions, radius=0.01):
         hit_positions ((n, 3)-array): Desired positions to place markers at
         radius (float): Radius of the generated virtual marker
     """
-    color = th.cat([np.random.rand(3), [1]])
+    color = th.cat([th.rand(3), [1]])
     for vec in hit_positions:
         for dim in range(3):
             start_point = vec + th.eye(3)[dim] * radius
@@ -152,7 +152,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     ray_direction = destination - source
 
     # Get an orthogonal vector using a random vector.
-    random_vector = np.random.rand(3)
+    random_vector = th.rand(3)
     orthogonal_vector_1 = th.cross(ray_direction, random_vector)
     orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 
@@ -210,7 +210,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     results = []
     for i in range(count):
         # Get the uniform sample first.
-        position = np.random.rand(3)
+        position = th.rand(3)
 
         # Sample the bimodal normal.
         bottom = (0 - bimodal_mean_fraction) / bimodal_stdev_fraction

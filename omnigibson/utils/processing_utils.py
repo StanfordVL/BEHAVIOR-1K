@@ -282,4 +282,4 @@ if __name__ == "__main__":
     f = MovingAverageFilter(3, 10)
     a = th.Tensor([1, 1, 1])
     for i in range(500):
-        print(f.estimate(a + np.random.normal(scale=0.1)))
+        print(f.estimate(a + th.randn_like(a) * 0.1))
