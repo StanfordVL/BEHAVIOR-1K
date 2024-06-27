@@ -311,12 +311,12 @@ class RigidPrim(XFormPrim):
         if self.kinematic_only:
             self.clear_kinematic_only_cache()
         if position is not None:
-            position = np.asarray(position)[None, :]
+            position = th.asarray(position)[None, :]
         if orientation is not None:
             assert th.isclose(
                 th.norm(orientation), 1, atol=1e-3
             ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
         PoseAPI.invalidate()
 
@@ -340,9 +340,9 @@ class RigidPrim(XFormPrim):
         if self.kinematic_only:
             self.clear_kinematic_only_cache()
         if position is not None:
-            position = np.asarray(position)[None, :]
+            position = th.asarray(position)[None, :]
         if orientation is not None:
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_local_poses(position, orientation)
         PoseAPI.invalidate()
 

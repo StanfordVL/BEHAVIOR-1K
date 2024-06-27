@@ -424,7 +424,7 @@ def euler2mat(euler):
         AssertionError: [Invalid input shape]
     """
 
-    euler = np.asarray(euler, dtype=th.float64)
+    euler = th.asarray(euler, dtype=th.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
     return R.from_euler("xyz", euler).as_matrix()

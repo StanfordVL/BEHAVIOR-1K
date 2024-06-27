@@ -976,9 +976,9 @@ class EntityPrim(XFormPrim):
         # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
-                position = np.asarray(position)[None, :]
+                position = th.asarray(position)[None, :]
             if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+                orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_world_poses(position, orientation)
             PoseAPI.invalidate()
 
@@ -1007,9 +1007,9 @@ class EntityPrim(XFormPrim):
         # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
-                position = np.asarray(position)[None, :]
+                position = th.asarray(position)[None, :]
             if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+                orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_local_poses(position, orientation)
             PoseAPI.invalidate()
 
