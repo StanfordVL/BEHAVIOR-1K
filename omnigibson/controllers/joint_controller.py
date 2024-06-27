@@ -186,7 +186,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = np.ix_(self.dof_idx, self.dof_idx)
+            dof_idxs_mat = th.meshgrid(self.dof_idx, self.dof_idx, indexing="ij")
             mm = control_dict["mass_matrix"][dof_idxs_mat]
             u = th.dot(mm, u)
 
