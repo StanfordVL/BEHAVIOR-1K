@@ -463,7 +463,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         else:
             des_body_pos, des_body_orn = self.get_position_orientation()
             des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
-        action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
+        action[self.controller_action_idx["base"]] = th.cat((des_body_pos, des_body_rpy))
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
@@ -498,7 +498,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             )
             des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
             controller_name = "camera" if part_name == "head" else "arm_" + part_name
-            action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
+            action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose
             if part_name in self.arm_names and teleop_action.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)

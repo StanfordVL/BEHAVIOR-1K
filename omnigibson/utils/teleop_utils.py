@@ -60,7 +60,7 @@ class TeleopSystem(TeleopPolicy):
         """
         robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
-        robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
+        robot_obs.base = th.cat((base_pos[:2], th.tensor([T.quat2euler(base_orn)[2]])))
         for i, arm in enumerate(self.robot_arms):
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[
                 self.robot.arm_names[self.robot_arms.index(arm)]
@@ -72,7 +72,7 @@ class TeleopSystem(TeleopPolicy):
             # if we are grasping, we manually set the gripper position to be at most 0.5
             if self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"].is_grasping():
                 gripper_pos = min(gripper_pos, 0.5)
-            robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, gripper_pos]
+            robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
         return robot_obs
 
     def get_action(self, robot_obs: TeleopObservation) -> th.Tensor:
@@ -303,14 +303,16 @@ class OVXRSystem(TeleopSystem):
                 self.teleop_action.base[1] = -left_axis["touchpad_x"] * self.movement_speed
                 self.teleop_action.base[2] = left_axis["touchpad_y"] * self.movement_speed
         # update head related info
-        self.teleop_action.head = np.r_[
-            self.raw_data["transforms"]["head"][0], T.quat2euler(self.raw_data["transforms"]["head"][1])
-        ]
+        self.teleop_action.head = th.cat(
+            (self.raw_data["transforms"]["head"][0], th.tensor(T.quat2euler(self.raw_data["transforms"]["head"][1])))
+        )
         self.teleop_action.is_valid["head"] = self._is_valid_transform(self.raw_data["transforms"]["head"])
         # Optionally move anchor
         if self.enable_touchpad_movement:
             # we use x, y from right controller for 2d movement and y from left controller for z movement
-            self._move_anchor(pos_offset=np.r_[[self.teleop_action.torso], self.teleop_action.base[[0, 2]]])
+            self._move_anchor(
+                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
+            )
         if self.align_anchor_to_robot_base:
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
@@ -439,16 +441,22 @@ class OVXRSystem(TeleopSystem):
                     pos, orn = self.xr2og(hand_joint_matrices[16 * i : 16 * (i + 1)].reshape(4, 4))
                     self.raw_data["hand_data"][hand]["pos"].append(pos)
                     self.raw_data["hand_data"][hand]["orn"].append(orn)
-                self.teleop_action[hand_name] = np.r_[
-                    self.raw_data["hand_data"][hand]["pos"][0],
-                    T.quat2euler(
-                        T.quat_multiply(
-                            self.raw_data["hand_data"][hand]["orn"][0],
-                            self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(hand)]],
+                    self.teleop_action[hand_name] = th.cat(
+                        (
+                            self.raw_data["hand_data"][hand]["pos"][0],
+                            th.tensor(
+                                T.quat2euler(
+                                    T.quat_multiply(
+                                        self.raw_data["hand_data"][hand]["orn"][0],
+                                        self.robot.teleop_rotation_offset[
+                                            self.robot.arm_names[self.robot_arms.index(hand)]
+                                        ],
+                                    )
+                                )
+                            ),
+                            th.tensor([0]),
                         )
-                    ),
-                    [0],
-                ]
+                    )
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
                 joint_angles = th.zeros((5, 3))

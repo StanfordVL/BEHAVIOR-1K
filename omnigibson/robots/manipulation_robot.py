@@ -1545,7 +1545,7 @@ class ManipulationRobot(BaseRobot):
                 self._controllers[f"arm_{arm_name}"], OperationalSpaceController
             ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
             target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
-            action[self.arm_action_idx[arm_name]] = np.r_[target_pos, target_orn]
+            action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
             # gripper action
             assert isinstance(
                 self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
