@@ -13,8 +13,8 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_all_object_categories, get_og_avg_category_specs
 
-MAX_INSTANCE_COUNT = np.iinfo(th.uint32).max
-MAX_CLASS_COUNT = np.iinfo(th.uint32).max
+MAX_INSTANCE_COUNT = th.iinfo(th.uint32).max
+MAX_CLASS_COUNT = th.iinfo(th.uint32).max
 MAX_VIEWER_SIZE = 2048
 
 

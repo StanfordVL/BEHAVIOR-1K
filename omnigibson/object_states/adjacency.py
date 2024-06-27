@@ -80,7 +80,7 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
     """
     # Get vectors for each of the axes' directions.
     # The ordering is axes1+, axis1-, axis2+, axis2- etc.
-    directions = np.empty((len(axes) * 2, 3))
+    directions = th.empty((len(axes) * 2, 3))
     directions[0::2] = axes
     directions[1::2] = -axes
 

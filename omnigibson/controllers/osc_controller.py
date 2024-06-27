@@ -1,5 +1,4 @@
 import torch as th
-from numba import jit
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -438,8 +437,6 @@ class OperationalSpaceController(ManipulationController):
         return self._command_dim
 
 
-# Use numba since faster
-@jit(nopython=True)
 def _compute_osc_torques(
     q,
     qd,
@@ -461,7 +458,7 @@ def _compute_osc_torques(
     base_ang_vel,
 ):
     # Compute the inverse
-    mm_inv = th.linalg.inv_ex(mm)
+    mm_inv = th.linalg.inv(mm)
 
     # Calculate error
     pos_err = goal_pos - ee_pos
@@ -476,20 +473,20 @@ def _compute_osc_torques(
     vel_err = th.cat((lin_vel_err, base_ang_vel)) - ee_vel
 
     # Determine desired wrench
-    err = np.expand_dims(kp * err + kd * vel_err, dim=-1)
+    err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)
     m_eef_inv = j_eef @ mm_inv @ j_eef.T
-    m_eef = th.linalg.inv_ex(m_eef_inv)
+    m_eef = th.linalg.inv(m_eef_inv)
 
     if decouple_pos_ori:
         # # More efficient, but numba doesn't support 3D tensor operations yet
         # j_eef_batch = j_eef.reshape(2, 3, -1)
-        # m_eef_pose_inv = th.matmul(th.matmul(j_eef_batch, np.expand_dims(mm_inv, dim=0)), th.transpose(j_eef_batch, (0, 2, 1)))
+        # m_eef_pose_inv = th.matmul(th.matmul(j_eef_batch, th.unsqueeze(mm_inv, dim=0)), th.transpose(j_eef_batch, 0, 2, 1))
         # m_eef_pose = th.linalg.inv_ex(m_eef_pose_inv)  # Shape (2, 3, 3)
         # wrench = th.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
         m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
         m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
-        m_eef_pos = th.linalg.inv_ex(m_eef_pos_inv)
-        m_eef_ori = th.linalg.inv_ex(m_eef_ori_inv)
+        m_eef_pos = th.linalg.inv(m_eef_pos_inv)
+        m_eef_ori = th.linalg.inv(m_eef_ori_inv)
         wrench_pos = m_eef_pos @ err[:3, :]
         wrench_ori = m_eef_ori @ err[3:, :]
         wrench = th.cat((wrench_pos, wrench_ori))
@@ -505,7 +502,7 @@ def _compute_osc_torques(
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
         u_null = kd_null * -qd + kp_null * ((rest_qpos - q + 3.1415) % (2 * 3.1415) - 3.1415)
-        u_null = mm @ np.expand_dims(u_null, dim=-1).float()
+        u_null = mm @ th.unsqueeze(u_null, dim=-1).float()
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u

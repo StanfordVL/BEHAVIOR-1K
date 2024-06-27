@@ -576,7 +576,7 @@ class VisualParticleSystem(BaseSystem):
         """
         # First set the bbox ranges -- depends on the object's bounding box
         obj = self._group_objects[group]
-        median_aabb_dim = np.median(obj.aabb_extent)
+        median_aabb_dim = th.median(obj.aabb_extent)
 
         # Compute lower and upper limits to bbox
         bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
@@ -626,7 +626,7 @@ class VisualParticleSystem(BaseSystem):
         # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
         # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
         obj = self._group_objects[group]
-        avg_scale = np.cbrt(th.prod(obj.scale))
+        avg_scale = th.prod(obj.scale).cbrt()
         return scales / avg_scale
 
     def generate_particles(

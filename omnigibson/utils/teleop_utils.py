@@ -373,9 +373,7 @@ class OVXRSystem(TeleopSystem):
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """
-        return th.any(np.not_equal(transform[0], th.zeros(3))) and th.any(
-            np.not_equal(transform[1], self.og2xr_orn_offset)
-        )
+        return th.any(transform[0] != th.zeros(3)) and th.any(transform[1] != self.og2xr_orn_offset)
 
     def _update_devices(self) -> None:
         """
@@ -438,7 +436,7 @@ class OVXRSystem(TeleopSystem):
                 hand_joint_matrices = data_dict[f"joint_matrices_{hand}"]
                 for i in range(26):
                     # extract the pose from the flattened transform matrix
-                    pos, orn = self.xr2og(np.reshape(hand_joint_matrices[16 * i : 16 * (i + 1)], (4, 4)))
+                    pos, orn = self.xr2og(hand_joint_matrices[16 * i : 16 * (i + 1)].reshape(4, 4))
                     self.raw_data["hand_data"][hand]["pos"].append(pos)
                     self.raw_data["hand_data"][hand]["orn"].append(orn)
                 self.teleop_action[hand_name] = np.r_[

@@ -186,11 +186,11 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     )[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     assert th.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
-    push_axis_idx = np.argmax(th.abs(push_axis))
+    push_axis_idx = th.argmax(th.abs(push_axis))
     canonical_push_axis = th.eye(3)[push_axis_idx]
 
     # TODO: Need to figure out how to get the correct push direction.
-    push_direction = np.sign(push_axis[push_axis_idx]) if should_open else -1 * np.sign(push_axis[push_axis_idx])
+    push_direction = th.sign(push_axis[push_axis_idx]) if should_open else -1 * th.sign(push_axis[push_axis_idx])
     canonical_push_direction = canonical_push_axis * push_direction
 
     # Pick the closer of the two faces along the push axis as our favorite.
@@ -356,9 +356,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     lateral_axis = th.cross(open_direction, joint_axis)
 
     # Match the axes to the canonical axes of the link bb.
-    lateral_axis_idx = np.argmax(th.abs(lateral_axis))
-    open_axis_idx = np.argmax(th.abs(open_direction))
-    joint_axis_idx = np.argmax(th.abs(joint_axis))
+    lateral_axis_idx = th.argmax(th.abs(lateral_axis))
+    open_axis_idx = th.argmax(th.abs(open_direction))
+    joint_axis_idx = th.argmax(th.abs(joint_axis))
     assert lateral_axis_idx != open_axis_idx
     assert lateral_axis_idx != joint_axis_idx
     assert open_axis_idx != joint_axis_idx
@@ -381,7 +381,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     # Find the correct side of the lateral axis & go some distance along that direction.
     canonical_joint_axis = th.eye(3)[joint_axis_idx]
-    lateral_away_from_origin = th.eye(3)[lateral_axis_idx] * np.sign(origin_towards_bbox[lateral_axis_idx])
+    lateral_away_from_origin = th.eye(3)[lateral_axis_idx] * th.sign(origin_towards_bbox[lateral_axis_idx])
     min_lateral_pos_wrt_surface_center = (
         lateral_away_from_origin * -th.Tensor(origin_wrt_bbox[0])
         - canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2
@@ -527,7 +527,7 @@ def _get_closest_point_to_point_in_world_frame(
     )
 
     vector_distances_to_point = th.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], dim=1)
-    closer_option_idx = np.argmin(vector_distances_to_point)
+    closer_option_idx = th.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]
 

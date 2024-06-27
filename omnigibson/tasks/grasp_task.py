@@ -107,7 +107,7 @@ class GraspTask(BaseTask):
             if "combined" in robot.robot_arm_descriptor_yamls:
                 joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
                 initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
-                control_idx_in_joint_pos = th.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+                control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
             # For Fetch
             else:
                 initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])

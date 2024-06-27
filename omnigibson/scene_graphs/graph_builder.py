@@ -284,7 +284,7 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     plt.close(fig)
 
     # Combine the two images side-by-side
-    img = np.hstack((robot_view, graph_view))
+    img = th.cat((robot_view, graph_view), dim=1)
 
     # # Convert to BGR for cv2-based viewing.
     if show_window:

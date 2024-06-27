@@ -196,7 +196,7 @@ class XFormPrim(BasePrim):
         local_transform = th.linalg.inv_ex(parent_world_transform) @ my_world_transform
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
         assert th.allclose(
-            product, np.diag(np.diag(product)), atol=1e-3
+            product, th.diag(th.diag(product)), atol=1e-3
         ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 

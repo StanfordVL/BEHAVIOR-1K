@@ -53,7 +53,7 @@ def fit_plane(points, refusal_log):
 
     ctr = points.mean(dim=0)
     x = points - ctr
-    normal = np.linalg.svd(th.dot(x.T, x))[0][:, -1]
+    normal = th.linalg.svd(th.matmul(x.T, x)).U[:, -1]
     normal /= th.norm(normal)
     return ctr, normal
 
@@ -109,7 +109,7 @@ def get_projection_onto_plane(points, plane_centroid, plane_normal):
         (k,3)-array: Points' positions projected onto the plane
     """
     distances_to_plane = get_distance_to_plane(points, plane_centroid, plane_normal)
-    return points - np.outer(distances_to_plane, plane_normal)
+    return points - th.outer(distances_to_plane, plane_normal)
 
 
 def draw_debug_markers(hit_positions, radius=0.01):
@@ -161,7 +161,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
     orthogonal_vectors = th.Tensor([orthogonal_vector_1, orthogonal_vector_2])
-    assert th.all(np.isfinite(orthogonal_vectors))
+    assert th.all(th.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
     offset = th.Tensor([1, 1]) * offset
@@ -171,7 +171,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     steps = th.maximum(steps, 3)
     x_range = th.linspace(-offset[0], offset[0], steps[0])
     y_range = th.linspace(-offset[1], offset[1], steps[1])
-    ray_grid = np.dstack(th.meshgrid(x_range, y_range, indexing="ij"))
+    ray_grid = th.stack(th.meshgrid(x_range, y_range, indexing="ij"), dim=-1)
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
     # Apply the grid onto the orthogonal vectors to obtain the rays in the world frame.
@@ -494,7 +494,7 @@ def sample_raytest_start_end_full_grid_topdown(
     start_points = th.stack(
         [
             th.tile(x, len(y)),
-            np.repeat(y, len(x)),
+            th.repeat_interleave(y, len(x)),
             th.ones(n_rays) * half_extent_with_offset[2],
         ]
     ).T
@@ -507,8 +507,8 @@ def sample_raytest_start_end_full_grid_topdown(
     start_points = trimesh.transformations.transform_points(start_points, to_wf_transform)
     end_points = trimesh.transformations.transform_points(end_points, to_wf_transform)
 
-    start_points = np.expand_dims(start_points, dim=1)
-    end_points = np.expand_dims(end_points, dim=1)
+    start_points = th.unsqueeze(start_points, dim=1)
+    end_points = th.unsqueeze(end_points, dim=1)
 
     return start_points, end_points
 
@@ -933,7 +933,7 @@ def sample_cuboid_on_object(
                 # We get a vector from the centroid towards the center ray source, and flip the plane normal to match it.
                 # The cosine has positive sign if the two vectors are similar and a negative one if not.
                 plane_to_source = sources[center_idx] - plane_centroid
-                plane_normal *= np.sign(th.dot(plane_to_source, plane_normal))
+                plane_normal *= th.sign(th.dot(plane_to_source, plane_normal))
 
                 # Check that the plane normal is similar to the hit normal
                 if not check_normal_similarity(
@@ -1086,7 +1086,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     all_rays_hit_with_similar_normal = th.all(parallel_hit_normal_angles_to_hit_normal < tolerance)
     if not all_rays_hit_with_similar_normal:
         if m.DEBUG_SAMPLING:
-            refusal_log.append("angles %r" % (np.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
+            refusal_log.append("angles %r" % (th.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
 
         return False
 
@@ -1179,14 +1179,14 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
 
     # Choose the minimum of these multiples, e.g. how many times the ray direction should be multiplied
     # to reach the nearest boundary.
-    multiple_to_face = th.min(multiple_to_face_on_each_axis[np.isfinite(multiple_to_face_on_each_axis)])
+    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)])
 
     # Finally, use the multiple we found to calculate the point on the AABB boundary that we want to cast our
     # ray until.
     point_on_face = start_pos + ray_direction * multiple_to_face
 
     # Make sure that we did not end up with all NaNs or infinities due to division issues.
-    assert not th.any(np.isnan(point_on_face)) and not th.any(np.isinf(point_on_face))
+    assert not th.any(th.isnan(point_on_face)) and not th.any(th.isinf(point_on_face))
 
     return point_on_face
 

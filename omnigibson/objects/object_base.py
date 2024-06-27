@@ -404,8 +404,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, dim=0)
-        aabb_max_in_desired_frame = np.amax(points, dim=0)
+        aabb_min_in_desired_frame = th.amin(points, dim=0)
+        aabb_max_in_desired_frame = th.amax(points, dim=0)
         bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
         bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
 

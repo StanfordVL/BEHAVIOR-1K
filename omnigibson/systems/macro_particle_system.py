@@ -605,7 +605,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=max_samples)
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
-        avg_scale = np.cbrt(th.prod(obj.scale))
+        avg_scale = th.prod(obj.scale).cbrt()
 
         bbox_extents_global = scales * self.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
@@ -806,7 +806,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 link_tfs_batch[i] = link_tf
 
             # particle_local_poses_batch = th.matmul(th.linalg.inv_ex(link_tfs_batch), particle_local_poses_batch)
-            particle_local_poses_batch = np.linalg.solve(link_tfs_batch, particle_local_poses_batch)
+            particle_local_poses_batch = th.linalg.solve(link_tfs_batch, particle_local_poses_batch)
 
         for i, name in enumerate(particles):
             self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i], ignore_scale=local)

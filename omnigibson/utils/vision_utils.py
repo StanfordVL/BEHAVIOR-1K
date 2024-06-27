@@ -98,14 +98,14 @@ class Remapper:
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
         assert th.all(
-            th.Tensor(list(new_mapping.keys())) != np.iinfo(th.uint32).max
+            th.Tensor(list(new_mapping.keys())) != th.iinfo(th.uint32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = th.max(image)
         key_array_max_key = len(self.key_array) - 1
         if image_max_key > key_array_max_key:
             prev_key_array = self.key_array.copy()
             # We build a new key array and use max uint32 as the default value.
-            self.key_array = th.full(image_max_key + 1, np.iinfo(th.uint32).max, dtype=th.uint32)
+            self.key_array = th.full(image_max_key + 1, th.iinfo(th.uint32).max, dtype=th.uint32)
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 
@@ -131,7 +131,7 @@ class Remapper:
         # Apply remapping
         remapped_img = self.key_array[image]
         # Make sure all values are correctly remapped and not equal to the default value
-        assert th.all(remapped_img != np.iinfo(th.uint32).max), "Not all keys in the image are in the key array!"
+        assert th.all(remapped_img != th.iinfo(th.uint32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
         for key in th.unique(remapped_img):
             remapped_labels[key] = new_mapping[key]
@@ -191,7 +191,7 @@ def segmentation_to_rgb(seg_im, N, colors=None):
             to different segmentation IDs. Otherwise, will be generated randomly
     """
     # ensure all values lie within [0, N]
-    seg_im = np.mod(seg_im, N)
+    seg_im = th.fmod(seg_im, N)
 
     if colors is None:
         use_colors = randomize_colors(N=N, bright=True)
@@ -223,7 +223,7 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
         proj_mat = camera_params["cameraProjection"].reshape(4, 4)
         view_mat = camera_params["cameraViewTransform"].reshape(4, 4)
         view_proj_mat = th.dot(view_mat, proj_mat)
-        world_points_homo = np.pad(world_points, ((0, 0), (0, 1)), constant_values=1.0)
+        world_points_homo = th.nn.functional.pad(world_points, (0, 1), value=1.0)
         tf_points = th.dot(world_points_homo, view_proj_mat)
         tf_points = tf_points / (tf_points[..., -1:])
         return 0.5 * (tf_points[..., :2] + 1)

@@ -149,7 +149,7 @@ class PhysxParticleInstancer(BasePrim):
         self.particle_velocities = th.vstack([self.particle_velocities, velocities])
         self.particle_orientations = th.vstack([self.particle_orientations, orientations])
         self.particle_scales = th.vstack([self.particle_scales, scales])
-        self.particle_prototype_ids = np.hstack([self.particle_prototype_ids, prototype_indices])
+        self.particle_prototype_ids = th.cat([self.particle_prototype_ids, prototype_indices])
 
     def remove_particles(self, idxs):
         """

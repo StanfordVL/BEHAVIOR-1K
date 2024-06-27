@@ -152,7 +152,7 @@ class GeomPrim(XFormPrim):
 
         # transform self.points into world frame
         points = self.points
-        points_homogeneous = np.hstack((points, th.ones((points.shape[0], 1))))
+        points_homogeneous = th.cat((points, th.ones((points.shape[0], 1))), dim=1)
         points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
 
         aabb_lo = th.min(points_transformed, dim=0)

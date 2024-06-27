@@ -89,7 +89,7 @@ def plan_base_motion(
         @staticmethod
         def is_valid_rotation(si, start_conf, final_orientation):
             diff = _wrap_angle(final_orientation - start_conf[2])
-            direction = np.sign(diff)
+            direction = th.sign(diff)
             diff = abs(diff)
             num_points = ceil(diff / m.ANGLE_DIFF) + 1
             nav_angle = th.linspace(0.0, diff, num_points) * direction
@@ -246,7 +246,7 @@ def plan_arm_motion(
         if "combined" in robot.robot_arm_descriptor_yamls:
             joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
-            control_idx_in_joint_pos = th.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+            control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
@@ -346,7 +346,7 @@ def plan_arm_motion_ik(
         if "combined" in robot.robot_arm_descriptor_yamls:
             joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
-            control_idx_in_joint_pos = th.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+            control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
             initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
@@ -613,7 +613,7 @@ def astar(search_map, start, goal, eight_connected=True):
     open_set = [(0, start)]
     came_from = {}
     visited = set()
-    g_score = {cell: float("inf") for cell in np.ndindex(search_map.shape)}
+    g_score = {cell: float("inf") for cell in th.ndindex(search_map.shape)}
     g_score[start] = 0
 
     while open_set:

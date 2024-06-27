@@ -349,7 +349,7 @@ class EntityPrim(XFormPrim):
                         axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
 
                         # Find the correct scale along the joint axis direction
-                        scale_along_axis = self.scale[np.argmax(th.abs(axis_in_obj_frame))]
+                        scale_along_axis = self.scale[th.argmax(th.abs(axis_in_obj_frame))]
 
             joint.lower_limit = joint.lower_limit * scale_along_axis
             joint.upper_limit = joint.upper_limit * scale_along_axis

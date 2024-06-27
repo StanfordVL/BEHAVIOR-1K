@@ -10,7 +10,7 @@ import torch as th
 from scipy.spatial.transform import Rotation as R
 
 PI = 3.1415
-EPS = np.finfo(float).eps * 4.0
+EPS = th.finfo(th.float32).eps * 4.0
 
 # axis sequences for Euler angles
 _NEXT_AXIS = [1, 2, 0, 1]
@@ -75,14 +75,14 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
         else:
             dtype = th.float64
     else:
-        dtype = np.dtype(dtype)
+        dtype = th.dtype(dtype)
 
     if data.ndim > 1:
         # flatten input
         data = data.reshape(-1, order)
 
     if out is None:
-        out = np.empty_like(data, dtype=dtype)
+        out = th.empty_like(data, dtype=dtype)
     else:
         assert out.shape == data.shape
         assert out.dtype == dtype
@@ -98,10 +98,10 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
 
     # scaling_factors -> 0 as len(data) gets large
     # this leads to divide-by-zeros below
-    scaling_factors = np.power(1.0 - alpha, th.arange(data.size + 1, dtype=dtype), dtype=dtype)
+    scaling_factors = th.pow(1.0 - alpha, th.arange(data.numel() + 1, dtype=dtype), dtype=dtype)
     # create cumulative sum array
-    np.multiply(data, (alpha * scaling_factors[-2]) / scaling_factors[:-1], dtype=dtype, out=out)
-    np.cumsum(out, dtype=dtype, out=out)
+    th.mul(data, (alpha * scaling_factors[-2]) / scaling_factors[:-1], dtype=dtype, out=out)
+    th.cumsum(out, dtype=dtype, out=out)
 
     # cumsums / scaling
     out /= scaling_factors[-2::-1]
@@ -765,7 +765,7 @@ def rotation_matrix(angle, direction, point=None):
     direction = unit_vector(direction[:3])
     # rotation matrix around unit vector
     R = th.Tensor(((cosa, 0.0, 0.0), (0.0, cosa, 0.0), (0.0, 0.0, cosa)), dtype=th.float32)
-    R += np.outer(direction, direction) * (1.0 - cosa)
+    R += th.outer(direction, direction) * (1.0 - cosa)
     direction *= sina
     R += th.Tensor(
         (
@@ -838,7 +838,7 @@ def clip_rotation(quat, limit):
 
     # Clip rotation if necessary and return clipped quat
     if abs(a) > limit:
-        a = limit * np.sign(a) / 2
+        a = limit * th.sign(a) / 2
         sa = math.sin(a)
         ca = math.cos(a)
         quat = th.Tensor([x * sa, y * sa, z * sa, ca])
@@ -914,10 +914,10 @@ def unit_vector(data, dim=None, out=None):
         if out is not data:
             out[:] = th.Tensor(data, copy=False)
         data = out
-    length = np.atleast_1d(th.sum(data * data, axis))
+    length = th.atleast_1d(th.sum(data * data, dim))
     th.sqrt(length, length)
-    if axis is not None:
-        length = np.expand_dims(length, axis)
+    if dim is not None:
+        length = th.unsqueeze(length, dim)
     data /= length
     if out is None:
         return data

@@ -41,7 +41,7 @@ def recursively_generate_flat_dict(dic, prefix=None):
 def recursively_generate_compatible_dict(dic):
     """
     Helper function to recursively iterate through dictionary and cast values to necessary types to be compatibel with
-    Gym spaces -- in particular, the Sequence and Tuple types for th.Tensor / np.void values in @dic
+    Gym spaces -- in particular, the Sequence and Tuple types for th.Tensor / th.void values in @dic
 
     Args:
         dic (dict or gym.spaces.Dict): (Potentially nested) dictionary to convert into a flattened dictionary
