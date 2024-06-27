@@ -5,7 +5,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, torch_delete
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create settings for this module
@@ -61,8 +61,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from all internal tracked arrays
-        cls.DELAY_COUNTER = np.delete(cls.DELAY_COUNTER, [deleted_idx])
-        cls.PREVIOUSLY_TOUCHING = np.delete(cls.PREVIOUSLY_TOUCHING, [deleted_idx])
+        cls.DELAY_COUNTER = torch_delete(cls.DELAY_COUNTER, [deleted_idx])
+        cls.PREVIOUSLY_TOUCHING = torch_delete(cls.PREVIOUSLY_TOUCHING, [deleted_idx])
         del cls.SLICER_LINK_PATHS[deleted_idx]
 
         # Call super

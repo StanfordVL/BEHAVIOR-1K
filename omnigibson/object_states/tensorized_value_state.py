@@ -2,7 +2,7 @@ import torch as th
 
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, torch_delete
 
 
 class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
@@ -91,7 +91,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # Re-standardize the indices
         for i, o in enumerate(cls.OBJ_IDXS.keys()):
             cls.OBJ_IDXS[o] = i
-        cls.VALUES = np.delete(cls.VALUES, [deleted_idx])
+        cls.VALUES = torch_delete(cls.VALUES, [deleted_idx])
 
     @classmethod
     def add_callback_on_remove(cls, name, callback):

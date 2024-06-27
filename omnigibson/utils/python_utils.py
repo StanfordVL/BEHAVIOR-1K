@@ -726,3 +726,32 @@ def clear():
     """
     NAMES.clear()
     CLASS_NAMES.clear()
+
+
+def torch_delete(tensor, indices, axis=None):
+    """
+    Delete elements from a tensor along a specified axis.
+
+    Parameters:
+    tensor (torch.Tensor): Input tensor.
+    indices (int or array-like): Indices of elements to remove.
+    axis (int, optional): The axis along which to delete the elements.
+                          If None, the tensor is flattened before deletion.
+
+    Returns:
+    torch.Tensor: Tensor with specified elements removed.
+    """
+    if axis is None:
+        # Flatten the tensor if no axis is specified
+        tensor = tensor.flatten()
+        axis = 0
+
+    # Convert indices to a tensor if they are not already
+    if not isinstance(indices, th.Tensor):
+        indices = th.tensor(indices, dtype=th.long)
+
+    # Create a mask for the indices to keep
+    keep_indices = th.ones(tensor.size(axis), dtype=th.bool)
+    keep_indices[indices] = False
+
+    return tensor[keep_indices] if axis == 0 else tensor.transpose(0, axis)[keep_indices].transpose(0, axis)

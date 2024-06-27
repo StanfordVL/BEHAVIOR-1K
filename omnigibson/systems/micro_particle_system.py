@@ -18,7 +18,7 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import (
@@ -161,11 +161,11 @@ class PhysxParticleInstancer(BasePrim):
         """
         if len(idxs) > 0:
             # Remove all requested indices and write to all the internal data arrays
-            self.particle_positions = np.delete(self.particle_positions, idxs, dim=0)
-            self.particle_velocities = np.delete(self.particle_velocities, idxs, dim=0)
-            self.particle_orientations = np.delete(self.particle_orientations, idxs, dim=0)
-            self.particle_scales = np.delete(self.particle_scales, idxs, dim=0)
-            self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, dim=0)
+            self.particle_positions = torch_delete(self.particle_positions, idxs, dim=0)
+            self.particle_velocities = torch_delete(self.particle_velocities, idxs, dim=0)
+            self.particle_orientations = torch_delete(self.particle_orientations, idxs, dim=0)
+            self.particle_scales = torch_delete(self.particle_scales, idxs, dim=0)
+            self.particle_prototype_ids = torch_delete(self.particle_prototype_ids, idxs, dim=0)
 
     def remove_all_particles(self):
         self.remove_particles(idxs=th.arange(self.n_particles))

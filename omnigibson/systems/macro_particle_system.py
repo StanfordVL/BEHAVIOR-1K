@@ -13,6 +13,7 @@ from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
@@ -511,7 +512,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # Also remove from cloth face ids
             face_ids = self._cloth_face_ids[group]
             idx_mapping = {face_id: i for i, face_id in enumerate(face_ids)}
-            self._cloth_face_ids[group] = np.delete(face_ids, idx_mapping[particle_info["face_id"]])
+            self._cloth_face_ids[group] = torch_delete(face_ids, idx_mapping[particle_info["face_id"]])
 
     def generate_group_particles(
         self,
@@ -1069,9 +1070,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_attached_references=particle_attached_references,
         )
         state["n_particles"] -= len(indices_to_remove)
-        state["positions"] = np.delete(state["positions"], indices_to_remove, dim=0)
-        state["orientations"] = np.delete(state["orientations"], indices_to_remove, dim=0)
-        state["scales"] = np.delete(state["scales"], indices_to_remove, dim=0)
+        state["positions"] = torch_delete(state["positions"], indices_to_remove, dim=0)
+        state["orientations"] = torch_delete(state["orientations"], indices_to_remove, dim=0)
+        state["scales"] = torch_delete(state["scales"], indices_to_remove, dim=0)
 
         # Run super
         super()._load_state(state=state)

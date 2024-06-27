@@ -22,7 +22,7 @@ from omnigibson.systems import PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
+from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory, torch_delete
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import RigidContactAPI
@@ -1468,7 +1468,7 @@ class RecipeRule(BaseTransitionRule):
         nonrecipe_objects_in_volume = (
             in_volume
             if len(recipe["input_objects"]) == 0
-            else np.delete(
+            else torch_delete(
                 in_volume,
                 th.cat([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
             )

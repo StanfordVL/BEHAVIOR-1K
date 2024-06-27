@@ -2,7 +2,7 @@ import torch as th
 
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, torch_delete
 
 
 class MaxTemperature(TensorizedValueState):
@@ -54,7 +54,7 @@ class MaxTemperature(TensorizedValueState):
         deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from temperature index
-        cls.TEMPERATURE_IDXS = np.delete(cls.TEMPERATURE_IDXS, [deleted_idx])
+        cls.TEMPERATURE_IDXS = torch_delete(cls.TEMPERATURE_IDXS, [deleted_idx])
 
         # Decrement all remaining temperature idxs -- they're strictly increasing so we can simply
         # subtract 1 from all downstream indices

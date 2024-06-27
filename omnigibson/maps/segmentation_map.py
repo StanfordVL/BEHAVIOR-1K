@@ -9,6 +9,7 @@ Image.MAX_IMAGE_PIXELS = None
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
+from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -71,7 +72,7 @@ class SegmentationMap(BaseMap):
 
         sem_id_to_ins_id = {}
         unique_ins_ids = th.unique(img_ins)
-        unique_ins_ids = np.delete(unique_ins_ids, 0)
+        unique_ins_ids = torch_delete(unique_ins_ids, 0)
         for ins_id in unique_ins_ids:
             # find one pixel for each ins id
             x, y = th.where(img_ins == ins_id)
