@@ -1027,7 +1027,7 @@ class ParticleApplier(ParticleModifier):
         system_name = list(self.conditions.keys())[0]
 
         # This will initialize the system if it's not initialized already.
-        system = self.obj.scene.system_registry("name", system_name)
+        system = self.obj.scene.get_system(system_name)
 
         if self.visualize:
             assert self._projection_mesh_params["type"] in {
