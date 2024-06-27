@@ -70,7 +70,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         # We can do so with HalfspaceIntersection, which takes as input a list of equations that define the half spaces,
         # and an interior point. We assume the center of the bounding box is an interior point.
         interior_pt = vertices.mean(dim=0)[:2]
-        half_spaces = np.vstack((cloth_hull.equations, rigid_hull.equations))
+        half_spaces = th.vstack((cloth_hull.equations, rigid_hull.equations))
         try:
             half_space_intersection = HalfspaceIntersection(half_spaces, interior_pt)
         except QhullError:
