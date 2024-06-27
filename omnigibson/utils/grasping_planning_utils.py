@@ -1,3 +1,4 @@
+import random
 from math import ceil
 
 import torch as th
@@ -60,8 +61,8 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     )
 
     # Pick an axis and a direction.
-    approach_axis = np.random.choice([0, 1, 2])
-    approach_direction = np.random.choice([-1, 1]) if approach_axis != 2 else 1
+    approach_axis = random.choice([0, 1, 2])
+    approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * th.eye(3)[approach_axis]
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
     dim_lo, dim_hi = th.Tensor([-1, -1, 0]), th.Tensor([1, 1, 1])

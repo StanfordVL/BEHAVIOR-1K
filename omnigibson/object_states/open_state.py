@@ -1,3 +1,5 @@
+import random
+
 import torch as th
 
 from omnigibson.macros import create_module_macros
@@ -222,12 +224,12 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         sides = [1, -1] if both_sides else [1]
 
         for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
-            side = np.random.choice(sides)
+            side = random.choice(sides)
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
                 num_to_open = th.randint(1, len(relevant_joints) + 1)
-                random_indices = np.random.choice(range(len(relevant_joints)), size=num_to_open, replace=False)
+                random_indices = th.randperm(len(relevant_joints))[:num_to_open]
                 relevant_joints = [relevant_joints[i] for i in random_indices]
                 joint_directions = [joint_directions[i] for i in random_indices]
 

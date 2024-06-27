@@ -1175,7 +1175,7 @@ class ParticleApplier(ParticleModifier):
         self._in_mesh_local_particle_positions = (
             points_in_local_frame
             if n_max_particles > len(points)
-            else points_in_local_frame[np.random.choice(len(points_in_local_frame), n_max_particles, replace=False)]
+            else points_in_local_frame[th.randperm(len(points_in_local_frame))[:n_max_particles]]
         )
         # Also programmatically compute the directions of each particle position -- this is the normalized
         # vector pointing from source to the particle

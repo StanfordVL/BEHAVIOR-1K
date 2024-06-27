@@ -5,6 +5,7 @@ Helper classes and functions for streamlining user interactions
 import contextlib
 import datetime
 import logging
+import random
 import sys
 from pathlib import Path
 
@@ -288,7 +289,7 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = np.random.choice(range(len(options)))
+        k = random.choice(range(len(options)))
 
     # Return requested option
     return list(options)[k]

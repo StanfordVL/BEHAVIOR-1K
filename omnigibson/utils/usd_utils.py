@@ -1222,17 +1222,11 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     unique_vertices = th.unique(faces_flat)
     assert len(unique_vertices) == n_unique_vertices
     keypoint_idx = (
-        np.random.choice(unique_vertices, size=n_keypoints, replace=False)
-        if n_unique_vertices > n_keypoints
-        else unique_vertices
+        th.randperm(len(unique_vertices))[:n_keypoints] if n_unique_vertices > n_keypoints else unique_vertices
     )
 
     # Sample faces
-    keyface_idx = (
-        np.random.choice(n_unique_faces, size=n_keyfaces, replace=False)
-        if n_unique_faces > n_keyfaces
-        else th.arange(n_unique_faces)
-    )
+    keyface_idx = th.randperm(n_unique_faces)[:n_keyfaces] if n_unique_faces > n_keyfaces else th.arange(n_unique_faces)
 
     return keypoint_idx, keyface_idx
 

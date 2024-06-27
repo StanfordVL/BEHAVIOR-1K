@@ -892,9 +892,7 @@ class PhysicalParticleSystem(BaseSystem):
 
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)
-            ]
+            particle_positions = particle_positions[th.randperm(len(particle_positions))[: int(max_samples)]]
 
         return self.generate_particles(
             scene=self._scene,
@@ -947,9 +945,7 @@ class PhysicalParticleSystem(BaseSystem):
         particle_positions = th.Tensor([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)
-            ]
+            particle_positions = particle_positions[th.randperm(len(particle_positions))[:max_samples]]
 
         n_particles = len(particle_positions)
         success = n_particles >= min_samples_for_success

@@ -1,4 +1,5 @@
 import itertools
+import random
 import time
 from collections import Counter, defaultdict
 
@@ -217,13 +218,13 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
         bimodal_sample = truncnorm.rvs(bottom, top, loc=bimodal_mean_fraction, scale=bimodal_stdev_fraction)
 
         # Pick which axis the bimodal normal sample should go to.
-        bimodal_axis = np.random.choice([0, 1, 2], p=axis_probabilities)
+        bimodal_axis = random.choice([0, 1, 2], p=axis_probabilities)
 
         # Choose which side of the axis to sample from. We only sample from the top for the Z axis.
         if bimodal_axis == 2:
             bimodal_axis_top_side = True
         else:
-            bimodal_axis_top_side = np.random.choice([True, False])
+            bimodal_axis_top_side = random.choice([True, False])
 
         # Move sample based on chosen side.
         position[bimodal_axis] = bimodal_sample if bimodal_axis_top_side else 1 - bimodal_sample

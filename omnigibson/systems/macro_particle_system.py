@@ -613,7 +613,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # Sample locations based on randomly sampled keyfaces
             cloth = obj.root_link
             n_faces = len(cloth.faces)
-            face_ids = np.random.choice(n_faces, min(max_samples, n_faces), replace=False)
+            face_ids = th.randperm(n_faces)[: min(max_samples, n_faces)]
             # Positions are the midpoints of each requested face
             normals = cloth.compute_face_normals(face_ids=face_ids)
             positions = (

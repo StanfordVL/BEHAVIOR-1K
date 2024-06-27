@@ -31,7 +31,7 @@ _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW
 def _get_position(obj_idx, is_random=False):
     if is_random:
         pos_arange = th.arange(_MIN_VAL, _MAX_VAL, step=0.1, dtype=th.float32)
-        x, y, z = np.random.choice(pos_arange, size=3)
+        x, y, z = pos_arange[th.randint(len(pos_arange), (3,))]
         return x, y, z
     x = _MIN_VAL + _STEP_SIZE * (obj_idx % _N_PER_ROW)
     y = _MIN_VAL + _STEP_SIZE * (obj_idx // _N_PER_ROW)

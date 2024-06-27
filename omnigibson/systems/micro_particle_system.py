@@ -925,7 +925,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 else th.Tensor(prototype_indices, dtype=int)
             )
         else:
-            prototype_indices = np.random.choice(th.arange(len(self.particle_prototypes)), size=(n_particles,))
+            prototype_indices = th.randint(len(self.particle_prototypes), (n_particles,))
 
         if inst is None:
             inst = self.generate_particle_instancer(

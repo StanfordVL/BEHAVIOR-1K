@@ -2,6 +2,7 @@ import itertools
 import json
 import operator
 import os
+import random
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from copy import copy
@@ -1847,7 +1848,7 @@ class RecipeRule(BaseTransitionRule):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
                     category=category,
-                    model=np.random.choice(models),
+                    model=random.choice(models),
                 )
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,

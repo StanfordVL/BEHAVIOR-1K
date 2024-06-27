@@ -1261,7 +1261,7 @@ class BDDLSampler:
                     return f"Missing valid object models for all categories: {categories}"
 
                 # Randomly select an object model
-                model = np.random.choice(list(model_choices))
+                model = random.choice(list(model_choices))
 
                 # Potentially add additional kwargs
                 obj_kwargs = dict()

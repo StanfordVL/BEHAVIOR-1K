@@ -1,5 +1,6 @@
 import math
 import os
+import random
 
 import torch as th
 
@@ -108,7 +109,7 @@ class DatasetObject(USDObject):
         if model is None:
             available_models = get_all_object_category_models(category=category)
             assert len(available_models) > 0, f"No available models found for category {category}!"
-            model = np.random.choice(available_models)
+            model = random.choice(available_models)
 
         # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
         # TODO: Remove this once the asset is fixed!
@@ -175,9 +176,9 @@ class DatasetObject(USDObject):
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = th.Tensor(probabilities) / th.sum(probabilities)
-            chosen_orientation = th.Tensor(
-                np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
-            )
+            chosen_orientation = th.Tensor(list(self.orientations.values()))[
+                th.multinomial(th.tensor(probabilities), 1)
+            ].item()["rotation"]
 
         # Randomize yaw from -pi to pi
         rot_lo, rot_hi = -1, 1
