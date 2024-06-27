@@ -98,7 +98,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             # use vacuum to remove projections particles
             tool_cfg["category"] = "vacuum"
-            tool_cfg["model"] = "wikhik"    
+            tool_cfg["model"] = "wikhik"
     else:
 
         # If the modifier type is particleApplier, the applier is always projection type
@@ -114,7 +114,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             # use water atomizer to apply water particles
             tool_cfg["category"] = "water_atomizer"
             tool_cfg["model"] = "lfarai"
-            
+
     # Create the scene config to load -- empty scene with a light and table
     cfg = {
         "scene": {
@@ -152,7 +152,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Take a few steps to let particles settle
         for _ in range(25):
             env.step(np.array([]))
-    
+
     # If the particle remover/applier is projection type, set the turn on shaker
     if method_type == "Projection":
         tool.states[ToggledOn].set_value(True)
@@ -180,7 +180,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         tool.set_position_orientation(
             position=np.array([0, 0.3, 1.4]),
             orientation=np.array([0.3827, 0, 0, 0.9239]),
-        )   
+        )
     else:
 
         tool.set_position_orientation(
