@@ -366,7 +366,7 @@ class RigidContactAPIImpl:
         assert (
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
-        interesting_row_idxes = np.nonzero(th.any(interesting_impulse_columns > 0, dim=1))[0]
+        interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1))[0]
         interesting_row_paths = [
             GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
         ]

@@ -71,7 +71,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _update_values(cls, values):
         # If we were slicing in the past step, deactivate now
-        previously_touching_idxs = np.nonzero(cls.PREVIOUSLY_TOUCHING)[0]
+        previously_touching_idxs = th.nonzero(cls.PREVIOUSLY_TOUCHING)[0]
         values[previously_touching_idxs] = False
         cls.DELAY_COUNTER[previously_touching_idxs] = 0  # Reset the counter when we stop touching a sliceable object
 
