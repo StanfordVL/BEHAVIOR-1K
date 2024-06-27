@@ -24,6 +24,7 @@ from omnigibson.systems.system_base import (
     VisualParticleSystem,
     create_system_from_metadata,
 )
+from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -83,6 +84,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
         self._use_skybox = use_skybox
+        self._transition_rule_api = None
 
         # Call super init
         super().__init__()
@@ -206,6 +208,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def use_floor_plane(self):
         return self._use_floor_plane
+
+    @property
+    def transition_rule_api(self):
+        return self._transition_rule_api
 
     def prebuild(self):
         """
@@ -390,6 +396,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
+        if gm.ENABLE_TRANSITION_RULES:
+            self._transition_rule_api = TransitionRuleAPI(scene=self)
+
         # Always stop the sim if we started it internally
         if not og.sim.is_stopped():
             og.sim.stop()
@@ -401,7 +410,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Clears any internal state before the scene is destroyed
         """
         # Clears systems so they can be re-initialized.
-        for system in self.get_active_systems():
+        for system in self.active_systems.values():
             system.clear()
 
         # Remove all of the scene's objects.
@@ -409,6 +418,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Remove the scene prim.
         self._scene_prim.remove()
+
+        if gm.ENABLE_TRANSITION_RULES:
+            # Clear the transition rule API
+            self._transition_rule_api.clear()
 
     def _initialize(self):
         """
@@ -649,25 +662,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         }
 
     def is_system_active(self, system_name):
-        system = self.system_registry("name", system_name)
-        if system is None:
-            return False
-        return system.initialized
+        return self.get_system(system_name, force_active=False).initialized
 
     def is_visual_particle_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, VisualParticleSystem)
+        return isinstance(self.get_system(system_name, force_active=False), VisualParticleSystem)
 
     def is_physical_particle_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, PhysicalParticleSystem)
+        return isinstance(self.get_system(system_name, force_active=False), PhysicalParticleSystem)
 
     def is_fluid_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, FluidSystem)
+        return isinstance(self.get_system(system_name, force_active=False), FluidSystem)
 
     def get_system(self, system_name, force_active=True):
         # Make sure scene exists
@@ -679,8 +683,25 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             system.initialize(scene=self)
         return system
 
-    def get_active_systems(self):
-        return [system for system in self.systems if system.initialized]
+    @property
+    def active_visual_particle_systems(self):
+        return {
+            system.name: system
+            for system in self.systems
+            if system.initialized and self.is_visual_particle_system(system.name)
+        }
+
+    @property
+    def active_physical_particle_systems(self):
+        return {
+            system.name: system
+            for system in self.systems
+            if system.initialized and self.is_physical_particle_system(system.name)
+        }
+
+    @property
+    def active_systems(self):
+        return dict(**self.active_visual_particle_systems, **self.active_physical_particle_systems)
 
     def get_random_floor(self):
         """

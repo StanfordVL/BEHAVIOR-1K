@@ -78,7 +78,7 @@ class ModifiedParticles(RelativeObjectState):
                     np.concatenate(
                         [
                             (
-                                self.obj.scene.system_registry("name", system_name).uuid,
+                                self.obj.scene.get_system(system_name, force_active=False).uuid,
                                 state[system_name],
                             )
                             for system_name in system_names
@@ -168,7 +168,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         colors = []
 
         for system_name in self._limits.keys():
-            system = self.obj.scene.system_registry("name", system_name)
+            system = self.obj.scene.get_system(system_name)
             if self.get_value(system):
                 colors.append(system.color)
 
@@ -236,7 +236,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                     np.concatenate(
                         [
                             (
-                                self.obj.scene.system_registry("name", system_name).uuid,
+                                self.obj.scene.get_system(system_name, force_active=False).uuid,
                                 state[system_name],
                             )
                             for system_name in system_names
