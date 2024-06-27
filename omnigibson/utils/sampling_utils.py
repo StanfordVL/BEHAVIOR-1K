@@ -1077,7 +1077,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     Returns:
         bool: Whether the normal similarity is acceptable or not
     """
-    parallel_hit_main_hit_dot_products = np.clip(
+    parallel_hit_main_hit_dot_products = th.clip(
         th.dot(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
         -1.0,
         1.0,
@@ -1136,7 +1136,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = th.arccos(np.clip(th.dot(hit_normal, th.Tensor([0, 0, 1])), -1.0, 1.0))
+    hit_angle_with_z = th.arccos(th.clip(th.dot(hit_normal, th.Tensor([0, 0, 1])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)

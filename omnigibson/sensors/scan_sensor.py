@@ -232,7 +232,7 @@ class ScanSensor(BaseSensor):
         if "scan" in self._modalities:
             raw_scan = self._rs.get_linear_depth_data(self.prim_path)
             # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
-            raw_scan = np.clip(raw_scan, self.min_range, self.max_range)
+            raw_scan = th.clip(raw_scan, self.min_range, self.max_range)
             obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)
 
             # Optionally add occupancy grid info

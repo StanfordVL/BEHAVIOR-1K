@@ -580,14 +580,14 @@ class VisualParticleSystem(BaseSystem):
 
         # Compute lower and upper limits to bbox
         bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_lower_limit = np.clip(
+        bbox_lower_limit = th.clip(
             bbox_lower_limit_from_aabb,
             m.BBOX_LOWER_LIMIT_MIN,
             m.BBOX_LOWER_LIMIT_MAX,
         )
 
         bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_upper_limit = np.clip(
+        bbox_upper_limit = th.clip(
             bbox_upper_limit_from_aabb,
             m.BBOX_UPPER_LIMIT_MIN,
             m.BBOX_UPPER_LIMIT_MAX,

@@ -258,7 +258,7 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
         # invert rotation
         d = -d
         q1 *= -1.0
-    angle = math.acos(np.clip(d, -1, 1))
+    angle = math.acos(th.clip(d, -1, 1))
     if abs(angle) < EPS:
         return q0
     isin = 1.0 / math.sin(angle)
