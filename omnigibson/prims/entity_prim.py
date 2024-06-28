@@ -1440,7 +1440,7 @@ class EntityPrim(XFormPrim):
         Enable physics for this articulation
         """
         if self.articulated:
-            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1451,7 +1451,7 @@ class EntityPrim(XFormPrim):
         Disable physics for this articulation
         """
         if self.articulated:
-            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
