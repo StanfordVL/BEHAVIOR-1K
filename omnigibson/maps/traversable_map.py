@@ -1,3 +1,4 @@
+import math
 import os
 
 import cv2
@@ -114,7 +115,7 @@ class TraversableMap(BaseMap):
             radius = th.norm(robot_chassis_extent) / 2.0
         else:
             radius = self.default_erosion_radius
-        radius_pixel = int(th.ceil(radius / self.map_resolution))
+        radius_pixel = int(math.ceil(radius / self.map_resolution))
         trav_map = cv2.erode(trav_map, th.ones((radius_pixel, radius_pixel)))
         return trav_map
 

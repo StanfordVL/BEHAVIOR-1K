@@ -1,4 +1,5 @@
 import torch as th
+import math
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
@@ -38,7 +39,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super().global_initialize()
 
         # Initialize other global variables
-        cls.STEPS_TO_WAIT = max(1, int(th.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
+        cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
         cls.DELAY_COUNTER = th.empty(0, dtype=int)
         cls.PREVIOUSLY_TOUCHING = th.empty(0, dtype=bool)
         cls.SLICER_LINK_PATHS = []
