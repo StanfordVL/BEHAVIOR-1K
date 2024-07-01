@@ -470,7 +470,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
         for system_name in self.conditions.keys():
-            system = self.obj.scene.get_system(system_name, force_active=False)
+            system = self.obj.scene.get_system(system_name, force_init=False)
             limit = (
                 self.visual_particle_modification_limit
                 if self.obj.scene.is_visual_particle_system(system_name=system.name)
@@ -602,7 +602,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        system = self.obj.scene.get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_init=False)
 
         def condition(obj):
             return not self.obj.states[Saturated].get_value(system=system)
@@ -911,7 +911,7 @@ class ParticleRemover(ParticleModifier):
             function: Generated condition function with signature fcn(obj) --> bool, returning True if there is at least
                 one particle in the given system @system_name
         """
-        system = self.obj.scene.get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_init=False)
         return lambda obj: system.initialized and system.n_particles > 0
 
     @property

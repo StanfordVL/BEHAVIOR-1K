@@ -17,6 +17,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.system_base import (
     BaseSystem,
@@ -267,9 +268,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for system_name in system_names:
                 self.system_registry.add(create_system_from_metadata(system_name=system_name))
 
-        from omnigibson import systems
-
-        cloth_system = systems.Cloth(name="cloth")
+        cloth_system = Cloth(name="cloth")
         self.system_registry.add(cloth_system)
 
     def _load_scene_prim_with_objects(self, last_scene_edge, initial_scene_prim_z_offset, scene_margin):
@@ -662,46 +661,30 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         }
 
     def is_system_active(self, system_name):
-        return self.get_system(system_name, force_active=False).initialized
+        return self.get_system(system_name, force_init=False).initialized
 
     def is_visual_particle_system(self, system_name):
-        return isinstance(self.get_system(system_name, force_active=False), VisualParticleSystem)
+        return isinstance(self.get_system(system_name, force_init=False), VisualParticleSystem)
 
     def is_physical_particle_system(self, system_name):
-        return isinstance(self.get_system(system_name, force_active=False), PhysicalParticleSystem)
+        return isinstance(self.get_system(system_name, force_init=False), PhysicalParticleSystem)
 
     def is_fluid_system(self, system_name):
-        return isinstance(self.get_system(system_name, force_active=False), FluidSystem)
+        return isinstance(self.get_system(system_name, force_init=False), FluidSystem)
 
-    def get_system(self, system_name, force_active=True):
+    def get_system(self, system_name, force_init=True):
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
         # If system_name is not in REGISTERED_SYSTEMS, create from metadata
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
-        if not system.initialized and force_active:
+        if not system.initialized and force_init:
             system.initialize(scene=self)
         return system
 
     @property
-    def active_visual_particle_systems(self):
-        return {
-            system.name: system
-            for system in self.systems
-            if system.initialized and self.is_visual_particle_system(system.name)
-        }
-
-    @property
-    def active_physical_particle_systems(self):
-        return {
-            system.name: system
-            for system in self.systems
-            if system.initialized and self.is_physical_particle_system(system.name)
-        }
-
-    @property
     def active_systems(self):
-        return dict(**self.active_visual_particle_systems, **self.active_physical_particle_systems)
+        return {system.name: system for system in self.systems if system.initialized and not isinstance(system, Cloth)}
 
     def get_random_floor(self):
         """

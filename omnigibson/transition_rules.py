@@ -1202,10 +1202,7 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant systems are contained
         """
-        for system in self.scene.system_registry.objects:
-            # Skip cloth system
-            if system.name == "cloth":
-                continue
+        for system in self.scene.active_systems.values():
             if system.name not in recipe["input_systems"] and container.states[Contains].get_value(system=system):
                 return False
         return True
@@ -1730,20 +1727,17 @@ class RecipeRule(BaseTransitionRule):
         if not self.is_multi_instance:
             # Remove either all systems or only the ones specified in the input systems of the recipe
             contained_particles_state = container.states[ContainedParticles]
-            for system in self.scene.active_physical_particle_systems.values():
-                if not self.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
+            for system_name, system in self.scene.active_systems.items():
+                if not self.ignore_nonrecipe_systems or system_name in recipe["input_systems"]:
                     if container.states[Contains].get_value(system):
-                        volume += (
-                            contained_particles_state.get_value(system).n_in_volume
-                            * np.pi
-                            * (system.particle_radius**3)
-                            * 4
-                            / 3
-                        )
-                        container.states[Contains].set_value(system, False)
-            for system in self.scene.active_visual_particle_systems.values():
-                if not self.ignore_nonrecipe_systems or system.name in recipe["input_systems"]:
-                    if container.states[Contains].get_value(system):
+                        if self.scene.is_physical_particle_system(system_name):
+                            volume += (
+                                contained_particles_state.get_value(system).n_in_volume
+                                * np.pi
+                                * (system.particle_radius**3)
+                                * 4
+                                / 3
+                            )
                         container.states[Contains].set_value(system, False)
         else:
             # Remove the particles that are involved in this execution
