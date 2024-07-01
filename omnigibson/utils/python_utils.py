@@ -174,7 +174,7 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
                     not_equal = not_equal.any()
                 if not_equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")
-                base_dict[k] = th.Tensor(v) if isinstance(v, list) else v
+                base_dict[k] = v
 
     # Return new dict
     return base_dict
