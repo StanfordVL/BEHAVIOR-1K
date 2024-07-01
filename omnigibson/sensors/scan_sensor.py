@@ -166,9 +166,9 @@ class ScanSensor(BaseSensor):
 
         # Grab vector of corresponding angles for each scan line
         angles = th.arange(
-            -th.deg2rad(self.horizontal_fov / 2),
-            th.deg2rad(self.horizontal_fov / 2),
-            th.deg2rad(self.horizontal_resolution),
+            -th.deg2rad(th.Tensor([self.horizontal_fov / 2])).item(),
+            th.deg2rad(th.Tensor([self.horizontal_fov / 2])).item(),
+            th.deg2rad(th.Tensor([self.horizontal_resolution])).item(),
         )
 
         # Convert into 3D unit vectors for each angle

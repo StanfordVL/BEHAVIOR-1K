@@ -25,7 +25,7 @@ m.NORMAL_Z_PERCENTAGE = 0.5
 m.DEBUG_CLOTH_PROJ_VIS = False
 
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
-m.NORMAL_Z_ANGLE_DIFF = th.deg2rad(45.0)
+m.NORMAL_Z_ANGLE_DIFF = th.deg2rad(th.Tensor([45.0])).item()
 
 """
 FoldedLevelData contains the following fields:

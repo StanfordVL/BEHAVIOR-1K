@@ -693,8 +693,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def arm_workspace_range(self):
         return {
-            "left": [th.deg2rad(15), th.deg2rad(75)],
-            "right": [th.deg2rad(-75), th.deg2rad(-15)],
+            "left": [th.deg2rad(th.Tensor([15])).item(), th.deg2rad(th.Tensor([75])).item()],
+            "right": [th.deg2rad(th.Tensor([-75])).item(), th.deg2rad(th.Tensor([-15])).item()],
         }
 
     def get_position_orientation(self):
