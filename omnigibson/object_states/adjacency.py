@@ -1,4 +1,5 @@
 from collections import namedtuple
+import math
 
 import torch as th
 
@@ -33,7 +34,7 @@ def get_equidistant_coordinate_planes(n_planes):
 
     The samples will cover all 360 degrees (although rotational symmetry
     is assumed, e.g. if you take into account the axis index and the
-    positive/negative directions, only 1/4 of the possible coordinate (1 quadrant, 3.1415 / 2.0)
+    positive/negative directions, only 1/4 of the possible coordinate (1 quadrant, math.pi / 2.0)
     planes will be sampled: the ones where the first axis' positive direction
     is in the first quadrant).
 
@@ -47,7 +48,7 @@ def get_equidistant_coordinate_planes(n_planes):
             corresponding to the axis.
     """
     # Compute the positive directions of the 1st axis of each plane.
-    first_axis_angles = th.linspace(0, 3.1415 / 2, n_planes)
+    first_axis_angles = th.linspace(0, math.pi / 2, n_planes)
     first_axes = th.stack(
         [th.cos(first_axis_angles), th.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
     )

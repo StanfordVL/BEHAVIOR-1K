@@ -1,4 +1,5 @@
 import torch as th
+import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -205,7 +206,7 @@ def assert_test_env():
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
     pos = th.rand(3) * (pos_hi - pos_low) + pos_low
-    ori_lo, ori_hi = -3.1415, 3.1415
+    ori_lo, ori_hi = -math.pi, math.pi
     orn = T.euler2quat(th.rand(3) * (ori_hi - ori_lo) + ori_lo)
     return pos, orn
 

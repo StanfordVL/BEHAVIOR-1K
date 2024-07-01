@@ -1,6 +1,7 @@
 import pytest
 import torch as th
 from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_plane, place_objA_on_objB_bbox
+import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -313,7 +314,7 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     # Open the microwave
-    microwave.joints["j_link_0"].set_pos(3.1415 / 2)
+    microwave.joints["j_link_0"].set_pos(math.pi / 2)
 
     # Set the objects to be inside the microwave
     bagel.set_position_orientation([0, 0, 0.11], [0, 0, 0, 1])
@@ -453,7 +454,7 @@ def test_heat_source_or_sink(env):
     assert microwave.states[HeatSourceOrSink].requires_closed
     assert microwave.states[HeatSourceOrSink].requires_toggled_on
 
-    microwave.joints["j_link_0"].set_pos(3.1415 / 2)
+    microwave.joints["j_link_0"].set_pos(math.pi / 2)
     microwave.states[ToggledOn].set_value(False)
 
     og.sim.step()
@@ -471,7 +472,7 @@ def test_heat_source_or_sink(env):
     assert fridge.states[HeatSourceOrSink].requires_closed
     assert not fridge.states[HeatSourceOrSink].requires_toggled_on
 
-    fridge.joints["j_link_0"].set_pos(3.1415 / 2)
+    fridge.joints["j_link_0"].set_pos(math.pi / 2)
 
     og.sim.step()
     assert not fridge.states[HeatSourceOrSink].get_value()
@@ -641,7 +642,7 @@ def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")
     robot = env.scene.object_registry("name", "robot0")
 
-    stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -3.1415 / 2.0]))
+    stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -math.pi / 2.0]))
     robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()

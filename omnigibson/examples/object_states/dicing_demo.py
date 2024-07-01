@@ -1,3 +1,4 @@
+import math
 import torch as th
 
 import omnigibson as og
@@ -90,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     knife.keep_still()
     knife.set_position_orientation(
         position=apple.get_position() + th.Tensor([-0.15, 0.0, 0.2]),
-        orientation=T.euler2quat([-3.1415 / 2, 0, 0]),
+        orientation=T.euler2quat([-math.pi / 2, 0, 0]),
     )
 
     input("The knife will fall on the apple and dice it. Press [ENTER] to continue.")

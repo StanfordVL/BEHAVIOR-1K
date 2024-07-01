@@ -642,7 +642,7 @@ class FlatcacheAPI:
                 for joint, joint_pos in zip(prim.joints.values(), joints_pos):
                     state_name = "linear" if joint.joint_type == JointType.JOINT_PRISMATIC else "angular"
                     joint_pos = (
-                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / 3.1415
+                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / math.pi
                     )
                     joint.set_attribute(f"state:{state_name}:physics:position", float(joint_pos))
 

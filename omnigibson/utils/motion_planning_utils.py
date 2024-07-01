@@ -1,5 +1,5 @@
 import heapq
-from math import ceil
+import math
 
 import torch as th
 
@@ -27,7 +27,7 @@ def _wrap_angle(theta):
     Returns:
         float: angle in radians in range [-pi, pi)
     """
-    return (theta + 3.1415) % (2 * 3.1415) - 3.1415
+    return (theta + math.pi) % (2 * math.pi) - math.pi
 
 
 def plan_base_motion(
@@ -72,7 +72,7 @@ def plan_base_motion(
 
             # Navigation
             dist = th.norm(goal[:2] - start[:2])
-            num_points = ceil(dist / m.DIST_DIFF) + 1
+            num_points = math.ceil(dist / m.DIST_DIFF) + 1
             nav_x = th.linspace(start[0], goal[0], num_points).tolist()
             nav_y = th.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
@@ -91,7 +91,7 @@ def plan_base_motion(
             diff = _wrap_angle(final_orientation - start_conf[2])
             direction = th.sign(diff)
             diff = abs(diff)
-            num_points = ceil(diff / m.ANGLE_DIFF) + 1
+            num_points = math.ceil(diff / m.ANGLE_DIFF) + 1
             nav_angle = th.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start_conf[2]
             for i in range(num_points):
@@ -391,8 +391,8 @@ def plan_arm_motion_ik(
 
     # # set lower and upper bounds for eef orientation (axis angle bounds)
     for i in range(3, 6):
-        bounds.setLow(i, -3.1415)
-        bounds.setHigh(i, 3.1415)
+        bounds.setLow(i, -math.pi)
+        bounds.setHigh(i, math.pi)
     space.setBounds(bounds)
 
     # create a simple setup object

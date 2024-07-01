@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import time
+import math
 
 import torch as th
 
@@ -143,7 +144,7 @@ def main():
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(
             position=apples[n].get_position() + th.Tensor([-0.15, 0.0, 0.1 * (n + 2)]),
-            orientation=T.euler2quat([-3.1415 / 2, 0, 0]),
+            orientation=T.euler2quat([-math.pi / 2, 0, 0]),
         )
         knife.keep_still()
     if args.fluids:

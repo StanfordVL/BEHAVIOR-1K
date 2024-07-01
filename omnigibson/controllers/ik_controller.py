@@ -1,4 +1,5 @@
 import torch as th
+import math
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -155,21 +156,21 @@ class InverseKinematicsController(JointController, ManipulationController):
             if command_input_limits is not None:
                 if type(command_input_limits) == str and command_input_limits == "default":
                     command_input_limits = [
-                        [-1.0, -1.0, -1.0, -3.1415, -3.1415, -3.1415],
-                        [1.0, 1.0, 1.0, 3.1415, 3.1415, 3.1415],
+                        [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
+                        [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
                     ]
                 else:
-                    command_input_limits[0][3:] = -3.1415
-                    command_input_limits[1][3:] = 3.1415
+                    command_input_limits[0][3:] = -math.pi
+                    command_input_limits[1][3:] = math.pi
             if command_output_limits is not None:
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
-                        [-1.0, -1.0, -1.0, -3.1415, -3.1415, -3.1415],
-                        [1.0, 1.0, 1.0, 3.1415, 3.1415, 3.1415],
+                        [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
+                        [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
                     ]
                 else:
-                    command_output_limits[0][3:] = -3.1415
-                    command_output_limits[1][3:] = 3.1415
+                    command_output_limits[0][3:] = -math.pi
+                    command_output_limits[1][3:] = math.pi
 
         # Run super init
         super().__init__(

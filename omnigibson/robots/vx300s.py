@@ -1,4 +1,5 @@
 import os
+import math
 
 import torch as th
 
@@ -221,7 +222,7 @@ class VX300S(ManipulationRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-3.1415, 0, 0])}
+        return {self.default_arm: euler2quat([-math.pi, 0, 0])}
 
     @property
     def assisted_grasp_start_points(self):

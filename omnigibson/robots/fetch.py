@@ -1,4 +1,5 @@
 import os
+import math
 
 import torch as th
 
@@ -500,4 +501,4 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([0, 3.1415 / 2, 3.1415])}
+        return {self.default_arm: euler2quat([0, math.pi / 2, math.pi])}

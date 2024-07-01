@@ -8,6 +8,7 @@ import logging
 import random
 import sys
 from pathlib import Path
+import math
 
 import imageio
 import torch as th
@@ -487,7 +488,7 @@ class CameraMover:
                 pan_angle = th.arctan2(-xy_direction[0], xy_direction[1])
                 tilt_angle = th.arcsin(z)
                 # Infer global quat orientation from these angles
-                quat = T.euler2quat([3.1415 / 2 + tilt_angle, 0.0, pan_angle])
+                quat = T.euler2quat([math.pi / 2 + tilt_angle, 0.0, pan_angle])
                 poses.append([positions[j], quat])
 
         # Record the generated trajectory

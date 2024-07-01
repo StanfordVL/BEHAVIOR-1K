@@ -10,7 +10,7 @@ import inspect
 import logging
 import random
 from functools import cached_property
-from math import ceil
+import math
 
 import cv2
 import gymnasium as gym
@@ -1037,7 +1037,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         interpolated_plan = []
         for i in range(len(plan) - 1):
             max_diff = max(plan[i + 1] - plan[i])
-            num_intervals = ceil(max_diff / max_inter_dist)
+            num_intervals = math.ceil(max_diff / max_inter_dist)
             interpolated_plan += th.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
@@ -1720,14 +1720,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 distance_lo, distance_hi = 0.0, 5.0
                 distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
-                yaw_lo, yaw_hi = -3.1415, 3.1415
+                yaw_lo, yaw_hi = -math.pi, math.pi
                 yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.Tensor(
                     [
                         pose_on_obj[0][0] + distance * th.cos(yaw),
                         pose_on_obj[0][1] + distance * th.sin(yaw),
-                        yaw + 3.1415 - avg_arm_workspace_range,
+                        yaw + math.pi - avg_arm_workspace_range,
                     ]
                 )
                 # Check room
@@ -1789,7 +1789,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     #     # TODO(MP): Bias the sampling near the agent.
     #     for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
     #         _, pos = self.env.scene.get_random_point_by_room_instance(room)
-    #         yaw_lo, yaw_hi = -3.1415, 3.1415
+    #         yaw_lo, yaw_hi = -math.pi, math.pi
     #         yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
     #         pose = (pos[0], pos[1], yaw)
     #         if self._test_pose(pose):

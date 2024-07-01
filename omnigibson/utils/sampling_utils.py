@@ -2,6 +2,7 @@ import itertools
 import random
 import time
 from collections import Counter, defaultdict
+import math
 
 import torch as th
 import trimesh
@@ -24,7 +25,7 @@ m.DEBUG_SAMPLING = False
 m.DEFAULT_AABB_OFFSET_FRACTION = 0.02
 m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE = 1.0  # Around 60 degrees
 m.DEFAULT_HIT_TO_PLANE_THRESHOLD = 0.05
-m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * 3.1415 / 4
+m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * math.pi / 4
 m.DEFAULT_MAX_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_CUBOID_BOTTOM_PADDING = 0.005
 # We will cast an additional parallel ray for each additional this much distance.

@@ -3,6 +3,7 @@ import os
 from abc import ABC
 from collections import OrderedDict
 from typing import Iterable, List, Tuple
+import math
 
 import torch as th
 from scipy.spatial.transform import Rotation as R
@@ -46,7 +47,7 @@ m.ARM_JOINT_STIFFNESS = 1e6
 m.ARM_JOINT_MAX_EFFORT = 300
 m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
-m.FINGER_JOINT_MAX_VELOCITY = 3.1415 * 4
+m.FINGER_JOINT_MAX_VELOCITY = math.pi * 4
 
 
 class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):

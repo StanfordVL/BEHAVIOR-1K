@@ -1,5 +1,5 @@
 import random
-from math import ceil
+import math
 
 import torch as th
 from scipy.spatial.transform import Rotation as R
@@ -38,7 +38,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
-    grasp_quat = T.euler2quat([0, 3.1415 / 2, 0])
+    grasp_quat = T.euler2quat([0, math.pi / 2, 0])
 
     grasp_pose = (grasp_center_pos, grasp_quat)
     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
@@ -424,7 +424,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     # Get the arc length and divide it up to 10cm segments
     arc_length = abs(required_yaw_change) * th.norm(grasp_pose_in_origin_frame[0])
-    turn_steps = int(ceil(arc_length / m.ROTATION_ARC_SEGMENT_LENGTHS))
+    turn_steps = int(math.ceil(arc_length / m.ROTATION_ARC_SEGMENT_LENGTHS))
     targets = []
 
     for i in range(turn_steps):

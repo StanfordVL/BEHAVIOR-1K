@@ -1,8 +1,8 @@
 import cv2
 import torch as th
-from IPython import embed
 from scipy.spatial import ConvexHull, distance_matrix
 from scipy.spatial.transform import Rotation as R
+import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -297,7 +297,7 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         # Sample a random position
         pos = th.rand(low.size()) * (high - low) + low
         # Sample a random orientation in the z-axis
-        z_lo, z_hi = 0, 3.1415 * 2
+        z_lo, z_hi = 0, math.pi * 2
         orn = T.euler2quat(th.Tensor([0.0, 0.0, (th.rand(1) * (z_hi - z_lo) + z_lo).item()]))
 
         obj.set_position_orientation(pos, orn)
