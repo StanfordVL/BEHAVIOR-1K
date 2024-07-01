@@ -3,6 +3,7 @@ A set of helper utility functions for dealing with 3D geometry
 """
 
 import math
+
 import torch as th
 
 import omnigibson.utils.transform_utils as T

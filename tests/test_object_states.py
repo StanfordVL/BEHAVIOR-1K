@@ -1,7 +1,8 @@
+import math
+
 import pytest
 import torch as th
 from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_plane, place_objA_on_objB_bbox
-import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T

@@ -1,5 +1,5 @@
-from functools import cached_property
 import math
+from functools import cached_property
 
 import torch as th
 from scipy.spatial import ConvexHull, QhullError

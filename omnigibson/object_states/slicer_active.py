@@ -1,5 +1,6 @@
-import torch as th
 import math
+
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros

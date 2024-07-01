@@ -8,9 +8,9 @@ runnable examples.
 
 import inspect
 import logging
+import math
 import random
 from functools import cached_property
-import math
 
 import cv2
 import gymnasium as gym

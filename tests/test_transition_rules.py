@@ -1,3 +1,5 @@
+import math
+
 import pytest
 import torch as th
 from scipy.spatial.transform import Rotation as R
@@ -9,7 +11,6 @@ from utils import (
     remove_all_systems,
     retrieve_obj_cfg,
 )
-import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T

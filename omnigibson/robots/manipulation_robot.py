@@ -1,6 +1,6 @@
+import math
 from abc import abstractmethod
 from collections import namedtuple
-import math
 
 import networkx as nx
 import torch as th

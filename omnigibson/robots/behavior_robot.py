@@ -1,9 +1,9 @@
 import itertools
+import math
 import os
 from abc import ABC
 from collections import OrderedDict
 from typing import Iterable, List, Tuple
-import math
 
 import torch as th
 from scipy.spatial.transform import Rotation as R

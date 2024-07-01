@@ -1,7 +1,7 @@
+import math
 from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
-import math
 
 import gymnasium as gym
 import torch as th

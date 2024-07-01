@@ -1,6 +1,6 @@
-import math
 import itertools
 import json
+import math
 import operator
 import os
 import random

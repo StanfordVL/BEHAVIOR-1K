@@ -1,8 +1,8 @@
 import itertools
+import math
 import random
 import time
 from collections import Counter, defaultdict
-import math
 
 import torch as th
 import trimesh

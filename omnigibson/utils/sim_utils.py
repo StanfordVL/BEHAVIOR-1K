@@ -1,6 +1,6 @@
+import math
 from collections import namedtuple
 from collections.abc import Iterable
-import math
 
 import torch as th
 

@@ -1,6 +1,6 @@
+import math
 from abc import abstractmethod
 from collections import defaultdict
-import math
 
 import torch as th
 

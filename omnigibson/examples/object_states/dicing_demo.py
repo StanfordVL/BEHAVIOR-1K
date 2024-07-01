@@ -1,4 +1,5 @@
 import math
+
 import torch as th
 
 import omnigibson as og

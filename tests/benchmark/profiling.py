@@ -1,8 +1,8 @@
 import argparse
 import json
+import math
 import os
 import time
-import math
 
 import torch as th
 

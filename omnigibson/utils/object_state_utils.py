@@ -1,8 +1,9 @@
+import math
+
 import cv2
 import torch as th
 from scipy.spatial import ConvexHull, distance_matrix
 from scipy.spatial.transform import Rotation as R
-import math
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T

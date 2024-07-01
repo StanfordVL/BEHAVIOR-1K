@@ -1,7 +1,7 @@
+import math
 from abc import ABCMeta
 from collections.abc import Iterable
 from functools import cached_property
-import math
 
 import torch as th
 import trimesh

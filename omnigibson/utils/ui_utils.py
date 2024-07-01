@@ -5,10 +5,10 @@ Helper classes and functions for streamlining user interactions
 import contextlib
 import datetime
 import logging
+import math
 import random
 import sys
 from pathlib import Path
-import math
 
 import imageio
 import torch as th
