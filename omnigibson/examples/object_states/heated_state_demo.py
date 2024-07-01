@@ -76,7 +76,7 @@ def main():
     # Heated.
     for obj in objs:
         obj.states[object_states.Temperature].set_value(50)
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
     report_states(objs)
 
     # Take a look at the steam effect.
@@ -84,7 +84,7 @@ def main():
     print("==== Objects are now heated... ====")
     print()
     for _ in range(2000):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
         # Also print temperatures
         temps = [f"{obj.states[object_states.Temperature].get_value():>7.2f}" for obj in objs]
         print(f"obj temps:", *temps, end="\r")

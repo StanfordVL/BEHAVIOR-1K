@@ -80,7 +80,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Let objects settle
     for _ in range(10):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Turn on the stove
     stove.states[object_states.ToggledOn].set_value(True)
@@ -96,7 +96,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Main recording loop
     while steps != max_steps:
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
         temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
         print(f"{'Apple temperature:':<20}", *temps, end="\r")
         steps += 1

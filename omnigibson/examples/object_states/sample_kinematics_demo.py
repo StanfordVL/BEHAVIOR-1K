@@ -111,7 +111,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = 100 if short_exec else -1
     step = 0
     while step != max_steps:
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
         step += 1
 
     # Always close environment at the end
@@ -127,10 +127,10 @@ def sample_microwave_plates_apples(env):
     # Place the cabinet at a pre-determined location on the floor
     og.log.info("Placing cabinet on the floor...")
     cabinet.set_orientation([0, 0, 0, 1.0])
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
     offset = cabinet.get_position()[2] - cabinet.aabb_center[2]
     cabinet.set_position(th.Tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
     og.log.info("Placing microwave OnTop of the cabinet...")
@@ -138,7 +138,7 @@ def sample_microwave_plates_apples(env):
     assert microwave.states[object_states.Open].set_value(True)
     og.log.info("Microwave placed.")
     for _ in range(50):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     og.log.info("Placing plates")
     n_apples_per_plate = int(len(apples) / len(plates))
@@ -153,7 +153,7 @@ def sample_microwave_plates_apples(env):
 
         og.log.info(f"Plate {i} placed.")
         for _ in range(50):
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
         og.log.info(f"Placing {n_apples_per_plate} apples OnTop of the plate...")
         for j in range(n_apples_per_plate):
@@ -162,7 +162,7 @@ def sample_microwave_plates_apples(env):
             assert apple.states[object_states.OnTop].set_value(plate, True)
             og.log.info(f"Apple {apple_idx} placed.")
             for _ in range(50):
-                env.step(th.Tensor([]))
+                env.step(th.empty(0))
 
 
 def sample_boxes_on_shelf(env):
@@ -171,14 +171,14 @@ def sample_boxes_on_shelf(env):
     # Place the shelf at a pre-determined location on the floor
     og.log.info("Placing shelf on the floor...")
     shelf.set_orientation([0, 0, 0, 1.0])
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
     offset = shelf.get_position()[2] - shelf.aabb_center[2]
     shelf.set_position(th.Tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
-    env.step(th.Tensor([]))  # One step is needed for the object to be fully initialized
+    env.step(th.empty(0))  # One step is needed for the object to be fully initialized
 
     og.log.info("Shelf placed.")
     for _ in range(50):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     og.log.info("Placing boxes...")
     for i, box in enumerate(boxes):
@@ -186,7 +186,7 @@ def sample_boxes_on_shelf(env):
         og.log.info(f"Box {i} placed.")
 
         for _ in range(50):
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
 
 if __name__ == "__main__":

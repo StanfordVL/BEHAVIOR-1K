@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a few steps to let objects settle
     for i in range(100):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Grab observations from viewer camera and write them to disk
     obs, _ = cam.get_obs()

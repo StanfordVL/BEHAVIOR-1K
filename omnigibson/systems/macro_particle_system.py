@@ -160,7 +160,7 @@ class MacroParticleSystem(BaseSystem):
         state["scales"] = (
             th.Tensor([particle.scale for particle in self.particles.values()])
             if self.particles is not None
-            else th.Tensor([])
+            else th.empty(0)
         )
         state["particle_counter"] = self._particle_counter
         return state
@@ -686,7 +686,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         n_particles = len(particles) if particles else 0
         if n_particles == 0:
-            return (th.Tensor([]).reshape(0, 3), th.Tensor([]).reshape(0, 4))
+            return (th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 4))
 
         if local:
             poses = th.zeros((n_particles, 4, 4))
@@ -1054,7 +1054,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         particle_idns = []
         particle_attached_references = []
 
-        indices_to_remove = th.Tensor([], dtype=int)
+        indices_to_remove = th.empty(0, dtype=int)
         for info in state["groups"].values():
             obj = self._scene.object_registry("uuid", info["particle_attached_obj_uuid"])
             # obj will be None if an object with an attachment group is removed between dump_state() and load_state()
@@ -1292,7 +1292,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = tfs[:, :3], tfs[:, 3:]
             pos = pos + T.quat2mat(ori) @ self._particle_offset
         else:
-            pos, ori = th.Tensor([]).reshape(0, 3), th.Tensor([]).reshape(0, 4)
+            pos, ori = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 4)
         return pos, ori
 
     def get_particles_local_pose(self):
@@ -1348,7 +1348,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             vels = self.particles_view.get_velocities()
             lin_vel, ang_vel = vels[:, :3], vels[:, 3:]
         else:
-            lin_vel, ang_vel = th.Tensor([]).reshape(0, 3), th.Tensor([]).reshape(0, 3)
+            lin_vel, ang_vel = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 3)
         return lin_vel, ang_vel
 
     def get_particle_velocities(self, idx):

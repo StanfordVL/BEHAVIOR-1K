@@ -72,7 +72,7 @@ def main():
     def report_states():
         # Make sure states are propagated before printing
         for i in range(5):
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
         print("=" * 20)
         print("temperature:", obj.states[object_states.Temperature].get_value())

@@ -75,13 +75,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a few steps to let the objects settle, and then turn on the sink
     for _ in range(10):
-        env.step(th.Tensor([]))  # Empty action since no robots are in the scene
+        env.step(th.empty(0))  # Empty action since no robots are in the scene
 
     sink = env.scene.object_registry("name", "sink")
     assert sink.states[object_states.ToggledOn].set_value(True)
 
     # Take a step, and save the state
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
     initial_state = og.sim.dump_state()
 
     # Main simulation loop.
@@ -95,7 +95,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             steps = 0
             while steps != max_steps:
                 steps += 1
-                env.step(th.Tensor([]))
+                env.step(th.empty(0))
             og.log.info("Max steps reached; resetting.")
 
             # Reset to the initial state

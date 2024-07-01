@@ -36,7 +36,7 @@ class Filter(Serializable):
 
     def serialize(self, state):
         # Default is no state, so do nothing
-        return th.Tensor([])
+        return th.empty(0)
 
     def deserialize(self, state):
         # Default is no state, so do nothing

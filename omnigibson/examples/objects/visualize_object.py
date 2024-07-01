@@ -107,7 +107,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.stop()
     obj.scale = (th.ones(3) / extents).min()
     og.sim.play()
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
 
     # Move the object so that its center is at [0, 0, 1]
     center_offset = obj.get_position() - obj.aabb_center + th.Tensor([0, 0, 1.0])
@@ -130,7 +130,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             obj.set_joint_positions(positions=j_frac * th.ones(obj.n_dof), normalized=True, drive=False)
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Shut down at the end
     og.shutdown()

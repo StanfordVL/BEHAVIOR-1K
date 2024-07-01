@@ -50,7 +50,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     def steps(n):
         for _ in range(n):
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
     # Take a few steps to let objects settle
     steps(25)

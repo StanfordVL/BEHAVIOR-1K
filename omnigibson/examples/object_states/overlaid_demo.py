@@ -67,7 +67,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     while steps != max_steps:
         print(f"Overlaid {carpet.states[Overlaid].get_value(breakfast_table)}    ", end="\r")
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Shut down env at the end
     env.close()

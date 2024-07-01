@@ -56,9 +56,9 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         # Value is false by default
         n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = (
             0,
-            th.Tensor([]),
-            th.Tensor([]),
-            th.Tensor([]),
+            th.empty(0),
+            th.empty(0),
+            th.empty(0),
         )
 
         # Only run additional computations if there are any particles

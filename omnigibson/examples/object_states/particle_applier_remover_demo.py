@@ -168,7 +168,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Play the simulator and take some environment steps to let the objects settle
     og.sim.play()
     for _ in range(25):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
@@ -176,7 +176,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Take a few steps to let particles settle
         for _ in range(25):
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
     # Enable camera teleoperation for convenience
     og.sim.enable_viewer_camera_teleoperation()
@@ -207,7 +207,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for t, delta in deltas:
         for i in range(t):
             modifier.set_position(modifier.get_position() + delta)
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
 
     # Always shut down environment at the end
     env.close()

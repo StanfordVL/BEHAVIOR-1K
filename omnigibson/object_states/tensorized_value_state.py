@@ -28,7 +28,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         super().global_initialize()
 
         # Initialize the global variables
-        cls.VALUES = th.Tensor([], dtype=cls.value_type).reshape(0, *cls.value_shape)
+        cls.VALUES = th.empty(0, dtype=cls.value_type).reshape(0, *cls.value_shape)
         cls.OBJ_IDXS = dict()
         cls.CALLBACKS_ON_REMOVE = dict()
 

@@ -48,7 +48,7 @@ def main():
 
     # Take a few steps so that visibility propagates
     for _ in range(5):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Heat source is off.
     print("Heat source is OFF.")
@@ -62,33 +62,33 @@ def main():
     assert stove.states[object_states.ToggledOn].get_value()
 
     # Need to take a step to update the state.
-    env.step(th.Tensor([]))
+    env.step(th.empty(0))
 
     # Heat source is on
     heat_source_state = stove.states[object_states.HeatSourceOrSink].get_value()
     assert heat_source_state
     for _ in range(500):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Toggle off stove, notify user
     input("Heat source will now turn OFF: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(False)
     assert not stove.states[object_states.ToggledOn].get_value()
     for _ in range(200):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
     stove.set_position(th.Tensor([0, 1.0, 0.61]))
     for i in range(100):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Toggle on stove again, notify user
     input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
     assert stove.states[object_states.ToggledOn].get_value()
     for i in range(500):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     # Shutdown environment at end
     env.close()

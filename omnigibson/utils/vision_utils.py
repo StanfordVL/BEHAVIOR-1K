@@ -69,13 +69,13 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.Tensor([], dtype=th.int32)  # Initialize the key_array as empty
+        self.key_array = th.empty(0, dtype=th.int32)  # Initialize the key_array as empty
         self.known_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.Tensor([], dtype=th.int32)
+        self.key_array = th.empty(0, dtype=th.int32)
         self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image, image_keys=None):

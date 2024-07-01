@@ -1798,7 +1798,7 @@ class Cloth(MicroParticleSystem):
 
     def serialize(self, state):
         # Nothing by default
-        return th.Tensor([], dtype=float)
+        return th.empty(0, dtype=float)
 
     def deserialize(self, state):
         # Nothing by default

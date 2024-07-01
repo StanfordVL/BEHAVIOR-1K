@@ -25,7 +25,7 @@ class MaxTemperature(TensorizedValueState):
         super().global_initialize()
 
         # Initialize other global variables
-        cls.TEMPERATURE_IDXS = th.Tensor([], dtype=int)
+        cls.TEMPERATURE_IDXS = th.empty(0, dtype=int)
 
         # Add global callback to Temperature state so that temperature idxs will be updated
         def _update_temperature_idxs(obj):

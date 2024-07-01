@@ -139,11 +139,11 @@ def main(random_selection=False, headless=False, short_exec=False):
             increments = 25
             for ctrl_pts in th.cat([th.linspace(start, mid, increments), th.linspace(mid, end, increments)]):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
-                env.step(th.Tensor([]))
+                env.step(th.empty(0))
                 print_state()
 
         while True:
-            env.step(th.Tensor([]))
+            env.step(th.empty(0))
             print_state()
 
     # Shut down env at the end

@@ -29,7 +29,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     highlighted = False
     max_steps = -1 if not short_exec else 1000
     while i != max_steps:
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
         if i % 50 == 0:
             highlighted = not highlighted
             og.log.info(f"Toggling window highlight to: {highlighted}")

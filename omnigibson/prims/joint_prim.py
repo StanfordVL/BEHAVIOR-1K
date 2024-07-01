@@ -842,8 +842,8 @@ class JointPrim(BasePrim):
             self.set_effort(th.zeros(self.n_dof))
 
     def _dump_state(self):
-        pos, vel, effort = self.get_state() if self.articulated else (th.Tensor([]), th.Tensor([]), th.Tensor([]))
-        target_pos, target_vel = self.get_target() if self.articulated else (th.Tensor([]), th.Tensor([]))
+        pos, vel, effort = self.get_state() if self.articulated else (th.empty(0), th.empty(0), th.empty(0))
+        target_pos, target_vel = self.get_target() if self.articulated else (th.empty(0), th.empty(0))
         return dict(
             pos=pos,
             vel=vel,

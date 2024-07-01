@@ -560,7 +560,7 @@ class StatefulObject(BaseObject):
                 ]
             )
             if len(state["non_kin"]) > 0
-            else th.Tensor([])
+            else th.empty(0)
         )
 
         # Combine these two arrays

@@ -83,7 +83,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Let apple settle
     for _ in range(50):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     knife.keep_still()
     knife.set_position_orientation(
@@ -95,7 +95,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Step simulation for a bit so that apple is sliced
     for i in range(1000):
-        env.step(th.Tensor([]))
+        env.step(th.empty(0))
 
     input("Apple has been sliced! Press [ENTER] to terminate the demo.")
 
