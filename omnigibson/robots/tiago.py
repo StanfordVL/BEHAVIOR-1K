@@ -709,8 +709,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         if orientation is None:
             orientation = current_orientation
         position, orientation = th.Tensor(position), th.Tensor(orientation)
-        assert th.isclose(
-            th.norm(orientation), 1, atol=1e-3
+        assert math.isclose(
+            th.norm(orientation), 1, abs_tol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?

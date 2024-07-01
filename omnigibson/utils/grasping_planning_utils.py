@@ -185,7 +185,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
-    assert th.isclose(th.max(th.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
+    assert math.isclose(th.max(th.abs(push_axis)).item(), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = th.argmax(th.abs(push_axis))
     canonical_push_axis = th.eye(3)[push_axis_idx]
 

@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import math
 
 import torch as th
 import trimesh.transformations
@@ -181,10 +182,10 @@ class XFormPrim(BasePrim):
         """
         current_position, current_orientation = self.get_position_orientation()
 
-        position = current_position if position is None else th.Tensor(position, dtype=float)
-        orientation = current_orientation if orientation is None else th.Tensor(orientation, dtype=float)
-        assert th.isclose(
-            th.norm(orientation), 1, atol=1e-3
+        position = current_position if position is None else position.to(dtype=th.float32)
+        orientation = current_orientation if orientation is None else orientation.to(dtype=th.float32)
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         my_world_transform = T.pose2mat((position, orientation))
