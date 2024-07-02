@@ -63,8 +63,8 @@ class SegmentationMap(BaseMap):
         assert height == width, "room seg map is not a square"
         assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
         map_size = int(height * self.map_default_resolution / self.map_resolution)
-        img_ins = th.Tensor(img_ins.resize((map_size, map_size), Image.NEAREST))
-        img_sem = th.Tensor(img_sem.resize((map_size, map_size), Image.NEAREST))
+        img_ins = th.tensor(img_ins.resize((map_size, map_size), Image.NEAREST))
+        img_sem = th.tensor(img_sem.resize((map_size, map_size), Image.NEAREST))
 
         room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
@@ -123,14 +123,14 @@ class SegmentationMap(BaseMap):
             return None, None
 
         sem_id = self.room_sem_name_to_sem_id[room_type]
-        valid_idx = th.Tensor(th.where(self.room_sem_map == sem_id))
+        valid_idx = th.tensor(th.where(self.room_sem_map == sem_id))
         random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, th.Tensor([x, y, z])
+        return floor, th.tensor([x, y, z])
 
     def get_random_point_by_room_instance(self, room_instance):
         """
@@ -149,14 +149,14 @@ class SegmentationMap(BaseMap):
             return None, None
 
         ins_id = self.room_ins_name_to_ins_id[room_instance]
-        valid_idx = th.Tensor(th.where(self.room_ins_map == ins_id))
+        valid_idx = th.tensor(th.where(self.room_ins_map == ins_id))
         random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, th.Tensor([x, y, z])
+        return floor, th.tensor([x, y, z])
 
     def get_room_type_by_point(self, xy):
         """

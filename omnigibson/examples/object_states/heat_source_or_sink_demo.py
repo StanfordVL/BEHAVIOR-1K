@@ -38,8 +38,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([-0.0792399, -1.30104, 1.51981]),
-        orientation=th.Tensor([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
+        position=th.tensor([-0.0792399, -1.30104, 1.51981]),
+        orientation=th.tensor([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
     )
 
     # Make sure necessary object states are included with the stove
@@ -79,7 +79,7 @@ def main():
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(th.Tensor([0, 1.0, 0.61]))
+    stove.set_position(th.tensor([0, 1.0, 0.61]))
     for i in range(100):
         env.step(th.empty(0))
 

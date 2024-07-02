@@ -58,8 +58,8 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = th.Tensor([150.16513062, 150.0, 101.39360809])
-    sensor_world_ori_gt = th.Tensor([-0.29444984, 0.29444979, 0.64288365, -0.64288352])
+    sensor_world_pos_gt = th.tensor([150.16513062, 150.0, 101.39360809])
+    sensor_world_ori_gt = th.tensor([-0.29444984, 0.29444979, 0.64288365, -0.64288352])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert th.allclose(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)

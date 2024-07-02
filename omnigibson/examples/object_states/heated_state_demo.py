@@ -30,7 +30,7 @@ def main():
                 name=f"bowl{i}",
                 category="bowl",
                 model="ajzltc",
-                bounding_box=th.Tensor([0.329, 0.293, 0.168]) * scale,
+                bounding_box=th.tensor([0.329, 0.293, 0.168]) * scale,
                 abilities={"heatable": {}},
                 position=[x, 0, 0.2],
             )
@@ -49,8 +49,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([0.182103, -2.07295, 0.14017]),
-        orientation=th.Tensor([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
+        position=th.tensor([0.182103, -2.07295, 0.14017]),
+        orientation=th.tensor([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
 
     # Dim the skybox so we can see the bowls' steam effectively

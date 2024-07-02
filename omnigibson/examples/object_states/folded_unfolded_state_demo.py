@@ -67,8 +67,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set viewer camera
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([0.46382895, -2.66703958, 1.22616824]),
-        orientation=th.Tensor([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
+        position=th.tensor([0.46382895, -2.66703958, 1.22616824]),
+        orientation=th.tensor([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
     )
 
     def print_state():

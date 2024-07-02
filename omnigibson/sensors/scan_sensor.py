@@ -166,13 +166,13 @@ class ScanSensor(BaseSensor):
 
         # Grab vector of corresponding angles for each scan line
         angles = th.arange(
-            -th.deg2rad(th.Tensor([self.horizontal_fov / 2])).item(),
-            th.deg2rad(th.Tensor([self.horizontal_fov / 2])).item(),
-            th.deg2rad(th.Tensor([self.horizontal_resolution])).item(),
+            -th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
+            th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
+            th.deg2rad(th.tensor([self.horizontal_resolution])).item(),
         )
 
         # Convert into 3D unit vectors for each angle
-        unit_vector_laser = th.Tensor([[th.cos(ang), th.sin(ang), 0.0] for ang in angles])
+        unit_vector_laser = th.tensor([[th.cos(ang), th.sin(ang), 0.0] for ang in angles])
 
         # Scale unit vectors by corresponding laser scan distnaces
         assert ((scan >= 0.0) & (scan <= 1.0)).all(), "scan out of valid range [0, 1]"
@@ -186,7 +186,7 @@ class ScanSensor(BaseSensor):
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
         scan_local = quat2mat(base_ori).T.dot((scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
-        scan_local = th.cat([th.Tensor([[0, 0]]), scan_local, th.Tensor([[0, 0]])], dim=0)
+        scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
 
         # flip y axis
         scan_local[:, 1] *= -1

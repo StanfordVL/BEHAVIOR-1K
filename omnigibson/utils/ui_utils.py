@@ -375,7 +375,7 @@ class CameraMover:
         Helper function for quickly grabbing the currently viewed RGB image
 
         Returns:
-            th.Tensor: (H, W, 3) sized RGB image array
+            th.tensor: (H, W, 3) sized RGB image array
         """
         return self.cam.get_obs()[0]["rgb"][:, :, :-1]
 
@@ -441,7 +441,7 @@ class CameraMover:
         an mp4 video file on disk.
 
         Args:
-            waypoints (th.Tensor): (n, 3) global position waypoint values to set the viewer camera to defining this trajectory
+            waypoints (th.tensor): (n, 3) global position waypoint values to set the viewer camera to defining this trajectory
             per_step_distance (float): How much distance (in m) should be approximately covered per trajectory step.
                 This will determine the path length between individual waypoints
             fps (int): Frames per second when recording this video
@@ -471,7 +471,7 @@ class CameraMover:
             interpolated_points = th.zeros((path_length, 3))
             for i in range(path_length):
                 curr_step = step + (i / path_length)
-                interpolated_points[i, :] = th.Tensor([spline(curr_step) for spline in splines])
+                interpolated_points[i, :] = th.tensor([spline(curr_step) for spline in splines])
             return interpolated_points
 
         # Iterate over all waypoints and infer the resulting trajectory, recording the resulting poses
@@ -532,12 +532,12 @@ class CameraMover:
             dict: Mapping from relevant keypresses to corresponding delta command to apply to the camera pose
         """
         return {
-            lazy.carb.input.KeyboardInput.D: th.Tensor([self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.A: th.Tensor([-self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.W: th.Tensor([0, 0, -self.delta]),
-            lazy.carb.input.KeyboardInput.S: th.Tensor([0, 0, self.delta]),
-            lazy.carb.input.KeyboardInput.T: th.Tensor([0, self.delta, 0]),
-            lazy.carb.input.KeyboardInput.G: th.Tensor([0, -self.delta, 0]),
+            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0]),
+            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0]),
+            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta]),
+            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta]),
+            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0]),
+            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0]),
         }
 
     def _sub_keyboard_event(self, event, *args, **kwargs):

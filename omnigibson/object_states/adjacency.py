@@ -112,7 +112,7 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
                 # Check for self-hit -- if so, record the position and terminate early
                 should_continue = True
                 if hit.rigid_body in obj_link_paths:
-                    ray_starts[idx] = th.Tensor(hit.position)
+                    ray_starts[idx] = th.tensor(hit.position)
                     should_continue = False
                 return should_continue
 
@@ -166,7 +166,7 @@ class VerticalAdjacency(AbsoluteObjectState):
     def _get_value(self):
         # Call the adjacency computation with th Z axis.
         bodies_by_axis = compute_adjacencies(
-            self.obj, th.Tensor([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False
+            self.obj, th.tensor([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False
         )
 
         # Return the adjacencies from the only axis we passed in.

@@ -89,8 +89,8 @@ class GraspTask(BaseTask):
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = th.Tensor(robot_pose["base_pos"])
-            robot_orn = th.Tensor(robot_pose["base_ori"])
+            robot_pos = th.tensor(robot_pose["base_pos"])
+            robot_orn = th.tensor(robot_pose["base_ori"])
             # Move it to the appropriate scene. TODO: The scene should provide a function for this.
             robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
             robot.set_position_orientation(robot_pos, robot_orn)
@@ -106,11 +106,11 @@ class GraspTask(BaseTask):
             # For Tiago
             if "combined" in robot.robot_arm_descriptor_yamls:
                 joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-                initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
+                initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
                 control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
             # For Fetch
             else:
-                initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
+                initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
                 control_idx_in_joint_pos = th.arange(dim)
 
             with PlanningContext(
@@ -149,7 +149,7 @@ class GraspTask(BaseTask):
 
             # Check if the robot has toppled
             rotation = R.from_quat(robot.get_orientation())
-            robot_up = rotation.apply(th.Tensor([0, 0, 1]))
+            robot_up = rotation.apply(th.tensor([0, 0, 1]))
             if robot_up[2] < 0.75:
                 raise ValueError("Robot has toppled over")
 
@@ -202,7 +202,7 @@ class GraspTask(BaseTask):
     def _get_random_joint_position(self, robot):
         joint_positions = []
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        joints = th.Tensor([joint for joint in robot.joints.values()])
+        joints = th.tensor([joint for joint in robot.joints.values()])
         arm_joints = joints[joint_control_idx]
         for i, joint in enumerate(arm_joints):
             val = random.uniform(joint.lower_limit, joint.upper_limit)

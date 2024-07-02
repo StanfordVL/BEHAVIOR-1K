@@ -85,7 +85,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         # Update the features dim manually
         self._features_dim = total_concat_size
 
-    def forward(self, observations) -> th.Tensor:
+    def forward(self, observations) -> th.tensor:
         encoded_tensor_list = []
         self.step_index += 1
 

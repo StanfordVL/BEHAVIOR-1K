@@ -62,8 +62,8 @@ def plan_base_motion(
             if not self.si.isValid(s2):
                 return False
 
-            start = th.Tensor([s1.getX(), s1.getY(), s1.getYaw()])
-            goal = th.Tensor([s2.getX(), s2.getY(), s2.getYaw()])
+            start = th.tensor([s1.getX(), s1.getY(), s1.getYaw()])
+            goal = th.tensor([s2.getX(), s2.getY(), s2.getYaw()])
             segment_theta = self.get_angle_between_poses(start, goal)
 
             # Start rotation
@@ -238,17 +238,17 @@ def plan_arm_motion(
     if torso_fixed:
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
-        initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
+        initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
         control_idx_in_joint_pos = th.arange(dim)
     else:
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         dim = len(joint_control_idx)
         if "combined" in robot.robot_arm_descriptor_yamls:
             joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-            initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
             control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
-            initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
 
     def state_valid_fn(q):
@@ -261,7 +261,7 @@ def plan_arm_motion(
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(dim)
-    joints = th.Tensor([joint for joint in robot.joints.values()])
+    joints = th.tensor([joint for joint in robot.joints.values()])
     arm_joints = joints[joint_control_idx]
     for i, joint in enumerate(arm_joints):
         if end_conf[i] > joint.upper_limit:
@@ -337,7 +337,7 @@ def plan_arm_motion_ik(
     if torso_fixed:
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
-        initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
+        initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
         control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls["left_fixed"]
     else:
@@ -345,10 +345,10 @@ def plan_arm_motion_ik(
         dim = len(joint_control_idx)
         if "combined" in robot.robot_arm_descriptor_yamls:
             joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-            initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_combined_idx])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
             control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
-            initial_joint_pos = th.Tensor(robot.get_joint_positions()[joint_control_idx])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls[robot.default_arm]
 
@@ -448,10 +448,10 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(*th.Tensor(pose[0], dtype=float))
+    translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=float))
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = th.Tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
+    orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
 
     return detect_robot_collision(context)
@@ -480,9 +480,9 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lazy.pxr.Gf.Vec3d(*th.Tensor(mesh_pose[0], dtype=float))
+                translation = lazy.pxr.Gf.Vec3d(*th.tensor(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
-                orientation = th.Tensor(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
+                orientation = th.tensor(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
 
     return detect_robot_collision(context)
@@ -628,7 +628,7 @@ def astar(search_map, start, goal, eight_connected=True):
                 path.insert(0, current)
                 current = came_from[current]
             path.insert(0, start)
-            return th.Tensor(path)
+            return th.tensor(path)
 
         for neighbor in get_neighbors(current):
             # Skip neighbors that are not valid or have already been visited

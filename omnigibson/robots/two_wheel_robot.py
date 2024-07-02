@@ -78,8 +78,8 @@ class TwoWheelRobot(LocomotionRobot):
         ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
         # Add info
-        dic["dd_base_lin_vel"] = th.Tensor([lin_vel])
-        dic["dd_base_ang_vel"] = th.Tensor([ang_vel])
+        dic["dd_base_lin_vel"] = th.tensor([lin_vel])
+        dic["dd_base_ang_vel"] = th.tensor([ang_vel])
 
         return dic
 
@@ -151,7 +151,7 @@ class TwoWheelRobot(LocomotionRobot):
         classes.add("TwoWheelRobot")
         return classes
 
-    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports DifferentialDriveController.
@@ -159,11 +159,11 @@ class TwoWheelRobot(LocomotionRobot):
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            th.Tensor: array of action data
+            th.tensor: array of action data
         """
         action = super().teleop_data_to_action(teleop_action)
         assert isinstance(
             self._controllers["base"], DifferentialDriveController
         ), "Only DifferentialDriveController is supported!"
-        action[self.base_action_idx] = th.Tensor([teleop_action.base[0], teleop_action.base[2]]) * 0.3
+        action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]) * 0.3
         return action

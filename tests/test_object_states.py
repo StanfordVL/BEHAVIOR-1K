@@ -651,8 +651,8 @@ def test_toggled_on(env):
     q = robot.get_joint_positions()
     jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
     q[jnt_idxs["torso_lift_joint"]] = 0.0
-    q[jnt_idxs["shoulder_pan_joint"]] = th.deg2rad(th.Tensor([90.0])).item()
-    q[jnt_idxs["shoulder_lift_joint"]] = th.deg2rad(th.Tensor([9.0])).item()
+    q[jnt_idxs["shoulder_pan_joint"]] = th.deg2rad(th.tensor([90.0])).item()
+    q[jnt_idxs["shoulder_lift_joint"]] = th.deg2rad(th.tensor([9.0])).item()
     q[jnt_idxs["upperarm_roll_joint"]] = 0.0
     q[jnt_idxs["elbow_flex_joint"]] = 0.0
     q[jnt_idxs["forearm_roll_joint"]] = 0.0
@@ -722,7 +722,7 @@ def test_attached_to(env):
     # shelf should be attached to the back panel
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
-    force_dir = th.Tensor([0, 0, 1])
+    force_dir = th.tensor([0, 0, 1])
     # A small force will not break the attachment
     force_mag = 10
     apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
@@ -790,7 +790,7 @@ def test_particle_sink(env):
     assert water_system.n_particles == 0
 
     sink_pos = sink.states[ParticleSink].link.get_position()
-    water_system.generate_particles(scene=env.scene, positions=[sink_pos + th.Tensor([0, 0, 0.05])])
+    water_system.generate_particles(scene=env.scene, positions=[sink_pos + th.tensor([0, 0, 0.05])])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
 
@@ -817,7 +817,7 @@ def test_particle_applier(env):
 
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(spray_bottle, breakfast_table, z_offset=0.1)
-    spray_bottle.set_orientation(th.Tensor([0.707, 0, 0, 0.707]))
+    spray_bottle.set_orientation(th.tensor([0.707, 0, 0, 0.707]))
     for _ in range(3):
         og.sim.step()
 
@@ -845,7 +845,7 @@ def test_particle_applier(env):
     # Test adjacency
 
     water_system.remove_all_particles()
-    spray_bottle.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.Tensor([0, 0, 0, 1.0]))
+    spray_bottle.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.tensor([0, 0, 0, 1.0]))
 
     place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
     og.sim.step()
@@ -885,7 +885,7 @@ def test_particle_remover(env):
     water_system = env.scene.get_system("water")
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        scene=env.scene, positions=[th.Tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        scene=env.scene, positions=[th.tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
     )
     assert water_system.n_particles > 0
 
@@ -912,7 +912,7 @@ def test_particle_remover(env):
     og.sim.step()
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        scene=env.scene, positions=[th.Tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        scene=env.scene, positions=[th.tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
     )
 
     # Water should be present
@@ -950,7 +950,7 @@ def test_saturated(env):
     water_system.generate_particles(
         scene=env.scene,
         positions=[
-            th.Tensor([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)])
+            th.tensor([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)])
             for i in range(n_particles)
         ],
     )
@@ -1125,13 +1125,13 @@ def test_contains(env):
 
         # Sample single particle
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(scene=env.scene, positions=[th.Tensor([0, 0, stockpot.aabb[1][2] - 0.1])])
+            system.generate_particles(scene=env.scene, positions=[th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
             system.generate_group_particles(
                 group=system.get_group_name(stockpot),
-                positions=th.Tensor([th.Tensor([0, 0, stockpot.aabb[1][2] - 0.1])]),
+                positions=th.tensor([th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])]),
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 

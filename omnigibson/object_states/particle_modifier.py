@@ -375,7 +375,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if self._projection_mesh_params is None:
                     self._projection_mesh_params = {
                         "type": mesh_type,
-                        "extents": th.Tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
+                        "extents": th.tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
                     }
                 # Otherwise, make sure we don't have a mismatch between the pre-existing shape type and the
                 # desired type since we can't delete the original mesh
@@ -404,7 +404,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     ), f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
 
             # Set the scale based on projection mesh params
-            self.projection_mesh.scale = th.Tensor(self._projection_mesh_params["extents"])
+            self.projection_mesh.scale = th.tensor(self._projection_mesh_params["extents"])
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             self.link.update_meshes()
@@ -421,7 +421,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             self.projection_mesh.set_local_pose(
-                position=th.Tensor([0, 0, -z_offset]),
+                position=th.tensor([0, 0, -z_offset]),
                 orientation=T.euler2quat([0, 0, 0]),
             )
 
@@ -458,7 +458,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 og.sim.psqi.overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
-                    rot=th.Tensor([0, 0, 0, 1.0]),
+                    rot=th.tensor([0, 0, 0, 1.0]),
                     reportFn=overlap_callback,
                 )
                 return valid_hit
@@ -515,8 +515,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             cond = (
                 lambda obj: (
                     th.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ th.Tensor([0, 0, 1]),
-                        th.Tensor([0, 0, 1]),
+                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ th.tensor([0, 0, 1]),
+                        th.tensor([0, 0, 1]),
                     )
                     > 0
                 )
@@ -752,7 +752,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._current_step = state["current_step"]
 
     def serialize(self, state):
-        return th.Tensor([state["current_step"]], dtype=float)
+        return th.tensor([state["current_step"]], dtype=float)
 
     def deserialize(self, state):
         current_step = int(state[0])
@@ -899,7 +899,7 @@ class ParticleRemover(ParticleModifier):
             inbound_idxs = (
                 self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()[0]
                 if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION
-                else th.Tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
+                else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
             )
             modification_limit = self.physical_particle_modification_limit
 
@@ -1094,7 +1094,7 @@ class ParticleApplier(ParticleModifier):
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_local_pose()
             assert th.all(
-                th.isclose(local_pos + th.Tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
+                th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
             ), "Projection mesh tip should align with metalink position!"
             assert th.all(
                 th.isclose(T.quat2euler(local_quat), th.zeros_like(local_quat))
@@ -1148,7 +1148,7 @@ class ParticleApplier(ParticleModifier):
         # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
         # We sample over the entire object AABB, assuming most will be filtered out
         sampling_distance = 2 * system.particle_radius
-        extent = th.Tensor(self._projection_mesh_params["extents"])
+        extent = th.tensor(self._projection_mesh_params["extents"])
         h = extent[2]
         low, high = self.obj.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int()
@@ -1302,9 +1302,9 @@ class ParticleApplier(ParticleModifier):
                 # Generate particles for this group
                 system.generate_group_particles(
                     group=group,
-                    positions=th.Tensor(particle_info["positions"]),
-                    orientations=th.Tensor(particle_info["orientations"]),
-                    scales=th.Tensor(particles_info[group]["scales"]),
+                    positions=th.tensor(particle_info["positions"]),
+                    orientations=th.tensor(particle_info["orientations"]),
+                    scales=th.tensor(particles_info[group]["scales"]),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
@@ -1321,11 +1321,11 @@ class ParticleApplier(ParticleModifier):
                 velocities = (
                     None
                     if self._initial_speed == 0
-                    else -self._initial_speed * th.Tensor([hit[1] for hit in hits[:n_particles]])
+                    else -self._initial_speed * th.tensor([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
                     scene=self.obj.scene,
-                    positions=th.Tensor([hit[0] for hit in hits[:n_particles]]),
+                    positions=th.tensor([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
                 # Update our particle count
@@ -1389,7 +1389,7 @@ class ParticleApplier(ParticleModifier):
         n_samples = self._get_max_particles_limit_per_step(system=system)
         r, h = self._projection_mesh_params["extents"][0] / 2, self._projection_mesh_params["extents"][2]
         sampled_r_theta = th.rand(n_samples, 2)
-        sampled_r_theta = sampled_r_theta * th.Tensor([r, math.pi * 2]).reshape(1, 2)
+        sampled_r_theta = sampled_r_theta * th.tensor([r, math.pi * 2]).reshape(1, 2)
         # Get start, end points in local link frame, start points to end points along the -z direction
         end_points = th.stack(
             [
@@ -1406,7 +1406,7 @@ class ParticleApplier(ParticleModifier):
         elif projection_type == "Cylinder":
             # All start points are the parallel point for their corresponding end point
             # i.e.: (x, y, 0)
-            start_points = end_points + th.Tensor([0, 0, h]).reshape(1, 3)
+            start_points = end_points + th.tensor([0, 0, h]).reshape(1, 3)
         else:
             # Other types not supported
             raise ValueError(f"Unsupported projection mesh type: {projection_type}!")

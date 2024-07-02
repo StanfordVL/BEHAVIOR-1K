@@ -26,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     trav_map_erosion = 2
 
     trav_map = Image.open(os.path.join(get_og_scene_path(scene_model), "layout", "floor_trav_0.png"))
-    trav_map = th.Tensor(trav_map.resize((trav_map_size, trav_map_size)))
+    trav_map = th.tensor(trav_map.resize((trav_map_size, trav_map_size)))
     trav_map = cv2.erode(trav_map, th.ones((trav_map_erosion, trav_map_erosion)))
 
     if not headless:

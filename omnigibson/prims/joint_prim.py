@@ -350,7 +350,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_max_velocities(th.Tensor([[vel]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_max_velocities(th.tensor([[vel]]), joint_indices=self.dof_indices)
 
     @property
     def max_effort(self):
@@ -376,7 +376,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_max_efforts(th.Tensor([[effort]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_max_efforts(th.tensor([[effort]]), joint_indices=self.dof_indices)
 
     @property
     def stiffness(self):
@@ -401,7 +401,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_gains(kps=th.Tensor([[stiffness]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_gains(kps=th.tensor([[stiffness]]), joint_indices=self.dof_indices)
 
     @property
     def damping(self):
@@ -426,7 +426,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_gains(kds=th.Tensor([[damping]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_gains(kds=th.tensor([[damping]]), joint_indices=self.dof_indices)
 
     @property
     def friction(self):
@@ -452,7 +452,7 @@ class JointPrim(BasePrim):
         """
         self.set_attribute("physxJoint:jointFriction", friction)
         if og.sim.is_playing():
-            self._articulation_view.set_friction_coefficients(th.Tensor([[friction]]), joint_indices=self.dof_indices)
+            self._articulation_view.set_friction_coefficients(th.tensor([[friction]]), joint_indices=self.dof_indices)
 
     @property
     def lower_limit(self):
@@ -486,7 +486,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         self._articulation_view.set_joint_limits(
-            th.Tensor([[lower_limit, self.upper_limit]]), joint_indices=self.dof_indices
+            th.tensor([[lower_limit, self.upper_limit]]), joint_indices=self.dof_indices
         )
 
     @property
@@ -520,7 +520,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         self._articulation_view.set_joint_limits(
-            th.Tensor([[self.lower_limit, upper_limit]]), joint_indices=self.dof_indices
+            th.tensor([[self.lower_limit, upper_limit]]), joint_indices=self.dof_indices
         )
 
     @property
@@ -759,7 +759,7 @@ class JointPrim(BasePrim):
             ), "Trying to set joint position target, but control type is not position!"
 
         # Standardize input
-        pos = th.Tensor([pos]) if self._n_dof == 1 and not isinstance(pos, Iterable) else th.Tensor(pos)
+        pos = th.tensor([pos]) if self._n_dof == 1 and not isinstance(pos, Iterable) else th.tensor(pos)
 
         # Potentially de-normalize if the input is normalized
         if normalized:
@@ -795,7 +795,7 @@ class JointPrim(BasePrim):
             ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
         # Standardize input
-        vel = th.Tensor([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else th.Tensor(vel)
+        vel = th.tensor([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else th.tensor(vel)
 
         # Potentially de-normalize if the input is normalized
         if normalized:
@@ -823,7 +823,7 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set effort for articulated joints!"
 
         # Standardize input
-        effort = th.Tensor([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else th.Tensor(effort)
+        effort = th.tensor([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else th.tensor(effort)
 
         # Potentially de-normalize if the input is normalized
         if normalized:

@@ -107,7 +107,7 @@ class DifferentialDriveController(LocomotionController):
         right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
         # Return desired velocities
-        return th.Tensor([left_wheel_joint_vel, right_wheel_joint_vel])
+        return th.tensor([left_wheel_joint_vel, right_wheel_joint_vel])
 
     def compute_no_op_goal(self, control_dict):
         # This is zero-vector, since we want zero linear / angular velocity

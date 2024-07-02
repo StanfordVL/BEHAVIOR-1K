@@ -30,7 +30,7 @@ class Locobot(TwoWheelRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return th.Tensor([1, 0])
+        return th.tensor([1, 0])
 
     @property
     def _default_joint_pos(self):

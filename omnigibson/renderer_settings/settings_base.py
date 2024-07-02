@@ -163,7 +163,7 @@ class SettingItem:
 
         elif self.setting_type == lazy.omni.kit.widget.settings.SettingType.COLOR3:
             assert (
-                isinstance(value, (list, tuple, th.Tensor)) and len(value) == 3
+                isinstance(value, (list, tuple, th.tensor)) and len(value) == 3
             ), f"Setting {self.path} must be a list of 3 numbers within range [0,1]."
             for v in value:
                 assert (
@@ -181,7 +181,7 @@ class SettingItem:
 
         elif self.setting_type == lazy.omni.kit.widget.settings.SettingType.DOUBLE3:
             assert (
-                isinstance(value, (list, tuple, th.Tensor)) and len(value) == 3
+                isinstance(value, (list, tuple, th.tensor)) and len(value) == 3
             ), f"Setting {self.path} must be a list of 3 floats."
             for v in value:
                 assert isinstance(v, (int, float)), f"Setting {self.path} must be a list of 3 floats."
@@ -189,7 +189,7 @@ class SettingItem:
 
         elif self.setting_type == lazy.omni.kit.widget.settings.SettingType.INT2:
             assert (
-                isinstance(value, (list, tuple, th.Tensor)) and len(value) == 2
+                isinstance(value, (list, tuple, th.tensor)) and len(value) == 2
             ), f"Setting {self.path} must be a list of 2 ints."
             for v in value:
                 assert isinstance(v, int), f"Setting {self.path} must be a list of 2 ints."
@@ -197,7 +197,7 @@ class SettingItem:
 
         elif self.setting_type == lazy.omni.kit.widget.settings.SettingType.DOUBLE2:
             assert (
-                isinstance(value, (list, tuple, th.Tensor)) and len(value) == 2
+                isinstance(value, (list, tuple, th.tensor)) and len(value) == 2
             ), f"Setting {self.path} must be a list of 2 floats."
             for v in value:
                 assert isinstance(v, (int, float)), f"Setting {self.path} must be a list of 2 floats."

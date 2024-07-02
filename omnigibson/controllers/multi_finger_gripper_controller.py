@@ -95,8 +95,8 @@ class MultiFingerGripperController(GripperController):
         self._inverted = inverted
         self._mode = mode
         self._limit_tolerance = limit_tolerance
-        self._open_qpos = open_qpos if open_qpos is None else th.Tensor(open_qpos)
-        self._closed_qpos = closed_qpos if closed_qpos is None else th.Tensor(closed_qpos)
+        self._open_qpos = open_qpos if open_qpos is None else th.tensor(open_qpos)
+        self._closed_qpos = closed_qpos if closed_qpos is None else th.tensor(closed_qpos)
 
         # Create other args to be filled in at runtime
         self._is_grasping = IsGraspingState.FALSE
@@ -125,9 +125,9 @@ class MultiFingerGripperController(GripperController):
         # We extend this method to make sure command is always 2D
         if self._mode != "independent":
             command = (
-                th.Tensor([command] * self.command_dim)
+                th.tensor([command] * self.command_dim)
                 if type(command) in {int, float}
-                else th.Tensor([command[0]] * self.command_dim)
+                else th.tensor([command[0]] * self.command_dim)
             )
 
         # Flip the command if the direction is inverted.

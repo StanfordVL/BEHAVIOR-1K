@@ -143,7 +143,7 @@ def main():
 
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(
-            position=apples[n].get_position() + th.Tensor([-0.15, 0.0, 0.1 * (n + 2)]),
+            position=apples[n].get_position() + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
             orientation=T.euler2quat([-math.pi / 2, 0, 0]),
         )
         knife.keep_still()
@@ -161,7 +161,7 @@ def main():
         if args.robot:
             action_lo, action_hi = -0.3, 0.3
             result = env.step(
-                th.Tensor(
+                th.tensor(
                     [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
                 ).flatten()
             )[4]
@@ -181,7 +181,7 @@ def main():
     output.append(
         {"name": field, "unit": "time (ms)", "value": total_load_time, "extra": ["Loading time", "Loading time"]}
     )
-    results = th.Tensor(results)
+    results = th.tensor(results)
     for i, title in enumerate(PROFILING_FIELDS):
         unit = "time (ms)" if "time" in title else "GB"
         value = th.mean(results[:, i])

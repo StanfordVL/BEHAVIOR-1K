@@ -578,8 +578,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         following OpenAI Gym's convention
 
         Args:
-            action (gym.spaces.Dict or dict or th.Tensor): robot actions. If a dict is specified, each entry should
-                map robot name to corresponding action. If a th.Tensor, it should be the flattened, concatenated set
+            action (gym.spaces.Dict or dict or th.tensor): robot actions. If a dict is specified, each entry should
+                map robot name to corresponding action. If a th.tensor, it should be the flattened, concatenated set
                 of actions
 
         Returns:
@@ -654,7 +654,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
                     real_obs = dict()
                     for key, value in recursively_generate_flat_dict(dic=check_obs).items():
-                        if isinstance(value, th.Tensor):
+                        if isinstance(value, th.tensor):
                             real_obs[key] = ("obs", key, value.dtype, value.shape)
                         else:
                             real_obs[key] = ("obs", key, type(value), "()")

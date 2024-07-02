@@ -50,10 +50,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         Updates all internally tracked @values for this object state. Should be implemented by subclass.
 
         Args:
-            values (th.Tensor): Tensorized value array
+            values (th.tensor): Tensorized value array
 
         Returns:
-            th.Tensor: Updated tensorized value array
+            th.tensor: Updated tensorized value array
         """
         raise NotImplementedError
 
@@ -179,8 +179,8 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # If the state value is not an iterable, wrap it in a numpy array
         val = (
             state[self.value_name]
-            if isinstance(state[self.value_name], th.Tensor)
-            else th.Tensor([state[self.value_name]])
+            if isinstance(state[self.value_name], th.tensor)
+            else th.tensor([state[self.value_name]])
         )
         return val.flatten().float()
 

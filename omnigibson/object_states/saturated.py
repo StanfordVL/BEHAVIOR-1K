@@ -69,7 +69,7 @@ class ModifiedParticles(RelativeObjectState):
         }
 
     def serialize(self, state):
-        state_flat = th.Tensor([state["n_systems"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
             state_flat = th.cat(
@@ -183,7 +183,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             # We want diffuse_tint to sum to 2.5 to result in the final RGB to sum to 1.5 on average
             # This is because an average RGB color sum to 1.5 (i.e. [0.5, 0.5, 0.5])
             # (0.5 [original avg RGB per channel] + 0.1 [albedo_add]) * 2.5 = 1.5
-            diffuse_tint = th.Tensor([0.5, 0.5, 0.5]) + avg_color / th.sum(avg_color)
+            diffuse_tint = th.tensor([0.5, 0.5, 0.5]) + avg_color / th.sum(avg_color)
             diffuse_tint = diffuse_tint.tolist()
 
         return albedo_add, diffuse_tint
@@ -227,7 +227,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 self._limits[k] = v
 
     def serialize(self, state):
-        state_flat = th.Tensor([state["n_systems"], state["default_limit"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=float)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]
             state_flat = th.cat(

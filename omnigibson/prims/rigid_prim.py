@@ -227,7 +227,7 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
         if len(coms) > 0:
-            com = (th.Tensor(coms) * th.Tensor(vols).reshape(-1, 1)).sum(dim=0) / th.sum(vols)
+            com = (th.tensor(coms) * th.tensor(vols).reshape(-1, 1)).sum(dim=0) / th.sum(vols)
             self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
 
     def enable_collisions(self):
@@ -280,14 +280,14 @@ class RigidPrim(XFormPrim):
         Sets the linear velocity of the prim in stage.
 
         Args:
-            velocity (th.Tensor): linear velocity to set the rigid prim to. Shape (3,).
+            velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
         self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self):
         """
         Returns:
-            th.Tensor: current linear velocity of the the rigid prim. Shape (3,).
+            th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
         return self._rigid_prim_view.get_linear_velocities()[0]
 
@@ -296,14 +296,14 @@ class RigidPrim(XFormPrim):
         Sets the angular velocity of the prim in stage.
 
         Args:
-            velocity (th.Tensor): angular velocity to set the rigid prim to. Shape (3,).
+            velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
         self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self):
         """
         Returns:
-            th.Tensor: current angular velocity of the the rigid prim. Shape (3,).
+            th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
         return self._rigid_prim_view.get_angular_velocities()[0]
 
@@ -630,7 +630,7 @@ class RigidPrim(XFormPrim):
     def _compute_points_on_convex_hull(self, visual):
         """
         Returns:
-            th.Tensor or None: points on the convex hull of all points from child geom prims
+            th.tensor or None: points on the convex hull of all points from child geom prims
         """
         meshes = self._visual_meshes if visual else self._collision_meshes
         points = []
@@ -657,7 +657,7 @@ class RigidPrim(XFormPrim):
     def visual_boundary_points_local(self):
         """
         Returns:
-            th.Tensor: local coords of points on the convex hull of all points from child geom prims
+            th.tensor: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=True)
 
@@ -665,7 +665,7 @@ class RigidPrim(XFormPrim):
     def visual_boundary_points_world(self):
         """
         Returns:
-            th.Tensor: world coords of points on the convex hull of all points from child geom prims
+            th.tensor: world coords of points on the convex hull of all points from child geom prims
         """
         local_points = self.visual_boundary_points_local
         if local_points is None:
@@ -676,7 +676,7 @@ class RigidPrim(XFormPrim):
     def collision_boundary_points_local(self):
         """
         Returns:
-            th.Tensor: local coords of points on the convex hull of all points from child geom prims
+            th.tensor: local coords of points on the convex hull of all points from child geom prims
         """
         return self._compute_points_on_convex_hull(visual=False)
 
@@ -684,7 +684,7 @@ class RigidPrim(XFormPrim):
     def collision_boundary_points_world(self):
         """
         Returns:
-            th.Tensor: world coords of points on the convex hull of all points from child geom prims
+            th.tensor: world coords of points on the convex hull of all points from child geom prims
         """
         local_points = self.collision_boundary_points_local
         if local_points is None:
@@ -812,8 +812,8 @@ class RigidPrim(XFormPrim):
         super()._load_state(state=state)
 
         # Set velocities if not kinematic
-        self.set_linear_velocity(th.Tensor(state["lin_vel"]))
-        self.set_angular_velocity(th.Tensor(state["ang_vel"]))
+        self.set_linear_velocity(th.tensor(state["lin_vel"]))
+        self.set_angular_velocity(th.tensor(state["ang_vel"]))
 
     def serialize(self, state):
         # Run super first

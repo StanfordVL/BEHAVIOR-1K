@@ -69,8 +69,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([0.37860532, -0.65396566, 1.4067066]),
-        orientation=th.Tensor([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
+        position=th.tensor([0.37860532, -0.65396566, 1.4067066]),
+        orientation=th.tensor([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink

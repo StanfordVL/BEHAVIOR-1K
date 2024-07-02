@@ -650,7 +650,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            positions (th.Tensor): positions to set. This should be n-DOF length if all joints are being set,
+            positions (th.tensor): positions to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @positions must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF positions to set.
@@ -681,7 +681,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            velocities (th.Tensor): velocities to set. This should be n-DOF length if all joints are being set,
+            velocities (th.tensor): velocities to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @velocities must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF velocities to set.
@@ -711,7 +711,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            efforts (th.Tensor): efforts to set. This should be n-DOF length if all joints are being set,
+            efforts (th.tensor): efforts to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @efforts must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF efforts to set.
@@ -914,12 +914,12 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
-    def set_linear_velocity(self, velocity: th.Tensor):
+    def set_linear_velocity(self, velocity: th.tensor):
         """
         Sets the linear velocity of the root prim in stage.
 
         Args:
-            velocity (th.Tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
@@ -928,7 +928,7 @@ class EntityPrim(XFormPrim):
         Gets the linear velocity of the root prim in stage.
 
         Returns:
-            velocity (th.Tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
@@ -937,7 +937,7 @@ class EntityPrim(XFormPrim):
         Sets the angular velocity of the root prim in stage.
 
         Args:
-            velocity (th.Tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
@@ -945,7 +945,7 @@ class EntityPrim(XFormPrim):
         """Gets the angular velocity of the root prim in stage.
 
         Returns:
-            velocity (th.Tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
 
@@ -1042,7 +1042,7 @@ class EntityPrim(XFormPrim):
             n-array: minimum values for this robot's joints. If joint does not have a range, returns -1000
                 for that joint
         """
-        return th.Tensor([joint.lower_limit for joint in self._joints.values()])
+        return th.tensor([joint.lower_limit for joint in self._joints.values()])
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1052,7 +1052,7 @@ class EntityPrim(XFormPrim):
             n-array: maximum values for this robot's joints. If joint does not have a range, returns 1000
                 for that joint
         """
-        return th.Tensor([joint.upper_limit for joint in self._joints.values()])
+        return th.tensor([joint.upper_limit for joint in self._joints.values()])
 
     @property
     def joint_range(self):
@@ -1068,7 +1068,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum velocities for this robot's joints
         """
-        return th.Tensor([joint.max_velocity for joint in self._joints.values()])
+        return th.tensor([joint.max_velocity for joint in self._joints.values()])
 
     @property
     def max_joint_efforts(self):
@@ -1076,7 +1076,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return th.Tensor([joint.max_effort for joint in self._joints.values()])
+        return th.tensor([joint.max_effort for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):
@@ -1123,7 +1123,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
-        return th.Tensor([j.has_limit for j in self._joints.values()])
+        return th.tensor([j.has_limit for j in self._joints.values()])
 
     @property
     def disabled_collision_link_names(self):

@@ -59,14 +59,14 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the viewer camera's pose so that it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([4.32248, -5.74338, 6.85436]),
-        orientation=th.Tensor([0.39592, 0.13485, 0.29286, 0.85982]),
+        position=th.tensor([4.32248, -5.74338, 6.85436]),
+        orientation=th.tensor([0.39592, 0.13485, 0.29286, 0.85982]),
     )
 
     robot = env.robots[0]
 
     # Set robot base at the origin
-    robot.set_position_orientation(th.Tensor([0, 0, 0]), th.Tensor([0, 0, 0, 1]))
+    robot.set_position_orientation(th.tensor([0, 0, 0]), th.tensor([0, 0, 0, 1]))
     # At least one simulation step while the simulator is playing must occur for the robot (or in general, any object)
     # to be fully initialized after it is imported into the simulator
     og.sim.play()
@@ -179,12 +179,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 def input_to_xyz_delta_command(inp, delta=0.01):
     mapping = {
-        lazy.carb.input.KeyboardInput.W: th.Tensor([delta, 0, 0]),
-        lazy.carb.input.KeyboardInput.S: th.Tensor([-delta, 0, 0]),
-        lazy.carb.input.KeyboardInput.DOWN: th.Tensor([0, 0, -delta]),
-        lazy.carb.input.KeyboardInput.UP: th.Tensor([0, 0, delta]),
-        lazy.carb.input.KeyboardInput.A: th.Tensor([0, delta, 0]),
-        lazy.carb.input.KeyboardInput.D: th.Tensor([0, -delta, 0]),
+        lazy.carb.input.KeyboardInput.W: th.tensor([delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.S: th.tensor([-delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.DOWN: th.tensor([0, 0, -delta]),
+        lazy.carb.input.KeyboardInput.UP: th.tensor([0, 0, delta]),
+        lazy.carb.input.KeyboardInput.A: th.tensor([0, delta, 0]),
+        lazy.carb.input.KeyboardInput.D: th.tensor([0, -delta, 0]),
     }
 
     return mapping.get(inp)

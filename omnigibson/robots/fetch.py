@@ -165,7 +165,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def tucked_default_joint_pos(self):
-        return th.Tensor(
+        return th.tensor(
             [
                 0.0,
                 0.0,  # wheels
@@ -189,28 +189,28 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         pos = th.zeros(self.n_joints)
         pos[self.base_control_idx] = 0.0
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
-        pos[self.camera_control_idx] = th.Tensor([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = th.Tensor([0.05, 0.05])  # open gripper
+        pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
+        pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
 
         # Choose arm based on setting
         if self.default_arm_pose == "vertical":
-            pos[self.arm_control_idx[self.default_arm]] = th.Tensor(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
             )
         elif self.default_arm_pose == "diagonal15":
-            pos[self.arm_control_idx[self.default_arm]] = th.Tensor(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]
             )
         elif self.default_arm_pose == "diagonal30":
-            pos[self.arm_control_idx[self.default_arm]] = th.Tensor(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
             )
         elif self.default_arm_pose == "diagonal45":
-            pos[self.arm_control_idx[self.default_arm]] = th.Tensor(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
             )
         elif self.default_arm_pose == "horizontal":
-            pos[self.arm_control_idx[self.default_arm]] = th.Tensor(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
             )
         else:
@@ -371,7 +371,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return th.Tensor([0, 1])
+        return th.tensor([0, 1])
 
     @property
     def trunk_control_idx(self):
@@ -379,7 +379,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to trunk joint.
         """
-        return th.Tensor([2])
+        return th.tensor([2])
 
     @property
     def camera_control_idx(self):
@@ -387,15 +387,15 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
         """
-        return th.Tensor([3, 5])
+        return th.tensor([3, 5])
 
     @property
     def arm_control_idx(self):
-        return {self.default_arm: th.Tensor([4, 6, 7, 8, 9, 10, 11])}
+        return {self.default_arm: th.tensor([4, 6, 7, 8, 9, 10, 11])}
 
     @property
     def gripper_control_idx(self):
-        return {self.default_arm: th.Tensor([12, 13])}
+        return {self.default_arm: th.tensor([12, 13])}
 
     @property
     def disabled_collision_pairs(self):
@@ -493,7 +493,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {self.default_arm: [th.deg2rad(th.Tensor([-45])).item(), th.deg2rad(th.Tensor([45])).item()]}
+        return {self.default_arm: [th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()]}
 
     @property
     def eef_usd_path(self):

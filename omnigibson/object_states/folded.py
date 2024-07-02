@@ -25,7 +25,7 @@ m.NORMAL_Z_PERCENTAGE = 0.5
 m.DEBUG_CLOTH_PROJ_VIS = False
 
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
-m.NORMAL_Z_ANGLE_DIFF = th.deg2rad(th.Tensor([45.0])).item()
+m.NORMAL_Z_ANGLE_DIFF = th.deg2rad(th.tensor([45.0])).item()
 
 """
 FoldedLevelData contains the following fields:
@@ -60,7 +60,7 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         normals = cloth.compute_face_normals(face_ids=cloth.keyface_idx)
 
         # projection onto the z-axis
-        proj = th.abs(th.dot(normals, th.Tensor([0.0, 0.0, 1.0])))
+        proj = th.abs(th.dot(normals, th.tensor([0.0, 0.0, 1.0])))
         percentage = th.mean(proj > th.cos(m.NORMAL_Z_ANGLE_DIFF))
         return percentage
 

@@ -75,13 +75,13 @@ class TeleopSystem(TeleopPolicy):
             robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
         return robot_obs
 
-    def get_action(self, robot_obs: TeleopObservation) -> th.Tensor:
+    def get_action(self, robot_obs: TeleopObservation) -> th.tensor:
         """
         Generate action data from VR input for robot teleoperation
         Args:
             robot_obs (TeleopObservation): dataclass containing robot observations
         Returns:
-            th.Tensor: array of action data
+            th.tensor: array of action data
         """
         # get teleop action
         self.teleop_action = super().get_action(robot_obs)
@@ -178,8 +178,8 @@ class OVXRSystem(TeleopSystem):
         self.hmd = None
         self.controllers = {}
         self.trackers = {}
-        self.xr2og_orn_offset = th.Tensor([0.5, -0.5, -0.5, -0.5])
-        self.og2xr_orn_offset = th.Tensor([-0.5, 0.5, 0.5, -0.5])
+        self.xr2og_orn_offset = th.tensor([0.5, -0.5, -0.5, -0.5])
+        self.og2xr_orn_offset = th.tensor([-0.5, 0.5, 0.5, -0.5])
         # setup event subscriptions
         self.reset()
         self.use_hand_tracking = use_hand_tracking
@@ -190,28 +190,28 @@ class OVXRSystem(TeleopSystem):
                 lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
 
-    def xr2og(self, transform: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
+    def xr2og(self, transform: th.tensor) -> Tuple[th.tensor, th.tensor]:
         """
         Apply the orientation offset from the Omniverse XR coordinate system to the OmniGibson coordinate system
         Note that we have to transpose the transform matrix because Omniverse uses row-major matrices
         while OmniGibson uses column-major matrices
         Args:
-            transform (th.Tensor): the transform matrix in the Omniverse XR coordinate system
+            transform (th.tensor): the transform matrix in the Omniverse XR coordinate system
         Returns:
-            tuple(th.Tensor, th.Tensor): the position and orientation in the OmniGibson coordinate system
+            tuple(th.tensor, th.tensor): the position and orientation in the OmniGibson coordinate system
         """
-        pos, orn = T.mat2pose(th.Tensor(transform).T)
+        pos, orn = T.mat2pose(th.tensor(transform).T)
         orn = T.quat_multiply(orn, self.xr2og_orn_offset)
         return pos, orn
 
-    def og2xr(self, pos: th.Tensor, orn: th.Tensor) -> th.Tensor:
+    def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.tensor:
         """
         Apply the orientation offset from the OmniGibson coordinate system to the Omniverse XR coordinate system
         Args:
-            pos (th.Tensor): the position in the OmniGibson coordinate system
-            orn (th.Tensor): the orientation in the OmniGibson coordinate system
+            pos (th.tensor): the position in the OmniGibson coordinate system
+            orn (th.tensor): the orientation in the OmniGibson coordinate system
         Returns:
-            th.Tensor: the transform matrix in the Omniverse XR coordinate system
+            th.tensor: the transform matrix in the Omniverse XR coordinate system
         """
         orn = T.quat_multiply(self.og2xr_orn_offset, orn)
         return T.pose2mat((pos, orn)).T.double()
@@ -317,11 +317,11 @@ class OVXRSystem(TeleopSystem):
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
 
-    def teleop_data_to_action(self) -> th.Tensor:
+    def teleop_data_to_action(self) -> th.tensor:
         """
         Generate action data from VR input for robot teleoperation
         Returns:
-            th.Tensor: array of action data
+            th.tensor: array of action data
         """
         # optionally update control marker
         if self.show_control_marker:
@@ -365,13 +365,13 @@ class OVXRSystem(TeleopSystem):
         """
         if pos_offset is not None:
             # note that x is forward, y is down, z is left for ovxr, but x is forward, y is left, z is up for og
-            pos_offset = th.Tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double()
+            pos_offset = th.tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double()
             self.vr_profile.add_move_physical_world_relative_to_device(pos_offset)
         if rot_offset is not None:
-            rot_offset = th.Tensor(rot_offset).double()
+            rot_offset = th.tensor(rot_offset).double()
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
-    def _is_valid_transform(self, transform: Tuple[th.Tensor, th.Tensor]) -> bool:
+    def _is_valid_transform(self, transform: Tuple[th.tensor, th.tensor]) -> bool:
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """

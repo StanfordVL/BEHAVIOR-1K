@@ -442,7 +442,7 @@ class ManipulationRobot(BaseRobot):
                     self.articulation_root_path, self.eef_link_names[arm]
                 )
             )
-            dic["grasp_{}".format(arm)] = th.Tensor([self.is_grasping(arm)])
+            dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
 
@@ -838,7 +838,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = th.norm(th.Tensor(candidate_link.get_position()) - th.Tensor(gripper_center_pos))
+            dist = th.norm(th.tensor(candidate_link.get_position()) - th.tensor(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1006,8 +1006,8 @@ class ManipulationRobot(BaseRobot):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    th.Tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    th.Tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
                 "mode": "pose_delta_ori",
                 "smoothing_filter_size": 2,
@@ -1032,8 +1032,8 @@ class ManipulationRobot(BaseRobot):
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
-                    th.Tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
-                    th.Tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                    th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                    th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
                 ),
                 "mode": "pose_delta_ori",
                 "workspace_pose_limiter": None,
@@ -1189,7 +1189,7 @@ class ManipulationRobot(BaseRobot):
                 Default is "default" which corresponds to the first entry in self.arm_names
             ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidPrim)).
                 Otherwise, does a no-op
-            contact_pos (None or th.Tensor): if specified, contact position to use for grasp.
+            contact_pos (None or th.tensor): if specified, contact position to use for grasp.
         """
         arm = self.default_arm if arm == "default" else arm
 
@@ -1206,7 +1206,7 @@ class ManipulationRobot(BaseRobot):
             force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
             for c_link_prim_path, c_contact_pos in force_data:
                 if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = th.Tensor(c_contact_pos)
+                    contact_pos = th.tensor(c_contact_pos)
                     break
         assert contact_pos is not None
 
@@ -1214,7 +1214,7 @@ class ManipulationRobot(BaseRobot):
         # Need to find distance between robot and contact point in robot link's local frame and
         # ag link and contact point in ag link's local frame
         joint_frame_pos = contact_pos
-        joint_frame_orn = th.Tensor([0, 0, 0, 1.0])
+        joint_frame_orn = th.tensor([0, 0, 0, 1.0])
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         parent_frame_pos, parent_frame_orn = T.relative_pose_transform(
             joint_frame_pos, joint_frame_orn, eef_link_pos, eef_link_orn
@@ -1328,7 +1328,7 @@ class ManipulationRobot(BaseRobot):
         """
         Same as _calculate_in_hand_object_rigid, except for cloth. Only one should be used at any given time.
 
-        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, th.Tensor) tuple or
+        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, th.tensor) tuple or
         None if no valid AG-enabled object can be found.
 
         1) Check if the gripper is closed enough
@@ -1344,7 +1344,7 @@ class ManipulationRobot(BaseRobot):
         Returns:
             None or 3-tuple: If a valid assisted-grasp object is found,
                 returns the corresponding (object, object_link, attachment_point_position), i.e.
-                ((BaseObject, RigidPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
+                ((BaseObject, RigidPrim, th.tensor)) to the contacted in-hand object. Otherwise, returns None
         """
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03
@@ -1385,7 +1385,7 @@ class ManipulationRobot(BaseRobot):
             arm (str): specific arm to establish grasp.
                 Default is "default" which corresponds to the first entry in self.arm_names
             ag_data (None or 3-tuple): If specified, should be the corresponding
-                (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, th.Tensor)) to the]
+                (object, object_link, attachment_point_position), i.e. ((BaseObject, RigidPrim, th.tensor)) to the]
                 contacted in-hand object
         """
         arm = self.default_arm if arm == "default" else arm
@@ -1524,9 +1524,9 @@ class ManipulationRobot(BaseRobot):
         Rotational offset that will be applied for teleoperation
         such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
         """
-        return {arm: th.Tensor([0, 0, 0, 1]) for arm in self.arm_names}
+        return {arm: th.tensor([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper.
@@ -1534,7 +1534,7 @@ class ManipulationRobot(BaseRobot):
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            th.Tensor: array of action data for arm and gripper
+            th.tensor: array of action data for arm and gripper
         """
         action = super().teleop_data_to_action(teleop_action)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]

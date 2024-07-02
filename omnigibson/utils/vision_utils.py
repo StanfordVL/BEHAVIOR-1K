@@ -89,16 +89,16 @@ class Remapper:
                 e.g. {1: 'desk', 2: 'chair'}.
             new_mapping (dict): The new mapping dictionary that maps another set of image values to labels,
                 e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
-            image (th.Tensor): The 2D image to remap, e.g. [[1, 3], [1, 2]].
-            image_keys (th.Tensor): The unique keys in the image, e.g. [1, 2, 3].
+            image (th.tensor): The 2D image to remap, e.g. [[1, 3], [1, 2]].
+            image_keys (th.tensor): The unique keys in the image, e.g. [1, 2, 3].
 
         Returns:
-            th.Tensor: The remapped image, e.g. [[5,100],[5,7]].
+            th.tensor: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
         # Make sure that max uint32 doesn't match any value in the new mapping
         assert th.all(
-            th.Tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
+            th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = th.max(image)
         key_array_max_key = len(self.key_array) - 1
@@ -172,7 +172,7 @@ def randomize_colors(N, bright=True):
     """
     brightness = 1.0 if bright else 0.5
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
-    colors = th.Tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
+    colors = th.tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
     colors = colors[th.randperm(colors.size(0))]
     colors[0] = [0, 0, 0]  # First color is black
     return colors
@@ -210,12 +210,12 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
 
     Args:
-        bbox_3d_data (th.Tensor): 3D bounding box data
-        rgb_image (th.Tensor): RGB image
+        bbox_3d_data (th.tensor): 3D bounding box data
+        rgb_image (th.tensor): RGB image
         camera_params (dict): Camera parameters
 
     Returns:
-        th.Tensor: RGB image with 3D bounding boxes drawn
+        th.tensor: RGB image with 3D bounding boxes drawn
     """
 
     def world_to_image_pinhole(world_points, camera_params):
@@ -286,9 +286,9 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     # Project to image space
     corners_2d = world_to_image_pinhole(corners_3d, camera_params)
     width, height = rgb.size
-    corners_2d *= th.Tensor([[width, height]])
+    corners_2d *= th.tensor([[width, height]])
 
     # Now, draw all bounding boxes
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
-    return th.Tensor(rgb)
+    return th.tensor(rgb)

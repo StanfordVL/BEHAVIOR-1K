@@ -225,7 +225,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 og.sim.psqi.overlap_box(
                     halfExtent=half_extent,
                     pos=aabb_center,
-                    rot=th.Tensor([0, 0, 0, 1.0]),
+                    rot=th.tensor([0, 0, 0, 1.0]),
                     reportFn=overlap_callback,
                 )
 

@@ -41,7 +41,7 @@ class SB3VectorEnvironment(DummyVecEnv):
         # Keep track of our last reset time
         self.last_reset_time = time.time()
 
-    def step_async(self, actions: th.Tensor) -> None:
+    def step_async(self, actions: th.tensor) -> None:
         # We go into this context in case the pre-step tries to call step / render
         with og.sim.render_on_step(self.render_on_step):
             global last_stepped_env, last_stepped_time

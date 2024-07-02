@@ -44,8 +44,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
     cam.set_position_orientation(
-        position=th.Tensor([-4.62785, -0.418575, 0.933943]),
-        orientation=th.Tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
+        position=th.tensor([-4.62785, -0.418575, 0.933943]),
+        orientation=th.tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
     )
 
     def steps(n):

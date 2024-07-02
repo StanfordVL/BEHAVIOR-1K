@@ -87,9 +87,9 @@ class PointNavigationTask(BaseTask):
         # Store inputs
         self._robot_idn = robot_idn
         self._floor = floor
-        self._initial_pos = initial_pos if initial_pos is None else th.Tensor(initial_pos)
-        self._initial_quat = initial_quat if initial_quat is None else th.Tensor(initial_quat)
-        self._goal_pos = goal_pos if goal_pos is None else th.Tensor(goal_pos)
+        self._initial_pos = initial_pos if initial_pos is None else th.tensor(initial_pos)
+        self._initial_quat = initial_quat if initial_quat is None else th.tensor(initial_quat)
+        self._goal_pos = goal_pos if goal_pos is None else th.tensor(goal_pos)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
@@ -174,7 +174,7 @@ class PointNavigationTask(BaseTask):
                 radius=self._goal_tolerance,
                 height=self._goal_height,
                 visual_only=True,
-                rgba=th.Tensor([1, 0, 0, 0.3]),
+                rgba=th.tensor([1, 0, 0, 0.3]),
             )
             self._goal_pos_marker = PrimitiveObject(
                 relative_prim_path="/task_goal_pos_marker",
@@ -183,7 +183,7 @@ class PointNavigationTask(BaseTask):
                 radius=self._goal_tolerance,
                 height=self._goal_height,
                 visual_only=True,
-                rgba=th.Tensor([0, 0, 1, 0.3]),
+                rgba=th.tensor([0, 0, 1, 0.3]),
             )
 
             # Load the objects into the simulator
@@ -201,7 +201,7 @@ class PointNavigationTask(BaseTask):
                     radius=self._waypoint_width,
                     height=self._waypoint_height,
                     visual_only=True,
-                    rgba=th.Tensor([0, 1, 0, 0.3]),
+                    rgba=th.tensor([0, 1, 0, 0.3]),
                 )
                 env.scene.add_object(waypoint)
                 waypoints.append(waypoint)
@@ -234,7 +234,7 @@ class PointNavigationTask(BaseTask):
         # Possibly sample initial ori
         quat_lo, quat_hi = 0, math.pi * 2
         initial_quat = (
-            T.euler2quat(th.Tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]))
+            T.euler2quat(th.tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]))
             if self._randomize_initial_quat
             else self._initial_quat
         )
@@ -382,14 +382,14 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = th.Tensor(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
+        delta_pos_global = th.tensor(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
         return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
 
     def _get_obs(self, env):
         # Get relative position of goal with respect to the current agent position
         xy_pos_to_goal = self._global_pos_to_robot_frame(env, self._goal_pos)[:2]
         if self._goal_in_polar:
-            xy_pos_to_goal = th.Tensor(T.cartesian_to_polar(*xy_pos_to_goal))
+            xy_pos_to_goal = th.tensor(T.cartesian_to_polar(*xy_pos_to_goal))
 
         # linear velocity and angular velocity
         ori_t = T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T
@@ -460,10 +460,10 @@ class PointNavigationTask(BaseTask):
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
                 self._waypoint_markers[i].set_position(
-                    position=th.Tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
+                    position=th.tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
                 )
             for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position(position=th.Tensor([0.0, 0.0, 100.0]))
+                self._waypoint_markers[i].set_position(position=th.tensor([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first

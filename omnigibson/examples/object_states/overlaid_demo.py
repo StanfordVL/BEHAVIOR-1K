@@ -56,8 +56,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([0.88215526, -1.40086216, 2.00311063]),
-        orientation=th.Tensor([0.42013364, 0.12342107, 0.25339685, 0.86258043]),
+        position=th.tensor([0.88215526, -1.40086216, 2.00311063]),
+        orientation=th.tensor([0.42013364, 0.12342107, 0.25339685, 0.86258043]),
     )
 
     max_steps = 100 if short_exec else -1

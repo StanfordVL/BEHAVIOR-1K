@@ -74,6 +74,6 @@ def load_default_config():
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, th.Tensor):
+        if isinstance(obj, th.tensor):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)

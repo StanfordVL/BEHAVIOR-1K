@@ -79,8 +79,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the table
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([0.544888, -0.412084, 1.11569]),
-        orientation=th.Tensor([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
+        position=th.tensor([0.544888, -0.412084, 1.11569]),
+        orientation=th.tensor([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
     )
 
     # Let apple settle
@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     knife.keep_still()
     knife.set_position_orientation(
-        position=apple.get_position() + th.Tensor([-0.15, 0.0, 0.2]),
+        position=apple.get_position() + th.tensor([-0.15, 0.0, 0.2]),
         orientation=T.euler2quat([-math.pi / 2, 0, 0]),
     )
 

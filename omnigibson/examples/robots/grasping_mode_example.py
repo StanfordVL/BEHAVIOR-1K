@@ -92,8 +92,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([-2.39951, 2.26469, 2.66227]),
-        orientation=th.Tensor([-0.23898481, 0.48475231, 0.75464013, -0.37204802]),
+        position=th.tensor([-2.39951, 2.26469, 2.66227]),
+        orientation=th.tensor([-0.23898481, 0.48475231, 0.75464013, -0.37204802]),
     )
 
     # Create teleop controller

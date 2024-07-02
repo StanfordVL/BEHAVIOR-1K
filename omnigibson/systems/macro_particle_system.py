@@ -158,7 +158,7 @@ class MacroParticleSystem(BaseSystem):
     def _dump_state(self):
         state = super()._dump_state()
         state["scales"] = (
-            th.Tensor([particle.scale for particle in self.particles.values()])
+            th.tensor([particle.scale for particle in self.particles.values()])
             if self.particles is not None
             else th.empty(0)
         )
@@ -340,7 +340,7 @@ class MacroParticleSystem(BaseSystem):
 
     @property
     def color(self):
-        return th.Tensor(self._color)
+        return th.tensor(self._color)
 
 
 class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
@@ -398,7 +398,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         self._particles_local_mat = None
 
         # Maps group name to array of face_ids where particles are located if the group object is a cloth type
-        # Maps group name to th.Tensor of face IDs (int) that particles are attached to
+        # Maps group name to th.tensor of face IDs (int) that particles are attached to
         self._cloth_face_ids = None
 
         # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
@@ -448,7 +448,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
                 if not self._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = (
-                        th.Tensor([z_extent * particle.scale[2] for particle in self._group_particles[group].values()])
+                        th.tensor([z_extent * particle.scale[2] for particle in self._group_particles[group].values()])
                         / 2.0
                     )
                     # Shift the particles halfway up
@@ -659,9 +659,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if success:
             self.generate_group_particles(
                 group=group,
-                positions=th.Tensor(positions),
-                orientations=th.Tensor(orientations),
-                scales=th.Tensor(scales),
+                positions=th.tensor(positions),
+                orientations=th.tensor(orientations),
+                scales=th.tensor(scales),
                 link_prim_paths=link_prim_paths,
             )
             # If we're a cloth, store the face_id as well
@@ -776,7 +776,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             pos, ori = self._compute_batch_particles_position_orientation(particles=particles, local=local)
             positions = pos if positions is None else positions
             orientations = ori if orientations is None else orientations
-        lens = th.Tensor([len(particles), len(positions), len(orientations)])
+        lens = th.tensor([len(particles), len(positions), len(orientations)])
         assert lens.min() == lens.max(), "Got mismatched particles, positions, and orientations!"
 
         particle_local_poses_batch = th.zeros((n_particles, 4, 4))
@@ -889,7 +889,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             ignore_scale (bool): Whether to ignore the parent_link scale when computing the local transform
 
         Returns:
-            th.Tensor: (4, 4) homogeneous transform matrix
+            th.tensor: (4, 4) homogeneous transform matrix
         """
         particle = self.particles[name]
         parent_obj = self._particles_info[name]["obj"]
@@ -998,7 +998,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             # Also store the cloth face IDs as a vector
             if is_cloth:
-                self._cloth_face_ids[self.get_group_name(obj)] = th.Tensor(
+                self._cloth_face_ids[self.get_group_name(obj)] = th.tensor(
                     [self._particles_info[particle_name]["face_id"] for particle_name in self._group_particles[name]]
                 )
 
@@ -1063,7 +1063,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_idns.append(info["particle_idns"])
                 particle_attached_references.append(info["particle_attached_references"])
             else:
-                indices_to_remove = th.cat((indices_to_remove, th.Tensor(info["particle_indices"], dtype=int)))
+                indices_to_remove = th.cat((indices_to_remove, th.tensor(info["particle_indices"], dtype=int)))
         self._sync_particle_groups(
             group_objects=group_objects,
             particle_idns=particle_idns,
@@ -1232,7 +1232,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         # Compute particle radius
         vertices = (
-            th.Tensor(self.particle_object.get_attribute("points"))
+            th.tensor(self.particle_object.get_attribute("points"))
             * self.particle_object.scale
             * self.max_scale.reshape(1, 3)
         )
@@ -1330,7 +1330,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             pos, ori = self.get_particle_position_orientation(idx=idx)
             orientation = ori if orientation is None else orientation
             position = pos if position is None else (position - T.quat2mat(orientation) @ self._particle_offset)
-        self.particles_view.set_transforms(th.cat([position, orientation]).reshape(1, -1), indices=th.Tensor([idx]))
+        self.particles_view.set_transforms(th.cat([position, orientation]).reshape(1, -1), indices=th.tensor([idx]))
 
     def set_particle_local_pose(self, idx, position=None, orientation=None):
         self.set_particle_position_orientation(idx=idx, position=position, orientation=orientation)
@@ -1384,7 +1384,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             l_vel, a_vel = self.get_particles_velocities()
             lin_vel = l_vel if lin_vel is None else lin_vel
             ang_vel = a_vel if ang_vel is None else ang_vel
-        self.particles_view.set_velocities(th.cat([lin_vel, ang_vel]).reshape(1, -1), indices=th.Tensor([idx]))
+        self.particles_view.set_velocities(th.cat([lin_vel, ang_vel]).reshape(1, -1), indices=th.tensor([idx]))
 
     @property
     def particle_radius(self):
@@ -1417,14 +1417,14 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         Generates new particles
 
         Args:
-            positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be sampled randomly
-            velocities (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+            velocities (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
                 If not specified, all will be set to 0
-            angular_velocities (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (ax,ay,az)
+            angular_velocities (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (ax,ay,az)
                 angular velocities. If not specified, all will be set to 0
-            scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+            scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """

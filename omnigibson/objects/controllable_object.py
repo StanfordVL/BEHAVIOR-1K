@@ -80,7 +80,7 @@ class ControllableObject(BaseObject):
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = None if reset_joint_pos is None else th.Tensor(reset_joint_pos)
+        self._reset_joint_pos = None if reset_joint_pos is None else th.tensor(reset_joint_pos)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -302,8 +302,8 @@ class ControllableObject(BaseObject):
         low, high = [], []
         for controller in self._controllers.values():
             limits = controller.command_input_limits
-            low.append(th.Tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
-            high.append(th.Tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
+            low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
+            high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(shape=(self.action_dim,), low=th.cat(low), high=th.cat(high), dtype=float)
 
@@ -321,7 +321,7 @@ class ControllableObject(BaseObject):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = th.Tensor(self.discrete_action_list[action])
+            action = th.tensor(self.discrete_action_list[action])
 
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
@@ -377,7 +377,7 @@ class ControllableObject(BaseObject):
         # Compose controls
         u_vec = th.zeros(self.n_dof)
         # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
-        u_type_vec = th.Tensor([ControlType.NONE] * self.n_dof)
+        u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -508,15 +508,15 @@ class ControllableObject(BaseObject):
         # set the targets for joints
         if using_pos:
             ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path, positions=th.Tensor(pos_vec), indices=th.Tensor(pos_idxs)
+                self.articulation_root_path, positions=th.tensor(pos_vec), indices=th.tensor(pos_idxs)
             )
         if using_vel:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path, velocities=th.Tensor(vel_vec), indices=th.Tensor(vel_idxs)
+                self.articulation_root_path, velocities=th.tensor(vel_vec), indices=th.tensor(vel_idxs)
             )
         if using_eff:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path, efforts=th.Tensor(eff_vec), indices=th.Tensor(eff_idxs)
+                self.articulation_root_path, efforts=th.tensor(eff_vec), indices=th.tensor(eff_idxs)
             )
 
     def get_control_dict(self):

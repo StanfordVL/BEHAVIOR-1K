@@ -108,12 +108,12 @@ class IKSolver:
             None or n-array: Joint positions for reaching desired target_pos and target_quat, otherwise None if no
                 solution was found
         """
-        pos = th.Tensor(target_pos, dtype=th.float64).reshape(3, 1)
-        rot = th.Tensor(T.quat2mat(th.Tensor([0, 0, 0, 1.0]) if target_quat is None else target_quat), dtype=th.float64)
+        pos = th.tensor(target_pos, dtype=th.float64).reshape(3, 1)
+        rot = th.tensor(T.quat2mat(th.tensor([0, 0, 0, 1.0]) if target_quat is None else target_quat), dtype=th.float64)
         ik_target_pose = lazy.lula.Pose3(lazy.lula.Rotation3(rot), pos)
 
         # Set the cspace seed and tolerance
-        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else th.Tensor(initial_joint_pos)
+        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else th.tensor(initial_joint_pos)
         self.config.cspace_seeds = [initial_joint_pos]
         self.config.position_tolerance = tolerance_pos
         self.config.orientation_tolerance = 100.0 if target_quat is None else tolerance_quat
@@ -125,7 +125,7 @@ class IKSolver:
         # Compute target joint positions
         ik_results = lazy.lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
         if ik_results.success:
-            return th.Tensor(ik_results.cspace_position)
+            return th.tensor(ik_results.cspace_position)
         else:
             return None
 

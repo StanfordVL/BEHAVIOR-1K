@@ -126,12 +126,12 @@ class PhysxParticleInstancer(BasePrim):
         """
         Adds particles to this particle instancer.
 
-        positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
-        velocities (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+        positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
+        velocities (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
             If not specified, all will be set to 0
-        orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+        orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
             orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-        scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+        scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
             If not specified, will be scale [1, 1, 1] by default
         prototype_indices (None or list of int): If specified, should specify which prototype should be used for
             each particle. If None, will use all 0s (i.e.: the first prototype created)
@@ -156,7 +156,7 @@ class PhysxParticleInstancer(BasePrim):
         Remove particles from this instancer, specified by their indices @idxs in the data array
 
         Args:
-            idxs (list or th.Tensor of int): IDs corresponding to the indices of specific particles to remove from this
+            idxs (list or th.tensor of int): IDs corresponding to the indices of specific particles to remove from this
                 instancer
         """
         if len(idxs) > 0:
@@ -206,10 +206,10 @@ class PhysxParticleInstancer(BasePrim):
     def particle_positions(self):
         """
         Returns:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.Tensor(self.get_attribute(attr="positions"))
+        return th.tensor(self.get_attribute(attr="positions"))
 
     @particle_positions.setter
     def particle_positions(self, pos):
@@ -217,7 +217,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle positions for this instancer
 
         Args:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
         self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.float()))
@@ -226,10 +226,10 @@ class PhysxParticleInstancer(BasePrim):
     def particle_orientations(self):
         """
         Returns:
-            th.Tensor: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
+            th.tensor: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        return th.Tensor(self.get_attribute(attr="orientations"))
+        return th.tensor(self.get_attribute(attr="orientations"))
 
     @particle_orientations.setter
     def particle_orientations(self, quat):
@@ -237,7 +237,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle positions for this instancer
 
         Args:
-            th.Tensor: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
+            th.tensor: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
         assert (
@@ -253,10 +253,10 @@ class PhysxParticleInstancer(BasePrim):
     def particle_velocities(self):
         """
         Returns:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.Tensor(self.get_attribute(attr="velocities"))
+        return th.tensor(self.get_attribute(attr="velocities"))
 
     @particle_velocities.setter
     def particle_velocities(self, vel):
@@ -264,7 +264,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle velocities for this instancer
 
         Args:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
         assert (
@@ -276,10 +276,10 @@ class PhysxParticleInstancer(BasePrim):
     def particle_scales(self):
         """
         Returns:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' scales are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.Tensor(self.get_attribute(attr="scales"))
+        return th.tensor(self.get_attribute(attr="scales"))
 
     @particle_scales.setter
     def particle_scales(self, scales):
@@ -287,7 +287,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle scales for this instancer
 
         Args:
-            th.Tensor: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
+            th.tensor: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
         assert (
@@ -299,10 +299,10 @@ class PhysxParticleInstancer(BasePrim):
     def particle_prototype_ids(self):
         """
         Returns:
-            th.Tensor: (N,) numpy array, where each of the N particles' prototype_id (i.e.: which prototype is being used
+            th.tensor: (N,) numpy array, where each of the N particles' prototype_id (i.e.: which prototype is being used
                 for that particle)
         """
-        return th.Tensor(self.get_attribute(attr="protoIndices"))
+        return th.tensor(self.get_attribute(attr="protoIndices"))
 
     @particle_prototype_ids.setter
     def particle_prototype_ids(self, prototype_ids):
@@ -310,7 +310,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle prototype_ids for this instancer
 
         Args:
-            th.Tensor: (N,) numpy array, where each of the N particles' desired prototype_id
+            th.tensor: (N,) numpy array, where each of the N particles' desired prototype_id
                 (i.e.: which prototype is being used for that particle)
         """
         assert (
@@ -338,9 +338,9 @@ class PhysxParticleInstancer(BasePrim):
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self.n_particles,
-            particle_positions=th.Tensor(local_positions),
+            particle_positions=th.tensor(local_positions),
             particle_velocities=self.particle_velocities,
-            particle_orientations=th.Tensor(local_orientations),
+            particle_orientations=th.tensor(local_orientations),
             particle_scales=self.particle_scales,
             particle_prototype_ids=self.particle_prototype_ids,
         )
@@ -356,16 +356,16 @@ class PhysxParticleInstancer(BasePrim):
             f"instancer when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
         )
 
-        local_positions = th.Tensor(state["particle_positions"])
-        local_orientations = th.Tensor(state["particle_orientations"])
+        local_positions = th.tensor(state["particle_positions"])
+        local_orientations = th.tensor(state["particle_orientations"])
         global_positions, global_orientations = zip(
             *[
                 T.pose_transform(*self.scene.prim.get_position_orientation(), local_pos, local_ori)
                 for local_pos, local_ori in zip(local_positions, local_orientations)
             ]
         )
-        setattr(self, "particle_positions", th.Tensor(global_positions))
-        setattr(self, "particle_orientations", th.Tensor(global_orientations))
+        setattr(self, "particle_positions", th.tensor(global_positions))
+        setattr(self, "particle_orientations", th.tensor(global_orientations))
 
         # Set values appropriately
         keys = (
@@ -376,7 +376,7 @@ class PhysxParticleInstancer(BasePrim):
         for key in keys:
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
             # JSON-serialization
-            val = th.Tensor(state[key]) if not isinstance(state[key], th.Tensor) else state[key]
+            val = th.tensor(state[key]) if not isinstance(state[key], th.tensor) else state[key]
             setattr(self, key, val)
 
     def serialize(self, state):
@@ -449,7 +449,7 @@ class MicroParticleSystem(BaseSystem):
 
         # Color of the generated material. Default is white [1.0, 1.0, 1.0]
         # (NOTE: external queries should call self.color)
-        self._color = th.Tensor([1.0, 1.0, 1.0])
+        self._color = th.tensor([1.0, 1.0, 1.0])
 
     def initialize(self, scene):
         # Run super first
@@ -491,7 +491,7 @@ class MicroParticleSystem(BaseSystem):
 
         self.system_prim = None
         self._material = None
-        self._color = th.Tensor([1.0, 1.0, 1.0])
+        self._color = th.tensor([1.0, 1.0, 1.0])
 
     @property
     def particle_radius(self):
@@ -858,7 +858,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Removes pre-existing particles from instancer @instancer_idn
 
         Args:
-            idxs (th.Tensor): (n_particles,) shaped array specifying IDs of particles to delete
+            idxs (th.tensor): (n_particles,) shaped array specifying IDs of particles to delete
             instancer_idn (None or int): Unique identification number of the particle instancer to delete the particles
                 from. If None, this system will delete particles from the default particle instancer
         """
@@ -889,7 +889,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             of a newly generated instancer.
 
         Args:
-            positions (th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
                 particles to. This is used to deterministically reproduce individual particle instancer states
                 dynamically, even if we delete / add additional ones at runtime during simulation. If there is no
@@ -898,11 +898,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
                 with each other. Particles in the same group will have collision behavior dictated by
                 @self.self_collision
-            velocities (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+            velocities (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
                 If not specified, all will be set to 0
-            orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+            scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will randomly sample from all available prototypes
@@ -922,7 +922,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             prototype_indices = (
                 th.ones(n_particles, dtype=int) * prototype_indices
                 if isinstance(prototype_indices, int)
-                else th.Tensor(prototype_indices, dtype=int)
+                else th.tensor(prototype_indices, dtype=int)
             )
         else:
             prototype_indices = th.randint(len(self.particle_prototypes), (n_particles,))
@@ -979,13 +979,13 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
                 with each other. Particles in the same group will have collision behavior dictated by
                 @self.self_collision
-            positions (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
+            positions (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
                 If not specified, will be set to the origin by default
-            velocities (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+            velocities (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
                 If not specified, all will be set to 0
-            orientations (None or th.Tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or th.Tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+            scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             prototype_indices (None or list of int): If specified, should specify which prototype should be used for
                 each particle. If None, will use all 0s (i.e.: the first prototype created)
@@ -1414,7 +1414,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         total_weight = base_color_weight + transmission_weight
         if total_weight == 0.0:
             # If the fluid doesn't have any color, we add a "blue" tint by default
-            color = th.Tensor([0.0, 0.0, 1.0])
+            color = th.tensor([0.0, 0.0, 1.0])
         else:
             base_color_weight /= total_weight
             transmission_weight /= total_weight
@@ -1484,7 +1484,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
 
 def customize_particle_material_factory(attr, value):
     def func(mat):
-        setattr(mat, attr, th.Tensor(value))
+        setattr(mat, attr, th.tensor(value))
 
     return func
 
@@ -1596,7 +1596,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Store the contact offset based on a minimum sphere
         # Threshold the lower-bound to avoid super small particles
-        vertices = th.Tensor(prototype.get_attribute("points")) * prototype.scale
+        vertices = th.tensor(prototype.get_attribute("points")) * prototype.scale
         _, particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
         if particle_contact_offset < m.MIN_PARTICLE_CONTACT_OFFSET:
             prototype.scale *= m.MIN_PARTICLE_CONTACT_OFFSET / particle_contact_offset
@@ -1662,7 +1662,7 @@ class Cloth(MicroParticleSystem):
             tm = mesh_prim_to_trimesh_mesh(
                 mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
             )
-            texcoord = th.Tensor(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
+            texcoord = th.tensor(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
         else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
@@ -1730,7 +1730,7 @@ class Cloth(MicroParticleSystem):
             new_faces = cm.face_matrix()
             new_vertices = cm.vertex_matrix()
             new_normals = cm.vertex_normal_matrix()
-            texcoord = th.Tensor(cm.wedge_tex_coord_matrix()) if has_uv_mapping else None
+            texcoord = th.tensor(cm.wedge_tex_coord_matrix()) if has_uv_mapping else None
             tm = trimesh.Trimesh(
                 vertices=new_vertices,
                 faces=new_faces,
@@ -1740,7 +1740,7 @@ class Cloth(MicroParticleSystem):
             tm.apply_transform(th.linalg.inv_ex(scaled_world_transform))
 
         # Update the mesh prim
-        face_vertex_counts = th.Tensor([len(face) for face in tm.faces], dtype=int)
+        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int)
         mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
         mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
         mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())

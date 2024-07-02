@@ -401,7 +401,7 @@ class StatefulObject(BaseObject):
             colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
             emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * th.Tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
             )
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
                 bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO

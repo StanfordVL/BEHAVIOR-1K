@@ -124,7 +124,7 @@ def create_physx_particleset_pointinstancer(
         prototype_prim_paths (list of str): Stage path(s) to the prototypes to reference for this particle set.
         particle_group (int): ID for this particle set. Particles from different groups will automatically collide
             with each other. Particles in the same group will have collision behavior dictated by @self_collision
-        positions (list of 3-tuple or th.Tensor): Particle (x,y,z) positions either as a list or a (N, 3) numpy array
+        positions (list of 3-tuple or th.tensor): Particle (x,y,z) positions either as a list or a (N, 3) numpy array
         self_collision (bool): Whether to enable particle-particle collision within the set
             (as defined by @particle_group) or not
         fluid (bool): Whether to simulated the particle set as fluid or not
@@ -133,13 +133,13 @@ def create_physx_particleset_pointinstancer(
         particle_density (None or float): If specified, should be per-particle density and is used to compute total
             point set mass. Otherwise, will be inferred from @density. Note: Either @particle_mass or
             @particle_density must be specified!
-        orientations (None or list of 4-array or th.Tensor): Particle (x,y,z,w) quaternion orientations, either as a
+        orientations (None or list of 4-array or th.tensor): Particle (x,y,z,w) quaternion orientations, either as a
             list or a (N, 4) numpy array. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-        velocities (None or list of 3-array or th.Tensor): Particle (x,y,z) velocities either as a list or a (N, 3)
+        velocities (None or list of 3-array or th.tensor): Particle (x,y,z) velocities either as a list or a (N, 3)
             numpy array. If not specified, all will be set to 0
-        angular_velocities (None or list of 3-array or th.Tensor): Particle (x,y,z) angular velocities either as a
+        angular_velocities (None or list of 3-array or th.tensor): Particle (x,y,z) angular velocities either as a
             list or a (N, 3) numpy array. If not specified, all will be set to 0
-        scales (None or list of 3-array or th.Tensor): Particle (x,y,z) scales either as a list or a (N, 3)
+        scales (None or list of 3-array or th.tensor): Particle (x,y,z) scales either as a list or a (N, 3)
             numpy array. If not specified, all will be set to 1.0
         prototype_indices (None or list of int): If specified, should specify which prototype should be used for
             each particle. If None, will use all 0s (i.e.: the first prototype created)
@@ -197,7 +197,7 @@ def create_physx_particleset_pointinstancer(
     if orientations is None:
         orientations = th.zeros((n_particles, 4))
         orientations[:, -1] = 1.0
-    orientations = th.Tensor(orientations)[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
+    orientations = th.tensor(orientations)[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
     velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
     angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
     scales = th.ones((n_particles, 3)) if scales is None else scales

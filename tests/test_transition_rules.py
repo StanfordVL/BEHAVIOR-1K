@@ -1131,8 +1131,8 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container(en
     place_obj_on_floor_plane(food_processor)
     og.sim.step()
 
-    milk.generate_particles(positions=th.Tensor([[0.02, 0.06, 0.22]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[-0.05, -0.04, 0.22]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0.06, 0.22]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[-0.05, -0.04, 0.22]]))
     ice_cream.set_position_orientation([0.03, -0.02, 0.23], [0, 0, 0, 1])
 
     og.sim.step()
@@ -1181,8 +1181,8 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env
     og.sim.step()
 
     # This fails the recipe because it requires the milk to be in the blender
-    milk.generate_particles(positions=th.Tensor([[0.02, 0, 1.57]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 1.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
     og.sim.step()
 
@@ -1225,8 +1225,8 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_objects(env
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=th.Tensor([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     # This fails the recipe because it requires the ice cream to be inside the blender
     ice_cream.set_position_orientation([0, 0, 1.51], [0, 0, 0, 1])
 
@@ -1269,10 +1269,10 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=th.Tensor([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     # This fails the recipe because water (nonrecipe system) is in the blender
-    water.generate_particles(positions=th.Tensor([[0, 0, 0.57]]))
+    water.generate_particles(positions=th.tensor([[0, 0, 0.57]]))
     ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
 
     og.sim.step()
@@ -1320,8 +1320,8 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=th.Tensor([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
     # This fails the recipe because the bowl (nonrecipe object) is in the blender
     bowl.set_position_orientation([0, 0, 0.58], [0, 0, 0, 1])
@@ -1369,8 +1369,8 @@ def test_single_toggleable_machine_rule_output_system_success(env):
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=th.Tensor([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=th.Tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
 
     og.sim.step()
@@ -1426,12 +1426,12 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states(env):
 
     another_raw_egg.set_position_orientation([-0.01, -0.14, 0.50], [0, 0, 0, 1])
     raw_egg.set_position_orientation([-0.01, -0.14, 0.47], [0, 0, 0, 1])
-    flour.generate_particles(positions=th.Tensor([[-0.01, -0.15, 0.43]]))
-    granulated_sugar.generate_particles(positions=th.Tensor([[0.01, -0.15, 0.43]]))
-    vanilla.generate_particles(positions=th.Tensor([[0.03, -0.15, 0.43]]))
-    melted_butter.generate_particles(positions=th.Tensor([[-0.01, -0.13, 0.43]]))
-    baking_powder.generate_particles(positions=th.Tensor([[0.01, -0.13, 0.43]]))
-    salt.generate_particles(positions=th.Tensor([[0.03, -0.13, 0.43]]))
+    flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
+    granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
+    vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
+    melted_butter.generate_particles(positions=th.tensor([[-0.01, -0.13, 0.43]]))
+    baking_powder.generate_particles(positions=th.tensor([[0.01, -0.13, 0.43]]))
+    salt.generate_particles(positions=th.tensor([[0.03, -0.13, 0.43]]))
     # This fails the recipe because the egg should not be cooked
     raw_egg.states[Cooked].set_value(True)
     og.sim.step()
@@ -1500,12 +1500,12 @@ def test_single_toggleable_machine_rule_output_object_success(env):
 
     another_raw_egg.set_position_orientation([-0.01, -0.14, 0.50], [0, 0, 0, 1])
     raw_egg.set_position_orientation([-0.01, -0.14, 0.47], [0, 0, 0, 1])
-    flour.generate_particles(positions=th.Tensor([[-0.01, -0.15, 0.43]]))
-    granulated_sugar.generate_particles(positions=th.Tensor([[0.01, -0.15, 0.43]]))
-    vanilla.generate_particles(positions=th.Tensor([[0.03, -0.15, 0.43]]))
-    melted_butter.generate_particles(positions=th.Tensor([[-0.01, -0.13, 0.43]]))
-    baking_powder.generate_particles(positions=th.Tensor([[0.01, -0.13, 0.43]]))
-    salt.generate_particles(positions=th.Tensor([[0.03, -0.13, 0.43]]))
+    flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
+    granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
+    vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
+    melted_butter.generate_particles(positions=th.tensor([[-0.01, -0.13, 0.43]]))
+    baking_powder.generate_particles(positions=th.tensor([[0.01, -0.13, 0.43]]))
+    salt.generate_particles(positions=th.tensor([[0.03, -0.13, 0.43]]))
 
     og.sim.step()
 

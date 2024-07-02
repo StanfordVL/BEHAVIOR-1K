@@ -172,18 +172,18 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = th.Tensor([0, 0, 0, 1.0])
+            chosen_orientation = th.tensor([0, 0, 0, 1.0])
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = th.Tensor(probabilities) / th.sum(probabilities)
-            chosen_orientation = th.Tensor(list(self.orientations.values()))[
+            probabilities = th.tensor(probabilities) / th.sum(probabilities)
+            chosen_orientation = th.tensor(list(self.orientations.values()))[
                 th.multinomial(th.tensor(probabilities), 1)
             ].item()["rotation"]
 
         # Randomize yaw from -pi to pi
         rot_lo, rot_hi = -1, 1
         rot_num = (th.rand(1) * (rot_hi - rot_lo) + rot_lo).item()
-        rot_matrix = th.Tensor(
+        rot_matrix = th.tensor(
             [
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
@@ -230,10 +230,10 @@ class DatasetObject(USDObject):
             scale = th.ones(3)
             valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = (
-                th.Tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
             )
         else:
-            scale = th.ones(3) if self._load_config["scale"] is None else th.Tensor(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else th.tensor(self._load_config["scale"])
 
         # Assert that the scale does not have too small dimensions
         assert th.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
@@ -364,7 +364,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return th.Tensor(self.get_attribute(attr="ig:nativeBB"))
+        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property
     def base_link_offset(self):
@@ -374,7 +374,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return th.Tensor(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
 
     @property
     def metadata(self):

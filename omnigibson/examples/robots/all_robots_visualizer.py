@@ -44,8 +44,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         if not headless:
             # Set viewer in front facing robot
             og.sim.viewer_camera.set_position_orientation(
-                position=th.Tensor([2.69918369, -3.63686664, 4.57894564]),
-                orientation=th.Tensor([0.39592411, 0.1348514, 0.29286304, 0.85982]),
+                position=th.tensor([2.69918369, -3.63686664, 4.57894564]),
+                orientation=th.tensor([0.39592411, 0.1348514, 0.29286304, 0.85982]),
             )
 
         og.sim.enable_viewer_camera_teleoperation()

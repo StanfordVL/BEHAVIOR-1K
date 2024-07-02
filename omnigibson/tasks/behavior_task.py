@@ -107,7 +107,7 @@ class BehaviorTask(BaseTask):
         self.future_obj_instances = None  # set of str
 
         # Info for demonstration collection
-        self.instruction_order = None  # th.Tensor of int
+        self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
         self.activity_natural_language_goal_conditions = None  # str
@@ -383,9 +383,9 @@ class BehaviorTask(BaseTask):
         # Batch rpy calculations for much better efficiency
         objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
-            th.Tensor(
+            th.tensor(
                 [
-                    obj.states[Pose].get_value()[1] if obj_exist else th.Tensor([0, 0, 0, 1.0])
+                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
                     for obj, obj_exist in objs_exist.items()
                 ]
             )
@@ -403,14 +403,14 @@ class BehaviorTask(BaseTask):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = th.Tensor([1.0])
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
                 low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
                 low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
                 low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.Tensor([float(grasping_object)])
+                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
                 low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
                 low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)

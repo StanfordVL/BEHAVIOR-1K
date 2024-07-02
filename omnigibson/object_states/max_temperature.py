@@ -10,7 +10,7 @@ class MaxTemperature(TensorizedValueState):
     This state remembers the highest temperature reached by an object.
     """
 
-    # th.Tensor: Array of Temperature.VALUE indices that correspond to the internally tracked MaxTemperature objects
+    # th.tensor: Array of Temperature.VALUE indices that correspond to the internally tracked MaxTemperature objects
     TEMPERATURE_IDXS = None
 
     @classmethod

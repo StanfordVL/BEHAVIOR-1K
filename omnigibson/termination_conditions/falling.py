@@ -38,7 +38,7 @@ class Falling(FailureCondition):
         # Terminate if the robot has toppled over
         if self._topple:
             rotation = R.from_quat(env.scene.robots[self._robot_idn].get_orientation())
-            robot_up = rotation.apply(th.Tensor([0, 0, 1]))
+            robot_up = rotation.apply(th.tensor([0, 0, 1]))
             if robot_up[2] < self._tilt_tolerance:
                 return True
 

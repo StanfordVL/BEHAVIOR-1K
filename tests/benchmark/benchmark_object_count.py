@@ -64,7 +64,7 @@ def benchmark_scene(sim):
             # x, y, z = _get_position(obj_idx, RAND_POSITION)
             x, y = 0, 0
             z = 0.5 + j * OBJ_SCALE * 2.25
-            obj.set_position(position=th.Tensor([x, y, z]))
+            obj.set_position(position=th.tensor([x, y, z]))
             new_objs.append(obj)
 
         # Take a step to initialize the new objects (done in _non_physics_step()).

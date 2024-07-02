@@ -149,8 +149,8 @@ class SceneGraphBuilder(object):
         # Update the position of everything that's already in the scene by using our relative position to last frame.
         old_desired_to_new_desired = world_to_desired_frame @ self._last_desired_frame_to_world
         nodes = list(self._G.nodes)
-        poses = th.Tensor([self._G.nodes[obj]["pose"] for obj in nodes])
-        bbox_poses = th.Tensor([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
+        poses = th.tensor([self._G.nodes[obj]["pose"] for obj in nodes])
+        bbox_poses = th.tensor([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
         updated_poses = old_desired_to_new_desired @ poses
         updated_bbox_poses = old_desired_to_new_desired @ bbox_poses
         for i, obj in enumerate(nodes):

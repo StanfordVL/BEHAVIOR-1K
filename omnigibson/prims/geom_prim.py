@@ -78,7 +78,7 @@ class GeomPrim(XFormPrim):
             return self.material.diffuse_color_constant
         else:
             color = self.get_attribute("primvars:displayColor")
-            return None if color is None else th.Tensor(color)[0]
+            return None if color is None else th.tensor(color)[0]
 
     @color.setter
     def color(self, rgb):
@@ -91,7 +91,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:
-            self.set_attribute("primvars:displayColor", th.Tensor(rgb))
+            self.set_attribute("primvars:displayColor", th.tensor(rgb))
 
     @property
     def opacity(self):
@@ -103,7 +103,7 @@ class GeomPrim(XFormPrim):
             return self.material.opacity_constant
         else:
             opacity = self.get_attribute("primvars:displayOpacity")
-            return None if opacity is None else th.Tensor(opacity)[0]
+            return None if opacity is None else th.tensor(opacity)[0]
 
     @opacity.setter
     def opacity(self, opacity):
@@ -116,23 +116,23 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.opacity_constant = opacity
         else:
-            self.set_attribute("primvars:displayOpacity", th.Tensor([opacity]))
+            self.set_attribute("primvars:displayOpacity", th.tensor([opacity]))
 
     @property
     def points(self):
         """
         Returns:
-            th.Tensor: Local poses of all points
+            th.tensor: Local poses of all points
         """
         # If the geom is a mesh we can directly return its points.
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return th.Tensor(self.prim.GetAttribute("points").Get())
+            return th.tensor(self.prim.GetAttribute("points").Get())
         else:
             # Return the vertices of the trimesh
-            return th.Tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
+            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
 
     @property
     def points_in_parent_frame(self):
@@ -185,7 +185,7 @@ class GeomPrim(XFormPrim):
     def extent(self):
         """
         Returns:
-            th.Tensor: The unscaled 3d extent of the mesh in its local frame.
+            th.tensor: The unscaled 3d extent of the mesh in its local frame.
         """
         points = self.points
         return th.max(points, dim=0) - th.min(points, dim=0)

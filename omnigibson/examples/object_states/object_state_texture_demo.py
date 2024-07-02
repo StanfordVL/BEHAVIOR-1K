@@ -56,8 +56,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([1.7789, -1.68822, 1.13551]),
-        orientation=th.Tensor([0.57065614, 0.20331904, 0.267029, 0.74947212]),
+        position=th.tensor([1.7789, -1.68822, 1.13551]),
+        orientation=th.tensor([0.57065614, 0.20331904, 0.267029, 0.74947212]),
     )
 
     # Grab reference to object of interest

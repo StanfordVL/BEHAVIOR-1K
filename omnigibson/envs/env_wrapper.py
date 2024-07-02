@@ -46,7 +46,7 @@ class EnvironmentWrapper(Wrapper, Registerable):
         By default, run the normal environment step() function
 
         Args:
-            action (th.Tensor): action to take in environment
+            action (th.tensor): action to take in environment
 
         Returns:
             4-tuple:

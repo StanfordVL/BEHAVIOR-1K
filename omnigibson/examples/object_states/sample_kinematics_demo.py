@@ -49,7 +49,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"plate{i}",
             category="plate",
             model="iawoof",
-            bounding_box=th.Tensor([0.20, 0.20, 0.05]),
+            bounding_box=th.tensor([0.20, 0.20, 0.05]),
         )
         for i in range(2)
     ]
@@ -70,7 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name=f"shelf",
         category="shelf",
         model="pkgbcp",
-        bounding_box=th.Tensor([1.0, 0.4, 2.0]),
+        bounding_box=th.tensor([1.0, 0.4, 2.0]),
     )
 
     box_cfgs = [
@@ -79,7 +79,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"box{i}",
             category="box_of_crackers",
             model="cmdigf",
-            bounding_box=th.Tensor([0.2, 0.05, 0.3]),
+            bounding_box=th.tensor([0.2, 0.05, 0.3]),
         )
         for i in range(5)
     ]
@@ -129,7 +129,7 @@ def sample_microwave_plates_apples(env):
     cabinet.set_orientation([0, 0, 0, 1.0])
     env.step(th.empty(0))
     offset = cabinet.get_position()[2] - cabinet.aabb_center[2]
-    cabinet.set_position(th.Tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
+    cabinet.set_position(th.tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
     env.step(th.empty(0))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
@@ -173,7 +173,7 @@ def sample_boxes_on_shelf(env):
     shelf.set_orientation([0, 0, 0, 1.0])
     env.step(th.empty(0))
     offset = shelf.get_position()[2] - shelf.aabb_center[2]
-    shelf.set_position(th.Tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
+    shelf.set_position(th.tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
     env.step(th.empty(0))  # One step is needed for the object to be fully initialized
 
     og.log.info("Shelf placed.")

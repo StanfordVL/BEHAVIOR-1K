@@ -794,7 +794,7 @@ class WasherDryerRule(BaseTransitionRule):
         """
         # Compute all obj
         objects = [obj for scene in og.sim.scenes for obj in scene.objects]
-        obj_positions = th.Tensor([obj.aabb_center for obj in objects])
+        obj_positions = th.tensor([obj.aabb_center for obj in objects])
         return dict(obj_positions=obj_positions)
 
     @classmethod
@@ -818,7 +818,7 @@ class WasherDryerRule(BaseTransitionRule):
         in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
         objects = [obj for scene in og.sim.scenes for obj in scene.objects]
-        in_volume_objs = list(th.Tensor(objects)[in_volume])
+        in_volume_objs = list(th.tensor(objects)[in_volume])
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
@@ -969,8 +969,8 @@ class SlicingRule(BaseTransitionRule):
                 # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
                 # Get bounding box info
-                part_bb_pos = th.Tensor(part["bb_pos"])
-                part_bb_orn = th.Tensor(part["bb_orn"])
+                part_bb_pos = th.tensor(part["bb_pos"])
+                part_bb_orn = th.tensor(part["bb_orn"])
 
                 # Determine the relative scale to apply to the object part from the original object
                 # Note that proper (rotated) scaling can only be applied when the relative orientation of
@@ -1275,7 +1275,7 @@ class RecipeRule(BaseTransitionRule):
     @classmethod
     def _filter_input_objects_by_unary_and_binary_system_states(cls, recipe):
         # Filter input objects based on a subset of input states (unary states and binary system states)
-        # Map object categories (str) to valid indices (th.Tensor)
+        # Map object categories (str) to valid indices (th.tensor)
         category_to_valid_indices = dict()
         for obj_category in recipe["input_objects"]:
             if obj_category not in recipe["input_states"]:
@@ -1306,7 +1306,9 @@ class RecipeRule(BaseTransitionRule):
                     category_to_valid_indices[obj_category].append(idx)
 
                 # Convert to numpy array for faster indexing
-                category_to_valid_indices[obj_category] = th.Tensor(category_to_valid_indices[obj_category], dtype=int)
+                category_to_valid_indices[obj_category] = th.tensor(
+                    category_to_valid_indices[obj_category], dtype=th.int32
+                )
         return category_to_valid_indices
 
     @classmethod
@@ -1617,7 +1619,7 @@ class RecipeRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all relevant object AABB positions
-        obj_positions = th.Tensor([obj.aabb_center for obj in cls._OBJECTS])
+        obj_positions = th.tensor([obj.aabb_center for obj in cls._OBJECTS])
         return dict(obj_positions=obj_positions)
 
     @classmethod
@@ -1641,7 +1643,7 @@ class RecipeRule(BaseTransitionRule):
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | th.Tensor(
+        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | th.tensor(
             [obj.states[OnTop].get_value(container) for obj in cls._OBJECTS]
         )
 
@@ -1683,7 +1685,7 @@ class RecipeRule(BaseTransitionRule):
                 i += 1
 
         # Wrap relevant objects as numpy array so we can index into it efficiently
-        cls._OBJECTS = th.Tensor(cls._OBJECTS)
+        cls._OBJECTS = th.tensor(cls._OBJECTS)
 
     @classproperty
     def candidate_filters(cls):
@@ -1798,7 +1800,7 @@ class RecipeRule(BaseTransitionRule):
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
                 system = get_system(system_name)
                 volume += len(particle_idxs) * math.pi * (system.particle_radius**3) * 4 / 3
-                system.remove_particles(idxs=th.Tensor(list(particle_idxs)))
+                system.remove_particles(idxs=th.tensor(list(particle_idxs)))
 
         if not cls.is_multi_instance:
             # Remove either all objects or only the ones specified in the input objects of the recipe
@@ -1826,7 +1828,7 @@ class RecipeRule(BaseTransitionRule):
                 log.warning(
                     f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead."
                 )
-                pos = th.Tensor(container.aabb_center) + th.Tensor(
+                pos = th.tensor(container.aabb_center) + th.tensor(
                     [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0]
                 )
                 obj.set_bbox_center_position_orientation(position=pos)

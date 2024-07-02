@@ -3,7 +3,6 @@ from collections.abc import Iterable
 
 import torch as th
 import trimesh.transformations
-from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -67,7 +66,7 @@ class XFormPrim(BasePrim):
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
-        self.original_scale = th.Tensor(self.get_attribute("xformOp:scale"))
+        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -288,14 +287,14 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*th.Tensor(position, dtype=float))
+            position = lazy.pxr.Gf.Vec3d(*th.tensor(position, dtype=float))
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
-            orientation = th.Tensor(orientation, dtype=float)[[3, 0, 1, 2]]
+            orientation = th.tensor(orientation, dtype=float)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 lazy.carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
@@ -325,12 +324,12 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the world's frame.
 
         Returns:
-            th.Tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
+            th.tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
         """
         prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
-        return th.Tensor(transform.GetScale())
+        return th.tensor(transform.GetScale())
 
     @property
     def scaled_transform(self):
@@ -348,11 +347,11 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the local frame (the parent's frame).
 
         Returns:
-            th.Tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
+            th.tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
-        return th.Tensor(scale)
+        return th.tensor(scale)
 
     @scale.setter
     def scale(self, scale):
@@ -360,10 +359,10 @@ class XFormPrim(BasePrim):
         Sets prim's scale with respect to the local frame (the prim's parent frame).
 
         Args:
-            scale (float or th.Tensor): scale to be applied to the prim's dimensions. shape is (3, ).
+            scale (float or th.tensor): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        scale = th.Tensor(scale, dtype=float) if isinstance(scale, Iterable) else th.ones(3) * scale
+        scale = th.tensor(scale, dtype=float) if isinstance(scale, Iterable) else th.ones(3) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
@@ -425,7 +424,7 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        pos, orn = th.Tensor(state["pos"]), th.Tensor(state["ori"])
+        pos, orn = th.tensor(state["pos"]), th.tensor(state["ori"])
         if self.scene is not None:
             pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
         self.set_position_orientation(pos, orn)

@@ -34,7 +34,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
         visual=False
     )
 
-    grasp_center_pos = bbox_center_in_world + th.Tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
+    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
@@ -65,7 +65,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * th.eye(3)[approach_axis]
     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - th.abs(constant_dimension_in_base_frame)
-    dim_lo, dim_hi = th.Tensor([-1, -1, 0]), th.Tensor([1, 1, 1])
+    dim_lo, dim_hi = th.tensor([-1, -1, 0]), th.tensor([1, 1, 1])
     random_dimensions_in_base_frame = (dim_hi - dim_lo) * th.rand(
         dim_lo.size()
     ) + dim_lo  # note that we don't allow going below center
@@ -76,7 +76,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_center_pos = T.mat2pose(
         T.pose2mat((bbox_center_in_world, bbox_quat_in_world))  # base frame to world frame
         @ T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))  # grasp pose in base frame
-    )[0] + th.Tensor([0, 0, 0.02])
+    )[0] + th.tensor([0, 0, 0.02])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
@@ -89,7 +89,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_y /= th.norm(grasp_y)
     grasp_z = th.cross(grasp_x, grasp_y)
     grasp_z /= th.norm(grasp_z)
-    grasp_mat = th.Tensor([grasp_x, grasp_y, grasp_z]).T
+    grasp_mat = th.tensor([grasp_x, grasp_y, grasp_z]).T
     grasp_quat = R.from_matrix(grasp_mat).as_quat()
 
     grasp_pose = (grasp_center_pos, grasp_quat)
@@ -195,7 +195,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Pick the closer of the two faces along the push axis as our favorite.
     points_along_push_axis = (
-        th.Tensor([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
+        th.tensor([canonical_push_axis, -canonical_push_axis]) * bbox_extent_in_link_frame[push_axis_idx] / 2
     )
     (
         push_axis_closer_side_idx,
@@ -303,7 +303,7 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     pos_waypoints = th.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
-    combined_rotation = R.from_quat(th.Tensor([start_orn, end_pose[1]]))
+    combined_rotation = R.from_quat(th.tensor([start_orn, end_pose[1]]))
     slerp = Slerp([0, 1], combined_rotation)
     orn_waypoints = slerp(th.linspace(0, 1, num_waypoints))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
@@ -337,7 +337,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     bbox_quat_in_world = link.get_orientation()
-    bbox_extent_in_link_frame = th.Tensor(
+    bbox_extent_in_link_frame = th.tensor(
         target_obj.native_link_bboxes[link_name]["collision"]["axis_aligned"]["extent"]
     )
     bbox_wrt_origin = T.relative_pose_transform(
@@ -350,7 +350,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )[[1, 2, 3, 0]]
     joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     joint_axis /= th.norm(joint_axis)
-    origin_towards_bbox = th.Tensor(bbox_wrt_origin[0])
+    origin_towards_bbox = th.tensor(bbox_wrt_origin[0])
     open_direction = th.cross(joint_axis, origin_towards_bbox)
     open_direction /= th.norm(open_direction)
     lateral_axis = th.cross(open_direction, joint_axis)
@@ -365,7 +365,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     canonical_open_direction = th.eye(3)[open_axis_idx]
     points_along_open_axis = (
-        th.Tensor([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
+        th.tensor([canonical_open_direction, -canonical_open_direction]) * bbox_extent_in_link_frame[open_axis_idx] / 2
     )
     current_yaw = relevant_joint.get_state()[0][0]
     closed_yaw = relevant_joint.lower_limit
@@ -383,7 +383,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     canonical_joint_axis = th.eye(3)[joint_axis_idx]
     lateral_away_from_origin = th.eye(3)[lateral_axis_idx] * th.sign(origin_towards_bbox[lateral_axis_idx])
     min_lateral_pos_wrt_surface_center = (
-        lateral_away_from_origin * -th.Tensor(origin_wrt_bbox[0])
+        lateral_away_from_origin * -th.tensor(origin_wrt_bbox[0])
         - canonical_joint_axis * bbox_extent_in_link_frame[lateral_axis_idx] / 2
     )
     max_lateral_pos_wrt_surface_center = (
@@ -446,7 +446,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
-    movement_in_world_frame = th.Tensor(targets[-1][0]) - th.Tensor(offset_grasp_pose_in_world_frame[0])
+    movement_in_world_frame = th.tensor(targets[-1][0]) - th.tensor(offset_grasp_pose_in_world_frame[0])
     grasp_required = th.dot(movement_in_world_frame, approach_direction_in_world_frame) < 0
 
     return (
@@ -464,10 +464,10 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     axes to be random.
 
     Args:
-        vector (th.Tensor): The vector to face.
+        vector (th.tensor): The vector to face.
 
     Returns:
-        th.Tensor: A quaternion representing the orientation.
+        th.tensor: A quaternion representing the orientation.
     """
     forward = vector / th.norm(vector)
     rand_vec = th.rand(3)
@@ -476,7 +476,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     side /= th.norm(3)
     up = th.cross(forward, side)
     # assert th.isclose(th.norm(up), 1, atol=1e-3)
-    rotmat = th.Tensor([forward, side, up]).T
+    rotmat = th.tensor([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 
 
@@ -489,7 +489,7 @@ def _rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_ori
     Args:
         point_wrt_arbitrary_frame (tuple): The point in the arbitrary frame.
         arbitrary_frame_wrt_origin (tuple): The pose of the arbitrary frame in the origin frame.
-        joint_axis (th.Tensor): The axis to rotate around.
+        joint_axis (th.tensor): The axis to rotate around.
         yaw_change (float): The amount to rotate by.
 
     Returns:
@@ -519,14 +519,14 @@ def _get_closest_point_to_point_in_world_frame(
     Returns:
         tuple: The index of the closest vector, the closest vector in the arbitrary frame, and the closest vector in the world frame.
     """
-    vectors_in_world = th.Tensor(
+    vectors_in_world = th.tensor(
         [
             T.pose_transform(*arbitrary_frame_to_world_frame, vector, [0, 0, 0, 1])[0]
             for vector in vectors_in_arbitrary_frame
         ]
     )
 
-    vector_distances_to_point = th.norm(vectors_in_world - th.Tensor(point_in_world)[None, :], dim=1)
+    vector_distances_to_point = th.norm(vectors_in_world - th.tensor(point_in_world)[None, :], dim=1)
     closer_option_idx = th.argmin(vector_distances_to_point)
     vector_in_arbitrary_frame = vectors_in_arbitrary_frame[closer_option_idx]
     vector_in_world_frame = vectors_in_world[closer_option_idx]

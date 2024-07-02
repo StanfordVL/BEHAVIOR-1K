@@ -510,13 +510,13 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return self._reset_joint_pos_aabb_extent
 
-    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.tensor:
         """
         Generate action data from teleoperation action data
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            th.Tensor: array of action data filled with update value
+            th.tensor: array of action data filled with update value
         """
         return th.zeros(self.action_dim)
 

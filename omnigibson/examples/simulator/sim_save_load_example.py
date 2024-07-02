@@ -36,8 +36,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set the camera to a good angle
     def set_camera_pose():
         og.sim.viewer_camera.set_position_orientation(
-            position=th.Tensor([-0.229375, -3.40576, 7.26143]),
-            orientation=th.Tensor([0.27619733, -0.00230233, -0.00801152, 0.9610648]),
+            position=th.tensor([-0.229375, -3.40576, 7.26143]),
+            orientation=th.tensor([0.27619733, -0.00230233, -0.00801152, 0.9610648]),
         )
 
     set_camera_pose()

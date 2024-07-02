@@ -244,8 +244,8 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
-        pos_relative = th.Tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.Tensor(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -306,8 +306,8 @@ class InverseKinematicsController(JointController, ManipulationController):
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
         # Grab important info from control dict
-        pos_relative = th.Tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.Tensor(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
         target_pos = goal_dict["target_pos"]
         target_quat = goal_dict["target_quat"]
 
@@ -359,8 +359,8 @@ class InverseKinematicsController(JointController, ManipulationController):
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
         return dict(
-            target_pos=th.Tensor(control_dict[f"{self.task_name}_pos_relative"]),
-            target_quat=th.Tensor(control_dict[f"{self.task_name}_quat_relative"]),
+            target_pos=th.tensor(control_dict[f"{self.task_name}_pos_relative"]),
+            target_quat=th.tensor(control_dict[f"{self.task_name}_quat_relative"]),
         )
 
     def _get_goal_shapes(self):

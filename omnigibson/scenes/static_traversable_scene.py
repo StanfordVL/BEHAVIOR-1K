@@ -120,7 +120,7 @@ class StaticTraversableScene(TraversableScene):
             height_adjustment = height - self.floor_heights[floor]
         else:
             height_adjustment = self.floor_heights[floor] - self._scene_prim.get_position()[2] + additional_elevation
-        self._scene_prim.set_position(th.Tensor([0, 0, height_adjustment]))
+        self._scene_prim.set_position(th.tensor([0, 0, height_adjustment]))
 
     def get_floor_height(self, floor=0):
         """

@@ -72,7 +72,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Either Cone or Cylinder; shape of the projection where particles can be applied / removed
             "type": "Cone",
             # Size of the cone
-            "extents": th.Tensor([0.1875, 0.1875, 0.375]),
+            "extents": th.tensor([0.1875, 0.1875, 0.375]),
         },
     }
 
@@ -129,8 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=th.Tensor([-1.61340969, -1.79803028, 2.53167412]),
-        orientation=th.Tensor([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
+        position=th.tensor([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=th.tensor([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
@@ -163,7 +163,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     modifier._post_load()
     env.scene.object_registry.add(modifier)
     og.sim.post_import_object(modifier)
-    modifier.set_position(th.Tensor([0, 0, 5.0]))
+    modifier.set_position(th.tensor([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle
     og.sim.play()
@@ -193,16 +193,16 @@ def main(random_selection=False, headless=False, short_exec=False):
         z = 1.22
     modifier.keep_still()
     modifier.set_position_orientation(
-        position=th.Tensor([0, 0.3, z]),
-        orientation=th.Tensor([0, 0, 0, 1.0]),
+        position=th.tensor([0, 0.3, z]),
+        orientation=th.tensor([0, 0, 0, 1.0]),
     )
 
     # Move object in square around table
     deltas = [
-        [130, th.Tensor([-0.01, 0, 0])],
-        [60, th.Tensor([0, -0.01, 0])],
-        [130, th.Tensor([0.01, 0, 0])],
-        [60, th.Tensor([0, 0.01, 0])],
+        [130, th.tensor([-0.01, 0, 0])],
+        [60, th.tensor([0, -0.01, 0])],
+        [130, th.tensor([0.01, 0, 0])],
+        [60, th.tensor([0, 0.01, 0])],
     ]
     for t, delta in deltas:
         for i in range(t):

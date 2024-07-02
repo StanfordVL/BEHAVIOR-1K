@@ -124,7 +124,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float):float], (x,y,z) cartesian delta base position
         """
-        new_pos = th.Tensor(delta) + self.get_position()
+        new_pos = th.tensor(delta) + self.get_position()
         self.set_position(position=new_pos)
 
     def move_forward(self, delta=0.05):
@@ -134,7 +134,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position forward
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(th.Tensor([delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([delta, 0, 0])))
 
     def move_backward(self, delta=0.05):
         """
@@ -143,7 +143,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position backward
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(th.Tensor([-delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([-delta, 0, 0])))
 
     def move_left(self, delta=0.05):
         """
@@ -152,7 +152,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position left
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(th.Tensor([0, -delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([0, -delta, 0])))
 
     def move_right(self, delta=0.05):
         """
@@ -161,7 +161,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position right
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(th.Tensor([0, delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([0, delta, 0])))
 
     def turn_left(self, delta=0.03):
         """
