@@ -172,7 +172,7 @@ class PlanningContext(object):
         translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(pose[0], dtype=th.float32)])
         prim.GetAttribute("xformOp:translate").Set(translation)
         orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
-        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
 
     def _construct_disabled_collision_pairs(self):
         robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
@@ -358,7 +358,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(reset_pose[0], dtype=th.float32)])
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
             orientation = th.tensor(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
-            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
 
             robot_to_copy = None
             if robot_type == "simplified":

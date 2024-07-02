@@ -452,7 +452,9 @@ def set_base_and_detect_collision(context, pose):
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
     orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(
+        lazy.pxr.Gf.Quatd(*[x.item() for x in orientation])
+    )
 
     return detect_robot_collision(context)
 
@@ -483,7 +485,7 @@ def set_arm_and_detect_collision(context, joint_pos):
                 translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(mesh_pose[0], dtype=th.float32)])
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = th.tensor(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
 
     return detect_robot_collision(context)
 

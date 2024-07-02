@@ -303,7 +303,7 @@ class XFormPrim(BasePrim):
             if xform_op.GetTypeName() == "quatf":
                 rotq = lazy.pxr.Gf.Quatf(*orientation)
             else:
-                rotq = lazy.pxr.Gf.Quatd(*orientation)
+                rotq = lazy.pxr.Gf.Quatd(*[x.item() for x in orientation])
             xform_op.Set(rotq)
         PoseAPI.invalidate()
         if gm.ENABLE_FLATCACHE:
