@@ -1009,7 +1009,7 @@ def matrix_inverse(matrix):
     Returns:
         th.tensor: 2d-array representing the matrix inverse
     """
-    return th.linalg.inv_ex(matrix)
+    return th.linalg.inv_ex(matrix).inverse
 
 
 def vecs2axisangle(vec0, vec1):

@@ -193,7 +193,7 @@ class XFormPrim(BasePrim):
         parent_path = str(parent_prim.GetPath())
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
-        local_transform = th.linalg.inv_ex(parent_world_transform) @ my_world_transform
+        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
         assert th.allclose(
             product, th.diag(th.diag(product)), atol=1e-3

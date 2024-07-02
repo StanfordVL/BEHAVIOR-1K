@@ -806,7 +806,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                     link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
-            # particle_local_poses_batch = th.matmul(th.linalg.inv_ex(link_tfs_batch), particle_local_poses_batch)
+            # particle_local_poses_batch = th.matmul(th.linalg.inv_ex(link_tfs_batch).inverse, particle_local_poses_batch)
             particle_local_poses_batch = th.linalg.solve(link_tfs_batch, particle_local_poses_batch)
 
         for i, name in enumerate(particles):
@@ -851,7 +851,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             if is_cloth
             else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
         )
-        local_mat = th.linalg.inv_ex(link_tf) @ global_mat
+        local_mat = th.linalg.inv_ex(link_tf).inverse @ global_mat
 
         self._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=False)
 
