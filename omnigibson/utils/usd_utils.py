@@ -149,13 +149,13 @@ def create_joint(
         joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
     if joint_frame_in_parent_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]])
+            lazy.pxr.Gf.Quatf(*[x.item() for x in joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]])
         )
     if joint_frame_in_child_frame_pos is not None:
         joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
     if joint_frame_in_child_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot1").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]])
+            lazy.pxr.Gf.Quatf(*[x.item() for x in joint_frame_in_child_frame_quat[[3, 0, 1, 2]]])
         )
 
     if break_force is not None:

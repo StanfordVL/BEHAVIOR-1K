@@ -301,7 +301,7 @@ class XFormPrim(BasePrim):
                 )
             xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*orientation)
+                rotq = lazy.pxr.Gf.Quatf(*[x.item() for x in orientation])
             else:
                 rotq = lazy.pxr.Gf.Quatd(*[x.item() for x in orientation])
             xform_op.Set(rotq)
