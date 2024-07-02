@@ -287,7 +287,7 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*th.tensor(position, dtype=float))
+            position = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(position, dtype=th.float32)])
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
@@ -364,7 +364,7 @@ class XFormPrim(BasePrim):
         """
         scale = th.tensor(scale, dtype=float) if isinstance(scale, Iterable) else th.ones(3) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
-        scale = lazy.pxr.Gf.Vec3d(*scale)
+        scale = lazy.pxr.Gf.Vec3d(*[x.item() for x in scale])
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
             lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))

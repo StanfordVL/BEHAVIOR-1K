@@ -169,7 +169,7 @@ class PlanningContext(object):
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
     def _set_prim_pose(self, prim, pose):
-        translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=th.float32))
+        translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(pose[0], dtype=th.float32)])
         prim.GetAttribute("xformOp:translate").Set(translation)
         orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
         prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
@@ -355,7 +355,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             lazy.omni.usd.commands.CreatePrimCommand("Xform", rc["copy_path"]).do()
             copy_robot = lazy.omni.isaac.core.utils.prims.get_prim_at_path(rc["copy_path"])
             reset_pose = robot_copy.reset_pose[robot_type]
-            translation = lazy.pxr.Gf.Vec3d(*th.tensor(reset_pose[0], dtype=float))
+            translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(reset_pose[0], dtype=th.float32)])
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
             orientation = th.tensor(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
             copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
