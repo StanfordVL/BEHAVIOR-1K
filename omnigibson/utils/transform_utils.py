@@ -389,7 +389,7 @@ def mat2quat(rmat):
     Returns:
         th.tensor: (..., 4) (x,y,z,w) float quaternion angles
     """
-    return R.from_matrix(rmat).as_quat()
+    return th.tensor(R.from_matrix(rmat).as_quat())
 
 
 def vec2quat(vec, up=(0, 0, 1.0)):
@@ -427,7 +427,7 @@ def euler2mat(euler):
     euler = th.asarray(euler, dtype=th.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
-    return R.from_euler("xyz", euler).as_matrix()
+    return th.tensor(R.from_euler("xyz", euler).as_matrix())
 
 
 def mat2euler(rmat):
@@ -441,7 +441,7 @@ def mat2euler(rmat):
         th.tensor: (r,p,y) converted euler angles in radian vec3 float
     """
     M = th.tensor(rmat, dtype=th.float32, copy=False)[:3, :3]
-    return R.from_matrix(M).as_euler("xyz")
+    return th.tensor(R.from_matrix(M).as_euler("xyz"))
 
 
 def pose2mat(pose):
@@ -472,7 +472,7 @@ def quat2mat(quaternion):
     Returns:
         th.tensor: (..., 3, 3) rotation matrix
     """
-    return R.from_quat(quaternion).as_matrix()
+    return th.tensor(R.from_quat(quaternion).as_matrix())
 
 
 def quat2axisangle(quat):
@@ -486,7 +486,7 @@ def quat2axisangle(quat):
     Returns:
         th.tensor: (ax,ay,az) axis-angle exponential coordinates
     """
-    return R.from_quat(quat).as_rotvec()
+    return th.tensor(R.from_quat(quat).as_rotvec())
 
 
 def axisangle2quat(vec):
@@ -499,7 +499,7 @@ def axisangle2quat(vec):
     Returns:
         th.tensor: (x,y,z,w) vec4 float angles
     """
-    return R.from_rotvec(vec).as_quat()
+    return th.tensor(R.from_rotvec(vec).as_quat())
 
 
 def euler2quat(euler):
