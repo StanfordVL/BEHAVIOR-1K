@@ -13,6 +13,7 @@ from omnigibson.sensors import VisionSensor, create_sensor
 from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.utils.config_utils import parse_config
+from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.gym_utils import (
     GymObservable,
     recursively_generate_compatible_dict,
@@ -25,7 +26,6 @@ from omnigibson.utils.python_utils import (
     merge_nested_dicts,
 )
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.constants import RelativeFrame
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

@@ -307,16 +307,15 @@ class RigidPrim(XFormPrim):
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
-        '''
+        """
         Set the position and orientation of XForm Prim.
 
-        Args: 
+        Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
-        '''
+            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
+        """
 
         if frame == RelativeFrame.WORLD:
 
@@ -350,9 +349,7 @@ class RigidPrim(XFormPrim):
             self._rigid_prim_view.set_local_poses(position, orientation)
             PoseAPI.invalidate()
 
-
     def get_position_orientation(self, frame=RelativeFrame.WORLD):
-
         """
         Gets prim's pose with respect to the specified frame.
 
@@ -367,10 +364,10 @@ class RigidPrim(XFormPrim):
         """
 
         if frame == RelativeFrame.WORLD:
-            
+
             if self.kinematic_only and self._kinematic_world_pose_cache is not None:
                 return self._kinematic_world_pose_cache
-            
+
             positions, orientations = self._rigid_prim_view.get_world_poses()
 
             assert np.isclose(
@@ -384,12 +381,11 @@ class RigidPrim(XFormPrim):
             if self.kinematic_only:
                 self._kinematic_world_pose_cache = (positions, orientations)
 
-        
         elif frame == RelativeFrame.SCENE:
-            
+
             # TODO: implement for scene frame
             pass
-        
+
         elif frame == RelativeFrame.PARENT:
 
             # Return cached pose if we're kinematic-only
@@ -400,27 +396,34 @@ class RigidPrim(XFormPrim):
 
             positions = positions[0]
             orientations = orientations[0][[1, 2, 3, 0]]
-            
+
             if self.kinematic_only:
                 self._kinematic_local_pose_cache = (positions, orientations)
-        
-        else: 
+
+        else:
 
             raise ValueError(f"Invalid frame {frame}")
-        
+
         return positions, orientations
-    
 
     def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
-    
+
         import warnings
-        warnings.warn("set_local_pose is deprecated. Use set_position_orientation(frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "set_local_pose is deprecated. Use set_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            DeprecationWarning,
+        )
         return self.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
 
     def get_local_pose(self):
-        
+
         import warnings
-        warnings.warn("get_local_pose is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "get_local_pose is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            DeprecationWarning,
+        )
         return self.get_position_orientation(frame=RelativeFrame.PARENT)
 
     @property

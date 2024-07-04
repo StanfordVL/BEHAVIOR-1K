@@ -554,7 +554,10 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Get the position of the heat source on the thing we're placing near
         heating_element_positions = np.array(
-            [link.get_position_orientation()[0] for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()]
+            [
+                link.get_position_orientation()[0]
+                for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()
+            ]
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 

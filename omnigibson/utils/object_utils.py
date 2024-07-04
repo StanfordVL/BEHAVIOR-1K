@@ -8,8 +8,8 @@ from scipy.spatial.transform import Rotation as R
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.scenes import Scene
-from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
 from omnigibson.utils.constants import RelativeFrame
+from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
 
 
 def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):

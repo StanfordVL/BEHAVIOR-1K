@@ -19,12 +19,11 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.constants import JointType, PrimType, RelativeFrame
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
-from omnigibson.utils.constants import RelativeFrame
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -310,7 +309,6 @@ class ManipulationRobot(BaseRobot):
         return contact_data, robot_contact_links
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
         """
         Sets manipulation robot's pose with respect to the specified frame
 
@@ -319,8 +317,8 @@ class ManipulationRobot(BaseRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
         """
 
         # Store the original EEF poses.
@@ -344,7 +342,7 @@ class ManipulationRobot(BaseRobot):
                     # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-        
+
         elif frame == RelativeFrame.SCENE:
             # TODO: Implement this for SCENE frame
             pass

@@ -333,7 +333,9 @@ class OVXRSystem(TeleopSystem):
             arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
         robot_base_orn = self.robot.get_position_orientation()[1]
-        robot_eef_pos = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()[0]
+        robot_eef_pos = self.robot.eef_links[
+            self.robot.arm_names[self.robot_arms.index(arm)]
+        ].get_position_orientation()[0]
         target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
             target_transform, self.controllers[arm]

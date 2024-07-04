@@ -12,7 +12,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
-from omnigibson.utils.constants import PrimType
+from omnigibson.utils.constants import PrimType, RelativeFrame
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
@@ -20,7 +20,6 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
 )
-from omnigibson.utils.constants import RelativeFrame
 
 # Create module logger
 log = create_module_logger(module_name=__name__)

@@ -251,7 +251,11 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
             else:
                 # Position is either the AABB center of the default link or the metalink position itself
-                heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position_orientation()[0]
+                heat_source_pos = (
+                    self.link.aabb_center
+                    if self.link == self._default_link
+                    else self.link.get_position_orientation()[0]
+                )
 
                 # Use overlap_sphere check!
                 og.sim.psqi.overlap_sphere(

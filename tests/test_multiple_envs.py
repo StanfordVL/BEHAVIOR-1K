@@ -1,7 +1,7 @@
 import numpy as np
-import omnigibson.lazy as lazy
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.utils.constants import ParticleModifyCondition, RelativeFrame
@@ -68,6 +68,7 @@ def test_multi_scene_displacement():
     assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
     og.clear()
 
+
 def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)
 
@@ -80,8 +81,9 @@ def test_multi_scene_get_local_position():
     assert np.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
     og.clear()
 
+
 def test_multi_scene_set_local_position():
-    
+
     vec_env = setup_multi_environment(3)
 
     # Get the robot from the second environment
@@ -109,18 +111,21 @@ def test_multi_scene_set_local_position():
     expected_local_pos = new_global_pos - scene_pos
 
     # Assert that the global position has been updated correctly
-    assert np.allclose(updated_global_pos, new_global_pos, atol=1e-3), \
-        f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
+    assert np.allclose(
+        updated_global_pos, new_global_pos, atol=1e-3
+    ), f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
 
     # Assert that the local position has been updated correctly
-    assert np.allclose(updated_local_pos, expected_local_pos, atol=1e-3), \
-        f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
+    assert np.allclose(
+        updated_local_pos, expected_local_pos, atol=1e-3
+    ), f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
 
     # Assert that the change in global position is correct
     global_pos_change = updated_global_pos - initial_global_pos
     expected_change = np.array([1.0, 0.5, 0.0])
-    assert np.allclose(global_pos_change, expected_change, atol=1e-3), \
-        f"Global position change {global_pos_change} does not match expected change {expected_change}"
+    assert np.allclose(
+        global_pos_change, expected_change, atol=1e-3
+    ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
 
     og.clear()
 
@@ -131,7 +136,9 @@ def test_multi_scene_scene_prim():
     scene_state = vec_env.envs[0].scene._dump_state()
     scene_prim_displacement = [10.0, 0.0, 0.0]
     original_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
-    vec_env.envs[0].scene._scene_prim.set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
+    vec_env.envs[0].scene._scene_prim.set_position_orientation(
+        position=original_scene_prim_pos + scene_prim_displacement
+    )
     vec_env.envs[0].scene._load_state(scene_state)
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]

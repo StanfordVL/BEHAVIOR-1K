@@ -679,7 +679,9 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_position_orientation(link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame=RelativeFrame.PARENT)
+                XFormPrim.set_position_orientation(
+                    link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame=RelativeFrame.PARENT
+                )
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -702,6 +704,7 @@ class FlatcacheAPI:
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
         cls.MODIFIED_PRIMS = set()
+
 
 class PoseAPI:
     """
@@ -736,7 +739,6 @@ class PoseAPI:
 
     @classmethod
     def get_position_orientation(cls, prim_path, frame=RelativeFrame.WORLD):
-
         """
         Gets pose with respect to the specified frame.
 
@@ -749,27 +751,27 @@ class PoseAPI:
                 - 3-array: (x,y,z) position in the specified frame
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
-         
+
         cls._refresh()
         if frame == RelativeFrame.WORLD:
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
         elif frame == RelativeFrame.SCENE:
-            
-            #TODO: implement get_scene_pose
+
+            # TODO: implement get_scene_pose
             pass
 
         elif frame == RelativeFrame.PARENT:
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
         else:
             raise ValueError(f"Invalid frame {frame}")
-        
-        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
 
+        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
 
     @classmethod
     def get_world_pose(cls, prim_path):
 
         import warnings
+
         warnings.warn("This method is deprecated. Use get_position_orientation() instead.", DeprecationWarning)
         return cls.get_position_orientation(prim_path)
 
@@ -921,7 +923,6 @@ class BatchControlViewAPIImpl:
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
     def get_position_orientation(self, prim_path, frame=RelativeFrame.WORLD):
-
         """
         Gets pose with respect to the specified frame.
 
@@ -942,7 +943,7 @@ class BatchControlViewAPIImpl:
             idx = self._idx[prim_path]
             pose = self._read_cache["root_transforms"][idx]
             return pose[:3], pose[3:]
-        
+
         elif frame == RelativeFrame.SCENE:
 
             # TODO: implement get_position_orientation for SCENE frame

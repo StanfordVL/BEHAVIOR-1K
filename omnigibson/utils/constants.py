@@ -75,6 +75,7 @@ class EmitterType(IntEnum):
     FIRE = 0
     STEAM = 1
 
+
 class RelativeFrame(str, Enum):
     WORLD = "world"
     SCENE = "scene"

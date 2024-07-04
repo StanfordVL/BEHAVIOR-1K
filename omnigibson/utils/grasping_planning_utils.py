@@ -371,7 +371,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         for point in points_along_open_axis
     ]
     open_axis_closer_side_idx, _, _ = _get_closest_point_to_point_in_world_frame(
-        points_along_open_axis_after_rotation, (bbox_center_in_world, bbox_quat_in_world), robot.get_position_orientation()[0]
+        points_along_open_axis_after_rotation,
+        (bbox_center_in_world, bbox_quat_in_world),
+        robot.get_position_orientation()[0],
     )
     open_axis_closer_side_sign = 1 if open_axis_closer_side_idx == 0 else -1
     center_of_selected_surface_along_push_axis = points_along_open_axis[open_axis_closer_side_idx]

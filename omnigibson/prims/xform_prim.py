@@ -10,9 +10,9 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
+from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
-from omnigibson.utils.constants import RelativeFrame
 
 
 class XFormPrim(BasePrim):
@@ -171,7 +171,6 @@ class XFormPrim(BasePrim):
         return material_path != ""
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
         """
         Sets prim's pose with respect to the specified frame
 
@@ -180,8 +179,8 @@ class XFormPrim(BasePrim):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
         """
 
         if frame == RelativeFrame.WORLD:
@@ -208,7 +207,7 @@ class XFormPrim(BasePrim):
             self.set_position_orientation(*T.mat2pose(local_transform), frame=RelativeFrame.PARENT)
 
         elif frame == RelativeFrame.SCENE:
-            
+
             # TODO: Implement this for the scene frame
             pass
 
@@ -251,7 +250,6 @@ class XFormPrim(BasePrim):
             raise ValueError(f"frame {frame} is not supported.")
 
     def get_position_orientation(self, frame=RelativeFrame.WORLD):
-        
         """
         Gets prim's pose with respect to the specified frame.
 
@@ -265,8 +263,7 @@ class XFormPrim(BasePrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        return PoseAPI.get_position_orientation(self.prim_path, frame)\
-        
+        return PoseAPI.get_position_orientation(self.prim_path, frame)
 
     # ------------------- Deprecated methods -------------------
 
@@ -279,7 +276,10 @@ class XFormPrim(BasePrim):
         """
 
         import warnings
-        warnings.warn("This method is deprecated. Use set_position_orientation(position=position) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "This method is deprecated. Use set_position_orientation(position=position) instead.", DeprecationWarning
+        )
         return self.set_position_orientation(position=position)
 
     def get_position(self):
@@ -290,7 +290,8 @@ class XFormPrim(BasePrim):
             3-array: (x,y,z) global cartesian position of this prim
         """
 
-        import warnings 
+        import warnings
+
         warnings.warn("This method is deprecated. Use get_position_orientation()[0] instead.", DeprecationWarning)
         return self.get_position_orientation()[0]
 
@@ -303,7 +304,11 @@ class XFormPrim(BasePrim):
         """
 
         import warnings
-        warnings.warn("This method is deprecated. Use set_position_orientation(orientation=orientation) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "This method is deprecated. Use set_position_orientation(orientation=orientation) instead.",
+            DeprecationWarning,
+        )
         self.set_position_orientation(orientation=orientation)
 
     def get_orientation(self):
@@ -315,6 +320,7 @@ class XFormPrim(BasePrim):
         """
 
         import warnings
+
         warnings.warn("This method is deprecated. Use get_position_orientation()[1] instead.", DeprecationWarning)
         return self.get_position_orientation()[1]
 
@@ -329,7 +335,11 @@ class XFormPrim(BasePrim):
         """
 
         import warnings
-        warnings.warn("This method is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "This method is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            DeprecationWarning,
+        )
 
         return PoseAPI.get_position_orientation(self.prim_path, RelativeFrame.PARENT)
 
@@ -343,17 +353,19 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
-        
+
         import warnings
-        warnings.warn("This method is deprecated. Use set_position_orientation(position, orientation, frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        warnings.warn(
+            "This method is deprecated. Use set_position_orientation(position, orientation, frame=RelativeFrame.PARENT) instead.",
+            DeprecationWarning,
+        )
 
         return self.set_position_orientation(self.prim_path, position, orientation, frame)
-    
-    # -----------------------------------------------------------------------------------------------------------------
-    
-    
-    def get_rpy(self):
 
+    # -----------------------------------------------------------------------------------------------------------------
+
+    def get_rpy(self):
         """
         Get this prim's orientation with respect to the world frame
 
@@ -364,7 +376,6 @@ class XFormPrim(BasePrim):
         return quat2euler(self.get_position_orientation()[1])
 
     def get_xy_orientation(self):
-
         """
         Get this prim's orientation on the XY plane of the world frame. This is obtained by
         projecting the forward vector onto the XY plane and then computing the angle.

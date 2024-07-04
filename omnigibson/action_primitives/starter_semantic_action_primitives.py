@@ -777,7 +777,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         toggle_position = toggle_state.get_link_position()
         yield from self._navigate_if_needed(obj, toggle_position)
 
-        hand_orientation = self.robot.eef_links[self.arm].get_position_orientation()[1]  # Just keep the current hand orientation.
+        hand_orientation = self.robot.eef_links[self.arm].get_position_orientation()[
+            1
+        ]  # Just keep the current hand orientation.
         desired_hand_pose = (toggle_position, hand_orientation)
 
         yield from self._move_hand(desired_hand_pose)
@@ -1747,7 +1749,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.SAMPLING_ERROR,
                 "Could not find valid position near object.",
-                {"target object": obj.name, "target pos": obj.get_position_orientation()[0], "pose on target": pose_on_obj},
+                {
+                    "target object": obj.name,
+                    "target pos": obj.get_position_orientation()[0],
+                    "pose on target": pose_on_obj,
+                },
             )
 
     @staticmethod

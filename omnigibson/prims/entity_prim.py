@@ -964,16 +964,15 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_position_orientation()[1]).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
-        '''
+        """
         Set the position and orientation of entry prim object.
 
-        Args: 
+        Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
-        '''
+            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
+        """
 
         if frame == RelativeFrame.WORLD:
 
@@ -1023,9 +1022,7 @@ class EntityPrim(XFormPrim):
         else:
             raise ValueError(f"Invalid frame: {frame}")
 
-
     def get_position_orientation(self, frame=RelativeFrame.WORLD):
-
         """
         Gets prim's pose with respect to the specified frame.
 
@@ -1049,12 +1046,12 @@ class EntityPrim(XFormPrim):
             # Sim is running and articulation view exists, so use that physx API backend
             else:
                 positions, orientations = self._articulation_view.get_world_poses()
-            
+
         elif frame == RelativeFrame.SCENE:
 
             # TODO: Implement this for scene frame
             pass
-        
+
         elif frame == RelativeFrame.PARENT:
 
             # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
@@ -1066,23 +1063,28 @@ class EntityPrim(XFormPrim):
             # Sim is running and articulation view exists, so use that physx API backend
             else:
                 positions, orientations = self._articulation_view.get_local_poses()
-        
+
         else:
             raise ValueError(f"Invalid frame: {frame}")
-        
+
         return positions[0], orientations[0][[1, 2, 3, 0]]
 
-
     def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
-        
+
         import warnings
-        warnings.warn("set_local_pose is not implemented for articulated objects. Use set_position_orientation(frame=RelativeFrame.PARENT) instead.")
+
+        warnings.warn(
+            "set_local_pose is not implemented for articulated objects. Use set_position_orientation(frame=RelativeFrame.PARENT) instead."
+        )
         return self.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
 
     def get_local_pose(self):
-        
+
         import warnings
-        warnings.warn("get_local_pose is not implemented for articulated objects. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.")
+
+        warnings.warn(
+            "get_local_pose is not implemented for articulated objects. Use get_position_orientation(frame=RelativeFrame.PARENT) instead."
+        )
         return self.get_position_orientation(frame=RelativeFrame.PARENT)
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?

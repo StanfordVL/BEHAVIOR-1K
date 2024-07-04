@@ -319,7 +319,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position_orientation(position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            self._scene_prim.set_position_orientation(
+                position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0]
+            )
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)

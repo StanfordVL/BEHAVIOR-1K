@@ -592,16 +592,15 @@ class StatefulObject(BaseObject):
             obj_state.clear_cache()
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
-        '''
+        """
         Set the position and orientation of stateful object.
 
-        Args: 
+        Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
-        '''
+            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
+        """
 
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
         self.clear_states_cache()

@@ -9,9 +9,9 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
-from omnigibson.utils.constants import RelativeFrame
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -699,7 +699,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     def get_position_orientation(self, frame=RelativeFrame.WORLD):
-        
         """
         Gets tiago's pose with respect to the specified frame.
 
@@ -717,16 +716,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             return self.base_footprint_link.get_position_orientation()
 
         elif frame == RelativeFrame.SCENE:
-            
+
             # TODO: Add the ability to get the position and orientation of the robot in the scene frame
             pass
         else:
-            
+
             # TODO: Add the ability to get the position and orientation of the robot in the parent frame
             pass
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
-
         """
         Sets tiago's pose with respect to the specified frame
 
@@ -735,8 +733,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame 
-            set position relative to the object parent. SCENE frame set position relative to the scene. 
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame
+            set position relative to the object parent. SCENE frame set position relative to the scene.
         """
 
         current_position, current_orientation = self.get_position_orientation()
