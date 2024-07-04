@@ -128,7 +128,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Get initial EE position and set marker to that location
         command = robot.get_eef_position()
-        marker.set_position(command)
+        marker.set_position_orientation(position=command)
         og.sim.step()
 
         # Setup callbacks for grabbing keyboard inputs from omni
@@ -154,7 +154,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     delta_cmd = input_to_xyz_delta_command(inp=event.input)
                     if delta_cmd is not None:
                         command = command + delta_cmd
-                        marker.set_position(command)
+                        marker.set_position_orientation(position=command)
                         og.sim.step()
 
             # Callback must return True if valid

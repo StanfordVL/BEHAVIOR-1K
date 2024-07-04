@@ -214,7 +214,7 @@ def sample_kinematics(
         # until it settles
         aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
         aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-        bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
+        bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
         desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
         desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
         pos = desired_bbox_pos + bbox_to_obj

@@ -315,7 +315,7 @@ class DatasetObject(USDObject):
                 None means it will not be changed
         """
         if orientation is None:
-            orientation = self.get_orientation()
+            orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
                 [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]

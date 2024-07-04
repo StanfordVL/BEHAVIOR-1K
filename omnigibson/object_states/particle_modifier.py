@@ -19,7 +19,7 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
-from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType, RelativeFrame
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
     get_particle_positions_from_frame,
@@ -419,9 +419,10 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 else self._projection_mesh_params["extents"][2] / 2
             )
 
-            self.projection_mesh.set_local_pose(
+            self.projection_mesh.set_position_orientation(
                 position=np.array([0, 0, -z_offset]),
                 orientation=T.euler2quat([0, 0, 0]),
+                frame=RelativeFrame.PARENT
             )
 
             # Generate the function for checking whether points are within the projection mesh
@@ -514,7 +515,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             cond = (
                 lambda obj: (
                     np.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ np.array([0, 0, 1]),
+                        T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1]) @ np.array([0, 0, 1]),
                         np.array([0, 0, 1]),
                     )
                     > 0
@@ -1086,12 +1087,12 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, np.pi / 2, 0]))
+            self.projection_source_sphere.set_position_orientation(orientation=T.euler2quat([0, np.pi / 2, 0]), frame=RelativeFrame.PARENT)
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
-            local_pos, local_quat = self.projection_mesh.get_local_pose()
+            local_pos, local_quat = self.projection_mesh.get_position_orientation(RelativeFrame.PARENT)
             assert np.all(
                 np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)
             ), "Projection mesh tip should align with metalink position!"
@@ -1446,7 +1447,7 @@ class ParticleApplier(ParticleModifier):
         lower_upper = np.concatenate([lower, upper], axis=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
-        pos = self.link.get_position()
+        pos = self.link.get_position_orientation()[0]
         start_points = np.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
         sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))

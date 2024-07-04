@@ -12,7 +12,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType, RelativeFrame
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -632,10 +632,10 @@ class FlatcacheAPI:
             from omnigibson.prims.xform_prim import XFormPrim
 
             # 1. For every link, update its xformOp properties based on the delta_tf between object frame and link frame
-            obj_pos, obj_quat = XFormPrim.get_local_pose(prim)
+            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame=RelativeFrame.PARENT)
             for link in prim.links.values():
                 rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_local_pose(link, rel_pos, rel_quat)
+                XFormPrim.set_position_orientation(link, rel_pos, rel_quat, frame=RelativeFrame.PARENT)
             # 2. For every joint, update its linear / angular joint state
             if prim.n_joints > 0:
                 joints_pos = prim.get_joint_positions()
@@ -679,7 +679,7 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_local_pose(link, np.zeros(3), np.array([0, 0, 0, 1.0]))
+                XFormPrim.set_position_orientation(link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame=RelativeFrame.PARENT)
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -702,7 +702,6 @@ class FlatcacheAPI:
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
         cls.MODIFIED_PRIMS = set()
-
 
 class PoseAPI:
     """
@@ -736,10 +735,43 @@ class PoseAPI:
             cls.mark_valid()
 
     @classmethod
-    def get_world_pose(cls, prim_path):
+    def get_position_orientation(cls, prim_path, frame=RelativeFrame.WORLD):
+
+        """
+        Gets pose with respect to the specified frame.
+
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+        """
+         
         cls._refresh()
-        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        if frame == RelativeFrame.WORLD:
+            position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
+        elif frame == RelativeFrame.SCENE:
+            
+            #TODO: implement get_scene_pose
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
+        else:
+            raise ValueError(f"Invalid frame {frame}")
+        
         return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+
+    @classmethod
+    def get_world_pose(cls, prim_path):
+
+        import warnings
+        warnings.warn("This method is deprecated. Use get_position_orientation() instead.", DeprecationWarning)
+        return cls.get_position_orientation(prim_path)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -888,13 +920,41 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path):
-        if "root_transforms" not in self._read_cache:
-            self._read_cache["root_transforms"] = self._view.get_root_transforms()
+    def get_position_orientation(self, prim_path, frame=RelativeFrame.WORLD):
 
-        idx = self._idx[prim_path]
-        pose = self._read_cache["root_transforms"][idx]
-        return pose[:3], pose[3:]
+        """
+        Gets pose with respect to the specified frame.
+
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+        """
+
+        if frame == RelativeFrame.WORLD:
+            if "root_transforms" not in self._read_cache:
+                self._read_cache["root_transforms"] = self._view.get_root_transforms()
+
+            idx = self._idx[prim_path]
+            pose = self._read_cache["root_transforms"][idx]
+            return pose[:3], pose[3:]
+        
+        elif frame == RelativeFrame.SCENE:
+
+            # TODO: implement get_position_orientation for SCENE frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+
+            # TODO: implement get_position_orientation for PARENT frame
+            pass
+
+        else:
+            raise ValueError(f"Invalid frame {frame}")
 
     def get_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:

@@ -16,6 +16,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.constants import RelativeFrame
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
@@ -386,19 +387,70 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def get_position_orientation(self):
-        return self.base_footprint_link.get_position_orientation()
+    def get_position_orientation(self, frame=RelativeFrame.WORLD):
 
-    def set_position_orientation(self, position=None, orientation=None):
-        super().set_position_orientation(position, orientation)
-        # Move the joint frame for the world_base_joint
-        if self._world_base_fixed_joint_prim is not None:
-            if position is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-            if orientation is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                    lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
+        """
+        Gets robot's pose with respect to the specified frame.
+
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+        """
+
+        if frame == RelativeFrame.WORLD:
+            return self.base_footprint_link.get_position_orientation()
+        elif frame == RelativeFrame.SCENE:
+
+            # TODO: Implement this for SCENE frame
+            pass
+        else:
+
+            # TODO: Implement this for PARENT frame
+            pass
+
+    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+
+
+        """
+        Sets behavior robot's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame 
+            set position relative to the object parent. SCENE frame set position relative to the scene. 
+        """
+         
+        super().set_position_orientation(position, orientation, frame=frame)
+
+        if frame == RelativeFrame.WORLD:
+            
+            # Move the joint frame for the world_base_joint
+            if self._world_base_fixed_joint_prim is not None:
+                if position is not None:
+                    self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+                if orientation is not None:
+                    self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                        lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
                 )
+                    
+        elif frame == RelativeFrame.SCENE:
+            # TODO: Implement this for SCENE frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+            # TODO: Implement this for PARENT frame
+            pass
+
+        else:
+            raise ValueError(f"Invalid frame {frame}")
 
     @property
     def assisted_grasp_start_points(self):
@@ -486,7 +538,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                     if self._use_ghost_hands:
                         self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
             else:
-                des_world_part_pos, des_world_part_orn = eef_part.local_position_orientation
+                des_world_part_pos, des_world_part_orn = eef_part.get_position_orientation(frame=RelativeFrame.PARENT)
 
             # Get local pose with respect to the new body frame
             des_local_part_pos, des_local_part_orn = T.relative_pose_transform(
@@ -546,33 +598,81 @@ class BRPart(ABC):
             self.scene.add_object(self.ghost_hand)
 
     @property
-    def local_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
+    def local_position_orientation(self, ) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get local position and orientation w.r.t. to the body
         Returns:
             Tuple[Array[x, y, z], Array[x, y, z, w]]
 
         """
-        return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
+        import warnings
+        warnings.warn("local_position_orientation is deprecated. Use get_position_orientation instead.", DeprecationWarning)
+        return self.get_position_orientation(frame=RelativeFrame.PARENT)
 
-    def get_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(self, frame=RelativeFrame.WORLD) -> Tuple[Iterable[float], Iterable[float]]:
+        
         """
-        Get position and orientation in the world space
+        Gets robot's pose with respect to the specified frame.
+
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
+
         Returns:
-            Tuple[Array[x, y, z], Array[x, y, z, w]]
+            2-tuple:
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
-        return self._root_link.get_position_orientation()
 
-    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float]) -> None:
+        if frame == RelativeFrame.WORLD:
+
+            return self._root_link.get_position_orientation()
+        
+        elif frame == RelativeFrame.SCENE:
+
+            # TODO: Implement this for SCENE frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+
+            return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
+        
+        else:
+            raise ValueError(f"Invalid frame {frame}")
+
+    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float], frame=RelativeFrame.WORLD) -> None:
+        
         """
-        Call back function to set the base's position
+        Sets BRPart's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame 
+            set position relative to the object parent. SCENE frame set position relative to the scene. 
         """
-        self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
-        self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
-        self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
-        self.parent.joints[f"{self.name}_rx_joint"].set_pos(orn[0], drive=False)
-        self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
-        self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
+
+        if frame == RelativeFrame.WORLD:
+            self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
+            self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
+            self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
+            self.parent.joints[f"{self.name}_rx_joint"].set_pos(orn[0], drive=False)
+            self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
+            self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
+
+        elif frame == RelativeFrame.SCENE:
+            # TODO: Implement this for SCENE frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+            # TODO: Implement this for PARENT frame
+            pass
+
+        else:
+            raise ValueError(f"Invalid frame {frame}")
+        
 
     def update_ghost_hands(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """

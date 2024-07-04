@@ -25,6 +25,7 @@ from omnigibson.utils.python_utils import (
     merge_nested_dicts,
 )
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.constants import RelativeFrame
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -269,7 +270,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 # TODO: Fix this after scene_local_position_orientation API is fixed
-                robot.set_local_pose(position=position, orientation=orientation)
+                robot.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -293,7 +294,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             )
             # Import the robot into the simulator and set the pose
             self.scene.add_object(obj)
-            obj.set_local_pose(position=position, orientation=orientation)
+            obj.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -324,7 +325,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Load an initialize this sensor
                 sensor.load(self.scene)
                 sensor.initialize()
-                sensor.set_local_pose(local_position, local_orientation)
+                sensor.set_position_orientation(local_position, local_orientation, frame=RelativeFrame.PARENT)
                 self._external_sensors[sensor.name] = sensor
                 self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 

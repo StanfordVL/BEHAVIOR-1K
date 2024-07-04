@@ -200,7 +200,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         center_of_selected_surface_along_push_axis,
         _,
     ) = _get_closest_point_to_point_in_world_frame(
-        points_along_push_axis, (bbox_center_in_world, bbox_quat_in_world), robot.get_position()
+        points_along_push_axis, (bbox_center_in_world, bbox_quat_in_world), robot.get_position_orientation()[0]
     )
     push_axis_closer_side_sign = 1 if push_axis_closer_side_idx == 0 else -1
 
@@ -333,7 +333,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         link_name=link_name, visual=False
     )
 
-    bbox_quat_in_world = link.get_orientation()
+    bbox_quat_in_world = link.get_position_orientation()[1]
     bbox_extent_in_link_frame = np.array(
         target_obj.native_link_bboxes[link_name]["collision"]["axis_aligned"]["extent"]
     )
@@ -371,7 +371,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         for point in points_along_open_axis
     ]
     open_axis_closer_side_idx, _, _ = _get_closest_point_to_point_in_world_frame(
-        points_along_open_axis_after_rotation, (bbox_center_in_world, bbox_quat_in_world), robot.get_position()
+        points_along_open_axis_after_rotation, (bbox_center_in_world, bbox_quat_in_world), robot.get_position_orientation()[0]
     )
     open_axis_closer_side_sign = 1 if open_axis_closer_side_idx == 0 else -1
     center_of_selected_surface_along_push_axis = points_along_open_axis[open_axis_closer_side_idx]

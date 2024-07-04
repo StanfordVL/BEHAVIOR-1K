@@ -148,7 +148,7 @@ class GraspTask(BaseTask):
                 raise ValueError("Robot could not settle")
 
             # Check if the robot has toppled
-            rotation = R.from_quat(robot.get_orientation())
+            rotation = R.from_quat(robot.get_position_orientation()[1])
             robot_up = rotation.apply(np.array([0, 0, 1]))
             if robot_up[2] < 0.75:
                 raise ValueError("Robot has toppled over")

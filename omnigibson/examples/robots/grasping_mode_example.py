@@ -80,7 +80,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Reset the robot
     robot = env.robots[0]
-    robot.set_position([0, 0, 0])
+    robot.set_position_orientation(position=[0, 0, 0])
     robot.reset()
     robot.keep_still()
 

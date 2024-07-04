@@ -24,6 +24,7 @@ from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_fu
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
+from omnigibson.utils.constants import RelativeFrame
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -308,26 +309,52 @@ class ManipulationRobot(BaseRobot):
 
         return contact_data, robot_contact_links
 
-    def set_position_orientation(self, position=None, orientation=None):
+    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+
+        """
+        Sets manipulation robot's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame 
+            set position relative to the object parent. SCENE frame set position relative to the scene. 
+        """
+
         # Store the original EEF poses.
         original_poses = {}
         for arm in self.arm_names:
             original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
 
         # Run the super method
-        super().set_position_orientation(position=position, orientation=orientation)
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Now for each hand, if it was holding an AG object, teleport it.
-        for arm in self.arm_names:
-            if self._ag_obj_in_hand[arm] is not None:
-                original_eef_pose = T.pose2mat(original_poses[arm])
-                inv_original_eef_pose = T.pose_inv(pose_mat=original_eef_pose)
-                original_obj_pose = T.pose2mat(self._ag_obj_in_hand[arm].get_position_orientation())
-                new_eef_pose = T.pose2mat((self.get_eef_position(arm), self.get_eef_orientation(arm)))
-                # New object pose is transform:
-                # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
-                new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
-                self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
+
+        if frame == RelativeFrame.WORLD:
+            for arm in self.arm_names:
+                if self._ag_obj_in_hand[arm] is not None:
+                    original_eef_pose = T.pose2mat(original_poses[arm])
+                    inv_original_eef_pose = T.pose_inv(pose_mat=original_eef_pose)
+                    original_obj_pose = T.pose2mat(self._ag_obj_in_hand[arm].get_position_orientation())
+                    new_eef_pose = T.pose2mat((self.get_eef_position(arm), self.get_eef_orientation(arm)))
+                    # New object pose is transform:
+                    # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
+                    new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
+                    self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
+        
+        elif frame == RelativeFrame.SCENE:
+            # TODO: Implement this for SCENE frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+            # TODO: Implement this for PARENT frame
+            pass
+
+        else:
+            raise ValueError(f"Invalid frame {frame}")
 
     def deploy_control(self, control, control_type):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
@@ -712,7 +739,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_position()
+        return self._links[self.eef_link_names[arm]].get_position_orientation()[0]
 
     def get_eef_orientation(self, arm="default"):
         """
@@ -725,7 +752,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_orientation()
+        return self._links[self.eef_link_names[arm]].get_position_orientation()[1]
 
     def get_relative_eef_pose(self, arm="default", mat=False):
         """
@@ -780,7 +807,7 @@ class ManipulationRobot(BaseRobot):
             3-array: (x,y,z) Linear velocity of end-effector relative to robot base frame
         """
         arm = self.default_arm if arm == "default" else arm
-        base_link_quat = self.get_orientation()
+        base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_linear_velocity()
 
     def get_relative_eef_ang_vel(self, arm="default"):
@@ -793,7 +820,7 @@ class ManipulationRobot(BaseRobot):
             3-array: (ax,ay,az) angular velocity of end-effector relative to robot base frame
         """
         arm = self.default_arm if arm == "default" else arm
-        base_link_quat = self.get_orientation()
+        base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_angular_velocity()
 
     def _calculate_in_hand_object_rigid(self, arm="default"):
@@ -827,7 +854,7 @@ class ManipulationRobot(BaseRobot):
             return None
 
         # Find the closest object to the gripper center
-        gripper_center_pos = self.eef_links[arm].get_position()
+        gripper_center_pos = self.eef_links[arm].get_position_orientation()[0]
 
         candidate_data = []
         for prim_path in candidates_set:
@@ -837,7 +864,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
+            dist = np.linalg.norm(np.array(candidate_link.get_position_orientation()[0]) - np.array(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1359,7 +1386,7 @@ class ManipulationRobot(BaseRobot):
         # TODO (eric): Only AG one cloth at any given moment.
         # Returns the first cloth that overlaps with the "ghost" box volume
         for cloth_obj in cloth_objs:
-            attachment_point_pos = cloth_obj.links["attachment_point"].get_position()
+            attachment_point_pos = cloth_obj.links["attachment_point"].get_position_orientation()[0]
             particles_in_volume = self._ag_check_in_volume[arm]([attachment_point_pos])
             if particles_in_volume.sum() > 0:
                 return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos

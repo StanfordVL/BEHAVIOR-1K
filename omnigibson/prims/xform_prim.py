@@ -12,6 +12,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.constants import RelativeFrame
 
 
 class XFormPrim(BasePrim):
@@ -169,47 +170,105 @@ class XFormPrim(BasePrim):
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return material_path != ""
 
-    def set_position_orientation(self, position=None, orientation=None):
+    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+
         """
-        Sets prim's pose with respect to the world frame
+        Sets prim's pose with respect to the specified frame
 
         Args:
             position (None or 3-array): if specified, (x,y,z) position in the world frame
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame 
+            set position relative to the object parent. SCENE frame set position relative to the scene. 
         """
-        current_position, current_orientation = self.get_position_orientation()
 
-        position = current_position if position is None else np.array(position, dtype=float)
-        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-        assert np.isclose(
-            np.linalg.norm(orientation), 1, atol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        if frame == RelativeFrame.WORLD:
 
-        my_world_transform = T.pose2mat((position, orientation))
+            current_position, current_orientation = self.get_position_orientation()
 
-        parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
-        parent_path = str(parent_prim.GetPath())
-        parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
+            position = current_position if position is None else np.array(position, dtype=float)
+            orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+            assert np.isclose(
+                np.linalg.norm(orientation), 1, atol=1e-3
+            ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
-        product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert np.allclose(
-            product, np.diag(np.diag(product)), atol=1e-3
-        ), f"{self.prim_path} local transform is not diagonal."
-        self.set_local_pose(*T.mat2pose(local_transform))
+            my_world_transform = T.pose2mat((position, orientation))
 
-    def get_position_orientation(self):
+            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
+            parent_path = str(parent_prim.GetPath())
+            parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
+
+            local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+            product = local_transform[:3, :3] @ local_transform[:3, :3].T
+            assert np.allclose(
+                product, np.diag(np.diag(product)), atol=1e-3
+            ), f"{self.prim_path} local transform is not diagonal."
+            self.set_position_orientation(*T.mat2pose(local_transform), frame=RelativeFrame.PARENT)
+
+        elif frame == RelativeFrame.SCENE:
+            
+            # TODO: Implement this for the scene frame
+            pass
+
+        elif frame == RelativeFrame.PARENT:
+
+            properties = self.prim.GetPropertyNames()
+            if position is not None:
+                position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
+                if "xformOp:translate" not in properties:
+                    lazy.carb.log_error(
+                        "Translate property needs to be set for {} before setting its position".format(self.name)
+                    )
+                self.set_attribute("xformOp:translate", position)
+            if orientation is not None:
+                orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+                if "xformOp:orient" not in properties:
+                    lazy.carb.log_error(
+                        "Orient property needs to be set for {} before setting its orientation".format(self.name)
+                    )
+                xform_op = self._prim.GetAttribute("xformOp:orient")
+                if xform_op.GetTypeName() == "quatf":
+                    rotq = lazy.pxr.Gf.Quatf(*orientation)
+                else:
+                    rotq = lazy.pxr.Gf.Quatd(*orientation)
+                xform_op.Set(rotq)
+            PoseAPI.invalidate()
+            if gm.ENABLE_FLATCACHE:
+                # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
+                # Ideally we should call usdrt's set local pose directly, but there is no such API.
+                # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
+                xformable_prim = lazy.usdrt.Rt.Xformable(
+                    lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+                )
+                assert (
+                    not xformable_prim.HasWorldXform()
+                ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
+                xformable_prim.SetLocalXformFromUsd()
+
+        else:
+            raise ValueError(f"frame {frame} is not supported.")
+
+    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+        
         """
-        Gets prim's pose with respect to the world's frame.
+        Gets prim's pose with respect to the specified frame.
+
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
 
         Returns:
             2-tuple:
-                - 3-array: (x,y,z) position in the world frame
-                - 4-array: (x,y,z,w) quaternion orientation in the world frame
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
-        return PoseAPI.get_world_pose(self.prim_path)
+
+        return PoseAPI.get_position_orientation(self.prim_path, frame)\
+        
+
+    # ------------------- Deprecated methods -------------------
 
     def set_position(self, position):
         """
@@ -218,7 +277,10 @@ class XFormPrim(BasePrim):
         Args:
             position (3-array): (x,y,z) global cartesian position to set
         """
-        self.set_position_orientation(position=position)
+
+        import warnings
+        warnings.warn("This method is deprecated. Use set_position_orientation(position=position) instead.", DeprecationWarning)
+        return self.set_position_orientation(position=position)
 
     def get_position(self):
         """
@@ -227,6 +289,9 @@ class XFormPrim(BasePrim):
         Returns:
             3-array: (x,y,z) global cartesian position of this prim
         """
+
+        import warnings 
+        warnings.warn("This method is deprecated. Use get_position_orientation()[0] instead.", DeprecationWarning)
         return self.get_position_orientation()[0]
 
     def set_orientation(self, orientation):
@@ -236,6 +301,9 @@ class XFormPrim(BasePrim):
         Args:
             orientation (4-array): (x,y,z,w) global quaternion orientation to set
         """
+
+        import warnings
+        warnings.warn("This method is deprecated. Use set_position_orientation(orientation=orientation) instead.", DeprecationWarning)
         self.set_position_orientation(orientation=orientation)
 
     def get_orientation(self):
@@ -245,23 +313,10 @@ class XFormPrim(BasePrim):
         Returns:
             4-array: (x,y,z,w) global quaternion orientation of this prim
         """
+
+        import warnings
+        warnings.warn("This method is deprecated. Use get_position_orientation()[1] instead.", DeprecationWarning)
         return self.get_position_orientation()[1]
-
-    def get_rpy(self):
-        """
-        Get this prim's orientation with respect to the world frame
-
-        Returns:
-            3-array: (roll, pitch, yaw) global euler orientation of this prim
-        """
-        return quat2euler(self.get_orientation())
-
-    def get_xy_orientation(self):
-        """
-        Get this prim's orientation on the XY plane of the world frame. This is obtained by
-        projecting the forward vector onto the XY plane and then computing the angle.
-        """
-        return T.calculate_xy_plane_angle(self.get_orientation())
 
     def get_local_pose(self):
         """
@@ -272,10 +327,13 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the local frame
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
-        pos, ori = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
-        return pos, ori[[1, 2, 3, 0]]
 
-    def set_local_pose(self, position=None, orientation=None):
+        import warnings
+        warnings.warn("This method is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        return PoseAPI.get_position_orientation(self.prim_path, RelativeFrame.PARENT)
+
+    def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
         """
         Sets prim's pose with respect to the local frame (the prim's parent frame).
 
@@ -285,39 +343,34 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
-        properties = self.prim.GetPropertyNames()
-        if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
-            if "xformOp:translate" not in properties:
-                lazy.carb.log_error(
-                    "Translate property needs to be set for {} before setting its position".format(self.name)
-                )
-            self.set_attribute("xformOp:translate", position)
-        if orientation is not None:
-            orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
-            if "xformOp:orient" not in properties:
-                lazy.carb.log_error(
-                    "Orient property needs to be set for {} before setting its orientation".format(self.name)
-                )
-            xform_op = self._prim.GetAttribute("xformOp:orient")
-            if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*orientation)
-            else:
-                rotq = lazy.pxr.Gf.Quatd(*orientation)
-            xform_op.Set(rotq)
-        PoseAPI.invalidate()
-        if gm.ENABLE_FLATCACHE:
-            # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
-            # Ideally we should call usdrt's set local pose directly, but there is no such API.
-            # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-            xformable_prim = lazy.usdrt.Rt.Xformable(
-                lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
-            )
-            assert (
-                not xformable_prim.HasWorldXform()
-            ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
-            xformable_prim.SetLocalXformFromUsd()
-        return
+        
+        import warnings
+        warnings.warn("This method is deprecated. Use set_position_orientation(position, orientation, frame=RelativeFrame.PARENT) instead.", DeprecationWarning)
+
+        return self.set_position_orientation(self.prim_path, position, orientation, frame)
+    
+    # -----------------------------------------------------------------------------------------------------------------
+    
+    
+    def get_rpy(self):
+
+        """
+        Get this prim's orientation with respect to the world frame
+
+        Returns:
+            3-array: (roll, pitch, yaw) global euler orientation of this prim
+        """
+
+        return quat2euler(self.get_position_orientation()[1])
+
+    def get_xy_orientation(self):
+
+        """
+        Get this prim's orientation on the XY plane of the world frame. This is obtained by
+        projecting the forward vector onto the XY plane and then computing the angle.
+        """
+
+        return T.calculate_xy_plane_angle(self.get_position_orientation()[1])
 
     def get_world_scale(self):
         """

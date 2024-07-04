@@ -159,8 +159,8 @@ def plan_base_motion(
 
         return new_path
 
-    pos = robot.get_position()
-    yaw = T.quat2euler(robot.get_orientation())[2]
+    pos = robot.get_position_orientation()[0]
+    yaw = T.quat2euler(robot.get_position_orientation()[1])[2]
     start_conf = (pos[0], pos[1], yaw)
 
     # create an SE(2) state space

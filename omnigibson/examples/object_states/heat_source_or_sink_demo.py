@@ -79,7 +79,7 @@ def main():
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(np.array([0, 1.0, 0.61]))
+    stove.set_position_orientation(position=np.array([0, 1.0, 0.61]))
     for i in range(100):
         env.step(np.array([]))
 

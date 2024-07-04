@@ -167,8 +167,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # yield from self._navigate_if_needed(obj)
 
         # Perform forced assisted grasp
-        obj.set_position(self.robot.get_eef_position(self.arm))
-        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position())
+        obj.set_position_orientation(position=self.robot.get_eef_position(self.arm))
+        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position_orientation()[0])
 
         # Execute for a moment
         yield from self._settle_robot()
@@ -554,7 +554,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Get the position of the heat source on the thing we're placing near
         heating_element_positions = np.array(
-            [link.get_position() for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()]
+            [link.get_position_orientation()[0] for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()]
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 

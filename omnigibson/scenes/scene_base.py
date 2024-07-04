@@ -24,7 +24,7 @@ from omnigibson.systems.system_base import (
     VisualParticleSystem,
     create_system_from_metadata,
 )
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES, RelativeFrame
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -302,23 +302,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
+        self._scene_prim.set_position_orientation(position=[0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
             # Import into the simulator
             self.add_object(obj)
             # Set the init pose accordingly
-            obj.set_local_pose(
+            obj.set_position_orientation(
                 position=self._init_state[obj_name]["root_link"]["pos"],
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
+                frame=RelativeFrame.PARENT,
             )
 
         # Position the scene prim based on the last scene's right edge
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            self._scene_prim.set_position_orientation(position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)

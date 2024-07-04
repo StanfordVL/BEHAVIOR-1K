@@ -39,7 +39,7 @@ def retrieve_obj_cfg(obj):
         "category": obj.category,
         "model": obj.model,
         "prim_type": obj.prim_type,
-        "position": obj.get_position(),
+        "position": obj.get_position_orientation()[0],
         "scale": obj.scale,
         "abilities": obj.abilities,
         "visual_only": obj.visual_only,
@@ -218,14 +218,14 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
     objA_aabb_center, objA_aabb_extent = objA.aabb_center, objA.aabb_extent
     objB_aabb_center, objB_aabb_extent = objB.aabb_center, objB.aabb_extent
-    objA_aabb_offset = objA.get_position() - objA_aabb_center
+    objA_aabb_offset = objA.get_position_orientation()[0] - objA_aabb_center
 
     target_objA_aabb_pos = (
         objB_aabb_center
         + np.array([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
         + np.array([x_offset, y_offset, z_offset])
     )
-    objA.set_position(target_objA_aabb_pos + objA_aabb_offset)
+    objA.set_position_orientation(position=target_objA_aabb_pos + objA_aabb_offset)
 
 
 def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
@@ -235,10 +235,10 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
         obj.root_link.reset()
 
     obj_aabb_center, obj_aabb_extent = obj.aabb_center, obj.aabb_extent
-    obj_aabb_offset = obj.get_position() - obj_aabb_center
+    obj_aabb_offset = obj.get_position_orientation()[0] - obj_aabb_center
 
     target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
-    obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
+    obj.set_position_orientation(position=target_obj_aabb_pos + obj_aabb_offset)
 
 
 def remove_all_systems(scene):

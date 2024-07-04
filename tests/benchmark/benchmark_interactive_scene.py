@@ -70,7 +70,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
 
     og.sim.play()
     if non_rigid_simulation:
-        cloth.set_position([1, 0, 1])
+        cloth.set_position_orientation(position=[1, 0, 1])
     og.sim.step()
     fps = []
     physics_fps = []

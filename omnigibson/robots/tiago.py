@@ -11,6 +11,7 @@ from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
+from omnigibson.utils.constants import RelativeFrame
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -307,8 +308,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = self.base_footprint_link.get_orientation()
-        root_link_orn = self.root_link.get_orientation()
+        base_orn = self.base_footprint_link.get_position_orientation()[1]
+        root_link_orn = self.root_link.get_position_orientation()[1]
 
         cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
 
@@ -697,11 +698,47 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "right": [np.deg2rad(-75), np.deg2rad(-15)],
         }
 
-    def get_position_orientation(self):
-        # TODO: Investigate the need for this custom behavior.
-        return self.base_footprint_link.get_position_orientation()
+    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+        
+        """
+        Gets tiago's pose with respect to the specified frame.
 
-    def set_position_orientation(self, position=None, orientation=None):
+        Args:
+            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
+            get position relative to the object parent. SCENE frame get position relative to the scene.
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the specified frame
+                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+        """
+
+        if frame == RelativeFrame.WORLD:
+            return self.base_footprint_link.get_position_orientation()
+
+        elif frame == RelativeFrame.SCENE:
+            
+            # TODO: Add the ability to get the position and orientation of the robot in the scene frame
+            pass
+        else:
+            
+            # TODO: Add the ability to get the position and orientation of the robot in the parent frame
+            pass
+
+    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+
+        """
+        Sets tiago's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame 
+            set position relative to the object parent. SCENE frame set position relative to the scene. 
+        """
+
         current_position, current_orientation = self.get_position_orientation()
         if position is None:
             position = current_position
@@ -733,7 +770,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
         else:
             # Call the super() method to move the robot frame first
-            super().set_position_orientation(position, orientation)
+            super().set_position_orientation(position, orientation, frame=frame)
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
@@ -745,7 +782,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = self.root_link.get_orientation()
+        orn = self.root_link.get_position_orientation()[1]
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
         self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
@@ -757,7 +794,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def set_angular_velocity(self, velocity: np.ndarray) -> None:
         # See comments of self.set_linear_velocity
-        orn = self.root_link.get_orientation()
+        orn = self.root_link.get_position_orientation()[1]
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
         self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)

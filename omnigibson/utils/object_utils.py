@@ -9,6 +9,7 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.scenes import Scene
 from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
+from omnigibson.utils.constants import RelativeFrame
 
 
 def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
@@ -29,7 +30,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     aabb_extent = obj.aabb_extent
     radius = np.linalg.norm(aabb_extent) / 2.0
     drop_pos = np.array([0, 0, radius + drop_aabb_offset])
-    center_offset = obj.get_position() - obj.aabb_center
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center
     drop_orientations = R.random(n_samples).as_quat()
     stable_orientations = np.zeros_like(drop_orientations)
     for i, drop_orientation in enumerate(drop_orientations):
@@ -39,7 +40,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
         obj.keep_still()
         for j in range(25):
             og.sim.step()
-        stable_orientations[i] = obj.get_orientation()
+        stable_orientations[i] = obj.get_position_orientation()[1]
 
     return stable_orientations
 
@@ -58,7 +59,7 @@ def compute_bbox_offset(obj):
     og.sim.stop()
     assert np.all(obj.scale == 1.0)
     obj.set_position_orientation(np.zeros(3), np.array([0, 0, 0, 1.0]))
-    return obj.aabb_center - obj.get_position()
+    return obj.aabb_center - obj.get_position_orientation()[0]
 
 
 def compute_native_bbox_extent(obj):
@@ -86,7 +87,7 @@ def compute_base_aligned_bboxes(obj):
             pts_in_link_frame = []
             for mesh_name, mesh in mesh_list.items():
                 pts = mesh.get_attribute("points")
-                local_pos, local_orn = mesh.get_local_pose()
+                local_pos, local_orn = mesh.get_position_orientation(RelativeFrame.PARENT)
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
             pts_in_link_frame = np.concatenate(pts_in_link_frame, axis=0)
             max_pt = np.max(pts_in_link_frame, axis=0)

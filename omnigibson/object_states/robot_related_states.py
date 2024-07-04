@@ -30,8 +30,8 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 #         if not robot:
 #             return False
 
-#         robot_pos = robot.get_position()
-#         object_pos = self.obj.get_position()
+#         robot_pos = robot.get_position_orientation()[0]
+#         object_pos = self.obj.get_position_orientation()[0]
 #         return np.linalg.norm(object_pos - np.array(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
 
 

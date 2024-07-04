@@ -142,7 +142,7 @@ def main():
 
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(
-            position=apples[n].get_position() + np.array([-0.15, 0.0, 0.1 * (n + 2)]),
+            position=apples[n].get_position_orientation()[0] + np.array([-0.15, 0.0, 0.1 * (n + 2)]),
             orientation=T.euler2quat([-np.pi / 2, 0, 0]),
         )
         knife.keep_still()
@@ -152,7 +152,7 @@ def main():
     output, results = [], []
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position([SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1])
+    og.sim.viewer_camera.set_position_orientation(position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1])
     # record total load time
     total_load_time = time.time() - load_start
 

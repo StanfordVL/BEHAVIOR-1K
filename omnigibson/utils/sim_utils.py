@@ -305,7 +305,7 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     from omnigibson.object_states import AABB
 
     lower, _ = obj.states[AABB].get_value()
-    cur_pos = obj.get_position()
+    cur_pos = obj.get_position_orientation()[0]
     z_diff = cur_pos[2] - lower[2]
     obj.set_position_orientation(pos + np.array([0, 0, z_diff if z_offset is None else z_diff + z_offset]), quat)
 

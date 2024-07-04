@@ -118,7 +118,7 @@ class GraspReward(BaseRewardFunction):
         info["postgrasp_dist_reward"] = 0.0
         if not current_grasping:
             # TODO: If we dropped the object recently, penalize for that
-            obj_center = self.obj.get_position()
+            obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(eef_pos, obj_center)
             dist_reward = math.exp(-dist) * self.dist_coeff
             reward += dist_reward
@@ -132,8 +132,8 @@ class GraspReward(BaseRewardFunction):
             info["grasp_reward"] = self.grasp_reward
 
             # Then apply a distance reward to take us to a tucked position
-            robot_center = robot.links["torso_lift_link"].get_position()
-            obj_center = self.obj.get_position()
+            robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
+            obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(robot_center, obj_center)
             dist_reward = math.exp(-dist) * self.dist_coeff
             reward += dist_reward

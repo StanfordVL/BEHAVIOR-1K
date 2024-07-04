@@ -342,8 +342,8 @@ class PointNavigationTask(BaseTask):
 
         # Update visuals if requested
         if self._visualize_goal:
-            self._initial_pos_marker.set_position(self._initial_pos)
-            self._goal_pos_marker.set_position(self._goal_pos)
+            self._initial_pos_marker.set_position_orientation(position=self._initial_pos)
+            self._goal_pos_marker.set_position_orientation(position=self._goal_pos)
 
     def _reset_variables(self, env):
         # Run super first
@@ -456,11 +456,11 @@ class PointNavigationTask(BaseTask):
             floor_height = env.scene.get_floor_height(self._floor)
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
-                self._waypoint_markers[i].set_position(
+                self._waypoint_markers[i].set_position_orientation(
                     position=np.array([shortest_path[i][0], shortest_path[i][1], floor_height])
                 )
             for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position(position=np.array([0.0, 0.0, 100.0]))
+                self._waypoint_markers[i].set_position_orientation(position=np.array([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first
