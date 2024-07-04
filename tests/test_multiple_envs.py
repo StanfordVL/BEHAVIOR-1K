@@ -68,16 +68,60 @@ def test_multi_scene_displacement():
     assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
     og.clear()
 
-def test_multi_scene_set_local_position():
+def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)
 
-    robot_0_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.PARENT)[0]
-    robot_0_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    robot_1_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.PARENT)[0]
+    robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.WORLD)[0]
 
     scene_prim = vec_env.envs[1].scene.prim
     pos_scene = scene_prim.get_position_orientation(frame=RelativeFrame.WORLD)[0]
 
-    assert np.allclose(robot_0_pos_global, pos_scene + robot_0_pos_local, atol=1e-3)
+    assert np.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
+    og.clear()
+
+def test_multi_scene_set_local_position():
+    
+    vec_env = setup_multi_environment(3)
+
+    # Get the robot from the second environment
+    robot = vec_env.envs[1].scene.robots[0]
+
+    # Get the initial global position of the robot
+    initial_global_pos = robot.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+
+    # Define a new global position
+    new_global_pos = initial_global_pos + np.array([1.0, 0.5, 0.0])
+
+    # Set the new global position
+    robot.set_position_orientation(position=new_global_pos)
+
+    # Get the updated global position
+    updated_global_pos = robot.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+
+    # Get the scene's global position
+    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+
+    # Get the updated local position
+    updated_local_pos = robot.get_position_orientation(frame=RelativeFrame.PARENT)[0]
+
+    # Calculate expected local position
+    expected_local_pos = new_global_pos - scene_pos
+
+    # Assert that the global position has been updated correctly
+    assert np.allclose(updated_global_pos, new_global_pos, atol=1e-3), \
+        f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
+
+    # Assert that the local position has been updated correctly
+    assert np.allclose(updated_local_pos, expected_local_pos, atol=1e-3), \
+        f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
+
+    # Assert that the change in global position is correct
+    global_pos_change = updated_global_pos - initial_global_pos
+    expected_change = np.array([1.0, 0.5, 0.0])
+    assert np.allclose(global_pos_change, expected_change, atol=1e-3), \
+        f"Global position change {global_pos_change} does not match expected change {expected_change}"
+
     og.clear()
 
 
