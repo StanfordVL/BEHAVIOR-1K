@@ -527,7 +527,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         added_obj_attrs += output.add
         removed_objs += output.remove
 
-        TransitionRuleAPI.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+        obj.scene.transition_rule_api.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
         yield from self._settle_robot()
 
     def _place_near_heating_element(self, heat_source_obj):

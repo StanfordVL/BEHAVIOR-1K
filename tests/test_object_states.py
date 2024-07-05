@@ -788,7 +788,7 @@ def test_particle_sink(env):
     assert water_system.n_particles == 0
 
     sink_pos = sink.states[ParticleSink].link.get_position()
-    water_system.generate_particles(scene=env.scene, positions=[sink_pos + np.array([0, 0, 0.05])])
+    water_system.generate_particles(positions=[sink_pos + np.array([0, 0, 0.05])])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
 
@@ -883,7 +883,7 @@ def test_particle_remover(env):
     water_system = env.scene.get_system("water")
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        scene=env.scene, positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
     )
     assert water_system.n_particles > 0
 
@@ -910,7 +910,7 @@ def test_particle_remover(env):
     og.sim.step()
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        scene=env.scene, positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
     )
 
     # Water should be present
@@ -946,7 +946,6 @@ def test_saturated(env):
     n_particles = 5
     remover_dishtowel.states[Saturated].set_limit(water_system, n_particles)
     water_system.generate_particles(
-        scene=env.scene,
         positions=[
             np.array([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)])
             for i in range(n_particles)
@@ -1123,7 +1122,7 @@ def test_contains(env):
 
         # Sample single particle
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(scene=env.scene, positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
+            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)

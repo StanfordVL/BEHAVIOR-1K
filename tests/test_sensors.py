@@ -22,7 +22,7 @@ def test_seg(env):
         # Sample two particles for each system
         pos = np.array([-0.2 + i * 0.2, 0, 0.55])
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(scene=env.scene, positions=[pos, pos + np.array([0.1, 0.0, 0.0])])
+            system.generate_particles(positions=[pos, pos + np.array([0.1, 0.0, 0.0])])
         else:
             if system.get_group_name(breakfast_table) not in system.groups:
                 system.create_attachment_group(breakfast_table)
