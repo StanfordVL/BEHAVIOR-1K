@@ -398,7 +398,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
             if orientation is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                    lazy.pxr.Gf.Quatf(*[x.item() for x in orientation[[3, 0, 1, 2]]])
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                 )
 
     @property

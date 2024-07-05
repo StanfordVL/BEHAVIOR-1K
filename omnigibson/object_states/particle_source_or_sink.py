@@ -111,7 +111,7 @@ class ParticleSource(ParticleApplier):
         # Extents are in local frame, so we need to convert to world frame using link scale
         distance = self.link.scale[2] * self._projection_mesh_params["extents"][2]
         t = (-self._initial_speed + th.sqrt(self._initial_speed**2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
-        self._n_steps_per_modification = math.ceil(1 + t / og.sim.get_rendering_dt()).int()
+        self._n_steps_per_modification = math.ceil(1 + t / og.sim.get_rendering_dt())
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system

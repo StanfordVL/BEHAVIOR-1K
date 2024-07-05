@@ -96,7 +96,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         for i in range(3):
             obj = objs[i]
             pos = obj.root_link.compute_particle_positions()
-            x_min, x_max = th.min(pos, dim=0)[0], th.max(pos, dim=0)[0]
+            x_min, x_max = th.min(pos, dim=0).values[0], th.max(pos, dim=0).values[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
             indices = th.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
@@ -120,7 +120,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         for direction in [-1, 1]:
             obj = shirt
             pos = obj.root_link.compute_particle_positions()
-            y_min, y_max = th.min(pos, dim=0)[1], th.max(pos, dim=0)[1]
+            y_min, y_max = th.min(pos, dim=0).values[1], th.max(pos, dim=0).values[1]
             y_extent = y_max - y_min
             if direction == 1:
                 indices = th.argsort(pos, dim=0)[:, 1][: (pos.shape[0] // 20)]

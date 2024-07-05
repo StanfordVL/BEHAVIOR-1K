@@ -51,8 +51,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super()._add_obj(obj=obj)
 
         # Add to previously touching and delay counter
-        cls.DELAY_COUNTER = th.cat([cls.DELAY_COUNTER, [0]])
-        cls.PREVIOUSLY_TOUCHING = th.cat([cls.PREVIOUSLY_TOUCHING, [False]])
+        cls.DELAY_COUNTER = th.cat([cls.DELAY_COUNTER, th.tensor([0])])
+        cls.PREVIOUSLY_TOUCHING = th.cat([cls.PREVIOUSLY_TOUCHING, th.tensor([False])])
 
         # Add this object's prim paths to slicer paths
         cls.SLICER_LINK_PATHS.append([link.prim_path for link in obj.links.values()])
@@ -73,7 +73,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _update_values(cls, values):
         # If we were slicing in the past step, deactivate now
-        previously_touching_idxs = th.nonzero(cls.PREVIOUSLY_TOUCHING)[0]
+        previously_touching_idxs = th.nonzero(cls.PREVIOUSLY_TOUCHING)
         values[previously_touching_idxs] = False
         cls.DELAY_COUNTER[previously_touching_idxs] = 0  # Reset the counter when we stop touching a sliceable object
 
@@ -178,9 +178,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         return th.cat(
             [
                 state_flat,
-                [state["previously_touching"], state["delay_counter"]],
-            ],
-            dtype=float,
+                th.tensor([state["previously_touching"], state["delay_counter"]]),
+            ]
         )
 
     def deserialize(self, state):

@@ -198,7 +198,7 @@ class OVXRSystem(TeleopSystem):
         Args:
             transform (th.tensor): the transform matrix in the Omniverse XR coordinate system
         Returns:
-            tuple(th.tensor, th.tensor): the position and orientation in the OmniGibson coordinate system
+            tuple(th.tensor, th.Tensor): the position and orientation in the OmniGibson coordinate system
         """
         pos, orn = T.mat2pose(th.tensor(transform).T)
         orn = T.quat_multiply(orn, self.xr2og_orn_offset)

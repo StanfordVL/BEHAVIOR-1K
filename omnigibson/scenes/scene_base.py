@@ -302,7 +302,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
+        self._scene_prim.set_position(th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0]))
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():

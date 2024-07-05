@@ -1,5 +1,6 @@
 from functools import cached_property
 
+import numpy as np
 import torch as th
 import trimesh
 
@@ -91,7 +92,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:
-            self.set_attribute("primvars:displayColor", th.tensor(rgb))
+            self.set_attribute("primvars:displayColor", np.array(rgb))
 
     @property
     def opacity(self):
@@ -129,10 +130,10 @@ class GeomPrim(XFormPrim):
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return th.tensor(self.prim.GetAttribute("points").Get())
+            return th.tensor(self.prim.GetAttribute("points").Get(), dtype=th.float32)
         else:
             # Return the vertices of the trimesh
-            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
+            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)
 
     @property
     def points_in_parent_frame(self):
@@ -142,7 +143,7 @@ class GeomPrim(XFormPrim):
         position, orientation = self.get_local_pose()
         scale = self.scale
         points_scaled = points * scale
-        points_rotated = th.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_rotated = (T.quat2mat(orientation) @ points_scaled.T).T
         points_transformed = points_rotated + position
         return points_transformed
 
@@ -155,8 +156,8 @@ class GeomPrim(XFormPrim):
         points_homogeneous = th.cat((points, th.ones((points.shape[0], 1))), dim=1)
         points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
 
-        aabb_lo = th.min(points_transformed, dim=0)
-        aabb_hi = th.max(points_transformed, dim=0)
+        aabb_lo = th.min(points_transformed, dim=0).values
+        aabb_hi = th.max(points_transformed, dim=0).values
         return aabb_lo, aabb_hi
 
     @property
@@ -188,7 +189,7 @@ class GeomPrim(XFormPrim):
             th.tensor: The unscaled 3d extent of the mesh in its local frame.
         """
         points = self.points
-        return th.max(points, dim=0) - th.min(points, dim=0)
+        return th.max(points, dim=0).values - th.min(points, dim=0).values
 
 
 class CollisionGeomPrim(GeomPrim):

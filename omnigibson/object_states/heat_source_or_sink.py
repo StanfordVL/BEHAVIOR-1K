@@ -223,9 +223,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 aabb_center = (aabb_upper + aabb_lower) / 2.0
 
                 og.sim.psqi.overlap_box(
-                    halfExtent=half_extent,
-                    pos=aabb_center,
-                    rot=th.tensor([0, 0, 0, 1.0]),
+                    halfExtent=half_extent.tolist(),
+                    pos=aabb_center.tolist(),
+                    rot=[0, 0, 0, 1.0],
                     reportFn=overlap_callback,
                 )
 

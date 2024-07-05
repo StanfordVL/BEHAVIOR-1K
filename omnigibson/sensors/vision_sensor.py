@@ -1,6 +1,8 @@
 import math
 import time
 
+import numpy as np
+
 import gymnasium as gym
 import torch as th
 
@@ -287,7 +289,9 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-            raw_obs = self._annotators[modality].get_data()
+            raw_obs = self._annotators[modality].get_data(device="cuda")
+            # TODO: use warp.to_torch() to convert warp array to torch tensor
+            # TODO: all segmentation modalities return a uint32 np array, but PyTorch doesn't support uint32
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
             if modality == "seg_semantic":
@@ -733,15 +737,15 @@ class VisionSensor(BaseSensor):
         bbox_3d_space = gym.spaces.Sequence(
             space=gym.spaces.Tuple(
                 (
-                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=th.int32),  # semanticId
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # x_min
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # y_min
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # z_min
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # x_max
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # y_max
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=th.float32),  # z_max
-                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(4, 4), dtype=th.float32),  # transform
-                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=th.float32),  # occlusion ratio
+                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # x_min
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # y_min
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # z_min
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # x_max
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # y_max
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # z_max
+                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32),  # transform
+                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),  # occlusion ratio
                 )
             )
         )
@@ -749,25 +753,25 @@ class VisionSensor(BaseSensor):
         bbox_2d_space = gym.spaces.Sequence(
             space=gym.spaces.Tuple(
                 (
-                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=th.int32),  # semanticId
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=th.int32),  # x_min
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=th.int32),  # y_min
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=th.int32),  # x_max
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=th.int32),  # y_max
-                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=th.float32),  # occlusion ratio
+                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_min
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_min
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_max
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_max
+                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),  # occlusion ratio
                 )
             )
         )
 
         obs_space_mapping = dict(
-            rgb=((self.image_height, self.image_width, 4), 0, 255, th.uint8),
-            depth=((self.image_height, self.image_width), 0.0, float("inf"), th.float32),
-            depth_linear=((self.image_height, self.image_width), 0.0, float("inf"), th.float32),
-            normal=((self.image_height, self.image_width, 4), -1.0, 1.0, th.float32),
-            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, th.int32),
-            seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, th.int32),
-            seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, th.int32),
-            flow=((self.image_height, self.image_width, 4), -float("inf"), float("inf"), th.float32),
+            rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
+            depth=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
+            depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
+            normal=((self.image_height, self.image_width, 4), -1.0, 1.0, np.float32),
+            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint32),
+            seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
+            seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
+            flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, np.float32),
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,

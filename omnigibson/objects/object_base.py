@@ -145,7 +145,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             scale = th.ones(3) if self._load_config["scale"] is None else th.tensor(self._load_config["scale"])
             if (
                 self.n_joints == 0
-                and (th.all(math.isclose(scale, 1.0, abs_tol=1e-3)) or self.n_fixed_joints == 0)
+                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
                 and (self._load_config["kinematic_only"] != False)
                 and not self.has_attachment_points
             ):

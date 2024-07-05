@@ -166,7 +166,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     def state_size(self):
         # This is the flattened size of @self.value_shape
         # Note that th.prod(()) returns 1, which is also correct for a non-arrayed value
-        return int(th.prod(self.value_shape))
+        if self.value_shape == ():
+            return 1
+        else:
+            return int(th.prod(self.value_shape))
 
     # For this state, we simply store its value.
     def _dump_state(self):
@@ -179,7 +182,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # If the state value is not an iterable, wrap it in a numpy array
         val = (
             state[self.value_name]
-            if isinstance(state[self.value_name], th.tensor)
+            if isinstance(state[self.value_name], th.Tensor)
             else th.tensor([state[self.value_name]])
         )
         return val.flatten().float()

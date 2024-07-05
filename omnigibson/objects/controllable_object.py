@@ -3,6 +3,8 @@ from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
 
+import numpy as np
+
 import gymnasium as gym
 import torch as th
 
@@ -305,7 +307,9 @@ class ControllableObject(BaseObject):
             low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
             high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
-        return gym.spaces.Box(shape=(self.action_dim,), low=th.cat(low), high=th.cat(high), dtype=float)
+        return gym.spaces.Box(
+            shape=(self.action_dim,), low=np.array(th.cat(low)), high=np.array(th.cat(high)), dtype=float
+        )
 
     def apply_action(self, action):
         """

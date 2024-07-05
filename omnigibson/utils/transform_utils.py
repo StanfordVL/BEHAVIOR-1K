@@ -291,8 +291,8 @@ def random_quat(rand=None):
         rand = th.rand(3)
     else:
         assert len(rand) == 3
-    r1 = th.sqrt(1.0 - rand[0])
-    r2 = th.sqrt(rand[0])
+    r1 = math.sqrt(1.0 - rand[0])
+    r2 = math.sqrt(rand[0])
     pi2 = math.pi * 2.0
     t1 = pi2 * rand[1]
     t2 = pi2 * rand[2]
@@ -389,7 +389,7 @@ def mat2quat(rmat):
     Returns:
         th.tensor: (..., 4) (x,y,z,w) float quaternion angles
     """
-    return th.tensor(R.from_matrix(rmat).as_quat())
+    return th.tensor(R.from_matrix(rmat).as_quat(), dtype=th.float32)
 
 
 def vec2quat(vec, up=(0, 0, 1.0)):
@@ -427,7 +427,7 @@ def euler2mat(euler):
     euler = th.asarray(euler, dtype=th.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
-    return th.tensor(R.from_euler("xyz", euler).as_matrix())
+    return th.tensor(R.from_euler("xyz", euler).as_matrix(), dtype=th.float32)
 
 
 def mat2euler(rmat):
@@ -441,7 +441,7 @@ def mat2euler(rmat):
         th.tensor: (r,p,y) converted euler angles in radian vec3 float
     """
     M = th.tensor(rmat, dtype=th.float32, copy=False)[:3, :3]
-    return th.tensor(R.from_matrix(M).as_euler("xyz"))
+    return th.tensor(R.from_matrix(M).as_euler("xyz"), dtype=th.float32)
 
 
 def pose2mat(pose):
@@ -472,7 +472,7 @@ def quat2mat(quaternion):
     Returns:
         th.tensor: (..., 3, 3) rotation matrix
     """
-    return th.tensor(R.from_quat(quaternion).as_matrix())
+    return th.tensor(R.from_quat(quaternion).as_matrix(), dtype=th.float32)
 
 
 def quat2axisangle(quat):
@@ -486,7 +486,7 @@ def quat2axisangle(quat):
     Returns:
         th.tensor: (ax,ay,az) axis-angle exponential coordinates
     """
-    return th.tensor(R.from_quat(quat).as_rotvec())
+    return th.tensor(R.from_quat(quat).as_rotvec(), dtype=th.float32)
 
 
 def axisangle2quat(vec):
@@ -499,7 +499,7 @@ def axisangle2quat(vec):
     Returns:
         th.tensor: (x,y,z,w) vec4 float angles
     """
-    return th.tensor(R.from_rotvec(vec).as_quat())
+    return th.tensor(R.from_rotvec(vec).as_quat(), dtype=th.float32)
 
 
 def euler2quat(euler):
@@ -515,7 +515,7 @@ def euler2quat(euler):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_euler("xyz", euler).as_quat()
+    return th.tensor(R.from_euler("xyz", euler).as_quat(), dtype=th.float32)
 
 
 def quat2euler(quat):
@@ -531,7 +531,7 @@ def quat2euler(quat):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_quat(quat).as_euler("xyz")
+    return th.tensor(R.from_quat(quat).as_euler("xyz"), dtype=th.float32)
 
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
@@ -579,7 +579,7 @@ def pose_inv(pose_mat):
 
     pose_inv = th.zeros((4, 4))
     pose_inv[:3, :3] = pose_mat[:3, :3].T
-    pose_inv[:3, 3] = -pose_inv[:3, :3].dot(pose_mat[:3, 3])
+    pose_inv[:3, 3] = -pose_inv[:3, :3] @ pose_mat[:3, 3]
     pose_inv[3, 3] = 1.0
     return pose_inv
 
@@ -825,7 +825,7 @@ def clip_rotation(quat, limit):
     # First, normalize the quaternion
     quat = quat / th.norm(quat)
 
-    den = th.sqrt(max(1 - quat[3] * quat[3], 0))
+    den = math.sqrt(max(1 - quat[3] * quat[3], 0))
     if den == 0:
         # This is a zero degree rotation, immediately return
         return quat, clipped
@@ -915,7 +915,7 @@ def unit_vector(data, dim=None, out=None):
             out[:] = th.tensor(data, copy=False)
         data = out
     length = th.atleast_1d(th.sum(data * data, dim))
-    th.sqrt(length, length)
+    math.sqrt(length, length)
     if dim is not None:
         length = th.unsqueeze(length, dim)
     data /= length

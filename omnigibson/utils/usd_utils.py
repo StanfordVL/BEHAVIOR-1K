@@ -146,16 +146,16 @@ def create_joint(
     og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
+        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist()))
     if joint_frame_in_parent_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*[x.item() for x in joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]])
+            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]].tolist())
         )
     if joint_frame_in_child_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos.tolist()))
     if joint_frame_in_child_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot1").Set(
-            lazy.pxr.Gf.Quatf(*[x.item() for x in joint_frame_in_child_frame_quat[[3, 0, 1, 2]]])
+            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]].tolist())
         )
 
     if break_force is not None:
@@ -271,8 +271,8 @@ class RigidContactAPIImpl:
                     path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
                 }
 
-                self._ROW_IDX_TO_PATH[scene_idx] = th.tensor(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
-                self._COL_IDX_TO_PATH[scene_idx] = th.tensor(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
+                self._ROW_IDX_TO_PATH[scene_idx] = list(self._PATH_TO_ROW_IDX[scene_idx].keys())
+                self._COL_IDX_TO_PATH[scene_idx] = list(self._PATH_TO_COL_IDX[scene_idx].keys())
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         # n_bodies = len(cls._PATH_TO_COL_IDX)
@@ -329,7 +329,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX:
             self._CONTACT_MATRIX[scene_idx] = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
 
-        return self._CONTACT_MATRIX[scene_idx]
+        return th.tensor(self._CONTACT_MATRIX[scene_idx], dtype=th.float32)
 
     def get_impulses(self, prim_paths_a, prim_paths_b):
         """
@@ -739,7 +739,7 @@ class PoseAPI:
     def get_world_pose(cls, prim_path):
         cls._refresh()
         position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        return th.tensor(position), th.tensor(orientation)[[1, 2, 3, 0]]
+        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)[[1, 2, 3, 0]]
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -1247,19 +1247,19 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     )
     if trimesh_mesh.is_volume:
         volume = trimesh_mesh.volume
-        com = trimesh_mesh.center_mass
+        com = th.tensor(trimesh_mesh.center_mass)
     else:
         # If the mesh is not a volume, we compute its convex hull and use that instead
         try:
             trimesh_mesh_convex = trimesh_mesh.convex_hull
             volume = trimesh_mesh_convex.volume
-            com = trimesh_mesh_convex.center_mass
+            com = th.tensor(trimesh_mesh_convex.center_mass)
         except:
             # if convex hull computation fails, it usually means the mesh is degenerated: use trivial values.
             volume = 0.0
             com = th.zeros(3)
 
-    return volume, com
+    return volume, com.to(dtype=th.float32)
 
 
 def check_extent_radius_ratio(geom_prim, com):
@@ -1288,7 +1288,7 @@ def check_extent_radius_ratio(geom_prim, com):
         return False
 
     max_radius = extent.max() / 2.0
-    min_radius = th.min(th.norm(geom_prim.points - com, dim=-1), dim=0)
+    min_radius = th.min(th.norm(geom_prim.points - com, dim=-1), dim=0).values
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
@@ -1330,9 +1330,11 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     extents = th.ones(3) * extents if isinstance(extents, float) else th.tensor(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = th.tensor(attr.Get()).double()
-        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
+        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0).tolist()) for val in vals]))
     mesh.GetExtentAttr().Set(
-        lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))])
+        lazy.pxr.Vt.Vec3fArray(
+            [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
+        )
     )
 
     return mesh

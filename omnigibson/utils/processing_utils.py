@@ -127,8 +127,8 @@ class MovingAverageFilter(Filter):
             [
                 state_flat,
                 state["past_samples"].flatten(),
-                [state["current_idx"]],
-                [state["fully_filled"]],
+                th.tensor([state["current_idx"]]),
+                th.tensor([state["fully_filled"]]),
             ]
         ).float()
 

@@ -166,11 +166,11 @@ def create_projection_visualization(
     emitter_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(emitter_path)
     emitter_prim.GetProperty("inputs:active").Set(True)
     emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
-    emitter_prim.GetProperty("inputs:lifespan").Set(projection_height / m.PROJECTION_VISUALIZATION_SPEED)
+    emitter_prim.GetProperty("inputs:lifespan").Set(projection_height.item() / m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:speed").Set(m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:alongAxis").Set(m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS)
     emitter_prim.GetProperty("inputs:scale").Set(lazy.pxr.Gf.Vec3f(1.0, 1.0, 1.0))
-    emitter_prim.GetProperty("inputs:directionRandom").Set(lazy.pxr.Gf.Vec3f(*spread))
+    emitter_prim.GetProperty("inputs:directionRandom").Set(lazy.pxr.Gf.Vec3f(*spread.tolist()))
     emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
     # Make sure we render 4 times to fully propagate changes (validated empirically)
@@ -456,9 +456,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 valid_hit = False
                 aabb = self.link.visual_aabb
                 og.sim.psqi.overlap_box(
-                    halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
-                    pos=(aabb[1] + aabb[0]) / 2.0,
-                    rot=th.tensor([0, 0, 0, 1.0]),
+                    halfExtent=((aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN).tolist(),
+                    pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                    rot=[0, 0, 0, 1.0],
                     reportFn=overlap_callback,
                 )
                 return valid_hit
@@ -1096,8 +1096,9 @@ class ParticleApplier(ParticleModifier):
             assert th.all(
                 th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
             ), "Projection mesh tip should align with metalink position!"
+            local_euler = T.quat2euler(local_quat)
             assert th.all(
-                th.isclose(T.quat2euler(local_quat), th.zeros_like(local_quat))
+                th.isclose(local_euler, th.zeros_like(local_euler))
             ), "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations

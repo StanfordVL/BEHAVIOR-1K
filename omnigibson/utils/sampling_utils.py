@@ -336,9 +336,9 @@ def raytest(
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
     if only_closest and ignore_bodies is None and ignore_collisions is None:
         return og.sim.psqi.raycast_closest(
-            origin=start_point,
-            dir=direction,
-            distance=distance,
+            origin=start_point.tolist(),
+            dir=direction.tolist(),
+            distance=distance.tolist(),
         )
     else:
         # Compose callback function for finding raycasts
@@ -364,9 +364,9 @@ def raytest(
 
         # Grab all collisions
         og.sim.psqi.raycast_all(
-            origin=start_point,
-            dir=direction,
-            distance=distance,
+            origin=start_point.tolist(),
+            dir=direction.tolist(),
+            distance=distance.tolist(),
             reportFn=hit_callback,
         )
 
@@ -1180,7 +1180,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
 
     # Choose the minimum of these multiples, e.g. how many times the ray direction should be multiplied
     # to reach the nearest boundary.
-    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)])
+    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)]).values
 
     # Finally, use the multiple we found to calculate the point on the AABB boundary that we want to cast our
     # ray until.

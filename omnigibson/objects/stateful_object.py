@@ -404,7 +404,7 @@ class StatefulObject(BaseObject):
                 tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
             )
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-                bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+                bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
             )
 
     def set_emitter_enabled(self, emitter_type, value):

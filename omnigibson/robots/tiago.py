@@ -286,7 +286,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
         self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*[x.item() for x in orientation[[3, 0, 1, 2]]])
+            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
         )
 
     # Name of the actual root link that we are interested in. Note that this is different from self.root_link_name,
@@ -739,7 +739,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                    lazy.pxr.Gf.Quatf(*[x.item() for x in orientation[[3, 0, 1, 2]]])
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                 )
 
     def set_linear_velocity(self, velocity: th.tensor):

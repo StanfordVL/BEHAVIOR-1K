@@ -1029,7 +1029,7 @@ def test_folded_unfolded(env):
     assert carpet.states[Unfolded].get_value()
 
     pos = carpet.root_link.compute_particle_positions()
-    x_min, x_max = th.min(pos, dim=0)[0], th.max(pos, dim=0)[0]
+    x_min, x_max = th.min(pos, dim=0).values[0], th.max(pos, dim=0).values[0]
     x_extent = x_max - x_min
     # Get indices for the bottom 10 percent vertices in the x-axis
     indices = th.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]

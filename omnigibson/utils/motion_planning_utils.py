@@ -448,13 +448,11 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(pose[0], dtype=th.float32)])
+    translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=th.float32).tolist())
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
     orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(
-        lazy.pxr.Gf.Quatd(*[x.item() for x in orientation])
-    )
+    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)
 
@@ -482,10 +480,10 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(mesh_pose[0], dtype=th.float32)])
+                translation = lazy.pxr.Gf.Vec3d(*th.tensor(mesh_pose[0], dtype=th.float32).tolist())
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = th.tensor(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
+                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)
 
@@ -581,7 +579,7 @@ def astar(search_map, start, goal, eight_connected=True):
 
     def heuristic(node):
         # Calculate the Euclidean distance from node to goal
-        return th.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
+        return math.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
 
     def get_neighbors(cell):
         if eight_connected:
@@ -610,7 +608,7 @@ def astar(search_map, start, goal, eight_connected=True):
         if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
             return 1
         else:
-            return th.sqrt(2)
+            return math.sqrt(2)
 
     open_set = [(0, start)]
     came_from = {}

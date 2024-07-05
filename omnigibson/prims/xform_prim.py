@@ -273,7 +273,7 @@ class XFormPrim(BasePrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
         pos, ori = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
-        return pos, ori[[1, 2, 3, 0]]
+        return th.tensor(pos, dtype=th.float32), th.tensor(ori[[1, 2, 3, 0]], dtype=th.float32)
 
     def set_local_pose(self, position=None, orientation=None):
         """
@@ -287,7 +287,7 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(position, dtype=th.float32)])
+            position = lazy.pxr.Gf.Vec3d(*th.tensor(position, dtype=th.float32).tolist())
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
@@ -301,9 +301,9 @@ class XFormPrim(BasePrim):
                 )
             xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*[x.item() for x in orientation])
+                rotq = lazy.pxr.Gf.Quatf(*orientation.tolist())
             else:
-                rotq = lazy.pxr.Gf.Quatd(*[x.item() for x in orientation])
+                rotq = lazy.pxr.Gf.Quatd(*orientation.tolist())
             xform_op.Set(rotq)
         PoseAPI.invalidate()
         if gm.ENABLE_FLATCACHE:
@@ -339,7 +339,7 @@ class XFormPrim(BasePrim):
         return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
-        return trimesh.transformations.transform_points(points, self.scaled_transform)
+        return th.tensor(trimesh.transformations.transform_points(points, self.scaled_transform))
 
     @property
     def scale(self):
@@ -364,7 +364,7 @@ class XFormPrim(BasePrim):
         """
         scale = th.tensor(scale, dtype=float) if isinstance(scale, Iterable) else th.ones(3) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
-        scale = lazy.pxr.Gf.Vec3d(*[x.item() for x in scale])
+        scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
             lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))

@@ -249,8 +249,8 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
     assert (
         trimesh_mesh.is_convex
     ), f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
-    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(dim=1)
-    face_normals = trimesh_mesh.face_normals
+    face_centroids = th.tensor(trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1), dtype=th.float32)
+    face_normals = th.tensor(trimesh_mesh.face_normals, dtype=th.float32)
 
     # This function assumes that:
     # 1. @particle_positions are in the local container_link frame
@@ -415,7 +415,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
         aabb_volume = th.prod(volume_link.visual_aabb_extent)
-        sampling_distance = (aabb_volume / min_n_particles).cbrt()
+        sampling_distance = th.pow(aabb_volume / min_n_particles, 1 / 3.0)
         low, high = volume_link.visual_aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int() + 1
         assert th.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
@@ -429,6 +429,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             mesh.visible = False
 
         # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
-        return aabb_volume * th.mean(check_points_in_volumes(points))
+        return aabb_volume * th.mean(check_points_in_volumes(points).float())
 
     return check_points_in_volumes, calculate_volume

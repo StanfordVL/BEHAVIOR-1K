@@ -169,10 +169,10 @@ class PlanningContext(object):
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
     def _set_prim_pose(self, prim, pose):
-        translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(pose[0], dtype=th.float32)])
+        translation = lazy.pxr.Gf.Vec3d(*(th.tensor(pose[0], dtype=th.float32).tolist()))
         prim.GetAttribute("xformOp:translate").Set(translation)
         orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
-        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
+        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     def _construct_disabled_collision_pairs(self):
         robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
@@ -355,10 +355,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             lazy.omni.usd.commands.CreatePrimCommand("Xform", rc["copy_path"]).do()
             copy_robot = lazy.omni.isaac.core.utils.prims.get_prim_at_path(rc["copy_path"])
             reset_pose = robot_copy.reset_pose[robot_type]
-            translation = lazy.pxr.Gf.Vec3d(*[x.item() for x in th.tensor(reset_pose[0], dtype=th.float32)])
+            translation = lazy.pxr.Gf.Vec3d(*th.tensor(reset_pose[0], dtype=th.float32).tolist())
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
             orientation = th.tensor(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
-            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*[x.item() for x in orientation]))
+            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
             robot_to_copy = None
             if robot_type == "simplified":
@@ -1063,11 +1063,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = th.tensor(joint_pos) - th.tensor(current_joint_pos)
-            if th.max(th.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
+            if th.max(th.abs(diff_joint_pos)).values < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
+            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).values < 0.0001:
                 # We're stuck!
                 break
 
@@ -1186,7 +1186,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = th.norm(target_pose[0] - start_pos)
-        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
+        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1]).values
         pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations

@@ -53,7 +53,7 @@ def recursively_generate_compatible_dict(dic):
     for k, v in dic.items():
         if isinstance(v, dict):
             out[k] = recursively_generate_compatible_dict(dic=v)
-        elif isinstance(v, th.tensor) and len(v.dtype) > 0:
+        elif isinstance(v, th.Tensor) and len(v.dtype) > 0:
             # Map to list of tuples
             out[k] = list(map(tuple, v))
         else:

@@ -1,10 +1,12 @@
 import datetime
+import math
 import os
 import tempfile
 import uuid
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import torch as th
 import trimesh
 
@@ -220,7 +222,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(pos.float()))
+        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray(pos.float().tolist()))
 
     @property
     def particle_orientations(self):
@@ -247,7 +249,7 @@ class PhysxParticleInstancer(BasePrim):
         quat = quat.float()
         if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
-        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat))
+        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray(quat.tolist()))
 
     @property
     def particle_velocities(self):
@@ -270,7 +272,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             vel.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(vel.float()))
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.float().tolist()))
 
     @property
     def particle_scales(self):
@@ -293,7 +295,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             scales.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray.FromNumpy(scales.float()))
+        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray(scales.float().tolist()))
 
     @property
     def particle_prototype_ids(self):
@@ -376,7 +378,7 @@ class PhysxParticleInstancer(BasePrim):
         for key in keys:
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
             # JSON-serialization
-            val = th.tensor(state[key]) if not isinstance(state[key], th.tensor) else state[key]
+            val = th.tensor(state[key]) if not isinstance(state[key], th.Tensor) else state[key]
             setattr(self, key, val)
 
     def serialize(self, state):
@@ -1715,7 +1717,7 @@ class Cloth(MicroParticleSystem):
                 cm = ms.current_mesh()
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
-                    particle_distance *= th.sqrt(2)  # halve the number of vertices
+                    particle_distance *= math.sqrt(2)  # halve the number of vertices
                     log.warn(
                         f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
                     )
@@ -1730,7 +1732,7 @@ class Cloth(MicroParticleSystem):
             new_faces = cm.face_matrix()
             new_vertices = cm.vertex_matrix()
             new_normals = cm.vertex_normal_matrix()
-            texcoord = th.tensor(cm.wedge_tex_coord_matrix()) if has_uv_mapping else None
+            texcoord = cm.wedge_tex_coord_matrix() if has_uv_mapping else None
             tm = trimesh.Trimesh(
                 vertices=new_vertices,
                 faces=new_faces,
@@ -1740,7 +1742,7 @@ class Cloth(MicroParticleSystem):
             tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
 
         # Update the mesh prim
-        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int)
+        face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
         mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
         mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
         mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())

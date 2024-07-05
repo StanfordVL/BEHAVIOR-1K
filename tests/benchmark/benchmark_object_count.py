@@ -2,6 +2,7 @@
 Script to benchmark speed vs. no. of objects in the scene.
 """
 
+import math
 import os
 import time
 
@@ -22,7 +23,7 @@ RAND_POSITION = True  # True to randomize positions.
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 
 # Internal constants.
-_N_PER_ROW = int(th.sqrt(MAX_NUM_OBJS))
+_N_PER_ROW = int(math.sqrt(MAX_NUM_OBJS))
 _MIN_VAL = -2.0
 _MAX_VAL = 2.0
 _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW
@@ -77,7 +78,7 @@ def benchmark_scene(sim):
             step_freqs.append(1 / (end - start))
 
         xs.append(i * NUM_OBJS_PER_ITER)
-        max_freq, min_freq = th.max(step_freqs), th.min(step_freqs)
+        max_freq, min_freq = th.max(step_freqs).values, th.min(step_freqs).values
         ys.append(th.mean((max_freq, min_freq)))
         yerrs.append(max_freq - ys[-1])
 

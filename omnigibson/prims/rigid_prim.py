@@ -227,8 +227,10 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
         if len(coms) > 0:
-            com = (th.tensor(coms) * th.tensor(vols).reshape(-1, 1)).sum(dim=0) / th.sum(vols)
-            self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com))
+            coms_tensor = th.stack(coms)
+            vols_tensor = th.tensor(vols).unsqueeze(1)
+            com = th.sum(coms_tensor * vols_tensor, dim=0) / th.sum(vols_tensor)
+            self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com.tolist()))
 
     def enable_collisions(self):
         """
@@ -289,7 +291,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_linear_velocities()[0]
+        return th.tensor(self._rigid_prim_view.get_linear_velocities()[0])
 
     def set_angular_velocity(self, velocity):
         """
@@ -305,7 +307,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_angular_velocities()[0]
+        return th.tensor(self._rigid_prim_view.get_angular_velocities()[0])
 
     def set_position_orientation(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
@@ -327,6 +329,8 @@ class RigidPrim(XFormPrim):
             return self._kinematic_world_pose_cache
 
         pos, ori = self._rigid_prim_view.get_world_poses()
+        pos = th.tensor(pos)
+        ori = th.tensor(ori)
 
         assert math.isclose(
             th.norm(ori), 1, abs_tol=1e-3
@@ -357,6 +361,8 @@ class RigidPrim(XFormPrim):
         positions, orientations = self._rigid_prim_view.get_local_poses()
         positions = positions[0]
         orientations = orientations[0][[1, 2, 3, 0]]
+        positions = th.tensor(positions)
+        orientations = th.tensor(orientations)
         if self.kinematic_only:
             self._kinematic_local_pose_cache = (positions, orientations)
         return positions, orientations
@@ -700,8 +706,8 @@ class RigidPrim(XFormPrim):
             # When there's no points on the collision meshes
             return position, position
 
-        aabb_lo = th.min(hull_points, dim=0)
-        aabb_hi = th.max(hull_points, dim=0)
+        aabb_lo = th.min(hull_points, dim=0).values
+        aabb_hi = th.max(hull_points, dim=0).values
         return aabb_lo, aabb_hi
 
     @property
@@ -732,8 +738,8 @@ class RigidPrim(XFormPrim):
         assert hull_points is not None, "No visual boundary points found for this rigid prim"
 
         # Calculate and return the AABB
-        aabb_lo = th.min(hull_points, dim=0)
-        aabb_hi = th.max(hull_points, dim=0)
+        aabb_lo = th.min(hull_points, dim=0).values
+        aabb_hi = th.max(hull_points, dim=0).values
 
         return aabb_lo, aabb_hi
 

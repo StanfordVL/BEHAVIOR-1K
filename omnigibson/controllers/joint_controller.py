@@ -1,3 +1,4 @@
+import math
 import torch as th
 
 import omnigibson.utils.transform_utils as T
@@ -95,7 +96,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             assert kp is None, "Cannot set kp for JointController with motor_type=effort!"
             assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=effort!"
         self.kp = kp
-        self.kd = None if damping_ratio is None else 2 * th.sqrt(self.kp) * damping_ratio
+        self.kd = None if damping_ratio is None else 2 * math.sqrt(self.kp) * damping_ratio
         self._use_impedances = use_impedances
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an

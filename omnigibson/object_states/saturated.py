@@ -235,10 +235,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                     state_flat,
                     th.cat(
                         [
-                            (
-                                self.obj.scene.system_registry("name", system_name).uuid,
-                                state[system_name],
-                            )
+                            th.tensor([self.obj.scene.system_registry("name", system_name).uuid, state[system_name]])
                             for system_name in system_names
                         ]
                     ),

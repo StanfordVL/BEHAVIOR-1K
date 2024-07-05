@@ -209,11 +209,11 @@ def create_physx_particleset_pointinstancer(
 
     # Set particle states
     instancer.GetProtoIndicesAttr().Set(prototype_indices)
-    instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(positions))
-    instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray.FromNumpy(orientations))
-    instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(velocities))
-    instancer.GetAngularVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(angular_velocities))
-    instancer.GetScalesAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(scales))
+    instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray(positions.tolist()))
+    instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray(orientations.tolist()))
+    instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
+    instancer.GetAngularVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(angular_velocities.tolist()))
+    instancer.GetScalesAttr().Set(lazy.pxr.Vt.Vec3fArray(scales.tolist()))
 
     # Take a render step to "lock" the visuals of the prototypes at the graveyard position
     # This needs to happen AFTER setting particle states

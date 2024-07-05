@@ -115,7 +115,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(th.sum([th.prod(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(sum(th.prod(th.tensor(shape)) for shape in self._goal_shapes.values()))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -325,12 +325,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             else th.zeros(self.goal_dim)
         )
 
-        return th.cat(
-            [
-                [state["goal_is_valid"]],
-                goal_state_flattened,
-            ]
-        )
+        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])
