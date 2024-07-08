@@ -327,7 +327,7 @@ class PhysxParticleInstancer(BasePrim):
         return 3 + self.n_particles * 14
 
     def _dump_state(self):
-        if self.particle_positions.size == 0 and self.particle_orientations.size == 0:
+        if self.particle_positions.numel() == 0 and self.particle_orientations.numel() == 0:
             local_positions, local_orientations = [], []
         else:
             local_positions, local_orientations = zip(

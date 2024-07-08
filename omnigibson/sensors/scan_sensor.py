@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 
 import cv2
+import numpy as np
 import torch as th
 from transforms3d.quaternions import quat2mat
 
@@ -144,8 +145,8 @@ class ScanSensor(BaseSensor):
         # Set the remaining modalities' values
         # (obs modality, shape, low, high)
         obs_space_mapping = dict(
-            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, th.float32),
-            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, th.float32),
+            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
+            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
         )
 
         return obs_space_mapping

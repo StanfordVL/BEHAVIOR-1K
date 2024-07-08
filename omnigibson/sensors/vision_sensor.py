@@ -290,6 +290,8 @@ class VisionSensor(BaseSensor):
 
         for modality in reordered_modalities:
             raw_obs = self._annotators[modality].get_data(device="cuda")
+            breakpoint()
+            # TODO: cast to int32 counterpart
             # TODO: use warp.to_torch() to convert warp array to torch tensor
             # TODO: all segmentation modalities return a uint32 np array, but PyTorch doesn't support uint32
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array

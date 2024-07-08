@@ -1180,7 +1180,7 @@ def calculate_xy_plane_angle(quaternion):
         The angle (in radians) of the projection of the forward vector onto the XY plane.
         Returns 0.0 if the projected vector's magnitude is negligibly small.
     """
-    fwd = R.from_quat(quaternion).apply([1, 0, 0])
+    fwd = th.tensor(R.from_quat(quaternion).apply([1, 0, 0]), dtype=th.float32)
     fwd[2] = 0.0
 
     if th.norm(fwd) < 1e-4:
