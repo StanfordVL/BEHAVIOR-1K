@@ -111,7 +111,7 @@ class ClothPrim(GeomPrim):
                 * max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0)
                 * max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
             )
-            true_vol = np.product(true_aabb[1] - true_aabb[0])
+            true_vol = np.prod(true_aabb[1] - true_aabb[0])
             if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
                 success = True
                 break
@@ -603,7 +603,7 @@ class ClothPrim(GeomPrim):
 
         idx += 2
         for key, size in zip(keys, sizes):
-            length = np.product(size)
+            length = np.prod(size)
             state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 

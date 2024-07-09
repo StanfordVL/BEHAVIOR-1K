@@ -212,7 +212,7 @@ class RigidPrim(XFormPrim):
                     volume, com = get_mesh_volume_and_com(mesh_prim)
                     # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
-                    vols.append(volume * np.product(mesh.scale))
+                    vols.append(volume * np.prod(mesh.scale))
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                     # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                     # boundingCube approximation for the underlying collision approximation for GPU compatibility

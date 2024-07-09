@@ -30,7 +30,6 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
@@ -674,19 +673,22 @@ def launch_simulator(*args, **kwargs):
                 # One physics timestep will elapse
                 self.step_physics()
 
+            scenes_modified = set()
             for ob in objs:
+                scenes_modified.add(ob.scene)
                 self._remove_object(ob)
 
             if self.is_playing():
                 # Update all handles that are now broken because objects have changed
                 self.update_handles()
 
+                if gm.ENABLE_TRANSITION_RULES:
+                    # Prune the transition rules that are currently active
+                    for scene in scenes_modified:
+                        scene.transition_rule_api.prune_active_rules()
+
                 # Load the state back
                 self.load_state(state)
-
-            if gm.ENABLE_TRANSITION_RULES:
-                # Refresh all current rules
-                TransitionRuleAPI.prune_active_rules()
 
         def _remove_object(self, obj):
             """
@@ -752,7 +754,7 @@ def launch_simulator(*args, **kwargs):
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
                             obj.update_handles()
-                    for system in scene.get_active_systems():
+                    for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.refresh_particles_view()
 
@@ -784,9 +786,11 @@ def launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+                    scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]
                         obj.initialize()
+                        scenes_modified.add(obj.scene)
                         if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
                             self._objects_require_contact_callback = True
                         if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
@@ -798,12 +802,13 @@ def launch_simulator(*args, **kwargs):
                     self.update_handles()
 
                     if gm.ENABLE_TRANSITION_RULES:
-                        # Also refresh the transition rules that are currently active
-                        TransitionRuleAPI.refresh_all_rules()
+                        # Refresh the transition rules
+                        for scene in scenes_modified:
+                            scene.transition_rule_api.refresh_all_rules()
 
                 # Update any system-related state
                 for scene in self.scenes:
-                    for system in scene.get_active_systems():
+                    for system in scene.active_systems.values():
                         system.update()
 
                 # Propagate states if the feature is enabled
@@ -828,7 +833,8 @@ def launch_simulator(*args, **kwargs):
 
                 # Possibly run transition rule step
                 if gm.ENABLE_TRANSITION_RULES:
-                    TransitionRuleAPI.step()
+                    for scene in self.scenes:
+                        scene.transition_rule_api.step()
 
         def _omni_update_step(self):
             """
@@ -880,8 +886,10 @@ def launch_simulator(*args, **kwargs):
                             for robot in scene.robots:
                                 if robot.initialized:
                                     robot.update_controller_mode()
-                        if gm.ENABLE_TRANSITION_RULES:
-                            TransitionRuleAPI.refresh_all_rules()
+
+                            # Also refresh any transition rules that became stale while sim was stopped
+                            if gm.ENABLE_TRANSITION_RULES:
+                                scene.transition_rule_api.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
