@@ -99,6 +99,7 @@ nav:
     - Scenes: modules/scenes.md
     - Transition Rules: modules/transition_rules.md
     - Simulator: modules/simulator.md
+    - Tasks: modules/tasks.md
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
