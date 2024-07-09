@@ -1,12 +1,12 @@
 ---
-icon: material/earth
+icon: octicons/stack-16
 ---
 
 # 🌌 **Vector Environments**
 
 ## Description
 
-To support large-scale parallelization, we now support vector environments. Each environment is similar to our regular [environment](./environments.md), but our simulator now can keep track of multiple environments simultaneously. We have implemented many vectorized operations to optimize the performance of these parallel environments, significantly improving speed. We are also actively working on further enhancements to make them even faster. Some use cases for this include reinforcement learning, parallelized training with domain randomization, and parallelized policy evaluation.
+To support large-scale parallelization, we now support vector environments. Each environment is similar to our regular [environment](./environments.md), but our simulator now can keep track of multiple environments simultaneously. We have implemented many vectorized operations to optimize the performance of these parallel environments. We are also actively working on further enhancements to make them faster. Some use cases for this include reinforcement learning, parallelized training with domain randomization, and parallelized policy evaluation.
 
 ## Usage
 
