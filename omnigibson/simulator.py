@@ -36,7 +36,6 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
 from omnigibson.utils.python_utils import create_object_from_init_info
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from omnigibson.utils.ui_utils import (
     CameraMover,
     create_module_logger,
@@ -71,6 +70,11 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
+m.KIT_FILES = {
+    (4, 0, 0): "omnigibson_4_0_0.kit",
+    (2023, 1, 1): "omnigibson_2023_1_1.kit",
+}
+
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -103,27 +107,28 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
-    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
-    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
-    # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
-    kit_file = Path(__file__).parent / "omnigibson.kit"
-    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
-    try:
-        shutil.copy(kit_file, kit_file_target)
-    except Exception as e:
-        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
-
-    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
-
+    # First obtain the Isaac Sim version
     version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
-        isaac_version = version_content.split("-")[0]
-        assert meets_minimum_isaac_version(
-            "2023.1.1", current_version=isaac_version
-        ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+        isaac_version_str = version_content.split("-")[0]
+        isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
+        assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
+        kit_file_name = m.KIT_FILES[isaac_version_tuple]
+
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / kit_file_name
+    kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
+
+    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
