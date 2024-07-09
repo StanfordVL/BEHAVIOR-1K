@@ -34,8 +34,7 @@ Alternatively, a scene can be directly imported at runtime by first creating the
 
 ### Runtime
 
-The scene keeps track of and organizes all imported objects via its owned `scene.object_registry`. Objects can quickly be queried by relevant property keys (1), such as `name`, `prim_path`, and `category`, from `env.scene.object_registry` as follows:
-{ .annotate }
+The scene keeps track of and organizes all imported objects via its owned `scene.object_registry`. Objects can quickly be queried by relevant property keys, such as `name`, `prim_path`, and `category`, from `env.scene.object_registry` as follows:
 
 `scene.object_registry_unique_keys` and `scene.object_registry_group_keys` define the valid possible key queries
 
