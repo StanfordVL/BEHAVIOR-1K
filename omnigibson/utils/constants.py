@@ -182,8 +182,8 @@ def semantic_class_name_to_id(scene):
     systems = sorted(scene.system_registry.object_names)
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
-    # Assign a unique class id to each class name with hashing
-    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**32) for s in all_semantics}
+    # Assign a unique class id to each class name with hashing, the upper limit here is the max of int32
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**31) for s in all_semantics}
 
     return class_name_to_class_id
 

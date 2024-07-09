@@ -290,17 +290,18 @@ class VisionSensor(BaseSensor):
 
         for modality in reordered_modalities:
             raw_obs = self._annotators[modality].get_data(device="cuda")
-            breakpoint()
-            # TODO: cast to int32 counterpart
-            # TODO: use warp.to_torch() to convert warp array to torch tensor
-            # TODO: all segmentation modalities return a uint32 np array, but PyTorch doesn't support uint32
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+            # All segmentation modalities return uint32 warp arrays, but PyTorch doesn't support it
+            if modality in ["seg_semantic", "seg_instance", "seg_instance_id"]:
+                obs[modality] = obs[modality].view(lazy.warp.int32)
+            obs[modality] = lazy.warp.to_torch(obs[modality])
             if modality == "seg_semantic":
                 id_to_labels = raw_obs["info"]["idToLabels"]
                 obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs["info"]["idToLabels"]
+
                 obs[modality], info[modality] = self._remap_instance_segmentation(
                     obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=False
                 )
@@ -345,7 +346,7 @@ class VisionSensor(BaseSensor):
                 replicator_mapping[key] in semantic_class_id_to_name(self._scene).values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        image_keys = th.unique(img)
+        image_keys = th.unique(img).tolist()
         assert set(image_keys).issubset(
             set(replicator_mapping.keys())
         ), "Semantic segmentation image does not match the original id_to_labels mapping."
@@ -413,10 +414,10 @@ class VisionSensor(BaseSensor):
         # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
         # They show up in the image, but not in the info (id_to_labels).
         # We identify these values, find the corresponding semantic label (system name), and add the mapping.
-        image_keys, key_indices = th.unique(img, return_index=True)
-        for key, img_idx in zip(image_keys, key_indices):
-            if str(key) not in id_to_labels:
-                semantic_label = semantic_img.flatten()[img_idx]
+        image_keys = th.unique(img)
+        for key in image_keys:
+            if str(key.item()) not in id_to_labels:
+                semantic_label = semantic_img[img == key].unique().item()
                 assert (
                     semantic_label in semantic_labels
                 ), f"Semantic map value {semantic_label} is not in the semantic labels!"
@@ -429,7 +430,7 @@ class VisionSensor(BaseSensor):
                 # we will label this as "unlabelled" for now
                 # This only happens with a very small number of pixels, e.g. 0.1% of the image
                 else:
-                    num_of_pixels = len(th.where(img == key)[0])
+                    num_of_pixels = (img == key).sum().item()
                     resolution = (self._load_config["image_width"], self._load_config["image_height"])
                     percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
                     if percentage > 2:
@@ -439,12 +440,12 @@ class VisionSensor(BaseSensor):
                         )
                     value = "unlabelled"
                     self._register_instance(value, id=id)
-                replicator_mapping[key] = value
+                replicator_mapping[key.item()] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
 
-        assert set(image_keys).issubset(
+        assert set(image_keys.tolist()).issubset(
             set(replicator_mapping.keys())
         ), "Instance segmentation image does not match the original id_to_labels mapping."
 

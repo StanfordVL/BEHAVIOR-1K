@@ -69,13 +69,13 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.empty(0, dtype=th.int32)  # Initialize the key_array as empty
+        self.key_array = th.empty(0, dtype=th.int32, device="cuda")  # Initialize the key_array as empty
         self.known_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.empty(0, dtype=th.int32)
+        self.key_array = th.empty(0, dtype=th.int32, device="cuda")
         self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image, image_keys=None):
@@ -96,16 +96,16 @@ class Remapper:
             th.tensor: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
-        # Make sure that max uint32 doesn't match any value in the new mapping
+        # Make sure that max int32 doesn't match any value in the new mapping
         assert th.all(
             th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
-        image_max_key = th.max(image).values
+        image_max_key = th.max(image).item()
         key_array_max_key = len(self.key_array) - 1
         if image_max_key > key_array_max_key:
-            prev_key_array = self.key_array.copy()
-            # We build a new key array and use max uint32 as the default value.
-            self.key_array = th.full(image_max_key + 1, th.iinfo(th.int32).max, dtype=th.int32)
+            prev_key_array = self.key_array.clone()
+            # We build a new key array and use max int32 as the default value.
+            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device="cuda")
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 
@@ -134,7 +134,7 @@ class Remapper:
         assert th.all(remapped_img != th.iinfo(th.int32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
         for key in th.unique(remapped_img):
-            remapped_labels[key] = new_mapping[key]
+            remapped_labels[key.item()] = new_mapping[key.item()]
 
         return remapped_img, remapped_labels
 
