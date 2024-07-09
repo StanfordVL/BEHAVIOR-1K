@@ -1440,10 +1440,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
-        load_config = {"created_manually": True}
-        prototype = VisualGeomPrim(
-            relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0", load_config=load_config
-        )
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
@@ -1565,10 +1562,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
-        load_config = {"created_manually": True}
-        prototype = VisualGeomPrim(
-            relative_prim_path=relative_prototype_path, name=prototype_path, load_config=load_config
-        )
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False

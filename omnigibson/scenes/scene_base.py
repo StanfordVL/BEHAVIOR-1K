@@ -91,30 +91,26 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         super().__init__()
 
         # Prepare the initialization dicts
-        self._init_info = {}
+        self._init_objs = {}
         self._init_state = {}
         self._init_systems = []
-        self._task_metadata = None
-        self._init_objs = {}
 
         # If we have any scene file specified, use it to create the objects within it
         if self.scene_file is not None:
             # Grab objects info from the scene file
             with open(self.scene_file, "r") as f:
                 scene_info = json.load(f)
-            self._init_info = scene_info["objects_info"]["init_info"]
+            init_info = scene_info["objects_info"]["init_info"]
             self._init_state = scene_info["state"]["object_registry"]
             self._init_systems = list(scene_info["state"]["system_registry"].keys())
-            self._task_metadata = {}
-            if "metadata" in scene_info and "task" in scene_info["metadata"]:
-                self._task_metadata = scene_info["metadata"]["task"]
+            task_metadata = (
+                scene_info["metadata"]["task"] if "metadata" in scene_info and "task" in scene_info["metadata"] else {}
+            )
 
-            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
-            # accordingly
-            self._init_objs = {}
-            for obj_name, obj_info in self._init_info.items():
+            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage accordingly
+            for obj_name, obj_info in init_info.items():
                 # Check whether we should load the object or not
-                if not self._should_load_object(obj_info=obj_info, task_metadata=self._task_metadata):
+                if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
                     continue
                 # Create object class instance
                 obj = create_object_from_init_info(obj_info)
@@ -290,7 +286,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim = XFormPrim(
             relative_prim_path=scene_relative_path,
             name=f"scene_{self.idx}",
-            load_config={"created_manually": True},
         )
         self._scene_prim.load(None)
         if self.scene_file is not None:

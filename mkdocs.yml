@@ -103,6 +103,7 @@ nav:
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Saving and Loading Simulation State: tutorials/save_load.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md

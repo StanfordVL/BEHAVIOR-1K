@@ -52,10 +52,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         # that get created during the _load phase of this class, but sometimes we create prims using
         # alternative methods and then create this class - in that case too we need to make sure we
         # add the right xform properties, so callers will just pass in the created manually flag.
-        self._xform_props_pre_loaded = (
-            "xform_props_pre_loaded" in self._load_config and self._load_config["xform_props_pre_loaded"]
-        )
-
+        self._xform_props_pre_loaded = self._load_config.get("xform_props_pre_loaded", False)
         # Run super init
         super().__init__()
 
