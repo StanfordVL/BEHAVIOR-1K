@@ -123,7 +123,7 @@ class Remapper:
         # new_mapping that equals to 'unlabelled'. This is needed because some values in the image don't necessarily
         # show up in the old_mapping, i.e. particle systems.
         for key in th.unique(image) if image_keys is None else image_keys:
-            if key not in old_mapping.keys():
+            if key.item() not in old_mapping.keys():
                 new_key = next((k for k, v in new_mapping.items() if v == "unlabelled"), None)
                 assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
                 self.key_array[key] = new_key

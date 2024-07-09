@@ -301,7 +301,6 @@ class VisionSensor(BaseSensor):
                 obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
             elif modality == "seg_instance":
                 id_to_labels = raw_obs["info"]["idToLabels"]
-
                 obs[modality], info[modality] = self._remap_instance_segmentation(
                     obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=False
                 )
@@ -346,8 +345,8 @@ class VisionSensor(BaseSensor):
                 replicator_mapping[key] in semantic_class_id_to_name(self._scene).values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
 
-        image_keys = th.unique(img).tolist()
-        assert set(image_keys).issubset(
+        image_keys = th.unique(img)
+        assert set(image_keys.tolist()).issubset(
             set(replicator_mapping.keys())
         ), "Semantic segmentation image does not match the original id_to_labels mapping."
 

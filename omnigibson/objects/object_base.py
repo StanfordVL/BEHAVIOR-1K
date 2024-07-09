@@ -367,15 +367,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
             rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
-                translate=translate, angles=[0, 0, rotation_around_Z_axis]
+            xy_aligned_base_com_to_world = th.tensor(
+                trimesh.transformations.compose_matrix(translate=translate, angles=[0, 0, rotation_around_Z_axis])
             )
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
         else:
             # Default desired frame is base CoM frame.
-            desired_frame_to_world = base_frame_to_world
+            desired_frame_to_world = th.tensor(base_frame_to_world)
 
         # Compute the world-to-base frame transform.
         world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse

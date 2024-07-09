@@ -210,7 +210,7 @@ def create_physx_particleset_pointinstancer(
     # Set particle states
     instancer.GetProtoIndicesAttr().Set(prototype_indices)
     instancer.GetPositionsAttr().Set(lazy.pxr.Vt.Vec3fArray(positions.tolist()))
-    instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray(orientations.tolist()))
+    instancer.GetOrientationsAttr().Set(lazy.pxr.Vt.QuathArray.FromNumpy(orientations.numpy()))
     instancer.GetVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(velocities.tolist()))
     instancer.GetAngularVelocitiesAttr().Set(lazy.pxr.Vt.Vec3fArray(angular_velocities.tolist()))
     instancer.GetScalesAttr().Set(lazy.pxr.Vt.Vec3fArray(scales.tolist()))

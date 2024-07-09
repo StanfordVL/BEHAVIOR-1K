@@ -147,10 +147,18 @@ class PhysxParticleInstancer(BasePrim):
         scales = th.ones((n_new_particles, 3)) * th.ones((1, 3)) if scales is None else scales
         prototype_indices = th.zeros(n_new_particles, dtype=int) if prototype_indices is None else prototype_indices
 
-        self.particle_positions = th.vstack([self.particle_positions, positions])
-        self.particle_velocities = th.vstack([self.particle_velocities, velocities])
-        self.particle_orientations = th.vstack([self.particle_orientations, orientations])
-        self.particle_scales = th.vstack([self.particle_scales, scales])
+        self.particle_positions = (
+            th.vstack([self.particle_positions, positions]) if self.particle_positions.numel() > 0 else positions
+        )
+        self.particle_velocities = (
+            th.vstack([self.particle_velocities, velocities]) if self.particle_velocities.numel() > 0 else velocities
+        )
+        self.particle_orientations = (
+            th.vstack([self.particle_orientations, orientations])
+            if self.particle_orientations.numel() > 0
+            else orientations
+        )
+        self.particle_scales = th.vstack([self.particle_scales, scales]) if self.particle_scales.numel() > 0 else scales
         self.particle_prototype_ids = th.cat([self.particle_prototype_ids, prototype_indices])
 
     def remove_particles(self, idxs):
@@ -249,7 +257,7 @@ class PhysxParticleInstancer(BasePrim):
         quat = quat.float()
         if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
-        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray(quat.tolist()))
+        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat.numpy()))
 
     @property
     def particle_velocities(self):
@@ -318,7 +326,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             prototype_ids.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="protoIndices", val=prototype_ids.int())
+        self.set_attribute(attr="protoIndices", val=prototype_ids.int().numpy())
 
     @property
     def state_size(self):
@@ -385,7 +393,7 @@ class PhysxParticleInstancer(BasePrim):
         # Compress into a 1D array
         return th.cat(
             [
-                [state["idn"], state["particle_group"], state["n_particles"]],
+                th.tensor([state["idn"], state["particle_group"], state["n_particles"]]),
                 state["particle_positions"].reshape(-1),
                 state["particle_velocities"].reshape(-1),
                 state["particle_orientations"].reshape(-1),

@@ -285,7 +285,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Update the tensors
         n_particles = len(positions)
-        orientations = R.random(num=n_particles).as_quat() if orientations is None else orientations
+        orientations = th.tensor(R.random(num=n_particles).as_quat()) if orientations is None else orientations
         scales = self.sample_scales(n=n_particles) if scales is None else scales
 
         positions = th.cat([current_positions, positions], dim=0)
@@ -606,7 +606,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=max_samples)
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
-        avg_scale = th.prod(obj.scale).cbrt()
+        avg_scale = th.pow(th.prod(obj.scale), 1 / 3)
 
         bbox_extents_global = scales * self.particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
@@ -1345,7 +1345,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 - (n, 3)-array: per-particle (ax, ay, az) angular velocities in the world frame
         """
         if self.n_particles > 0:
-            vels = self.particles_view.get_velocities()
+            vels = th.tensor(self.particles_view.get_velocities())
             lin_vel, ang_vel = vels[:, :3], vels[:, 3:]
         else:
             lin_vel, ang_vel = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 3)
