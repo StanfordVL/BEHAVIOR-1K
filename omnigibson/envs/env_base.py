@@ -15,9 +15,9 @@ from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.gym_utils import (
     GymObservable,
+    maxdim,
     recursively_generate_compatible_dict,
     recursively_generate_flat_dict,
-    maxdim,
 )
 from omnigibson.utils.python_utils import (
     Recreatable,
