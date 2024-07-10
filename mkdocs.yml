@@ -101,6 +101,7 @@ nav:
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Using Macros: tutorials/using_macros.md
     - Customizing Robots: tutorials/customizing_robots.md
     - Running on a Server: tutorials/running_on_a_server.md
   - API Reference: reference/*
