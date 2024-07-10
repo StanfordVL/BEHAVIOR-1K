@@ -104,6 +104,7 @@ nav:
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Saving and Loading Simulation State: tutorials/save_load.md
+    - BEHAVIOR Tasks: tutorials/behavior_tasks.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md

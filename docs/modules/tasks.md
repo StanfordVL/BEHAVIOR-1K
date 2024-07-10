@@ -135,6 +135,9 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
 </table>
 
+!!! info annotate "Follow our tutorial on BEHAVIOR tasks!"
+    To better understand how to use / sample / load / customize BEHAVIOR tasks, please read our [tutorial](../tutorials/behavior_tasks.html)!
+
 ### `TerminationCondition`
 <table markdown="span">
     <tr>
