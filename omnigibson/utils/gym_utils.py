@@ -144,11 +144,9 @@ def maxdim(space):
     Returns:
         int: Maximum dimension of the gym space
     """
-    if isinstance(space, gym.spaces.Dict):
+    if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple)):
         return sum([maxdim(s) for s in space.spaces.values()])
-    elif isinstance(
-        space, (gym.spaces.Box, gym.spaces.Tuple, gym.spaces.Discrete, gym.spaces.MultiDiscrete, gym.spaces.MultiBinary)
-    ):
+    elif isinstance(space, (gym.spaces.Box, gym.spaces.Discrete, gym.spaces.MultiDiscrete, gym.spaces.MultiBinary)):
         return gym.spaces.utils.flatdim(space)
     elif isinstance(space, (gym.spaces.Sequence, gym.spaces.Graph)):
         return float("inf")
