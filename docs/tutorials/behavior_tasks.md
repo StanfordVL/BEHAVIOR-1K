@@ -33,6 +33,8 @@ All 1000 activities are defined in BDDL, a domain-specific language designed for
 
 You can find them in [`bddl/activity_definitions`](https://github.com/StanfordVL/bddl/tree/master/bddl/activity_definitions) folder.
 
+Alternatively, you can browse them on the [BEHAVIOR Knowledgebase](https://behavior.stanford.edu/knowledgebase/tasks).
+
 Here is an example of a BEHAVIOR task definition, which consists of several components:
 
 - **:objects**: task-relevant objects, where each line represents a WordNet synset of the object. For example, `candle.n.01_1 candle.n.01_2 candle.n.01_3 candle.n.01_4 - candle.n.01` indicates that four objects that belong to the `candoe.n.01` synset are needed for this task.
@@ -199,7 +201,7 @@ You can run the following command to find out the path to the pre-sampled task i
 ls -l <gm.DATASET_PATH>/scenes/*/json/*task*
 ```
 
-## (Advanced) Create Custom BEHAVIOR Tasks
+## (Advanced) Customize BEHAVIOR Tasks
 
 The easiest way to create custom BEHAVIOR tasks is to add new task definitions to the `bddl` repo.
 
