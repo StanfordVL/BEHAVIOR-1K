@@ -86,7 +86,6 @@ nav:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
     - Examples: getting_started/examples.md
-    - Running on SLURM: getting_started/slurm.md
   - Modules:
     - Overview: modules/overview.md
     - Prims: modules/prims.md
@@ -103,6 +102,7 @@ nav:
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Customizing Robots: tutorials/customizing_robots.md
+    - Running on a Server: tutorials/running_on_a_server.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
