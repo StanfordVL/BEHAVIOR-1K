@@ -388,7 +388,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             particles_in_world_frame = th.cat(
                 [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], dim=0
             )
-            points_in_world.extend(particles_in_world_frame)
+            points_in_world.extend(particles_in_world_frame.tolist())
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
             for link_name, link in links.items():
@@ -398,10 +398,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     hull_points = link.collision_boundary_points_world
 
                 if hull_points is not None:
-                    points_in_world.extend(hull_points)
+                    points_in_world.extend(hull_points.tolist())
 
         # Move the points to the desired frame
-        points = trimesh.transformations.transform_points(points_in_world, world_to_desired_frame)
+        points = th.tensor(trimesh.transformations.transform_points(points_in_world, world_to_desired_frame))
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
