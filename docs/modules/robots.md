@@ -76,7 +76,7 @@ Usually, actions are passed to robots and observations retrieved via the `obs, i
 2. `obs` is a dict mapping observation name to observation data, and `info` is a dict of relevant metadata about the observations. For more information, please see the [Sensor](./sensors.md) section!
 
 
-Controllers and sensors can be accessed directly via the `controllers` and `sensors` properties, respectively. And, like all objects in **`OmniGibson`**, common information such as joint data and object states can also be directly accessed from the `robot` class.
+Controllers and sensors can be accessed directly via the `controllers` and `sensors` properties, respectively. And, like all objects in **`OmniGibson`**, common information such as joint data and object states can also be directly accessed from the `robot` class. Note that by default, control signals are updated and deployed every physics timestep via the robot's internal `step()` callback function. To disable controllers from automatically deploying control signals, set `robot.control_enabled = False`.
 
 
 ## Types

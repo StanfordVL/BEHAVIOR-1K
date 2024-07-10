@@ -102,6 +102,7 @@ nav:
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Customizing Robots: tutorials/customizing_robots.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
