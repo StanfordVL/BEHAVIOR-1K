@@ -129,8 +129,12 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
+    from isaacsim import SimulationApp
+
+    # Do not attempt to lazy load the SimulationApp class, as it prevents the app from importing correctly
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        app = SimulationApp(config_kwargs)
+        # app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.omni.isaac.core.utils.stage.close_stage()
