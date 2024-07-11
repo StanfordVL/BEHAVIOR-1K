@@ -46,8 +46,8 @@ class VisionSensor(BaseSensor):
     Args:
         relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
-        modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
-            to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb".
+        Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
                 {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
                 bbox_2d_loose, bbox_3d, camera}
@@ -113,7 +113,7 @@ class VisionSensor(BaseSensor):
         self,
         relative_prim_path,
         name,
-        modalities="all",
+        modalities=["rgb"],
         enabled=True,
         noise=None,
         load_config=None,
