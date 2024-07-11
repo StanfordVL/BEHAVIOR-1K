@@ -8,6 +8,7 @@
 #
 
 from collections.abc import Iterable
+import math
 
 import torch as th
 
@@ -213,10 +214,10 @@ class ClothPrim(GeomPrim):
             len(positions) == n_expected
         ), f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
 
-        r = T.quat2mat(self.get_orientation())
-        t = self.get_position()
-        s = self.scale
-        p_local = (r.T @ (positions - t).T).T / s
+        rot = T.quat2mat(self.get_orientation())
+        translation = self.get_position()
+        scale = self.scale
+        p_local = (rot.T @ (positions - translation).T).T / scale
 
         # Fill the idxs if requested
         if idxs is not None:
@@ -572,13 +573,7 @@ class ClothPrim(GeomPrim):
             if not isinstance(state["particle_velocities"], th.Tensor)
             else state["particle_velocities"]
         )
-        self.set_particle_positions(
-            positions=(
-                th.tensor(state["particle_positions"])
-                if not isinstance(state["particle_positions"], th.Tensor)
-                else state["particle_positions"]
-            )
-        )
+        self.set_particle_positions(positions=th.tensor(state["particle_positions"], dtype=th.float32))
 
     def serialize(self, state):
         # Run super first
@@ -616,7 +611,7 @@ class ClothPrim(GeomPrim):
 
         idx += 2
         for key, size in zip(keys, sizes):
-            length = th.prod(size)
+            length = math.prod(size)
             state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 

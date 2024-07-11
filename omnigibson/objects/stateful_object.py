@@ -564,7 +564,7 @@ class StatefulObject(BaseObject):
         )
 
         # Combine these two arrays
-        return th.cat([state_flat, non_kin_state_flat]).float()
+        return th.cat([state_flat, non_kin_state_flat])
 
     def deserialize(self, state):
         # Call super method first

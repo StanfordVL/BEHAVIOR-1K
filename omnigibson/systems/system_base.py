@@ -366,13 +366,12 @@ class BaseSystem(Serializable):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
         return th.cat(
             [
-                [state["n_particles"]],
+                th.tensor([state["n_particles"]], dtype=th.float32),
                 state["min_scale"],
                 state["max_scale"],
                 state["positions"].flatten(),
                 state["orientations"].flatten(),
-            ],
-            dtype=float,
+            ]
         )
 
     def deserialize(self, state):

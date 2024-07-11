@@ -10,6 +10,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.stats import truncnorm
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.ui_utils import create_module_logger, draw_line
@@ -94,7 +95,7 @@ def get_distance_to_plane(points, plane_centroid, plane_normal):
     Returns:
         k-array: Absolute distances from each point to the plane
     """
-    return th.abs(th.dot(points - plane_centroid, plane_normal))
+    return th.abs(th.matmul(points - plane_centroid, plane_normal))
 
 
 def get_projection_onto_plane(points, plane_centroid, plane_normal):
@@ -161,7 +162,7 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     orthogonal_vector_2 = -th.cross(ray_direction, orthogonal_vector_1)
     orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
-    orthogonal_vectors = th.tensor([orthogonal_vector_1, orthogonal_vector_2])
+    orthogonal_vectors = th.stack([orthogonal_vector_1, orthogonal_vector_2])
     assert th.all(th.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
@@ -169,15 +170,15 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
 
     # Compute the grid of rays
     steps = (offset / new_ray_per_horizontal_distance).int() * 2 + 1
-    steps = th.maximum(steps, 3)
+    steps = th.maximum(steps, th.tensor(3))
     x_range = th.linspace(-offset[0], offset[0], steps[0])
     y_range = th.linspace(-offset[1], offset[1], steps[1])
     ray_grid = th.stack(th.meshgrid(x_range, y_range, indexing="ij"), dim=-1)
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
     # Apply the grid onto the orthogonal vectors to obtain the rays in the world frame.
-    sources = [source + th.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
-    destinations = [destination + th.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
+    sources = [source + th.matmul(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
+    destinations = [destination + th.matmul(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
 
     return sources, destinations, ray_grid
 
@@ -219,7 +220,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
         bimodal_sample = truncnorm.rvs(bottom, top, loc=bimodal_mean_fraction, scale=bimodal_stdev_fraction)
 
         # Pick which axis the bimodal normal sample should go to.
-        bimodal_axis = random.choice([0, 1, 2], p=axis_probabilities)
+        bimodal_axis = th.multinomial(th.tensor(axis_probabilities), 1).item()
 
         # Choose which side of the axis to sample from. We only sample from the top for the Z axis.
         if bimodal_axis == 2:
@@ -446,11 +447,13 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     # Convert the points into the world frame
     orig_shape = start_points.shape
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = trimesh.transformations.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(
-        orig_shape
+    start_points = th.tensor(
+        trimesh.transformations.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape),
+        dtype=th.float32,
     )
-    end_points = trimesh.transformations.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(
-        orig_shape
+    end_points = th.tensor(
+        trimesh.transformations.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape),
+        dtype=th.float32,
     )
 
     return start_points, end_points
@@ -868,11 +871,9 @@ def sample_cuboid_on_object(
                     this_cuboid_dimensions[:2] / 2.0,
                     new_ray_per_horizontal_distance,
                 )
-                sources = th.tensor(sources)
-                destinations = th.tensor(destinations)
             else:
-                sources = th.tensor([start_pos])
-                destinations = th.tensor([end_pos])
+                sources = [start_pos]
+                destinations = [end_pos]
 
             # Time to cast the rays.
             cast_results = raytest_batch(
@@ -900,7 +901,7 @@ def sample_cuboid_on_object(
             # Process the hit positions and normals.
             hit_positions = th.tensor([ray_res["position"] for ray_res in filtered_cast_results])
             hit_normals = th.tensor([ray_res["normal"] for ray_res in filtered_cast_results])
-            hit_normals /= th.norm(hit_normals, dim=1, keepdims=True)
+            hit_normals /= th.norm(hit_normals, dim=1, keepdim=True)
 
             assert filtered_center_idx is not None
             hit_link = filtered_cast_results[filtered_center_idx]["rigidBody"]
@@ -956,7 +957,9 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = th.tensor([ray_res.get("position", th.zeros(3)) for ray_res in cast_results])
+                hit_positions = th.tensor(
+                    [ray_res.get("position", lazy.carb.Float3([0.0] * 3)) for ray_res in cast_results]
+                )
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
@@ -1046,7 +1049,7 @@ def compute_rotation_from_grid_sample(
         None or scipy.Rotation: If successfully hit, returns relative rotation from two_d_grid to
             generated hit plane. Otherwise, returns None
     """
-    if th.sum(hits) < 3:
+    if sum(hits) < 3:
         if m.DEBUG_SAMPLING:
             refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {th.sum(hits)}")
         return None
@@ -1079,7 +1082,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
         bool: Whether the normal similarity is acceptable or not
     """
     parallel_hit_main_hit_dot_products = th.clip(
-        th.dot(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
+        th.matmul(hit_normals, center_hit_normal) / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
         -1.0,
         1.0,
     )
@@ -1137,7 +1140,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = th.arccos(th.clip(th.dot(hit_normal, th.tensor([0, 0, 1])), -1.0, 1.0))
+    hit_angle_with_z = th.arccos(th.clip(th.dot(hit_normal, th.tensor([0.0, 0.0, 1.0])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)
@@ -1180,7 +1183,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
 
     # Choose the minimum of these multiples, e.g. how many times the ray direction should be multiplied
     # to reach the nearest boundary.
-    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)]).values
+    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)]).item()
 
     # Finally, use the multiple we found to calculate the point on the AABB boundary that we want to cast our
     # ray until.

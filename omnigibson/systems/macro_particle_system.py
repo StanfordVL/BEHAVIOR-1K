@@ -158,8 +158,8 @@ class MacroParticleSystem(BaseSystem):
     def _dump_state(self):
         state = super()._dump_state()
         state["scales"] = (
-            th.tensor([particle.scale for particle in self.particles.values()])
-            if self.particles is not None
+            th.stack([particle.scale for particle in self.particles.values()])
+            if self.particles is not None and self.particles != {}
             else th.empty(0)
         )
         state["particle_counter"] = self._particle_counter
@@ -186,9 +186,8 @@ class MacroParticleSystem(BaseSystem):
             [
                 states_flat,
                 state["scales"].flatten(),
-                [state["particle_counter"]],
-            ],
-            dtype=float,
+                th.tensor([state["particle_counter"]], dtype=th.float32),
+            ]
         )
 
     def deserialize(self, state):
@@ -538,7 +537,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 obj.prim.GetParent().GetPath().pathString == "/World"
             ), "cloth object should exist as direct child of /World prim!"
 
-        n_particles = positions.shape[0]
+        n_particles = len(positions)
         if orientations is None:
             orientations = th.zeros((n_particles, 4))
             orientations[:, -1] = 1.0
@@ -623,7 +622,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # Orientations are the normals
             z_up = th.zeros_like(normals)
             z_up[:, 2] = 1.0
-            orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
+            orientations = th.tensor(T.axisangle2quat(T.vecs2axisangle(z_up, normals)))
             link_prim_paths = None
             self._cloth_face_ids[group] = face_ids
         else:
@@ -649,7 +648,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position, normal, quaternion, hit_link, reasons = result
                 if position is not None:
                     positions.append(position)
-                    orientations.append(quaternion)
+                    orientations.append(th.tensor(quaternion))
                     particle_scales.append(scale)
                     link_prim_paths.append(hit_link)
             scales = particle_scales
@@ -659,9 +658,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if success:
             self.generate_group_particles(
                 group=group,
-                positions=th.tensor(positions),
-                orientations=th.tensor(orientations),
-                scales=th.tensor(scales),
+                positions=positions,
+                orientations=orientations,
+                scales=scales,
                 link_prim_paths=link_prim_paths,
             )
             # If we're a cloth, store the face_id as well
@@ -1020,7 +1019,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         for group_name, group_particles in self._group_particles.items():
             obj = self._group_objects[group_name]
             is_cloth = self._is_cloth_obj(obj=obj)
-
             groups_dict[group_name] = dict(
                 particle_attached_obj_uuid=obj.uuid,
                 n_particles=self.num_group_particles(group=group_name),
@@ -1082,24 +1080,27 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         state_flat = super().serialize(state=state)
 
         groups_dict = state["groups"]
-        state_group_flat = [[state["n_groups"]]]
+        state_group_flat = [th.tensor([state["n_groups"]], dtype=th.float32)]
         for group_name, group_dict in groups_dict.items():
             obj = self._group_objects[group_name]
             is_cloth = self._is_cloth_obj(obj=obj)
             group_obj_link2id = {link_name: i for i, link_name in enumerate(obj.links.keys())}
             state_group_flat += [
-                [group_dict["particle_attached_obj_uuid"]],
-                [group_dict["n_particles"]],
-                group_dict["particle_idns"],
-                group_dict["particle_indices"],
-                (
-                    group_dict["particle_attached_references"]
-                    if is_cloth
-                    else [group_obj_link2id[reference] for reference in group_dict["particle_attached_references"]]
+                th.tensor([group_dict["particle_attached_obj_uuid"]], dtype=th.float64),
+                th.tensor([group_dict["n_particles"]], dtype=th.float32),
+                th.tensor(group_dict["particle_idns"], dtype=th.float32),
+                th.tensor(group_dict["particle_indices"], dtype=th.float32),
+                th.tensor(
+                    (
+                        group_dict["particle_attached_references"]
+                        if is_cloth
+                        else [group_obj_link2id[reference] for reference in group_dict["particle_attached_references"]]
+                    ),
+                    dtype=th.float32,
                 ),
             ]
 
-        return th.cat([*state_group_flat, state_flat]).float()
+        return th.cat([*state_group_flat, state_flat])
 
     def deserialize(self, state):
         # Synchronize the particle groups
@@ -1288,7 +1289,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
     def get_particles_position_orientation(self):
         # Note: This gets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if self.n_particles > 0:
-            tfs = self.particles_view.get_transforms()
+            tfs = th.tensor(self.particles_view.get_transforms())
             pos, ori = tfs[:, :3], tfs[:, 3:]
             pos = pos + T.quat2mat(ori) @ self._particle_offset
         else:
@@ -1508,7 +1509,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         state_flat = super().serialize(state=state)
 
         # Add velocities
-        return th.cat([state_flat, state["lin_velocities"].flatten(), state["ang_velocities"].flatten()], dtype=float)
+        return th.cat([state_flat, state["lin_velocities"].flatten(), state["ang_velocities"].flatten()])
 
     def deserialize(self, state):
         # Sync the number of particles first

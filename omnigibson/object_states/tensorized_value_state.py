@@ -1,3 +1,4 @@
+import math
 import torch as th
 
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
@@ -188,7 +189,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         return val.flatten().float()
 
     def deserialize(self, state):
-        value_length = int(th.prod(self.value_shape))
+        value_length = int(math.prod(self.value_shape))
         value = state[:value_length].reshape(self.value_shape) if len(self.value_shape) > 0 else state[0]
         return {self.value_name: value}, value_length
 

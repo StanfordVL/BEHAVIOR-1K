@@ -663,7 +663,7 @@ def launch_simulator(*args, **kwargs):
                 # we first move the object to a safe location, then remove it.
                 pos = list(m.OBJECT_GRAVEYARD_POS)
                 for ob in objs:
-                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    ob.set_position_orientation(pos, th.tensor([0, 0, 0, 1], dtype=th.float32))
                     pos[0] += max(ob.aabb_extent)
 
                 # One physics timestep will elapse

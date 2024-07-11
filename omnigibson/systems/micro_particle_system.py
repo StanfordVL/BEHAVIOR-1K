@@ -239,7 +239,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        return th.tensor(self.get_attribute(attr="orientations"))
+        return th.from_numpy(np.array(self.get_attribute(attr="orientations")))
 
     @particle_orientations.setter
     def particle_orientations(self, quat):
@@ -338,19 +338,21 @@ class PhysxParticleInstancer(BasePrim):
         if self.particle_positions.numel() == 0 and self.particle_orientations.numel() == 0:
             local_positions, local_orientations = [], []
         else:
-            local_positions, local_orientations = zip(
-                *[
-                    T.relative_pose_transform(global_pos, global_ori, *self.scene.prim.get_position_orientation())
-                    for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations)
-                ]
-            )
+            local_positions = []
+            local_orientations = []
+            for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations):
+                local_pos, local_ori = T.relative_pose_transform(
+                    global_pos, global_ori, *self.scene.prim.get_position_orientation()
+                )
+                local_positions.append(local_pos)
+                local_orientations.append(local_ori)
         return dict(
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self.n_particles,
-            particle_positions=th.tensor(local_positions),
+            particle_positions=th.stack(local_positions) if len(local_positions) > 0 else th.tensor([]),
             particle_velocities=self.particle_velocities,
-            particle_orientations=th.tensor(local_orientations),
+            particle_orientations=th.stack(local_orientations) if len(local_orientations) > 0 else th.tensor([]),
             particle_scales=self.particle_scales,
             particle_prototype_ids=self.particle_prototype_ids,
         )
@@ -374,8 +376,8 @@ class PhysxParticleInstancer(BasePrim):
                 for local_pos, local_ori in zip(local_positions, local_orientations)
             ]
         )
-        setattr(self, "particle_positions", th.tensor(global_positions))
-        setattr(self, "particle_orientations", th.tensor(global_orientations))
+        setattr(self, "particle_positions", th.stack(global_positions))
+        setattr(self, "particle_orientations", th.stack(global_orientations))
 
         # Set values appropriately
         keys = (
@@ -433,7 +435,7 @@ class PhysxParticleInstancer(BasePrim):
 
         idx = 3
         for key, size in zip(keys, sizes):
-            length = th.prod(size)
+            length = math.prod(size)
             state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 
@@ -736,7 +738,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return [inst.idn for inst in self.particle_instancers.values()] if self.particle_instancers is not None else []
+        return (
+            th.tensor([inst.idn for inst in self.particle_instancers.values()])
+            if self.particle_instancers is not None
+            else th.tensor([])
+        )
 
     @property
     def self_collision(self):
@@ -1273,10 +1279,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
             instancer_particle_groups=(
-                [inst.particle_group for inst in self.particle_instancers.values()] if self.particle_instancers else []
+                th.tensor([inst.particle_group for inst in self.particle_instancers.values()])
+                if self.particle_instancers
+                else th.tensor([])
             ),
             instancer_particle_counts=(
-                [inst.n_particles for inst in self.particle_instancers.values()] if self.particle_instancers else []
+                th.tensor([inst.n_particles for inst in self.particle_instancers.values()])
+                if self.particle_instancers
+                else th.tensor([])
             ),
             particle_states=(
                 dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
@@ -1288,7 +1298,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def _load_state(self, state):
         # Synchronize the particle instancers
         self._sync_particle_instancers(
-            idns=state["instancer_idns"],
+            idns=(
+                state["instancer_idns"].tolist()
+                if isinstance(state["instancer_idns"], th.Tensor)
+                else state["instancer_idns"]
+            ),
             particle_groups=state["instancer_particle_groups"],
             particle_counts=state["instancer_particle_counts"],
         )
@@ -1301,7 +1315,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
         return th.cat(
             [
-                [state["n_instancers"]],
+                th.tensor([state["n_instancers"]]),
                 state["instancer_idns"],
                 state["instancer_particle_groups"],
                 state["instancer_particle_counts"],

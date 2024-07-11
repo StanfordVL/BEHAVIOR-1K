@@ -227,7 +227,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 self._limits[k] = v
 
     def serialize(self, state):
-        state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=th.float64)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]
             state_flat = th.cat(
@@ -235,12 +235,15 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                     state_flat,
                     th.cat(
                         [
-                            th.tensor([self.obj.scene.system_registry("name", system_name).uuid, state[system_name]])
+                            th.tensor(
+                                [self.obj.scene.system_registry("name", system_name).uuid, state[system_name]],
+                                dtype=th.float64,
+                            )
                             for system_name in system_names
                         ]
                     ),
                 ]
-            ).float()
+            )
         return state_flat
 
     def deserialize(self, state):

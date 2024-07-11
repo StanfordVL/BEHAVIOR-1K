@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from enum import IntEnum
+import math
 
 import torch as th
 
@@ -334,7 +335,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             idx = 1
             goal = dict()
             for key, shape in self._goal_shapes.items():
-                length = th.prod(shape)
+                length = math.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:

@@ -1101,14 +1101,14 @@ def perspective(fovy, aspect, znear, zfar):
     return frustum(-w, w, -h, h, znear, zfar)
 
 
-def anorm(x, dim=None, keepdims=False):
+def anorm(x, dim=None, keepdim=False):
     """Compute L2 norms alogn specified axes."""
-    return th.norm(x, dim=axis, keepdims=keepdims)
+    return th.norm(x, dim=dim, keepdim=keepdim)
 
 
 def normalize(v, dim=None, eps=1e-10):
     """L2 Normalize along specified axes."""
-    norm = anorm(v, dim=axis, keepdims=True)
+    norm = anorm(v, dim=dim, keepdim=True)
     return v / th.where(norm < eps, eps, norm)
 
 
