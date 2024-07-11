@@ -6,20 +6,20 @@ icon: material/repeat
 
 ## Description
 
-**`OmniGibson`**'s [Simulator](../reference/simulator.html) class is the global singleton that serves as the interface with omniverse's low-level physx (physics) backend. It provides utility functions for modulating the ongoing simulation as well as the low-level interface for importing scenes and objects. For standard use-cases, interfacing with the simulation exclusively through a created [environment](./environments.md) should be sufficient, though for more advanced or prototyping use-cases it may be common to interface via this simulator class.
+**`OmniGibson`**'s [Simulator](../reference/simulator.html) class is the global singleton that serves as the interface with omniverse's low-level physx (physics) backend. It provides utility functions for modulating the ongoing simulation as well as the low-level interface for importing scenes and objects. For standard use-cases, interfacing with the simulation exclusively through a created [environment](./environments.md) or [vector environment](./vector_environments.md) should be sufficient, though for more advanced or prototyping use-cases it may be common to interface via this simulator class.
 
 ## Usage
 
 ### Creating
 
-Because this `Simulator` is a global singleton, it is instantiated every time the stage is cleared and always occurs at the _very beginning_ of **`OmniGibson`**'s launching. This either occurs when an environment instance is created (`env = Environment(...)`), when `og.launch()` is explicitly called, or whenever the stage is reset.
+Because this `Simulator` is a global singleton, it is instantiated every time the stage is cleared and always occurs at the _very beginning_ of **`OmniGibson`**'s launching. This either occurs when an environment instance is created (`env = Environment(...)` or `vec_env = VectorEnvironment(...)`), when `og.launch()` is explicitly called, or whenever the stage is reset.
 
 ### Runtime
 
 After **`OmniGibson`** is launched, the simulator interface can be accessed globally via `og.sim`. Below, we briefly describe multiple common usages of the simulation interface:
 
 #### Importing and Removing Scenes / Objects
-The simulator can directly import a scene via `sim.import_scene(scene)`, and an object can be imported into a scene via `scene.import_object(object)`. The imported scene and its corresponding objects can be directly accessed through `sim.scenes`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear all the scenes via `og.clear()`.
+The simulator can directly import a scene via `sim.import_scene(scene)`. The imported scene and its corresponding objects can be directly accessed through `sim.scenes`. To remove a desired object, call `sim.remove_object(object)`. The simulator can also clear all the scenes via `og.clear()`.
 
 #### Propagating Physics
 The simulator can be manually stepped, with or without physics / rendering (`sim.step()`, `sim.step_physics()`, `sim.render()`), and can be stopped (`sim.stop()`), paused (`sim.pause()`), or played (`sim.play()`). Note that physics only runs when the simulator is playing! The current sim mode can be checked via `sim.is_stopped()`, `sim.is_paused()`, and `sim.is_playing()`.

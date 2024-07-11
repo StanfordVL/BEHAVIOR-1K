@@ -6,15 +6,15 @@ icon: material/water-outline
 
 ## Description
 
-**`OmniGibson`**'s [`System`](../reference/systems/base_system.html) class represents global singletons that encapsulate a single particle type. These system classes provide functionality for generating, tracking, and removing any number of particles arbitrarily located throughout the current scene.
+**`OmniGibson`**'s [`System`](../reference/systems/base_system.html)s represents scene singletons that encapsulate a single particle type. These systems provide functionality for generating, tracking, and removing any number of particles arbitrarily located throughout the current scene.
 
 ## Usage
 
 ### Creating
-For efficiency reasons, systems are created dynamically on an as-needed basis.  A system can be dynamically created (or referenced, if it already exists) via `get_system(name)`, where `name` defines the name of the system. For a list of all possible system names, see `REGISTERED_SYSTEMS`. Both of these utility functions can be directly imported from `omnigibson.systems`.
+For efficiency reasons, systems are created dynamically on an as-needed basis.  A system can be dynamically created (or referenced, if it already exists) via `scene.get_system(name)`, where `name` defines the name of the system. If you do not wish to initialize a system when refrencing it, e.g. for performance reasons, use the `force_init` flag: `scene.get_system(name, force_init=False)`. For a list of all possible system names, see `scene.system_registry.objects`. 
 
 ### Runtime
-A given system can be accessed globally at any time via `get_system(...)`. Systems can generate particles via `system.generate_particles(...)`, track their states via `system.get_particles_position_orientation()`, and remove them via `system.remove_particles(...)`. Please refer to the [`System`'s API Reference](../reference/systems/base_system.html) for specific information regarding arguments. Moreover, specific subclasses may implement more complex generation behavior, such as `VisualParticleSystem`s `generate_group_particles(...)` which spawn visual (non-collidable) particles that are attached to a specific object.
+A given system can be accessed at any time via `scene.get_system(...)`. Systems can generate particles via `system.generate_particles(...)`, track their states via `system.get_particles_position_orientation()`, and remove them via `system.remove_particles(...)`. Please refer to the [`System`'s API Reference](../reference/systems/base_system.html) for specific information regarding arguments. Moreover, specific subclasses may implement more complex generation behavior, such as `VisualParticleSystem`s `generate_group_particles(...)` which spawn visual (non-collidable) particles that are attached to a specific object.
 
 ## Types
 
