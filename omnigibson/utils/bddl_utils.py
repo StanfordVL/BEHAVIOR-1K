@@ -1066,7 +1066,9 @@ class BDDLSampler:
         else:
             problematic_objs_by_proportion = defaultdict(list)
             for child_scope_name, parent_obj_names in problematic_objs.items():
-                problematic_objs_by_proportion[th.mean(list(parent_obj_names.values()))].append(child_scope_name)
+                problematic_objs_by_proportion[
+                    th.mean(th.tensor(list(parent_obj_names.values()), dtype=th.float32)).item()
+                ].append(child_scope_name)
             max_problematic_objs = problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
         return filtered_object_scope, max_problematic_objs
@@ -1186,7 +1188,7 @@ class BDDLSampler:
         assert og.sim.is_stopped(), "Simulator should be stopped when importing sampleable objects"
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
-        self._agent.set_position_orientation([300, 300, 300], [0, 0, 0, 1])
+        self._agent.set_position_orientation(th.tensor([300, 300, 300]), th.tensor([0, 0, 0, 1]))
 
         self._sampled_objects = set()
         num_new_obj = 0
@@ -1236,7 +1238,7 @@ class BDDLSampler:
                     continue
 
                 # Shuffle categories and sample to find a valid model
-                categories = categories[th.randperm(categories.size(0))]
+                random.shuffle(categories)
                 model_choices = set()
                 for category in categories:
                     # Get all available models that support all of its synset abilities
@@ -1453,8 +1455,8 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         error_msg, problematic_objs = "", []
-        while not th.any(
-            [th.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
+        while not any(
+            th.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE).item() for obj_inst in problematic_objs
         ):
             filtered_object_scope, problematic_objs = self._filter_object_scope(
                 input_object_scope, conditions, condition_type

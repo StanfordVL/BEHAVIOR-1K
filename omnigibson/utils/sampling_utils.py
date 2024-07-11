@@ -4,6 +4,7 @@ import random
 import time
 from collections import Counter, defaultdict
 
+import numpy as np
 import torch as th
 import trimesh
 from scipy.spatial.transform import Rotation as R
@@ -220,7 +221,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
         bimodal_sample = truncnorm.rvs(bottom, top, loc=bimodal_mean_fraction, scale=bimodal_stdev_fraction)
 
         # Pick which axis the bimodal normal sample should go to.
-        bimodal_axis = th.multinomial(th.tensor(axis_probabilities), 1).item()
+        bimodal_axis = th.multinomial(th.tensor(axis_probabilities).float(), 1).item()
 
         # Choose which side of the axis to sample from. We only sample from the top for the Z axis.
         if bimodal_axis == 2:
@@ -1229,8 +1230,9 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     top_pairs = list(itertools.combinations(top_corner_positions, 2))
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
-    all_pairs = th.tensor(top_to_bottom_pairs + bottom_pairs + top_pairs)
-    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
+    pairs_list = top_to_bottom_pairs + bottom_pairs + top_pairs
+    all_pairs = th.stack([th.cat([pair[0], pair[1]]) for pair in pairs_list])
+    check_cast_results = raytest_batch(start_points=all_pairs[:, :3], end_points=all_pairs[:, 3:])
     if any(ray["hit"] for ray in check_cast_results):
         if m.DEBUG_SAMPLING:
             refusal_log.append("check ray info: %r" % (check_cast_results))

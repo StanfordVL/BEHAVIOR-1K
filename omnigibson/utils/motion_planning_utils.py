@@ -613,7 +613,8 @@ def astar(search_map, start, goal, eight_connected=True):
     open_set = [(0, start)]
     came_from = {}
     visited = set()
-    g_score = {cell: float("inf") for cell in th.ndindex(search_map.shape)}
+    rows, cols = search_map.shape
+    g_score = {(i.item(), j.item()): float("inf") for i, j in th.cartesian_prod(th.arange(rows), th.arange(cols))}
     g_score[start] = 0
 
     while open_set:

@@ -2,6 +2,7 @@ import math
 import os
 
 import cv2
+import numpy as np
 import torch as th
 from PIL import Image
 
@@ -77,9 +78,11 @@ class TraversableMap(BaseMap):
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
-                trav_map = th.tensor(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
+                trav_map = th.tensor(np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor)))))
             else:
-                trav_map = th.tensor(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+                trav_map = th.tensor(
+                    np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+                )
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the
@@ -91,7 +94,7 @@ class TraversableMap(BaseMap):
                 map_size = int(self.trav_map_original_size * self.map_default_resolution / self.map_resolution)
 
             # We resize the traversability map to the new size computed before
-            trav_map = cv2.resize(trav_map, (map_size, map_size))
+            trav_map = th.tensor(cv2.resize(trav_map.numpy(), (map_size, map_size)))
 
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
@@ -116,7 +119,7 @@ class TraversableMap(BaseMap):
         else:
             radius = self.default_erosion_radius
         radius_pixel = int(math.ceil(radius / self.map_resolution))
-        trav_map = cv2.erode(trav_map, th.ones((radius_pixel, radius_pixel)))
+        trav_map = th.tensor(cv2.erode(trav_map.numpy(), np.ones((radius_pixel, radius_pixel))))
         return trav_map
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
@@ -143,12 +146,13 @@ class TraversableMap(BaseMap):
             floor = th.randint(0, self.n_floors)
 
         # create a deep copy so that we don't erode the original map
-        trav_map = self.floor_map[floor].copy()
+        trav_map = th.clone(self.floor_map[floor])
         trav_map = self._erode_trav_map(trav_map, robot=robot)
 
         if reference_point is not None:
             # Find connected component
-            _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)
+            _, component_labels = cv2.connectedComponents(trav_map.numpy(), connectivity=4)
+            component_labels = th.tensor(component_labels)
 
             # If previous point is given, sample a point in the same connected component
             prev_xy_map = self.world_to_map(reference_point[:2])
@@ -156,7 +160,7 @@ class TraversableMap(BaseMap):
             trav_space = th.where(component_labels == prev_label)
         else:
             trav_space = th.where(trav_map == 255)
-        idx = th.randint(0, high=trav_space[0].shape[0])
+        idx = th.randint(0, high=trav_space[0].shape[0], size=(1,)).item()
         xy_map = th.tensor([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
@@ -180,11 +184,11 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-        source_map = tuple(self.world_to_map(source_world))
-        target_map = tuple(self.world_to_map(target_world))
+        source_map = tuple(self.world_to_map(source_world).tolist())
+        target_map = tuple(self.world_to_map(target_world).tolist())
 
         # create a deep copy so that we don't erode the original map
-        trav_map = self.floor_map[floor].copy()
+        trav_map = th.clone(self.floor_map[floor])
 
         trav_map = self._erode_trav_map(trav_map, robot=robot)
 

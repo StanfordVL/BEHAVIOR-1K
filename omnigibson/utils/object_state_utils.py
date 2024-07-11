@@ -1,6 +1,5 @@
 import math
 
-import cv2
 import torch as th
 from scipy.spatial import ConvexHull, distance_matrix
 from scipy.spatial.transform import Rotation as R
@@ -181,7 +180,7 @@ def sample_kinematics(
             # between the parallel bbox orientation and the sample orientation
             additional_rotation = sample_rotation * parallel_bbox_rotation.inv()
             combined_rotation = additional_rotation * original_rotation
-            orientation = combined_rotation.as_quat()
+            orientation = th.tensor(combined_rotation.as_quat())
 
             # The delta vector between the base CoM frame and the parallel bbox center needs to be rotated
             # by the same additional orientation

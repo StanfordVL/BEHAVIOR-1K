@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch as th
 from PIL import Image
 
@@ -63,8 +64,8 @@ class SegmentationMap(BaseMap):
         assert height == width, "room seg map is not a square"
         assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
         map_size = int(height * self.map_default_resolution / self.map_resolution)
-        img_ins = th.tensor(img_ins.resize((map_size, map_size), Image.NEAREST))
-        img_sem = th.tensor(img_sem.resize((map_size, map_size), Image.NEAREST))
+        img_ins = th.tensor(np.array(img_ins.resize((map_size, map_size), Image.NEAREST)))
+        img_sem = th.tensor(np.array(img_sem.resize((map_size, map_size), Image.NEAREST)))
 
         room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
