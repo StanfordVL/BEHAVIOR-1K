@@ -2,6 +2,7 @@ yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema
 
 site_name: OmniGibson Documentation
 repo_name: StanfordVL/OmniGibson
+site_url: https://behavior.stanford.edu/omnigibson
 repo_url: https://github.com/StanfordVL/OmniGibson
 theme: 
   name: material
@@ -12,7 +13,9 @@ theme:
 
   features:
     - navigation.tracking
-    - navigation.tabs
+    - navigation.instant
+    - navigation.expand
+    - toc.integrate
     - content.code.copy
 
   extra:
@@ -104,13 +107,13 @@ nav:
     - Under the Hood - Isaac Sim: modules/under_the_hood.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
-  - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
     - Known Issues & Troubleshooting: miscellaneous/known_issues.md
     - Contributing: miscellaneous/contributing.md
     - Changelog: https://github.com/StanfordVL/OmniGibson/releases
     - Contact Us: miscellaneous/contact.md
+  - API Reference: reference/*
 
 extra:
   analytics:
