@@ -102,6 +102,8 @@ nav:
     - Environments: modules/environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Custom Robot Import: tutorials/custom_robot_import.md
+    - Speed Optimization: tutorials/speed_optimization.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
