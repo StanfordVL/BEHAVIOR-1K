@@ -14,7 +14,7 @@ Here are the important conceptual components of the BEHAVIOR Knowledgebase:
 
 
 ### [**Tasks**](https://behavior.stanford.edu/knowledgebase/tasks)
-A family of 1000 long-horizon household activities. 
+A family of 1000 long-horizon household activities.
 
 - As illustrated in the [**BEHAVIOR Tasks tutorial**](behavior_tasks.html), each task definition contains a list of task-relevant objects, and their initial and goal conditions.
 - The knowledgebase page also shows
@@ -68,7 +68,7 @@ Hand-specified rules that define complex physical or chemical interactions betwe
 
 - Each transition rule specifies a list of input synsets and a list of output synsets, as well as the conditions that need to be satisfied for the transition to occur.
 - For instance, in the [`beef_stew`](https://behavior.stanford.edu/knowledgebase/transitions/beef_stew) rule, the input synsets are `ground_beef.n.01`, `beef_broth.n.01`, `pea.n.01`, `diced__carrot.n.01` and `diced__vidalia_onion.n.01` and the output synset is `beef_stew.n.01`.
-- The conditions are not yet visualized on the website, but you can manually inspect them in the [JSON files](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_jsons). 
+- The conditions are not yet visualized on the website, but you can manually inspect them in the [JSON files](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_jsons).
 
 We have 6 different types of transition rules:
 
@@ -150,4 +150,134 @@ leaf_descendant_substances = OBJECT_TAXONOMY.get_subtree_substances("liquid.n.01
 
 ## (Advanced) Customize BEHAVIOR Knowledgebase
 
-TBD
+To customize BEHAVIOR Knowedgebase, you can modify the source CSV files in the [bddl](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data) repository, and then rebuild the knowledgebase.
+
+### Modify Source CSV Files
+
+You can use Excel, Google Sheets or any other spreadsheet software to modify the source CSV files below.
+
+[category_mapping.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/category_mapping.csv)
+
+- **Information**: map an object category to a synset.
+- **When modify**: add a new object category.
+- **Caveat**: you also need to add the canonical density of the object category to `<gm.DATASET_PATH>/metadata/avg_category_specs.json`.
+
+[substance_hyperparams.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/substance_hyperparams.csv)
+
+- **Information**: map a substance category to a synset, and also specify the substance's type (e.g. `fluid`, `macro_physical_particle`), physical attributes (e.g. `is_viscous`, `particle_density`) and visual appearance (e.g. `material_mtl_name`, `diffuse_reflection_color`).
+- **When modify**: add a new substance category.
+- **Caveat**: you also need to add the metadata (in a JSON file) and (optionally) particle prototypes to the `<gm.DATASET_PATH>/systems/<substance_category>`.
+    - `fluid`: only metadata is needed, e.g. `<gm.DATASET_PATH>/systems/water/metadata.json`.
+    - `granular`: both metadata and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/salt/metadata.json` and `<gm.DATASET_PATH>/systems/sugar/iheusv`.
+    - `macro_physical_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/cashew/metadata.json` and `<gm.DATASET_PATH>/systems/cashew/qyglnm`.
+    - `macro_visual_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/stain/metadata.json` and `<gm.DATASET_PATH>/systems/stain/ahkjul`.
+
+[synsets.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/synsets.csv)
+
+- **Information**: specify the parent and abilities of a synset.
+- **When modify**: add a new synset.
+- **Caveat**: feel free to create custom synsets if you can't find existing ones from WordNet; you also need to update the property parameter annotations in the `prop_param_annots` folder accordingly (see below).
+
+[prop_param_annots/*](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots)
+
+- **Information**: specify the hyperparameters of the abilities (or properties) of a synset.
+- **When modify**: add a new synset that has the ability, or modify the hyperparameters of the ability.
+- **Caveat**: if a new object or substance synset is involved, you also need to modify `synsets.csv`, `category_mapping` and `substance_hyperparams.csv` accordingly (see above).
+
+[prop_param_annots/heatSource.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/heatSource.csv)
+
+- **Information**: specify the hyperparameters of the `heatSource` ability, e.g. whether the object needs to be toggled on or have its doors closed, whether it requires other objects to be inside it, and the heating temperature and rate.
+- **When modify**: add a new synset that has the `heatSource` ability.
+
+[prop_param_annots/coldSource.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/coldSource.csv)
+
+- **Information**: specify the hyperparameters of the `coldSource` ability, e.g. whether the object needs to be toggled on or have its doors closed, whether it requires other objects to be inside it, and the heating temperature and rate.
+- **When modify**: add a new synset that has the `coldSource` ability.
+
+[prop_param_annots/cookable.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/cookable.csv)
+
+- **Information**: specify the hyperparameters of the `cookable` ability, e.g. the temperature threshold, and the cooked version of the substance synset (if applicable).
+- **When modify**: add a new synset that has the `cookable` ability.
+
+[prop_param_annots/flammable.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/flammable.csv)
+
+- **Information**: specify the hyperparameters of the `flammable` ability, e.g. the ignition and fire temperature, the heating rate and distance threshold.
+- **When modify**: add a new synset that has the `flammable` ability.
+
+[prop_param_annots/particleApplier.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/particleApplier.csv)
+
+- **Information**: specify the hyperparameters of the `particleApplier` ability, e.g. modification method, conditions, and substance synset to be applied.
+- **When modify**: add a new synset that has the `particleApplier` ability.
+
+[prop_param_annots/particleSource.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/particleSource.csv)
+
+- **Information**: specify the hyperparameters of the `particleSource` ability, e.g. conditions, and substance synset to be applied.
+- **When modify**: add a new synset that has the `particleSource` ability.
+
+[prop_param_annots/particleRemover.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/particleRemover.csv)
+
+- **Information**: specify the hyperparameters of the `particleRemover` ability, e.g. conditions to remove white-listed substance synsets, and conditions to remove everything else.
+- **When modify**: add a new synset that has the `particleRemover` ability.
+
+[prop_param_annots/particleSink.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/particleSink.csv)
+
+- **Information**: specify the hyperparameters of the `particleSink` ability (deprecated).
+- **When modify**: add a new synset that has the `particleSink` ability.
+
+[prop_param_annots/diceable.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/diceable.csv)
+
+- **Information**: specify the hyperparameters of the `diceable` ability, e.g. the uncooked and cooked diced substance synsets.
+- **When modify**: add a new synset that has the `diceable` ability.
+
+[prop_param_annots/sliceable.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/sliceable.csv)
+
+- **Information**: specify the hyperparameters of the `sliceable` ability, e.g. the sliced halves' synset.
+- **When modify**: add a new synset that has the `sliceable` ability.
+
+[prop_param_annots/meltable.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/prop_param_annots/meltable.csv)
+
+- **Information**: specify the hyperparameters of the `meltable` ability, e.g. the melted substance synset.
+- **When modify**: add a new synset that has the `meltable` ability.
+
+[transition_map/tm_raw_data/*](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_raw_data)
+
+- **Information**: specify the transition rules for different types of transitions.
+- **Caveat**: if a new object or substance synset is involved, you also need to modify `synsets.csv`, `category_mapping` and `substance_hyperparams.csv` accordingly (see above).
+
+[transition_map/tm_raw_data/heat_cook.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_raw_data/heat_cook.csv)
+
+- **Information**: specify the transition rules for `CookingObjectRule` and `CookingSystemRule`, i.e. the input synsets / states, the output synsets / states, the heat source, the container, and the timesteps to cook.
+- **When modify**: add a new transition rule for cooking objects or systems.
+
+[transition_map/tm_raw_data/mixing_stick.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_raw_data/mixing_stick.csv)
+
+- **Information**: specify the transition rules for `MixingToolRule`, i.e. the input synsets, and the output synsets.
+- **When modify**: add a new transition rule for mixing systems.
+
+[transition_map/tm_raw_data/single_toggleable_machine.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_raw_data/single_toggleable_machine.csv)
+
+- **Information**: specify the transition rules for `ToggleableMachineRule`, i.e. the input synsets / states, the output synsets / states, and the machine.
+- **When modify**: add a new transition rule for toggleable machines.
+
+[transition_map/tm_raw_data/washer.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/transition_map/tm_raw_data/washer.csv)
+
+- **Information**: specify the transition rules for `WasherRule`, similar to `prop_param_annots/particleRemover.csv` , i.e. solvents required to remove white-listed substance synsets, and conditions to remove everything else.
+- **When modify**: add a new transition rule for washing machines.
+
+### Rebuild Knowledgebase
+
+To rebuild the knowledgebase, you need to run the following command:
+
+```bash
+cd bddl
+python data_generation/generate_datafiles.py
+```
+
+To make sure the new knowledgebase is consistent with the task definitions, you should also run the following command:
+
+```bash
+python tests/bddl_tests.py batch_verify
+python tests/tm_tests.py
+```
+
+If you encounter any errors during the rebuilding process, please read the error messages carefully and try to fix the issues accordingly.

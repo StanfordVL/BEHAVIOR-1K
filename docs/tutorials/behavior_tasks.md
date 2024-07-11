@@ -197,7 +197,7 @@ env = og.Environment(configs=cfg)
 Curently, in our publiclly available dataset, we have pre-sampled exactly **1** instance of all 1000 BEHAVIOR tasks.
 We recommend you to set `online_object_sampling` to `False` to load the pre-sampled task instances in the dataset.
 You can run the following command to find out the path to the pre-sampled task instances.
-```{.python .annotate}
+```bash
 ls -l <gm.DATASET_PATH>/scenes/*/json/*task*
 ```
 
@@ -208,7 +208,7 @@ The easiest way to create custom BEHAVIOR tasks is to add new task definitions t
 For instance, you can emulate the existing task definitions and create a new task definition at `bddl/activity_definitions/<my_new_task>/problem0.bddl`.
 
 Then you can run the following tests to ensure that your new task is compatible with the rest of BEHAVIOR knowledgebase (e.g. you are using valid synsets with valid states).
-```{.python .annotate}
+```bash
 cd bddl
 python tests/bddl_tests.py batch_verify
 python tests/tm_tests.py
