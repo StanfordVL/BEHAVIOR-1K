@@ -91,7 +91,7 @@ nav:
     - Important Concepts: getting_started/important_concepts.md
     - Examples: getting_started/examples.md
     - Running on SLURM: getting_started/slurm.md
-  - Modules:
+  - OmniGibson Modules:
     - Overview: modules/overview.md
     - Prims: modules/prims.md
     - Objects: modules/objects.md
