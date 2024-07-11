@@ -4,7 +4,8 @@ icon: octicons/rocket-16
 
 # 🕹️ **Importing a Custom Robot**
 
-The page is currently under construction. 
+While OmniGibson assets includes a set of commonly-used robots, users might still want to import robot model of there own. This tutorial introduces users 
+
 
 ## Preparation
 
@@ -38,14 +39,13 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 
 2. Make sure the default prim or root link of the robot has `Articulation Root` property
 
-    Select the default prim in `Stage` panel on the top right, go to the `Property` section at the bottom right, scroll down to the `Physics` section, you should see the `Articulation Root` section. Make sure the `Articulation Enabled` is checked. If you dont't see the section, scroll to top of the `Property` section, and `Add` -> `Physics` -> `Articulation Root`
+    Select the default prim in `Stage` panel on the top right, go to the `Property` section at the bottom right, scroll down to the `Physics` section, you should see the `Articulation Root` section. Make sure the `Articulation Enabled` is checked. If you don't see the section, scroll to top of the `Property` section, and `Add` -> `Physics` -> `Articulation Root`
    
-   ![Stretch Robot Import 2](../assets/tutorials/stretch-import-2.png)
+    ![Stretch Robot Import 2](../assets/tutorials/stretch-import-2.png)
 
 3. Make sure every link has visual mesh and collision mesh in the correct shape. You can visually inspect this by clicking on every link in the `Stage` panel and view the highlighted visual mesh in orange. To visualize all collision meshes, click on the Eye Icon at the top and select `Show By Type` -> `Physics` -> `Colliders` -> `All`. This will outline all the collision meshes in green. If any collision meshes do not look as expected, please inspect the original collision mesh referenced in the URDF. Note that IsaacSim cannot import a pre-convex-decomposed collision mesh, and so such a collision mesh must be manually split and explicitly defined as individual sub-meshes in the URDF before importing. In our case, the Stretch robot model already comes with rough cubic approximations of its meshes.
 
-
-   ![Stretch Robot Import 3](../assets/tutorials/stretch-import-3.png)
+    ![Stretch Robot Import 3](../assets/tutorials/stretch-import-3.png)
 
 4. Make sure the physics is stable:
 
@@ -65,18 +65,18 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
 
 5. The robot additionally needs to be equipped with sensors, such as cameras and / or LIDARs. To add a sensor to the robot, select the link under which the sensor should be attached, and select the appropriate sensor:
 
-   - **LIDAR**: From the top taskbar, select `Create` -> `Isaac` -> `Sensors` -> `PhysX Lidar` -> `Rotating`
-   - **Camera**: From the top taskbar, select `Create` -> `Camera`
+    - **LIDAR**: From the top taskbar, select `Create` -> `Isaac` -> `Sensors` -> `PhysX Lidar` -> `Rotating`
+    - **Camera**: From the top taskbar, select `Create` -> `Camera`
 
-   You can rename the generated sensors as needed. Note that it may be necessary to rotate / offset the sensors so that the pose is unobstructed and the orientation is correct. This can be achieved by modifying the `Translate` and `Rotate` properties in the `Lidar` sensor, or the `Translate` and `Orient` properties in the `Camera` sensor. Note that the local camera convention is z-backwards, y-up. Additional default values can be specified in each sensor's respective properties, such as `Clipping Range` and `Focal Length` in the `Camera` sensor.
+    You can rename the generated sensors as needed. Note that it may be necessary to rotate / offset the sensors so that the pose is unobstructed and the orientation is correct. This can be achieved by modifying the `Translate` and `Rotate` properties in the `Lidar` sensor, or the `Translate` and `Orient` properties in the `Camera` sensor. Note that the local camera convention is z-backwards, y-up. Additional default values can be specified in each sensor's respective properties, such as `Clipping Range` and `Focal Length` in the `Camera` sensor.
 
-   In our case, we created a LIDAR at the `laser` link (offset by 0.01m in the z direction), and cameras at the `camera_link` link (offset by 0.005m in the x direction and -90 degrees about the y-axis) and `gripper_camera_link` link (offset by 0.01m in the x direction and 90 / -90 degrees about the x-axis / y-axis). 
+    In our case, we created a LIDAR at the `laser` link (offset by 0.01m in the z direction), and cameras at the `camera_link` link (offset by 0.005m in the x direction and -90 degrees about the y-axis) and `gripper_camera_link` link (offset by 0.01m in the x direction and 90 / -90 degrees about the x-axis / y-axis). 
 
-   ![Stretch Robot Import 5a](../assets/tutorials/stretch-import-5a.png)
-   ![Stretch Robot Import 5b](../assets/tutorials/stretch-import-5b.png)
-   ![Stretch Robot Import 5c](../assets/tutorials/stretch-import-5c.png)
+    ![Stretch Robot Import 5a](../assets/tutorials/stretch-import-5a.png)
+    ![Stretch Robot Import 5b](../assets/tutorials/stretch-import-5b.png)
+    ![Stretch Robot Import 5c](../assets/tutorials/stretch-import-5c.png)
 
-6. Finally, save your USD!
+6. Finally, save your USD! Note that you need to remove the fixed link created at step 4 before saving.
 
 ## Create the Robot Class
 Now that we have the USD file for the robot, let's write our own robot class. For more information please refer to the [`robot module`](../modules/robots.md)
@@ -107,4 +107,6 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 
 4. Now add your robot class to `omnigibson/robots/__init__.py`. This way you will be able to import the robot in other scripts.
 
-5. You can now try import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`!
+5. You can now try import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`! Try different controller options and teleop the robot with your keyboard, If you observe that one joint is too stiff or , you can tune the corresponding damping and stiffness parameters on the joint drive, which is near the bottom of the `Property` section of the joint prim (see image below). You can refer to the Franka or Fetch robot to get some insiprations on what would be a good parameter for the robot joints.
+
+    ![Franka Joint](../assets/tutorials/franka_joint.png)

@@ -147,7 +147,7 @@ These are manipulation-only robots (an instance of [`ManipulationRobot`](../refe
     <tr>
         <td valign="top" width="60%">
             [**`Franka`**](../reference/robots/franka.html)<br><br>  
-            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes two alternative versions of Franka: FrankaAllegro (equipped with an Allegro hand) and FrankaLeap (equipped with a Leap hand).<br><br>
+            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes three alternative versions of Franka with dexterous hands: FrankaAllegro (equipped with an Allegro hand), FrankaLeap (equipped with a Leap hand) and FrankaInspire (equipped with an inspire hand).<br><br>
             <ul>
                 <li>_Controllers_: Arm, Gripper</li>
                 <li>_Sensors_: Wrist Camera</li>
