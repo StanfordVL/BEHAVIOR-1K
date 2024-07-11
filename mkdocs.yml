@@ -85,6 +85,7 @@ nav:
   - Getting Started:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
+    - Important Concepts: getting_started/important_concepts.md
     - Examples: getting_started/examples.md
     - Running on SLURM: getting_started/slurm.md
   - Modules:
@@ -100,6 +101,7 @@ nav:
     - Transition Rules: modules/transition_rules.md
     - Simulator: modules/simulator.md
     - Environments: modules/environments.md
+    - Under the Hood - Isaac Sim: modules/under_the_hood.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
   - API Reference: reference/*
