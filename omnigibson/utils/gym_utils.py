@@ -132,3 +132,23 @@ class GymObservable(metaclass=ABCMeta):
         log.debug(f"Loaded obs space dictionary for: {self.__class__.__name__}")
 
         return self.observation_space
+
+
+def maxdim(space):
+    """
+    Helper function to get the maximum dimension of a gym space
+
+    Args:
+        space (gym.spaces.Space): Gym space to get the maximum dimension of
+
+    Returns:
+        int: Maximum dimension of the gym space
+    """
+    if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple)):
+        return sum([maxdim(s) for s in space.spaces.values()])
+    elif isinstance(space, (gym.spaces.Box, gym.spaces.Discrete, gym.spaces.MultiDiscrete, gym.spaces.MultiBinary)):
+        return gym.spaces.utils.flatdim(space)
+    elif isinstance(space, (gym.spaces.Sequence, gym.spaces.Graph)):
+        return float("inf")
+    else:
+        raise ValueError(f"Unsupported gym space type: {type(space)}")
