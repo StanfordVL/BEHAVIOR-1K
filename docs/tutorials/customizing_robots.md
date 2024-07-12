@@ -34,7 +34,7 @@ One way to customize a robot's set of controllers is to manually set the desired
             use_delta_commands: False
     ```
 
-In the above example, the types of controllers are specified for each component of the robot (`base`, `arm_0`, `gripper_0`, `camera`), and additional relevant keyword arguments to pass to the specific controller init calls can also be specified. If a controller or any keyword arguments are not specified for a given component, a default set of values will be used, which are specified in the robot class itself (`_default_controller_config` property). Please see the [Controllers](../modules/controllers.md) section for additional details on controller arguments.
+In the above example, the types of controllers are specified for each component of the robot (`base`, `arm_0`, `gripper_0`, `camera`), and additional relevant keyword arguments to pass to the specific controller init calls can also be specified. If a controller or any keyword arguments are not specified for a given component, a default set of values will be used, which are specified in the robot class itself (`_default_controller_config` property). Please see the [Controllers](../modules/controllers.md) section for additional details on controller arguments. Do note that if `action_normalize=True` is passed as a robot-level kwarg, it will automatically overwrite any `command_input_limits` passed via the controller config, since it will assume a normalization range of `[-1, 1]`.
 
 Alternatively, if directly instantiating a robot class, the controller config can be directly passed into the constructor, e.g.:
 
