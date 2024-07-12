@@ -16,12 +16,14 @@ In Isaac Sim, there are three competing representations of the current state of 
 
 ### USD
 USD is the scene graph representation of the scene, as directly loaded from the USD files. This is the main scene / stage representation used by Omniverse apps.
+
   * This representation involves maintaining the full USD tree in memory and mutating it as the scene changes.
   * It is a complete, flexible representation containing all scene meshes and hierarchy that works really well for representing static scenes (e.g. no realtime physics simulation), e.g. for usual CAD workflows.
   * During physics simulation, we need to repeatedly update the transforms of the objects in the scene so that they will be rendered in their new poses. USD is not optimized for this: especially due to specific USD features like transforms being defined locally (so to compute a world transform, you need to traverse the tree). Queries and reads/writes using the Pixar USD library are also overall relatively slow.
 
 ### PhysX
 PhysX contains an internal physics-only representation of the scene that it uses to perform computations during physics simulation.
+
   * The PhysX representation is only available when simulation is playing (e.g. when it is stopped, all PhysX internal storage is freed, and when it is played again, the scene is reloaded from USD).
   * This representation is the fastest source for everything it provides (e.g. transforms, joint states, etc.) since it only contains physics-relevant information and provides methods to access these in a tensorized manner, called tensor APIs, used in a number of places in OmniGibson.
   * But it does not contain any rendering information and is not available when simulation is stopped. As such, it cannot be used as the renderer as the source of truth.
@@ -29,6 +31,7 @@ PhysX contains an internal physics-only representation of the scene that it uses
 
 ### Fabric
 Fabric (formerly Flatcache) is an optimized representation of the scene that is a flattened version of the USD scene graph that is optimized for fast accesses to transforms and for rendering.
+
   * It can be enabled using the ENABLE_FLATCACHE global macro in OmniGibson, which causes the renderer to use Fabric to get object transforms instead of USD, and causes PhysX to stop updating the USD state after every step and update the Fabric state instead.
   * The Fabric state exists alongside the USD and captures much of the same information, although it is not as complete as USD. It is optimized for fast reads and writes of object transforms and is used by the renderer to render the scene.
   * The information it contains is usually fresher than the USD, e.g. when Fabric is enabled, special attention needs to be paid in order to not accidentally access stale information from USD instead of Fabric.

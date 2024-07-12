@@ -100,6 +100,7 @@ It's important to note that the Omniverse SDK is generally meant as a CAD / coll
 ### OmniGibson
 
 OmniGibson is a Python package that is built by the BEHAVIOR team at the Stanford Vision and Learning Group on top of Isaac Sim and provides a number of features that are necessary for simulating BEHAVIOR tasks. OmniGibson:
+
 * completely abstracts away the Isaac Sim interface (e.g. users do not interact with NVIDIA code / interfaces / abstractions at all), instead providing a familiar scene/object/robot/task interface similar to those introduced in iGibson
 * provides a number of fast high-level APIs for interacting with the simulator, such as loading scenes, setting up tasks, and controlling robots
 * implements samplers and checkers for all of the predicates and functions defined in the BDDL standard to allow instantiation and simulation of BEHAVIOR-1K tasks
