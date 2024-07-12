@@ -101,6 +101,7 @@ nav:
     - Simulator: modules/simulator.md
     - Tasks: modules/tasks.md
     - Environments: modules/environments.md
+    - Vector Environments: modules/vector_environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Saving and Loading Simulation State: tutorials/save_load.md
