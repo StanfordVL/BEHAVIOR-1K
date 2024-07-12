@@ -161,7 +161,7 @@ def main():
         if args.robot:
             action_lo, action_hi = -0.3, 0.3
             result = env.step(
-                th.tensor(
+                th.stack(
                     [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
                 ).flatten()
             )[4]
@@ -188,7 +188,7 @@ def main():
         if title == "FPS":
             value = 1000 / value
             unit = "fps"
-        output.append({"name": field, "unit": unit, "value": value, "extra": [title, title]})
+        output.append({"name": field, "unit": unit, "value": value.item(), "extra": [title, title]})
 
     ret = []
     if os.path.exists("output.json"):
