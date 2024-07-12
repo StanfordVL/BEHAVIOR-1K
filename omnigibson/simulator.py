@@ -374,11 +374,6 @@ def launch_simulator(*args, **kwargs):
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
 
-            # Toggle simulator state once so that downstream omni features can be used without bugs
-            # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
-            self.play()
-            self.stop()
-
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
             Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
