@@ -590,14 +590,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - bool: truncated, i.e. whether this episode ended due to a time limit etc.
                 - dict: info, i.e. dictionary with any useful information
         """
-        try:
-            self._pre_step(action)
-            og.sim.step()
-            return self._post_step(action)
-        except:
-            raise ValueError(
-                f"Failed to execute environment step {self._current_step} in episode {self._current_episode}"
-            )
+        self._pre_step(action)
+        og.sim.step()
+        return self._post_step(action)
 
     def render(self):
         """Render the environment for debug viewing."""
