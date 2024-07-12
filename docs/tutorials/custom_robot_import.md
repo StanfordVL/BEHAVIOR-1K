@@ -101,12 +101,22 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 
     - `usd_path`, `urdf_path`: change it to the correct file path.
 
+    - `eef_usd_path`: if you want to teleoperate the robot using I/O devices other than keyboard, this usd path is needed to load the visualizer for the robot eef that would be used as a visual aid when teleoperating. To get such file, duplicate the robot USD file, and remove every prim except the robot end effector. You can then put the file path in the `eef_usd_path` attribute. Here is an example of the Franka Panda end effector USD:
+
+        ![Franka Panda EEF](../assets/tutorials/franka_panda_eef.png)
+
     - `disabled_collision_pairs`: you can put pairs of robot links in here and OmniGibson will ignore the collision between them. This is really useful if we have some bad collision modeling on certain links, and we can filter out these collisions without loosing much physics realism.
 
     - `assisted_grasp_start_points`, `assisted_grasp_end_points`: you need to implement this if you want to use sticky grasp/assisted grasp on the new robot.
 
-4. Now add your robot class to `omnigibson/robots/__init__.py`. This way you will be able to import the robot in other scripts.
+        These points are `omnigibson.robots.manipulation_robot.GraspingPoint` that is defined by the end effector link name and the relative position of the point w.r.t. to the pose of the link. Basically when the gripper receives a close command and OmniGibson tries to perform assisted grasping, it will cast rays from every start point to every end point, and if there is one object that is hit by any rays, then we consider the object is grasped by the robot. 
+        
+        In practice, for parallel grippers, naturally the start and end points should be uniformally sampled on the inner surface of the two fingers. You can refer to the Fetch class for an example of this case. For more complicated end effectors like dexterous hands, it's usually best practice to have start points at palm center and lower center, and thumb tip, and end points at each every other finger tips. You can refer to the Franka class for examples of this case.
 
-5. You can now try import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`! Try different controller options and teleop the robot with your keyboard, If you observe that one joint is too stiff or , you can tune the corresponding damping and stiffness parameters on the joint drive, which is near the bottom of the `Property` section of the joint prim (see image below). You can refer to the Franka or Fetch robot to get some insiprations on what would be a good parameter for the robot joints.
+        Best practise of setting these points is to load the robot into Isaac Sim, and create a small sphere under the target link of the end effector. Then drag the sphere to the desired location (which should be just right outside the mesh of the link) or by setting the position in the `Property` tab. After you get a desired relative pose to the link, write down the link name and position in the robot class. 
+
+5. Now add your robot class to `omnigibson/robots/__init__.py`. This way you will be able to import the robot in other scripts.
+
+6. You can now try import and control the robot by launching `python omnigibson/examples/robot/robot_control_examples.py`! Try different controller options and teleop the robot with your keyboard, If you observe that one joint is too stiff or , you can tune the corresponding damping and stiffness parameters on the joint drive, which is near the bottom of the `Property` section of the joint prim (see image below). You can refer to the Franka or Fetch robot to get some insiprations on what would be a good parameter for the robot joints.
 
     ![Franka Joint](../assets/tutorials/franka_joint.png)
