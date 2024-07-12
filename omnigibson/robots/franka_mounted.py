@@ -14,10 +14,6 @@ class FrankaMounted(FrankaPanda):
     """
 
     @property
-    def model_name(self):
-        return "FrankaMounted"
-
-    @property
     def controller_order(self):
         return ["arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
 
