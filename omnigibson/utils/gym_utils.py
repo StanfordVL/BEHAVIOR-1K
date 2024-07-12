@@ -55,7 +55,7 @@ def recursively_generate_compatible_dict(dic):
             out[k] = recursively_generate_compatible_dict(dic=v)
         elif isinstance(v, th.Tensor) and v.dim() > 1:
             # Map to list of tuples
-            out[k] = list(map(tuple, v))
+            out[k] = [tuple(row.tolist()) for row in v]
         else:
             # Preserve the key-value pair
             out[k] = v
