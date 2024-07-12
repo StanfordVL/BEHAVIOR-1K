@@ -112,6 +112,8 @@ nav:
     - Saving and Loading Simulation State: tutorials/save_load.md
     - BEHAVIOR Tasks: tutorials/behavior_tasks.md
     - BEHAVIOR Knowledgebase: tutorials/behavior_knowledgebase.md
+    - Custom Robot Import: tutorials/custom_robot_import.md
+    - Speed Optimization: tutorials/speed_optimization.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
