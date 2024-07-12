@@ -99,10 +99,14 @@ nav:
     - Scenes: modules/scenes.md
     - Transition Rules: modules/transition_rules.md
     - Simulator: modules/simulator.md
+    - Tasks: modules/tasks.md
     - Environments: modules/environments.md
     - Vector Environments: modules/vector_environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Saving and Loading Simulation State: tutorials/save_load.md
+    - BEHAVIOR Tasks: tutorials/behavior_tasks.md
+    - BEHAVIOR Knowledgebase: tutorials/behavior_knowledgebase.md
   - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
