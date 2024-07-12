@@ -1,6 +1,6 @@
+import math
 from collections.abc import Iterable
 from enum import IntEnum
-import math
 
 import torch as th
 

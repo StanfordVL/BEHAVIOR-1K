@@ -3,9 +3,8 @@ from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
 
-import numpy as np
-
 import gymnasium as gym
+import numpy as np
 import torch as th
 
 import omnigibson as og

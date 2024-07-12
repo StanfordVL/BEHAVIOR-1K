@@ -7,8 +7,8 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 
-from collections.abc import Iterable
 import math
+from collections.abc import Iterable
 
 import torch as th
 
