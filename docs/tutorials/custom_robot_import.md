@@ -1,5 +1,5 @@
 ---
-icon: octicons/rocket-16
+icon: material/robot-industrial
 ---
 
 # 🕹️ **Importing a Custom Robot**
