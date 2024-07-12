@@ -546,7 +546,6 @@ def launch_simulator(*args, **kwargs):
             self._floor_plane = XFormPrim(
                 relative_prim_path=ground_plane_relative_path,
                 name=plane.name,
-                load_config={"created_manually": True},
             )
             self._floor_plane.load(None)
 
@@ -1340,6 +1339,10 @@ def launch_simulator(*args, **kwargs):
                 json_paths (List[str]): Full paths of JSON file to load, which contains information
                     to recreate a scene.
             """
+            if len(self.scenes) > 0:
+                log.error("There are already scenes loaded. Please call og.clear() to relaunch the simulator first.")
+                return
+
             for json_path in json_paths:
                 if not json_path.endswith(".json"):
                     log.error(f"You have to define the full json_path to load from. Got: {json_path}")
