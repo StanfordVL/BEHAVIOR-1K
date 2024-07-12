@@ -34,6 +34,8 @@ Alternatively, a scene can be directly imported at runtime by first creating the
 
 ### Runtime
 
+To import an object into a scene, call `scene.add_object(obj)`.
+
 The scene keeps track of and organizes all imported objects via its owned `scene.object_registry`. Objects can quickly be queried by relevant property keys (1), such as `name`, `prim_path`, and `category`, from `env.scene.object_registry` as follows:
 { .annotate }
 

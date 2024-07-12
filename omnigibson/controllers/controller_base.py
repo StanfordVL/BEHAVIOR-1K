@@ -135,7 +135,7 @@ class BaseController(Serializable, Registerable, Recreatable):
                 np.array(self._control_limits[self.control_type][0])[self.dof_idx],
                 np.array(self._control_limits[self.control_type][1])[self.dof_idx],
             )
-            if type(command_input_limits) == str and command_input_limits == "default"
+            if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (

@@ -99,6 +99,7 @@ nav:
     - Transition Rules: modules/transition_rules.md
     - Simulator: modules/simulator.md
     - Environments: modules/environments.md
+    - Vector Environments: modules/vector_environments.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Using Macros: tutorials/using_macros.md
