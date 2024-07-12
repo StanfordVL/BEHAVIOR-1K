@@ -41,4 +41,11 @@ You can follow the below items to develop a feature:
 7. **Merged!** Once the reviewer is satisfied, they will go ahead and merge your PR. The PR will be merged into og-develop for immediate developer use, and included in the next release for public use. Public releases happen every few months. Thanks a lot for your contribution, and congratulations on becoming a contributor to what we hope will be the world's leading robotics benchmark!
 
 ## **Continuous Integration**
-The BEHAVIOR suite has continuous integration running via Github Actions in containers on our compute cluster. To keep our cluster safe, the CI will only be run on external work after one of our team members approves it. Tests and profiling are run directly on PRs and merges on the OmniGibson repo using our hosted runners, Docker image builds are performed using GitHub-owned runners, and docs builds are run on the behavior-website repo along with the rest of the website. When GitHub releases are created, a source distribution will be packed and shipped on PyPI by a hosted runner. For more information about the workflows and runners, please reach out on our Discord channel.
+The BEHAVIOR suite has continuous integration running via Github Actions in containers on our compute cluster. To keep our cluster safe, the CI will only be run on external work after one of our team members approves it.
+
+* Tests and profiling are run directly on PRs and merges on the OmniGibson repo using our hosted runners
+* Docker image builds are performed using GitHub-owned runners
+* Docs builds are run on the behavior-website repo along with the rest of the website.
+* When GitHub releases are created, a source distribution will be packed and shipped on PyPI by a hosted runner
+
+For more information about the workflows and runners, please reach out on our Discord channel.
