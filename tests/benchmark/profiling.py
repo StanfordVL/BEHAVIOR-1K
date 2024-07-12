@@ -148,7 +148,7 @@ def main():
         )
         knife.keep_still()
     if args.fluids:
-        table.states[Covered].set_value(env.scene.system_registry("name", "water"), True)
+        table.states[Covered].set_value(env.scene.get_system("water"))
 
     output, results = [], []
 

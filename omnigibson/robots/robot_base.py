@@ -142,6 +142,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             scale is None or isinstance(scale, int) or isinstance(scale, float) or th.all(scale == scale[0])
         ), f"Robot scale must be uniform! Got: {scale}"
 
+        # All BaseRobots should have xform properties pre-loaded
+        load_config = {} if load_config is None else load_config
+        load_config["xform_props_pre_loaded"] = True
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -183,7 +187,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 visible=False,
                 fixed_base=True,
                 visual_only=True,
-                load_config={"created_manually": True},
             )
             self._dummy.load(self.scene)
 

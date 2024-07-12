@@ -524,7 +524,7 @@ class BehaviorTask(BaseTask):
 
         Args:
             path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
-                <gm.DATASET_PATH/scenes/<SCENE_MODEL>/json/...>
+                <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:

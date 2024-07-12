@@ -471,7 +471,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
         for system_name in self.conditions.keys():
-            system = self.obj.scene.get_system(system_name, force_active=False)
+            system = self.obj.scene.get_system(system_name, force_init=False)
             limit = (
                 self.visual_particle_modification_limit
                 if self.obj.scene.is_visual_particle_system(system_name=system.name)
@@ -603,7 +603,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        system = self.obj.scene.get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_init=False)
 
         def condition(obj):
             return not self.obj.states[Saturated].get_value(system=system)
@@ -690,21 +690,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         raise NotImplementedError()
 
     @property
-    def supported_active_systems(self):
-        """
-        Returns:
-            dict: Maps system names to corresponding systems used in this state that are active, dynamic across time
-        """
-        return {system.name: system for system in self.obj.scene.get_active_systems()}
-
-    @property
     def systems_to_check(self):
         """
         Returns:
             tuple of str: System names that should be actively checked for particle modification at the current timestep
         """
         # Default is all supported active systems
-        return tuple(self.supported_active_systems.keys())
+        return tuple(self.obj.scene.active_systems.keys())
 
     @property
     def projection_is_active(self):
@@ -920,7 +912,7 @@ class ParticleRemover(ParticleModifier):
             function: Generated condition function with signature fcn(obj) --> bool, returning True if there is at least
                 one particle in the given system @system_name
         """
-        system = self.obj.scene.get_system(system_name, force_active=False)
+        system = self.obj.scene.get_system(system_name, force_init=False)
         return lambda obj: system.initialized and system.n_particles > 0
 
     @property
@@ -1028,7 +1020,7 @@ class ParticleApplier(ParticleModifier):
         system_name = list(self.conditions.keys())[0]
 
         # This will initialize the system if it's not initialized already.
-        system = self.obj.scene.system_registry("name", system_name)
+        system = self.obj.scene.get_system(system_name)
 
         if self.visualize:
             assert self._projection_mesh_params["type"] in {
@@ -1327,7 +1319,6 @@ class ParticleApplier(ParticleModifier):
                     else -self._initial_speed * th.tensor([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
-                    scene=self.obj.scene,
                     positions=th.tensor([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
@@ -1369,7 +1360,6 @@ class ParticleApplier(ParticleModifier):
         if n_particles > 0:
             velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
             system.generate_particles(
-                scene=self.obj.scene,
                 positions=points[:n_particles],
                 velocities=velocities,
             )

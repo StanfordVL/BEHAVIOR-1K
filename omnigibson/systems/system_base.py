@@ -123,20 +123,25 @@ class BaseSystem(Serializable):
         """
         assert not self.initialized, f"Already initialized system {self.name}!"
         self._scene = scene
+        self.initialized = True
 
         og.sim.stage.DefinePrim(self.prim_path, "Scope")
 
-        self.initialized = True
-
-        # Avoid circular import
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
-            from omnigibson.transition_rules import TransitionRuleAPI
-
-            TransitionRuleAPI.refresh_all_rules()
+            scene.transition_rule_api.refresh_all_rules()
 
         # Run any callbacks
         for callback in og.sim.get_callbacks_on_system_init():
             callback(self)
+
+    @property
+    def scene(self):
+        """
+        Returns:
+            Scene or None: Scene object that this prim is loaded into
+        """
+        assert self.initialized, f"System {self.name} has not been initialized yet!"
+        return self._scene
 
     def update(self):
         """
@@ -167,7 +172,6 @@ class BaseSystem(Serializable):
 
     def generate_particles(
         self,
-        scene,
         positions,
         orientations=None,
         scales=None,
@@ -177,7 +181,6 @@ class BaseSystem(Serializable):
         Generates new particles
 
         Args:
-            scene (Scene): Scene object to generate particles in
             positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
@@ -196,19 +199,17 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
-
         for callback in og.sim.get_callbacks_on_system_clear():
             callback(self)
 
         self.reset()
         lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
-        self.initialized = False
 
-        # Avoid circular import
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
-            from omnigibson.transition_rules import TransitionRuleAPI
+            self.scene.transition_rule_api.prune_active_rules()
 
-            TransitionRuleAPI.refresh_all_rules()
+        self.initialized = False
+        self._scene = None
 
     def reset(self):
         """
@@ -630,7 +631,6 @@ class VisualParticleSystem(BaseSystem):
 
     def generate_particles(
         self,
-        scene,
         positions,
         orientations=None,
         scales=None,
@@ -894,7 +894,6 @@ class PhysicalParticleSystem(BaseSystem):
             particle_positions = particle_positions[th.randperm(len(particle_positions))[: int(max_samples)]]
 
         return self.generate_particles(
-            scene=self._scene,
             positions=particle_positions,
             **kwargs,
         )
@@ -941,7 +940,7 @@ class PhysicalParticleSystem(BaseSystem):
             # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
             undo_cuboid_bottom_padding=False,
         )
-        particle_positions = th.tensor([result[0] for result in results if result[0] is not None])
+        particle_positions = th.stack([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
             particle_positions = particle_positions[th.randperm(len(particle_positions))[:max_samples]]
@@ -951,7 +950,6 @@ class PhysicalParticleSystem(BaseSystem):
         # If we generated a sufficient number of points, generate them in the simulator
         if success:
             self.generate_particles(
-                scene=self._scene,
                 positions=particle_positions,
                 **kwargs,
             )

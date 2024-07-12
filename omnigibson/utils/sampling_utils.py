@@ -498,7 +498,7 @@ def sample_raytest_start_end_full_grid_topdown(
 
     start_points = th.stack(
         [
-            th.tile(x, len(y)),
+            th.tile(x, (len(y),)),
             th.repeat_interleave(y, len(x)),
             th.ones(n_rays) * half_extent_with_offset[2],
         ]
@@ -509,8 +509,8 @@ def sample_raytest_start_end_full_grid_topdown(
 
     # Convert the points into the world frame
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = trimesh.transformations.transform_points(start_points, to_wf_transform)
-    end_points = trimesh.transformations.transform_points(end_points, to_wf_transform)
+    start_points = th.tensor(trimesh.transformations.transform_points(start_points, to_wf_transform), dtype=th.float32)
+    end_points = th.tensor(trimesh.transformations.transform_points(end_points, to_wf_transform), dtype=th.float32)
 
     start_points = th.unsqueeze(start_points, dim=1)
     end_points = th.unsqueeze(end_points, dim=1)

@@ -120,11 +120,6 @@ class ClothPrim(GeomPrim):
                 th.tensor(0),
             )
             overlap_vol = overlap_x * overlap_y * overlap_z
-            # overlap_vol = (
-            #     max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0)
-            #     * max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0)
-            #     * max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
-            # )
             true_vol = th.prod(true_aabb[1] - true_aabb[0])
             if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
                 success = True

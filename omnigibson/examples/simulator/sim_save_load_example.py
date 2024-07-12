@@ -64,7 +64,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.save(json_paths=[save_path])
 
     print("Re-loading scene...")
+    og.clear()
     og.sim.restore(json_paths=[save_path])
+
+    # env is no longer valid after og.clear()
+    del env
 
     # Take a sim step and play
     og.sim.step()
@@ -80,7 +84,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Register callback so user knows to press space once they're done manipulating the scene
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
-        env.step(th.zeros(env.robots[0].action_dim))
+        og.sim.step()
 
     # Shutdown omnigibson at the end
     og.shutdown()

@@ -90,8 +90,6 @@ class DatasetObject(USDObject):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
-        # TODO(parallel-hang): Pass _xform_props_pre_loaded = True to object_base to entityprim, make sure entityprim passes it into rigidprim and jointprim initializers
-
         # Store variables
         if isinstance(in_rooms, str):
             assert "," not in in_rooms
@@ -104,6 +102,8 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
+        # All DatasetObjects should have xform properties pre-loaded
+        load_config["xform_props_pre_loaded"] = True
 
         # Infer the correct usd path to use
         if model is None:

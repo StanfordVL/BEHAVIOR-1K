@@ -24,10 +24,12 @@ env = None
 def og_test(func):
     def wrapper():
         assert_test_env()
-        try:
-            func(env)
-        finally:
-            env.scene.reset()
+        # TODO: revert this
+        func(env)
+        # try:
+        #     func(env)
+        # finally:
+        #     env.scene.reset()
 
     return wrapper
 
@@ -184,8 +186,7 @@ def assert_test_env():
             gm.ENABLE_OBJECT_STATES = True
             gm.USE_GPU_DYNAMICS = True
             gm.ENABLE_FLATCACHE = False
-            # TODO: temporarily disable transition rules; fix later
-            gm.ENABLE_TRANSITION_RULES = False
+            gm.ENABLE_TRANSITION_RULES = True
         else:
             # Make sure sim is stopped
             og.sim.stop()
@@ -245,6 +246,6 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
 
 
 def remove_all_systems(scene):
-    for system in scene.get_active_systems():
+    for system in scene.active_systems.values():
         system.remove_all_particles()
     og.sim.step()
