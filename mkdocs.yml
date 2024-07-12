@@ -114,7 +114,6 @@ nav:
     - BEHAVIOR Knowledgebase: tutorials/behavior_knowledgebase.md
     - Custom Robot Import: tutorials/custom_robot_import.md
     - Speed Optimization: tutorials/speed_optimization.md
-  - API Reference: reference/*
   - Miscellaneous:
     - FAQ: miscellaneous/faq.md
     - Known Issues & Troubleshooting: miscellaneous/known_issues.md
