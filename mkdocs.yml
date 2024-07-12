@@ -104,6 +104,7 @@ nav:
     - Transition Rules: modules/transition_rules.md
     - Simulator: modules/simulator.md
     - Environments: modules/environments.md
+    - Vector Environments: modules/vector_environments.md
     - Under the Hood - Isaac Sim: modules/under_the_hood.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
