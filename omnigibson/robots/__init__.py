@@ -9,8 +9,8 @@ from omnigibson.robots.locobot import Locobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.robots.robot_base import REGISTERED_ROBOTS, BaseRobot
+from omnigibson.robots.stretch import Stretch
 from omnigibson.robots.tiago import Tiago
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
-from omnigibson.robots.stretch import Stretch
 from omnigibson.robots.vx300s import VX300S

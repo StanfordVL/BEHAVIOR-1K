@@ -11,6 +11,7 @@ class Locobot(TwoWheelRobot):
     Locobot robot
     Reference: https://www.trossenrobotics.com/locobot-pyrobot-ros-rover.aspx
     """
+
     @property
     def wheel_radius(self):
         return 0.038

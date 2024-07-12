@@ -177,7 +177,14 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: ["link_gripper_finger_left", "link_gripper_finger_right", "link_gripper_fingertip_left", "link_gripper_fingertip_right"]}
+        return {
+            self.default_arm: [
+                "link_gripper_finger_left",
+                "link_gripper_finger_right",
+                "link_gripper_fingertip_left",
+                "link_gripper_fingertip_right",
+            ]
+        }
 
     @property
     def finger_joint_names(self):

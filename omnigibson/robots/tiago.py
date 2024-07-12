@@ -623,16 +623,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def finger_link_names(self):
-        return {
-            arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"]
-            for arm in self.arm_names
-        }
+        return {arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"] for arm in self.arm_names}
 
     @property
     def finger_joint_names(self):
         return {
-            arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"]
-            for arm in self.arm_names
+            arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"] for arm in self.arm_names
         }
 
     @property
