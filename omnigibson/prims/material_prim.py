@@ -360,7 +360,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) diffuse_tint
         """
-        self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color))
+        self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
     def reflection_roughness_constant(self):

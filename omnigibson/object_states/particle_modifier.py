@@ -880,7 +880,7 @@ class ParticleRemover(ParticleModifier):
         if self.obj.scene.is_visual_particle_system(system_name=system.name):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             particle_positions = system.get_particles_position_orientation()[0]
-            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
+            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()
             modification_limit = self.visual_particle_modification_limit
 
         # Physical system
@@ -889,7 +889,7 @@ class ParticleRemover(ParticleModifier):
             # collisions via scene query interface. Alternatively, if we're using the projection method,
             # we also need to use check_in_mesh to check for overlap with the projection mesh.
             inbound_idxs = (
-                self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()[0]
+                self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()
                 if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION
                 else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
             )

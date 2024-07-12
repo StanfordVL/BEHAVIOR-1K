@@ -24,12 +24,10 @@ env = None
 def og_test(func):
     def wrapper():
         assert_test_env()
-        # TODO: revert this
-        func(env)
-        # try:
-        #     func(env)
-        # finally:
-        #     env.scene.reset()
+        try:
+            func(env)
+        finally:
+            env.scene.reset()
 
     return wrapper
 

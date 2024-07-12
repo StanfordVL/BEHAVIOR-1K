@@ -489,7 +489,7 @@ class StatefulObject(BaseObject):
         if object_state is None:
             # This restore the albedo map to its original value
             albedo_add = 0.0
-            diffuse_tint = (1.0, 1.0, 1.0)
+            diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         else:
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()

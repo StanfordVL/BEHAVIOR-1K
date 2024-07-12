@@ -228,7 +228,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
-                num_to_open = th.randint(1, len(relevant_joints) + 1)
+                num_to_open = th.randint(1, len(relevant_joints) + 1, (1,)).item()
                 random_indices = th.randperm(len(relevant_joints))[:num_to_open]
                 relevant_joints = [relevant_joints[i] for i in random_indices]
                 joint_directions = [joint_directions[i] for i in random_indices]

@@ -173,7 +173,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     def get_texture_change_params():
         # By default, it keeps the original albedo unchanged.
         albedo_add = 0.0
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     @property

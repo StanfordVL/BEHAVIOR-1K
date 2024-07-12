@@ -175,16 +175,15 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         if len(colors) == 0:
             # If no fluid system has Soaked=True, keep the default albedo value
             albedo_add = 0.0
-            diffuse_tint = [1.0, 1.0, 1.0]
+            diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         else:
             albedo_add = 0.1
-            avg_color = th.mean(colors, dim=0)
+            avg_color = th.mean(th.stack(colors), dim=0)
             # Add a tint of avg_color
             # We want diffuse_tint to sum to 2.5 to result in the final RGB to sum to 1.5 on average
             # This is because an average RGB color sum to 1.5 (i.e. [0.5, 0.5, 0.5])
             # (0.5 [original avg RGB per channel] + 0.1 [albedo_add]) * 2.5 = 1.5
             diffuse_tint = th.tensor([0.5, 0.5, 0.5]) + avg_color / th.sum(avg_color)
-            diffuse_tint = diffuse_tint.tolist()
 
         return albedo_add, diffuse_tint
 

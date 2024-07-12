@@ -189,7 +189,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
             dof_idxs_mat = th.meshgrid(self.dof_idx, self.dof_idx, indexing="ij")
             mm = control_dict["mass_matrix"][dof_idxs_mat]
-            u = th.dot(mm, u)
+            u = th.matmul(mm, u)
 
             # Add gravity compensation
             u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]

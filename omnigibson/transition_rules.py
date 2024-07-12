@@ -779,7 +779,7 @@ class WasherDryerRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all obj
-        obj_positions = th.tensor([obj.aabb_center for obj in self.scene.objects])
+        obj_positions = th.stack([obj.aabb_center for obj in self.scene.objects])
         return dict(obj_positions=obj_positions)
 
     def _compute_container_info(self, object_candidates, container, global_info):
@@ -801,7 +801,7 @@ class WasherDryerRule(BaseTransitionRule):
         obj_positions = global_info["obj_positions"]
         in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
-        in_volume_objs = list(th.tensor(self.scene.objects)[in_volume])
+        in_volume_objs = [obj for obj, is_in_volume in zip(self.scene.objects, in_volume) if is_in_volume]
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
@@ -1406,7 +1406,7 @@ class RecipeRule(BaseTransitionRule):
                 system = self.scene.get_system(system_name)
                 for obj in objs:
                     if state_class in [Filled, Contains]:
-                        contained_particle_idx = obj.states[ContainedParticles].get_value(system).in_volume.nonzero()[0]
+                        contained_particle_idx = obj.states[ContainedParticles].get_value(system).in_volume.nonzero()
                         relevant_systems[system_name] |= contained_particle_idx
                     elif state_class in [Covered]:
                         covered_particle_idx = obj.states[ContactParticles].get_value(system)

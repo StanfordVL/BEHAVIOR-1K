@@ -47,7 +47,7 @@ class Frozen(AbsoluteObjectState, BooleanStateMixin):
         # Increase all channels by 0.3 (to make it white)
         albedo_add = 0.3
         # No final scaling
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     # Nothing needs to be done to save/load Frozen since it will happen due to temperature caching.

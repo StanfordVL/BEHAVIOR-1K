@@ -119,7 +119,7 @@ class Contains(RelativeObjectState, BooleanStateMixin):
             raise NotImplementedError(f"{self.__class__.__name__} does not support set_value(system, True)")
         else:
             # Remove all particles from inside the volume
-            system.remove_particles(idxs=self.obj.states[ContainedParticles].get_value(system).in_volume.nonzero()[0])
+            system.remove_particles(idxs=self.obj.states[ContainedParticles].get_value(system).in_volume.nonzero())
 
         return True
 
