@@ -8,7 +8,7 @@ icon: material/silverware-fork-knife
 
 BEHAVIOR is short for Benchmark for Everyday Household Activities in Virtual, Interactive, and ecOlogical enviRonments.
 
-[**BEHAVIOR Knowledgebase**](https://behavior.stanford.edu/knowledgebase/) contains information about what synsets are valid, their relationship between each other, their abilities (or properties), the hyperparameters of the abilities, and the hand-specified transition rules.
+[**BEHAVIOR Knowledgebase**](https://behavior.stanford.edu/knowledgebase/) contains information about what synsets are valid, their relationship between each other, their abilities (or properties), the hyperparameters of the abilities, and the hand-specified [transition rules](../modules/transition_rules.md).
 
 Here are the important conceptual components of the BEHAVIOR Knowledgebase:
 
@@ -63,7 +63,7 @@ One-to-one mapping to a specific 3D scene model in our dataset.
 - Each scene consists of multiple rooms with the following naming convention: `<room_type>_<room_id>`, e.g. `living_room_0`, `kitchen_1`, etc.
 - Each room contains a list of objects, e.g. in the [`Beechwood_0_int`](https://behavior.stanford.edu/knowledgebase/scenes/Beechwood_0_int/index.html) scene, `countertop-tpuwys: 6` means the `kitchen_0` room has 6 copies of the `countertop-tpuwys` object.
 
-### [**Transition Rules**](hhttps://behavior.stanford.edu/knowledgebase/transitions/index.html)
+### [**Transition Rules**](https://behavior.stanford.edu/knowledgebase/transitions/index.html)
 Hand-specified rules that define complex physical or chemical interactions between objects and substances that are not natively supported by Omniverse.
 
 - Each transition rule specifies a list of input synsets and a list of output synsets, as well as the conditions that need to be satisfied for the transition to occur.

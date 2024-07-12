@@ -19,7 +19,7 @@ icon: material/list-box
 
 - `_reset_scene`: reset the scene for the next episode, default is `scene.reset()`.
 - `_reset_agent`: reset the agent for the next episode, default is do nothing.
-- `_reset_variables`: eset any internal variables as needed, default is do nothing.
+- `_reset_variables`: reset any internal variables as needed, default is do nothing.
 
 Different types of tasks should overwrite these methods for the appropriate reset behavior, e.g. a navigation task might want to randomize the initial pose of the agent and the goal location.
 
@@ -88,7 +88,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
             <ul>
                 <li>`termination_conditions`: `MaxCollision`, `Timeout`, `PointGoal`.</li>
                 <li>`reward_functions`: `PotentialReward`, `CollisionReward`, `PointGoalReward`.</li>
-                <li>`_get_obs()`: returns relative xy position to the goal, and the agent's current linear and angular velicities.</li>
+                <li>`_get_obs()`: returns relative xy position to the goal, and the agent's current linear and angular velocities.</li>
                 <li>`_reset_scene()`: default.</li>
                 <li>`_reset_agent()`: sample initial pose and goal location.</li>
             </ul>
@@ -101,7 +101,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
             <ul>
                 <li>`termination_conditions`: `MaxCollision`, `Timeout`, `PointGoal`.</li>
                 <li>`reward_functions`: `PotentialReward`, `CollisionReward`, `PointGoalReward`.</li>
-                <li>`_get_obs()`: returns the goal position and the end effector's position in the robot's frame, and the agent's current linear and angular velicities.</li>
+                <li>`_get_obs()`: returns the goal position and the end effector's position in the robot's frame, and the agent's current linear and angular velocities.</li>
                 <li>`_reset_scene()`: default.</li>
                 <li>`_reset_agent()`: sample initial pose and goal location.</li>
             </ul>

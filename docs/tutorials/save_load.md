@@ -47,6 +47,6 @@ og.clear()
 og.sim.restore(["path/to/scene_0.json"])
 ```
 
-??? warning annotate "`restore` assumes a empty simulator!"
+??? warning annotate "`restore` assumes an empty simulator!"
     Always remember to call `og.clear()`, which clears the entire simualtor, before calling `restore`.
     Otherwise, the saved scenes will be appended to the existing scenes of the current simulator, which may lead to unexpected behavior.

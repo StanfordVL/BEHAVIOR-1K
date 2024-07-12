@@ -37,7 +37,7 @@ Alternatively, you can browse them on the [BEHAVIOR Knowledgebase](https://behav
 
 Here is an example of a BEHAVIOR task definition, which consists of several components:
 
-- **:objects**: task-relevant objects, where each line represents a WordNet synset of the object. For example, `candle.n.01_1 candle.n.01_2 candle.n.01_3 candle.n.01_4 - candle.n.01` indicates that four objects that belong to the `candoe.n.01` synset are needed for this task.
+- **:objects**: task-relevant objects, where each line represents a [**WordNet**](https://wordnet.princeton.edu/) synset of the object. For example, `candle.n.01_1 candle.n.01_2 candle.n.01_3 candle.n.01_4 - candle.n.01` indicates that four objects that belong to the `candoe.n.01` synset are needed for this task.
 - **:init**: initial conditions of the task, where each line represents a ground predicate that holds at the beginning of the task. For example, `(ontop candle.n.01_1 table.n.02_1)` indicates that the first candle is on top of the first table when the task begins.
 - **:goal**: goal conditions of the task, where each line represents a ground predicate and each block represents a non-ground predicate (e.g. `forall`, `forpairs`, `and`, `or`, etc) that should hold for the task to be considered solved. For example, `(inside ?candle.n.01 ?wicker_basket.n.01)` indicates that the candle should be inside the wicker basket at the end of the task.
 
@@ -144,7 +144,7 @@ env = og.Environment(configs=cfg)
 
 Each time you run the code above, a different instance of the task will be generated:
 
-- A different object category might be sampled. For example, for a high-level synset like `fruit.n.01`, different types pf fruits like apple, banana, and orange might be sampled.
+- A different object category might be sampled. For example, for a high-level synset like `fruit.n.01`, different types of fruits like apple, banana, and orange might be sampled.
 - A different object model might be sampled. For example, different models of the same category (e.g. apple) might be sampled
 - A different object pose might be sampled. For example, the apple might be placed at a different location in the scene.
 
@@ -166,7 +166,7 @@ The default path for saving the task is:
 
 ## Load Pre-sampled BEHAVIOR Tasks
 
-Here is an example of load a pre-sampled BEHAVIOR task instance in OmniGibson that you just saved.
+Here is an example of loading a pre-sampled BEHAVIOR task instance in OmniGibson that you just saved.
 
 ```{.python .annotate}
 import omnigibson as og
@@ -194,7 +194,7 @@ cfg = {
 env = og.Environment(configs=cfg)
 ```
 
-Curently, in our publiclly available dataset, we have pre-sampled exactly **1** instance of all 1000 BEHAVIOR tasks.
+Curently, in our publicly available dataset, we have pre-sampled exactly **1** instance of all 1000 BEHAVIOR tasks.
 We recommend you to set `online_object_sampling` to `False` to load the pre-sampled task instances in the dataset.
 You can run the following command to find out the path to the pre-sampled task instances.
 ```bash
