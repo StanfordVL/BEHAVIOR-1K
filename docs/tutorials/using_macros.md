@@ -35,7 +35,7 @@ Macros can be read like any other python value. Both `gm` and `macros` are [Addi
     ```
 
 ## Setting Values
-Macros can be set like any other python value, and utilize the same convention for accessing as stated above. However, a key caveat is that once a macro is read, it **cannot** be set. This is to guarantee consistent runtime performance and avoid silent bugs due to macros being updated but not read by relevant downstream use cases. For example, `gm.HEADLESS` is read when `og.launch()` is called to start up the **OmniGibson** application, and cannot be modified afterward. If there was no guard in place, setting this macro after **OmniGibson** is launched would result in an inconsistency between the observed state (i.e.: the mode requested when **OmniGibson** was originally launched) and the read state (modified value of `gm.HEADLESS`). In general, we recommend setting all macros *before* `og.launch()` is called. We provide an example snippet of code below:
+Macros can be set like any other python value, and utilize the same convention for accessing as stated above. However, a key caveat is that once a macro is read, it **cannot** be set. This is to guarantee consistent runtime performance and avoid silent bugs due to macros being updated but not read by relevant downstream use cases. For example, `gm.HEADLESS` is read when `og.launch()` or `og.Environment()` is called to start up the **OmniGibson** application, and cannot be modified afterward. If there was no guard in place, setting this macro after **OmniGibson** is launched would result in an inconsistency between the observed state (i.e.: the mode requested when **OmniGibson** was originally launched) and the read state (modified value of `gm.HEADLESS`). In general, we recommend setting all macros *before* `og.launch()` or `og.Environment()` is called. We provide an example snippet of code below:
 
 ??? code "set_macros.py"
     ``` python linenums="1"
@@ -52,6 +52,6 @@ Macros can be set like any other python value, and utilize the same convention f
     macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 80
 
     # Now launch omnigibson
-    og.launch()
+    env = og.Environment({"scene": {"type": "Scene"}})
     ```
 
