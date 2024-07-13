@@ -61,8 +61,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=[0.025, -0.012, 0.0]),
-                GraspingPoint(link_name="r_gripper_finger_link", position=[-0.025, -0.012, 0.0]),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=[0.013, 0.0, 0.01]),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=[-0.01, 0.0, 0.009]),
             ]
         }
 
@@ -70,8 +70,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=[0.025, 0.012, 0.0]),
-                GraspingPoint(link_name="l_gripper_finger_link", position=[-0.025, 0.012, 0.0]),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=[0.013, 0.0, 0.01]),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=[-0.01, 0.0, 0.009]),
             ]
         }
 
