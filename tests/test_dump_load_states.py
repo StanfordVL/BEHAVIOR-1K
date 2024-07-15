@@ -70,7 +70,6 @@ def test_save_restore_partial(env):
 def test_save_restore_full(env):
     decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
     og.sim.save([tmp_json_path])
-    breakpoint()
 
     # Clear the simulator
     og.clear()
@@ -80,9 +79,3 @@ def test_save_restore_full(env):
 
     # Make sure we still have an object that existed beforehand
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
-
-
-# test_save_restore_partial()
-test_save_restore_full()
-
-og.shutdown()
