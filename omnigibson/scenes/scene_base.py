@@ -23,6 +23,7 @@ from omnigibson.systems.system_base import (
     BaseSystem,
     PhysicalParticleSystem,
     VisualParticleSystem,
+    get_all_system_names,
     create_system_from_metadata,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
@@ -86,6 +87,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane_color = floor_plane_color
         self._use_skybox = use_skybox
         self._transition_rule_api = None
+        self._available_systems = None
 
         # Call super init
         super().__init__()
@@ -163,12 +165,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def systems(self):
         """
-        Systems in the scene
+        Active systems in the scene
 
         Returns:
-            list of BaseSystem: System(s) that are available to use in this scene
+            list of BaseSystem: Active system(s) in this scene
         """
         return self.system_registry.objects
+
+    @property
+    def available_systems(self):
+        """
+        Available systems in the scene
+
+        Returns:
+            dict: Maps all system names to corresponding systems that are available to use in this scene
+        """
+        return self._available_systems
 
     @property
     def object_registry_unique_keys(self):
@@ -259,13 +271,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")
 
+        available_systems = dict()
         if os.path.exists(system_dir):
             system_names = os.listdir(system_dir)
             for system_name in system_names:
-                self.system_registry.add(create_system_from_metadata(system_name=system_name))
+                available_systems[system_name] = create_system_from_metadata(system_name=system_name)
 
+        # Manually add cloth system since it is a special system that doesn't have any corresponding directory in
+        # the B1K database
         cloth_system = Cloth(name="cloth")
-        self.system_registry.add(cloth_system)
+        available_systems["cloth"] = cloth_system
+        self._available_systems = available_systems
 
     def _load_scene_prim_with_objects(self, last_scene_edge, initial_scene_prim_z_offset, scene_margin):
         """
@@ -670,11 +686,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def get_system(self, system_name, force_init=True):
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
-        # If system_name is not in REGISTERED_SYSTEMS, create from metadata
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
+        assert system_name in self._available_systems, f"System {system_name} is not a valid system name"
+        # If system is not initialized, initialize and add it to our registry
+        system = self._available_systems[system_name]
         if not system.initialized and force_init:
             system.initialize(scene=self)
+            self.system_registry.add(system)
         return system
 
     @property

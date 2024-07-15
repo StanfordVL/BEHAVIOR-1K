@@ -1334,11 +1334,19 @@ def launch_simulator(*args, **kwargs):
                 json_paths (List[str]): Full paths of JSON file to load, which contains information
                     to recreate a scene.
             """
-            if len(self.scenes) > 0:
-                log.error("There are already scenes loaded. Please call og.clear() to relaunch the simulator first.")
+            # Note whether we're loading from scratch or not
+            load_from_scratch = len(self.scenes) == 0
+
+            # We don't support smart diff'ing if there's a mismatch in number of scenes
+            if not load_from_scratch and len(self.scenes) != len(json_paths):
+                log.error("There is a mismatch between the number of active scenes and number of json_paths to be "
+                          "loaded. Please call og.clear() to relaunch the simulator first.")
                 return
 
-            for json_path in json_paths:
+            # Parse each json path individually
+            states = []
+            og.sim.stop()
+            for i, json_path in enumerate(json_paths):
                 if not json_path.endswith(".json"):
                     log.error(f"You have to define the full json_path to load from. Got: {json_path}")
                     return
@@ -1348,21 +1356,45 @@ def launch_simulator(*args, **kwargs):
                     scene_info = json.load(f)
                 init_info = scene_info["init_info"]
                 state = scene_info["state"]
+                states.append(state)
 
-                # Override the init info with our json path
-                init_info["args"]["scene_file"] = json_path
+                if load_from_scratch:
+                    # Override the init info with our json path
+                    init_info["args"]["scene_file"] = json_path
 
-                # Also make sure we have any additional modifications necessary from the specific scene
-                og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
+                    # Also make sure we have any additional modifications necessary from the specific scene
+                    og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-                # Recreate and import the saved scene
-                og.sim.stop()
-                recreated_scene = create_object_from_init_info(init_info)
-                self.import_scene(scene=recreated_scene)
+                    # Recreate and import the saved scene
+                    recreated_scene = create_object_from_init_info(init_info)
+                    self.import_scene(scene=recreated_scene)
 
-                # Start the simulation and restore the dynamic state of the scene and then pause again
-                self.play()
-                recreated_scene.load_state(state, serialized=False)
+                else:
+                    scene = self.scenes[i]
+                    # Make sure the class type is the same
+                    if scene.__class__.__name__ != init_info["class_name"]:
+                        log.error(f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}")
+
+                    current_obj_names = set(scene.object_registry.get_dict("name").keys())
+                    load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
+
+                    objs_to_remove = current_obj_names - load_obj_names
+                    objs_to_add = load_obj_names - current_obj_names
+
+                    # Delete any extra objects that currently exist in the scene stage
+                    for obj_to_remove in objs_to_remove:
+                        obj = scene.object_registry("name", obj_to_remove)
+                        og.sim.remove_object(obj)
+
+                    # Add any extra objects that do not currently exist in the scene stage
+                    for obj_to_add in objs_to_add:
+                        obj = create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
+                        scene.add_object(obj)
+
+            # Start the simulation and restore the dynamic state of the scene and then pause again
+            self.play()
+            for i, state in enumerate(states):
+                self.scenes[i].load_state(state, serialized=False)
 
             log.info("The saved simulation environment loaded.")
 
@@ -1389,9 +1421,13 @@ def launch_simulator(*args, **kwargs):
             if not self.scenes:
                 log.warning("Scene has not been loaded. Nothing to save.")
                 return
-            if not all([json_path.endswith(".json") for json_path in json_paths]):
-                log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
-                return
+            if json_paths is not None:
+                if isinstance(json_paths, str):
+                    log.error(f"You must define a list of .json paths, one for each scene. Number of scenes: {len(self.scenes)}")
+                    return
+                if not all([json_path.endswith(".json") for json_path in json_paths]):
+                    log.error(f"You have to define the full json_path to save the scene to. Got: {json_paths}")
+                    return
 
             if not json_paths:
                 json_paths = [None] * len(self.scenes)

@@ -962,6 +962,19 @@ class PhysicalParticleSystem(BaseSystem):
         return success
 
 
+def get_all_system_names():
+    """
+    Gets all available systems from the OmniGibson dataset
+
+    Returns:
+        set: Set of all available system names that can be created in OmniGibson
+    """
+    system_dir = os.path.join(gm.DATASET_PATH, "systems")
+
+    assert os.path.exists(system_dir), f"Path for OmniGibson systems not found! Attempted path: {system_dir}"
+    return set(os.listdir(system_dir))
+
+
 def create_system_from_metadata(system_name):
     """
     Internal helper function to programmatically create a system from dataset metadata.

@@ -179,7 +179,7 @@ def semantic_class_name_to_id(scene):
     """
     categories = get_all_object_categories()
 
-    systems = sorted(scene.system_registry.object_names)
+    systems = sorted(scene.available_systems.keys())
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
     # Assign a unique class id to each class name with hashing

@@ -292,7 +292,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         for sys in list(params["conditions"].keys()):
             # The original key can be either a system name or a system synset. If it's a synset, we need to convert it.
-            system_name = sys if sys in scene.system_registry.object_names else get_system_name_by_synset(sys)
+            system_name = sys if sys in scene.available_systems.keys() else get_system_name_by_synset(sys)
             params["conditions"][system_name] = params["conditions"].pop(sys)
             conds = params["conditions"][system_name]
             if conds is None:
@@ -302,7 +302,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if cond_type == ParticleModifyCondition.SATURATED:
                     cond[1] = (
                         cond_sys
-                        if cond_sys in scene.system_registry.object_names
+                        if cond_sys in scene.available_systems.keys()
                         else get_system_name_by_synset(cond_sys)
                     )
         return params
@@ -843,7 +843,7 @@ class ParticleRemover(ParticleModifier):
 
         # Create set of default system to condition mappings based on settings
         all_conditions = dict()
-        for system_name in self.obj.scene.system_registry.object_names:
+        for system_name in self.obj.scene.available_systems.keys():
             # If the system is already explicitly specified in conditions, continue
             if system_name in conditions:
                 continue
