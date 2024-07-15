@@ -280,7 +280,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) color
         """
-        self.set_input(inp="diffuse_color_constant", val=lazy.pxr.Gf.Vec3f(*color))
+        self.set_input(inp="diffuse_color_constant", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
     def diffuse_texture(self):

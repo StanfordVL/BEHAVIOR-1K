@@ -372,6 +372,8 @@ class PhysxParticleInstancer(BasePrim):
         local_orientations = th.tensor(state["particle_orientations"])
         if local_positions.numel() == 0 and local_orientations.numel() == 0:
             global_positions, global_orientations = th.tensor([]), th.tensor([])
+            setattr(self, "particle_positions", global_positions)
+            setattr(self, "particle_orientations", global_orientations)
         else:
             global_positions, global_orientations = zip(
                 *[
@@ -379,8 +381,8 @@ class PhysxParticleInstancer(BasePrim):
                     for local_pos, local_ori in zip(local_positions, local_orientations)
                 ]
             )
-        setattr(self, "particle_positions", th.stack(global_positions))
-        setattr(self, "particle_orientations", th.stack(global_orientations))
+            setattr(self, "particle_positions", th.stack(global_positions))
+            setattr(self, "particle_orientations", th.stack(global_orientations))
 
         # Set values appropriately
         keys = (
@@ -915,6 +917,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             PhysxParticleInstancer: Particle instancer that includes the generated particles
         """
+        if not isinstance(positions, th.Tensor):
+            positions = th.tensor(positions, dtype=th.float32)
+
         # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
         inst = (
             self.default_particle_instancer

@@ -281,7 +281,7 @@ class ClothPrim(GeomPrim):
         Returns:
             th.tensor: centroid particle's (x,y,z) cartesian coordinates relative to the world frame
         """
-        return self.compute_particle_positions(idxs=[self._centroid_idx])[0]
+        return self.compute_particle_positions(idxs=[self._centroid_idx])
 
     @property
     def particle_velocities(self):
@@ -372,7 +372,7 @@ class ClothPrim(GeomPrim):
 
         positions = self.keypoint_particle_positions if keypoints_only else self.compute_particle_positions()
         for pos in positions:
-            og.sim.psqi.overlap_sphere(self.cloth_system.particle_contact_offset, pos, report_hit, False)
+            og.sim.psqi.overlap_sphere(self.cloth_system.particle_contact_offset, pos.tolist(), report_hit, False)
 
         return contacts
 

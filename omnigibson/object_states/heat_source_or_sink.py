@@ -256,7 +256,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 # Use overlap_sphere check!
                 og.sim.psqi.overlap_sphere(
                     radius=self.distance_threshold,
-                    pos=heat_source_pos,
+                    pos=heat_source_pos.tolist(),
                     reportFn=overlap_callback,
                 )
 

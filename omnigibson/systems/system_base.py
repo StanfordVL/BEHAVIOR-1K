@@ -817,7 +817,7 @@ class PhysicalParticleSystem(BaseSystem):
         in_contact = th.zeros(len(positions), dtype=bool)
         for idx, pos in enumerate(positions):
             # TODO: Maybe multiply particle contact radius * 2?
-            in_contact[idx] = og.sim.psqi.overlap_sphere_any(self.particle_contact_radius, pos)
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(self.particle_contact_radius, pos.tolist())
         return in_contact
 
     def generate_particles_from_link(

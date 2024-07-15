@@ -972,7 +972,7 @@ class SlicingRule(BaseTransitionRule):
                     category=part["category"],
                     model=part["model"],
                     bounding_box=part["bb_size"]
-                    * scale,  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
+                    * scale.numpy(),  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
                 sliceable_obj_state = sliceable_obj.dump_state()
@@ -1333,7 +1333,7 @@ class RecipeRule(BaseTransitionRule):
                 ), "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
                 state_class, _, state_value = input_states[child_cat]["binary_object"][0]
                 num_valid_children = 0
-                children_objs = self._objects[category_to_valid_indices[child_cat]]
+                children_objs = [self._objects[i] for i in category_to_valid_indices[child_cat]]
                 for child_obj in children_objs:
                     # If the child doesn't satisfy the binary object state, skip
                     if child_obj.states[state_class].get_value(obj) != state_value:
@@ -1379,7 +1379,7 @@ class RecipeRule(BaseTransitionRule):
                 0
             ]
             # A list of objects belonging to the root node category
-            root_nodes = self._objects[category_to_valid_indices[root_node_category]]
+            root_nodes = [self._objects[i] for i in category_to_valid_indices[root_node_category]]
             input_states = recipe["input_states"]
 
             for root_node in root_nodes:
@@ -1577,7 +1577,7 @@ class RecipeRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all relevant object AABB positions
-        obj_positions = th.tensor([obj.aabb_center for obj in self._objects])
+        obj_positions = th.stack([obj.aabb_center for obj in self._objects])
         return dict(obj_positions=obj_positions)
 
     def _compute_container_info(self, object_candidates, container, global_info):
@@ -1751,13 +1751,14 @@ class RecipeRule(BaseTransitionRule):
 
         if not self.is_multi_instance:
             # Remove either all objects or only the ones specified in the input objects of the recipe
-            object_mask = in_volume.copy()
+            object_mask = th.clone(in_volume)
             if self.ignore_nonrecipe_objects:
                 object_category_mask = th.zeros_like(object_mask, dtype=bool)
                 for obj_category in recipe["input_objects"].keys():
                     object_category_mask[self._category_idxs[obj_category]] = True
                 object_mask &= object_category_mask
-            objs_to_remove.extend(self._objects[object_mask])
+            mask_indices = object_mask.nonzero().flatten().tolist()
+            objs_to_remove.extend([self._objects[i] for i in mask_indices])
         else:
             # Remove the objects that are involved in this execution
             for obj_category, objs in execution_info["relevant_objects"].items():

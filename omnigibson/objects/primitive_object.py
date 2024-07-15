@@ -225,7 +225,10 @@ class PrimitiveObject(StatefulObject):
                     attr_pairs.append([attr, vals])
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -239,7 +242,7 @@ class PrimitiveObject(StatefulObject):
             else:
                 vals[:, :2] = vals[:, :2] * scaling_factor
             # Set the value
-            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
 
     @property
     def height(self):

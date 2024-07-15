@@ -1423,6 +1423,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """
+        if not isinstance(positions, th.Tensor):
+            positions = th.tensor(positions, dtype=th.float32)
+
         # Call super first
         super().generate_particles(
             positions=positions,

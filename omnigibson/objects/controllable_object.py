@@ -443,7 +443,7 @@ class ControllableObject(BaseObject):
             "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
         )
         # Set indices manually so that we're standardized
-        indices = th.arange(self.n_dof)
+        indices = range(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -457,8 +457,8 @@ class ControllableObject(BaseObject):
         cur_indices_idx = 0
         while cur_indices_idx != n_indices:
             # Grab the current DOF index we're controlling and find the corresponding joint
-            joint = self._dof_to_joints[indices[cur_indices_idx].item()]
-            cur_ctrl_idx = indices[cur_indices_idx].item()
+            joint = self._dof_to_joints[indices[cur_indices_idx]]
+            cur_ctrl_idx = indices[cur_indices_idx]
             joint_dof = joint.n_dof
             if joint_dof > 1:
                 # Run additional sanity checks since the joint has more than one DOF to make sure our controls,
@@ -466,7 +466,7 @@ class ControllableObject(BaseObject):
 
                 # Make sure the indices are mapped correctly
                 assert (
-                    indices[cur_indices_idx + joint_dof].item() == cur_ctrl_idx + joint_dof
+                    indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof
                 ), "Got mismatched control indices for a single joint!"
                 # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
                 for group_name, group in zip(
@@ -474,7 +474,7 @@ class ControllableObject(BaseObject):
                     (self._dof_to_joints, control_type),
                 ):
                     assert (
-                        len({group[indices[cur_indices_idx + i].item()] for i in range(joint_dof)}) == 1
+                        len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
                     ), f"Not all {group_name} were the same when trying to deploy control for a single joint!"
                 # Assuming this all passes, we grab the control subvector, type, and normalized value accordingly
                 ctrl = control[cur_ctrl_idx : cur_ctrl_idx + joint_dof]
