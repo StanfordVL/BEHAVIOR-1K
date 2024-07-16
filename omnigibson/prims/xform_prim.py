@@ -170,7 +170,9 @@ class XFormPrim(BasePrim):
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return material_path != ""
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Sets prim's pose with respect to the specified frame
 
@@ -191,7 +193,9 @@ class XFormPrim(BasePrim):
 
             # If we are in a scene, compute the scene-local transform before setting the pose
             if frame == "scene" and self.scene is None:
-                position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+                position, orientation = T.pose_transform(
+                    *self.scene.prim.get_position_orientation(), position, orientation
+                )
 
             assert np.isclose(
                 np.linalg.norm(orientation), 1, atol=1e-3
@@ -267,10 +271,12 @@ class XFormPrim(BasePrim):
             # If we are in a scene, compute the scene-local transform (and save this as the world transform
             # for legacy compatibility)
             if frame == "scene" and self.scene is not None:
-                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, *self.scene.prim.get_position_orientation()
+                )
 
             return position, orientation
-        
+
     # ------------------- Deprecated methods -------------------
 
     def set_position(self, position):
@@ -284,8 +290,8 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead", 
-            DeprecationWarning
+            "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead",
+            DeprecationWarning,
         )
         return self.set_position_orientation(position=position)
 
@@ -300,8 +306,8 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead.", 
-            DeprecationWarning
+            "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead.",
+            DeprecationWarning,
         )
         return self.get_position_orientation()[0]
 
@@ -331,7 +337,10 @@ class XFormPrim(BasePrim):
 
         import warnings
 
-        warnings.warn("get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead", DeprecationWarning)
+        warnings.warn(
+            "get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead",
+            DeprecationWarning,
+        )
         return self.get_position_orientation()[1]
 
     def get_local_pose(self):
@@ -347,7 +356,7 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead",
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead',
             DeprecationWarning,
         )
 
@@ -367,7 +376,7 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead",
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead',
             DeprecationWarning,
         )
 
@@ -493,7 +502,7 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        
+
         pos, orn = np.array(state["pos"]), np.array(state["ori"])
         self.set_position_orientation(pos, orn, frame="scene")
 

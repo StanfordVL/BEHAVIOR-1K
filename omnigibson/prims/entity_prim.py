@@ -965,7 +965,9 @@ class EntityPrim(XFormPrim):
         """
         return T.quat2mat(self.get_position_orientation()[1]).T @ self.get_angular_velocity()
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Set the position and orientation of entry prim object.
 
@@ -1034,14 +1036,16 @@ class EntityPrim(XFormPrim):
             if frame == "world" or frame == "scene":
                 positions, orientations = self._articulation_view.get_world_poses()
             else:
-                positions, orientations = self._articulation_view.get_local_poses()       
+                positions, orientations = self._articulation_view.get_local_poses()
 
         position, orientation = positions[0], orientations[0][[1, 2, 3, 0]]
 
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
-            position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
-        
+            position, orientation = T.relative_pose_transform(
+                position, orientation, *self.scene.prim.get_position_orientation()
+            )
+
         return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
@@ -1049,8 +1053,8 @@ class EntityPrim(XFormPrim):
         import warnings
 
         warnings.warn(
-            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead", 
-            DeprecationWarning
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead',
+            DeprecationWarning,
         )
         return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
@@ -1059,8 +1063,8 @@ class EntityPrim(XFormPrim):
         import warnings
 
         warnings.warn(
-            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead", 
-            DeprecationWarning
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead',
+            DeprecationWarning,
         )
         return self.get_position_orientation(frame="parent")
 

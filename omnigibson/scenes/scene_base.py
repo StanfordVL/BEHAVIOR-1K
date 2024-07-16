@@ -25,8 +25,8 @@ from omnigibson.systems.system_base import (
     VisualParticleSystem,
     create_system_from_metadata,
 )
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -323,7 +323,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0]
             )
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
-        else: 
+        else:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             new_scene_edge = aabb_max[0]
 

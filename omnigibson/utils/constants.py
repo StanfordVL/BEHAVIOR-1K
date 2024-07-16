@@ -75,6 +75,7 @@ class EmitterType(IntEnum):
     FIRE = 0
     STEAM = 1
 
+
 # Valid primitive mesh types
 PRIMITIVE_MESH_TYPES = {
     "Cone",

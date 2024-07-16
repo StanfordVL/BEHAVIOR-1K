@@ -111,6 +111,6 @@ def camera_pose_test(flatcache):
 
     og.clear()
 
+
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
-

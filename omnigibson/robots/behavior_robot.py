@@ -2,7 +2,7 @@ import itertools
 import os
 from abc import ABC
 from collections import OrderedDict
-from typing import Iterable, List, Tuple, Literal
+from typing import Iterable, List, Literal, Tuple
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -402,8 +402,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         return self.base_footprint_link.get_position_orientation()
 
-
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Sets behavior robot's pose with respect to the specified frame
 
@@ -417,7 +418,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
 
         super().set_position_orientation(position, orientation, frame=frame)
-
 
         # Move the joint frame for the world_base_joint
         if self._world_base_fixed_joint_prim is not None:
@@ -590,7 +590,9 @@ class BRPart(ABC):
         )
         return self.get_position_orientation(frame="parent")
 
-    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world") -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(
+        self, frame: Literal["world", "scene", "parent"] = "world"
+    ) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Gets robot's pose with respect to the specified frame.
 
@@ -617,7 +619,9 @@ class BRPart(ABC):
 
             return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
-    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float], frame: Literal["world", "parent", "scene"] = "world") -> None:
+    def set_position_orientation(
+        self, pos: Iterable[float], orn: Iterable[float], frame: Literal["world", "parent", "scene"] = "world"
+    ) -> None:
         """
         Sets BRPart's pose with respect to the specified frame
 

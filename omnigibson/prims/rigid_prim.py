@@ -307,7 +307,9 @@ class RigidPrim(XFormPrim):
         """
         return self._rigid_prim_view.get_angular_velocities()[0]
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Set the position and orientation of XForm Prim.
 
@@ -394,7 +396,9 @@ class RigidPrim(XFormPrim):
 
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
-            position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+            position, orientation = T.relative_pose_transform(
+                position, orientation, *self.scene.prim.get_position_orientation()
+            )
 
         return position, orientation
 
@@ -403,7 +407,7 @@ class RigidPrim(XFormPrim):
         import warnings
 
         warnings.warn(
-            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead",
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead',
             DeprecationWarning,
         )
         return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
@@ -413,7 +417,7 @@ class RigidPrim(XFormPrim):
         import warnings
 
         warnings.warn(
-            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead",
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead',
             DeprecationWarning,
         )
         return self.get_position_orientation(frame="parent")

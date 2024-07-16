@@ -1,9 +1,9 @@
 from abc import abstractmethod
 from collections import namedtuple
+from typing import Literal
 
 import networkx as nx
 import numpy as np
-from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -308,7 +308,9 @@ class ManipulationRobot(BaseRobot):
 
         return contact_data, robot_contact_links
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Sets manipulation robot's pose with respect to the specified frame
 

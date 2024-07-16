@@ -1,9 +1,9 @@
 import sys
 from collections import defaultdict
+from typing import Literal
 
 import numpy as np
 from bddl.object_taxonomy import ObjectTaxonomy
-from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -592,7 +592,9 @@ class StatefulObject(BaseObject):
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
         """
         Set the position and orientation of stateful object.
 
