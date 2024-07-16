@@ -5,6 +5,7 @@ import omnigibson.lazy as lazy
 from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.utils.constants import ParticleModifyCondition
+from omnigibson.utils.transform_utils import quat_multiply
 
 
 def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
@@ -181,5 +182,51 @@ def test_multi_scene_particle_source():
     for _ in range(50):
         og.sim.step()
 
-if __name__ == "__main__":
-    test_multi_scene_dump_and_load()
+def test_multi_scene_position_orientation_relative_to_scene():
+    vec_env = setup_multi_environment(3)
+
+    # Get the robot from the second environment
+    robot = vec_env.envs[1].scene.robots[0]
+
+    # Get the scene prim
+    scene_prim = vec_env.envs[1].scene.prim
+
+    # Define a new position and orientation relative to the scene
+    new_relative_pos = np.array([1.0, 2.0, 0.5])
+    new_relative_ori = np.array([0, 0, 0.7071, 0.7071])  # 90 degrees rotation around z-axis
+
+    # Set the new position and orientation relative to the scene
+    robot.set_position_orientation(position=new_relative_pos, orientation=new_relative_ori, frame="scene")
+
+    # Get the updated position and orientation relative to the scene
+    updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
+
+    # Assert that the relative position has been updated correctly
+    assert np.allclose(updated_relative_pos, new_relative_pos, atol=1e-3), \
+        f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
+
+    # Assert that the relative orientation has been updated correctly
+    assert np.allclose(updated_relative_ori, new_relative_ori, atol=1e-3), \
+        f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
+    
+    # Get the scene's global position and orientation
+    scene_pos, scene_ori = scene_prim.get_position_orientation(frame="world")
+
+    # Get the robot's global position and orientation
+    global_pos, global_ori = robot.get_position_orientation(frame="world")
+
+    # Calculate expected global position
+    expected_global_pos = scene_pos + updated_relative_pos
+
+    # Assert that the global position is correct
+    assert np.allclose(global_pos, expected_global_pos, atol=1e-3), \
+        f"Global position {global_pos} does not match expected {expected_global_pos}"
+
+    # Calculate expected global orientation
+    expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
+
+    # Assert that the global orientation is correct
+    assert np.allclose(global_ori, expected_global_ori, atol=1e-3), \
+        f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+
+    og.clear() 
