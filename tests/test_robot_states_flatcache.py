@@ -116,5 +116,6 @@ def camera_pose_test(flatcache):
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
 
+
 if __name__ == "__main__":
-  test_camera_pose_flatcache_on()
+    test_camera_pose_flatcache_on()

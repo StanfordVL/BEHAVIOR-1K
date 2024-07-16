@@ -43,5 +43,6 @@ def test_object_in_FOV_of_robot():
     assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
     og.clear()
 
+
 if __name__ == "__main__":
-  test_camera_semantic_segmentation()
+    test_camera_semantic_segmentation()

@@ -25,8 +25,8 @@ from omnigibson.systems.system_base import (
     VisualParticleSystem,
     create_system_from_metadata,
 )
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES, RelativeFrame
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES, RelativeFrame
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,

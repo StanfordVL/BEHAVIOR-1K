@@ -714,7 +714,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         return self.base_footprint_link.get_position_orientation()
 
-
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
         """
         Sets tiago's pose with respect to the specified frame
