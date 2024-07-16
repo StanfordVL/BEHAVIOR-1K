@@ -825,7 +825,9 @@ class BatchControlViewAPIImpl:
         }
         expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
 
-        # Apply the pattern
+        # Apply the pattern -- we manually check for the two cases:
+        # 1) (Non-fixed base objects) Articulation root path exists at the root link level, i.e.: /PRIM/PATH/object/base_link
+        # 2) (Fixed-base objects) Articulation root path exists at the object prim level, i.e.: /PRIM/PATH/object
         expected_prim_paths = {
             prim_path
             for prim_path in expected_prim_paths
