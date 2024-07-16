@@ -318,37 +318,27 @@ class RigidPrim(XFormPrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        # Invalidate kinematic-only object pose caches when new pose is set
+        if self.kinematic_only:
+            self.clear_kinematic_only_cache()
+        if position is not None:
+            position = np.asarray(position)[None, :]
+        if orientation is not None:
+            assert np.isclose(
+                np.linalg.norm(orientation), 1, atol=1e-3
+            ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+
         if frame == "world":
-
-            # Invalidate kinematic-only object pose caches when new pose is set
-            if self.kinematic_only:
-                self.clear_kinematic_only_cache()
-            if position is not None:
-                position = np.asarray(position)[None, :]
-            if orientation is not None:
-                assert np.isclose(
-                    np.linalg.norm(orientation), 1, atol=1e-3
-                ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
             self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
-            PoseAPI.invalidate()
-
         elif frame == "scene":
 
-            # TODO: implement for scene frame
+            # TODO: FRANK
             pass
-
         else:
+            self._rigid_prim_view.set_local_poses(positions=position, orientations=orientation)
 
-            # Invalidate kinematic-only object pose caches when new pose is set
-            if self.kinematic_only:
-                self.clear_kinematic_only_cache()
-            if position is not None:
-                position = np.asarray(position)[None, :]
-            if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-            self._rigid_prim_view.set_local_poses(position, orientation)
-            PoseAPI.invalidate()
+        PoseAPI.invalidate()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """

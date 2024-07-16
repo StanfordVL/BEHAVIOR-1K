@@ -976,53 +976,31 @@ class EntityPrim(XFormPrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == "world":
-
-            # If kinematic only, clear cache for the root link
-            if self.kinematic_only:
-                self.root_link.clear_kinematic_only_cache()
-            # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
-            if og.sim.is_stopped():
-                XFormPrim.set_position_orientation(self, position=position, orientation=orientation)
-            # Delegate to RigidPrim if we are not articulated
-            elif self._articulation_view is None:
-                self.root_link.set_position_orientation(position=position, orientation=orientation)
-            # Sim is running and articulation view exists, so use that physx API backend
-            else:
-                if position is not None:
-                    position = np.asarray(position)[None, :]
-                if orientation is not None:
-                    orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-                self._articulation_view.set_world_poses(position, orientation)
-                PoseAPI.invalidate()
-
-        elif frame == "scene":
-
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-
-            # If kinematic only, clear cache for the root link
-            if self.kinematic_only:
-                self.root_link.clear_kinematic_only_cache()
-            # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
-            if og.sim.is_stopped():
-                return XFormPrim.set_position_orientation(self, position, orientation, frame=frame)
-            # Delegate to RigidPrim if we are not articulated
-            elif self._articulation_view is None:
-                self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
-            # Sim is running and articulation view exists, so use that physx API backend
-            else:
-                if position is not None:
-                    position = np.asarray(position)[None, :]
-                if orientation is not None:
-                    orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
-                self._articulation_view.set_local_poses(position, orientation)
-                PoseAPI.invalidate()
-
+        # If kinematic only, clear cache for the root link
+        if self.kinematic_only:
+            self.root_link.clear_kinematic_only_cache()
+        # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+        # Delegate to RigidPrim if we are not articulated
+        elif self._articulation_view is None:
+            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
-            raise ValueError(f"Invalid frame: {frame}")
+            if position is not None:
+                position = np.asarray(position)[None, :]
+            if orientation is not None:
+                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+
+            if frame == "world":
+                self._articulation_view.set_world_poses(position, orientation)
+            elif frame == "scene":
+
+                # TODO: FRANK
+                pass
+            else:
+                self._articulation_view.set_local_poses(position, orientation)
+            PoseAPI.invalidate()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
@@ -1038,36 +1016,22 @@ class EntityPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == "world":
-            # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
-            if og.sim.is_stopped():
-                return XFormPrim.get_position_orientation(self)
-            # Delegate to RigidPrim if we are not articulated
-            elif self._articulation_view is None:
-                return self.root_link.get_position_orientation()
-            # Sim is running and articulation view exists, so use that physx API backend
-            else:
-                positions, orientations = self._articulation_view.get_world_poses()
-
-        elif frame == "scene":
-
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-
-            # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
-            if og.sim.is_stopped():
-                return XFormPrim.get_position_orientation(self, frame=frame)
-            # Delegate to RigidPrim if we are not articulated
-            elif self._articulation_view is None:
-                return self.root_link.get_position_orientation(frame=frame)
-            # Sim is running and articulation view exists, so use that physx API backend
-            else:
-                positions, orientations = self._articulation_view.get_local_poses()
-
+        # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
+        if og.sim.is_stopped():
+            return XFormPrim.get_position_orientation(self, frame=frame)
+        # Delegate to RigidPrim if we are not articulated
+        elif self._articulation_view is None:
+            return self.root_link.get_position_orientation(frame=frame)
+        # Sim is running and articulation view exists, so use that physx API backend
         else:
-            raise ValueError(f"Invalid frame: {frame}")
+            if frame == "world":
+                positions, orientations = self._articulation_view.get_world_poses()
+            elif frame == "scene":
+                
+                # TODO: FRANK
+                pass
+            else:
+                positions, orientations = self._articulation_view.get_local_poses()       
 
         return positions[0], orientations[0][[1, 2, 3, 0]]
 
