@@ -1,5 +1,5 @@
-from collections import namedtuple
 import math
+from collections import namedtuple
 
 import torch as th
 from scipy.spatial import ConvexHull, QhullError, distance_matrix
