@@ -807,11 +807,6 @@ class BatchControlViewAPIPerRobotImpl:
             obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
         ]
 
-        # This only works if the root link is called base_link for every controllable object, so assert that
-        assert all(
-            co.root_link.prim_path.endswith("/base_link") for co in controllable_objects
-        ), "Controllable objects must have a link named base_link as the root link."
-
         # Get their corresponding prim paths
         expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
         expected_dummy_prim_paths = {
@@ -1024,97 +1019,141 @@ class BatchControlViewAPIPerRobotImpl:
 
 
 class BatchControlViewAPIImpl:
-    def __init__(self, robot_type_pattern):
-        self._pattern = robot_type_pattern
-        self._view_by_robot = {}
+    def __init__(self, robot_type_prefix):
+        self._prefix = robot_type_prefix
+        self._view_by_pattern = {}
 
     def clear(self):
-        for view in self._view_by_robot.values():
+        for view in self._view_by_pattern.values():
             view.clear()
 
     def flush_control(self):
-        for view in self._view_by_robot.values():
+        for view in self._view_by_pattern.values():
             view.flush_control()
 
     def initialize_view(self):
-        for robot_type, pattern in self._pattern.items():
-            pass
+        # First, get all of the controllable objects in the scene (avoiding circular import)
+        from omnigibson.objects.controllable_object import ControllableObject
 
-    def _get_robot_type(self, prim_path):
-        robot_name = prim_path.split("/")[2]
-        assert robot_name.startswith(self._pattern), f"Prim path {prim_path} does not match pattern {self._pattern}"
+        controllable_objects = [
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+        ]
+
+        # Get their corresponding prim paths
+        expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
+        expected_dummy_prim_paths = {
+            obj._dummy.articulation_root_path
+            for obj in controllable_objects
+            if hasattr(obj, "_dummy") and obj._dummy is not None
+        }
+        expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
+
+        # Group the prim paths by robot type
+        patterns = {self._get_pattern_from_prim_path(prim_path) for prim_path in expected_prim_paths}
+
+        # Create the view for each robot type / fixedness combo
+        for pattern in patterns:
+            if pattern not in self._view_by_pattern:
+                self._view_by_pattern[pattern] = BatchControlViewAPIPerRobotImpl(pattern)
+
+        # Initialize the views
+        for view in self._view_by_pattern.values():
+            view.initialize_view()
+
+    def _get_pattern_from_prim_path(self, prim_path):
+        """Returns which of the regexes this prim path should be found in."""
+        scene_id, robot_name = prim_path.split("/")[1:3]
+        assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
         components = robot_name.split("__")
         assert len(components) == 3, f"Robot name {robot_name} does not match expected format"
-        robot_type = components[1]
-        assert robot_type in self._view_by_robot, f"Robot type {robot_type} not found in view"
-        return robot_type
+        assert (
+            components[0] == self._prefix
+        ), f"Prim path {prim_path} 3rd component does not start with prefix {self._prefix}__"
+        robot_name_pattern = prim_path.replace(f"/{scene_id}/", "/scene_*/").replace(
+            f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
+        )
+        return robot_name_pattern
 
     def set_joint_position_targets(self, prim_path, positions, indices):
-        self._view_by_robot[self._get_robot_type(prim_path)].set_joint_position_targets(prim_path, positions, indices)
-
-    def set_joint_velocity_targets(self, prim_path, velocities, indices):
-        self._view_by_robot[self._get_robot_type(prim_path)].set_joint_velocity_targets(prim_path, velocities, indices)
-
-    def set_joint_efforts(self, prim_path, efforts, indices):
-        self._view_by_robot[self._get_robot_type(prim_path)].set_joint_efforts(prim_path, efforts, indices)
-
-    def get_position_orientation(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_position_orientation(prim_path)
-
-    def get_linear_velocity(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_linear_velocity(prim_path)
-
-    def get_angular_velocity(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_angular_velocity(prim_path)
-
-    def get_relative_linear_velocity(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_relative_linear_velocity(prim_path)
-
-    def get_relative_angular_velocity(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_relative_angular_velocity(prim_path)
-
-    def get_joint_positions(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_joint_positions(prim_path)
-
-    def get_joint_velocities(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_joint_velocities(prim_path)
-
-    def get_joint_efforts(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_joint_efforts(prim_path)
-
-    def get_mass_matrix(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_mass_matrix(prim_path)
-
-    def get_generalized_gravity_forces(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_generalized_gravity_forces(prim_path)
-
-    def get_coriolis_and_centrifugal_forces(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_coriolis_and_centrifugal_forces(prim_path)
-
-    def get_link_relative_position_orientation(self, prim_path, link_name):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_link_relative_position_orientation(
-            prim_path, link_name
+        self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
+            prim_path, positions, indices
         )
 
+    def set_joint_velocity_targets(self, prim_path, velocities, indices):
+        self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
+            prim_path, velocities, indices
+        )
+
+    def set_joint_efforts(self, prim_path, efforts, indices):
+        self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].set_joint_efforts(
+            prim_path, efforts, indices
+        )
+
+    def get_position_orientation(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
+
+    def get_linear_velocity(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
+
+    def get_angular_velocity(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_angular_velocity(prim_path)
+
+    def get_relative_linear_velocity(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(
+            prim_path
+        )
+
+    def get_relative_angular_velocity(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
+            prim_path
+        )
+
+    def get_joint_positions(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
+
+    def get_joint_velocities(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_joint_velocities(prim_path)
+
+    def get_joint_efforts(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
+
+    def get_mass_matrix(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
+
+    def get_generalized_gravity_forces(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
+            prim_path
+        )
+
+    def get_coriolis_and_centrifugal_forces(self, prim_path):
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
+            prim_path
+        )
+
+    def get_link_relative_position_orientation(self, prim_path, link_name):
+        return self._view_by_pattern[
+            self._get_pattern_from_prim_path(prim_path)
+        ].get_link_relative_position_orientation(prim_path, link_name)
+
     def get_link_relative_linear_velocity(self, prim_path, link_name):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_link_relative_linear_velocity(
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
             prim_path, link_name
         )
 
     def get_link_relative_angular_velocity(self, prim_path, link_name):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_link_relative_angular_velocity(
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
             prim_path, link_name
         )
 
     def get_jacobian(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_jacobian(prim_path)
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
 
     def get_relative_jacobian(self, prim_path):
-        return self._view_by_robot[self._get_robot_type(prim_path)].get_relative_jacobian(prim_path)
+        return self._view_by_pattern[self._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
 
 
-ControllableObjectViewAPI = BatchControlViewAPIImpl("controllable__")
-DummyControllableObjectViewAPI = BatchControlViewAPIImpl("dummy__")
+ControllableObjectViewAPI = BatchControlViewAPIImpl("controllable")
+DummyControllableObjectViewAPI = BatchControlViewAPIImpl("dummy")
 
 
 def clear():

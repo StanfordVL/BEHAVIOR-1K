@@ -93,15 +93,16 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
+        class_name = self.__class__.__name__.lower()
         if relative_prim_path:
-            # If prim path is specified, assert that the last element starts with controllable_ to ensure that
+            # If prim path is specified, assert that the last element starts with the right prefix to ensure that
             # the object will be included in the ControllableObjectViewAPI.
             assert relative_prim_path.split("/")[-1].startswith(
-                "controllable_"
-            ), "If relative_prim_path is specified, the last element of the path must start with 'controllable_'."
+                f"controllable__{class_name}__"
+            ), f"If relative_prim_path is specified, the last element of the path must start with 'controllable__{class_name}__'."
         else:
             # If prim path is not specified, set it to the default path, but prepend controllable.
-            relative_prim_path = f"/controllable_{name}"
+            relative_prim_path = f"/controllable__{class_name}__{name}"
 
         # Run super init
         super().__init__(
