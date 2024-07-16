@@ -306,10 +306,10 @@ class InverseKinematicsController(JointController, ManipulationController):
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
         # Grab important info from control dict
-        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
-        target_pos = goal_dict["target_pos"]
-        target_quat = goal_dict["target_quat"]
+        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"], dtype=th.float32)
+        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"], dtype=th.float32)
+        target_pos = goal_dict["target_pos"].float()
+        target_quat = goal_dict["target_quat"].float()
 
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]
