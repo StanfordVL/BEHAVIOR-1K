@@ -412,7 +412,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
-        # Save the state
+        # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
+        self.scene.reset()
+
+        # Save the state for objects from load_robots / load_objects / load_task
         self.scene.update_initial_state()
 
         # Load the obs / action spaces
@@ -591,14 +594,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - bool: truncated, i.e. whether this episode ended due to a time limit etc.
                 - dict: info, i.e. dictionary with any useful information
         """
-        try:
-            self._pre_step(action)
-            og.sim.step()
-            return self._post_step(action)
-        except:
-            raise ValueError(
-                f"Failed to execute environment step {self._current_step} in episode {self._current_episode}"
-            )
+        self._pre_step(action)
+        og.sim.step()
+        return self._post_step(action)
 
     def render(self):
         """Render the environment for debug viewing."""
