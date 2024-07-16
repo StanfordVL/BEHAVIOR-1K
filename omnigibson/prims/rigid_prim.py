@@ -354,7 +354,7 @@ class RigidPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == "world":
+        if frame == "world" or frame == "scene":
 
             if self.kinematic_only and self._kinematic_world_pose_cache is not None:
                 return self._kinematic_world_pose_cache
@@ -365,19 +365,14 @@ class RigidPrim(XFormPrim):
                 np.linalg.norm(orientations), 1, atol=1e-3
             ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
 
-            positions = positions[0]
-            orientations = orientations[0][[1, 2, 3, 0]]
+            position = positions[0]
+            orientation = orientations[0][[1, 2, 3, 0]]
 
             # Cache pose if we're kinematic-only
             if self.kinematic_only:
-                self._kinematic_world_pose_cache = (positions, orientations)
+                self._kinematic_world_pose_cache = (position, orientation)
 
-        elif frame == "scene":
-
-            # TODO: implement for scene frame
-            pass
-
-        elif frame == "parent":
+        else:
 
             # Return cached pose if we're kinematic-only
             if self.kinematic_only and self._kinematic_local_pose_cache is not None:
@@ -385,17 +380,17 @@ class RigidPrim(XFormPrim):
 
             positions, orientations = self._rigid_prim_view.get_local_poses()
 
-            positions = positions[0]
-            orientations = orientations[0][[1, 2, 3, 0]]
+            position = positions[0]
+            orientation = orientations[0][[1, 2, 3, 0]]
 
             if self.kinematic_only:
-                self._kinematic_local_pose_cache = (positions, orientations)
+                self._kinematic_local_pose_cache = (position, orientation)
 
-        else:
+        # If we are in a scene, compute the scene-local transform
+        if frame == "scene":
+            position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
 
-            raise ValueError(f"Invalid frame {frame}")
-
-        return positions, orientations
+        return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 

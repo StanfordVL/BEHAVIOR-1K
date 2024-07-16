@@ -1024,16 +1024,18 @@ class EntityPrim(XFormPrim):
             return self.root_link.get_position_orientation(frame=frame)
         # Sim is running and articulation view exists, so use that physx API backend
         else:
-            if frame == "world":
+            if frame == "world" or frame == "scene":
                 positions, orientations = self._articulation_view.get_world_poses()
-            elif frame == "scene":
-                
-                # TODO: FRANK
-                pass
             else:
                 positions, orientations = self._articulation_view.get_local_poses()       
 
-        return positions[0], orientations[0][[1, 2, 3, 0]]
+        position, orientation = positions[0], orientations[0][[1, 2, 3, 0]]
+
+        # If we are in a scene, compute the scene-local transform
+        if frame == "scene":
+            position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+        
+        return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 

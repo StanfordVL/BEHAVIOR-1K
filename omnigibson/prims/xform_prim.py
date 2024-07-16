@@ -263,8 +263,18 @@ class XFormPrim(BasePrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        return PoseAPI.get_position_orientation(self.prim_path, frame)
+        if frame == "parent":
+            return PoseAPI.get_position_orientation(self.prim_path, frame)
+        else:
+            position, orientation = PoseAPI.get_position_orientation(self.prim_path, "world")
 
+            # If we are in a scene, compute the scene-local transform (and save this as the world transform
+            # for legacy compatibility)
+            if frame == "scene" and self.scene is not None:
+                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+
+            return position, orientation
+        
     # ------------------- Deprecated methods -------------------
 
     def set_position(self, position):
@@ -482,12 +492,7 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        pos, ori = self.get_position_orientation()
-
-        # If we are in a scene, compute the scene-local transform (and save this as the world transform
-        # for legacy compatibility)
-        if self.scene is not None:
-            pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
+        pos, ori = self.get_position_orientation(frame="scene")
 
         return dict(pos=pos, ori=ori)
 

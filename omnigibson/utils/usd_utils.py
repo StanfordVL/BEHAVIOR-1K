@@ -739,7 +739,7 @@ class PoseAPI:
             cls.mark_valid()
 
     @classmethod
-    def get_position_orientation(cls, prim_path, frame: Literal["world", "scene", "parent"] = "world"):
+    def get_position_orientation(cls, prim_path, frame: Literal["world", "parent"] = "world"):
         """
         Gets pose with respect to the specified frame.
 
@@ -756,15 +756,8 @@ class PoseAPI:
         cls._refresh()
         if frame == "world":
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        elif frame == "scene":
-
-            # TODO: implement get_scene_pose
-            pass
-
-        elif frame == "parent":
-            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
         else:
-            raise ValueError(f"Invalid frame {frame}")
+            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
 
         return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
 
@@ -937,26 +930,12 @@ class BatchControlViewAPIImpl:
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == "world":
-            if "root_transforms" not in self._read_cache:
-                self._read_cache["root_transforms"] = self._view.get_root_transforms()
+        if "root_transforms" not in self._read_cache:
+            self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
-            idx = self._idx[prim_path]
-            pose = self._read_cache["root_transforms"][idx]
-            return pose[:3], pose[3:]
-
-        elif frame == "scene":
-
-            # TODO: implement get_position_orientation for scene frame
-            pass
-
-        elif frame == "parent":
-
-            # TODO: implement get_position_orientation for parent frame
-            pass
-
-        else:
-            raise ValueError(f"Invalid frame {frame}")
+        idx = self._idx[prim_path]
+        pose = self._read_cache["root_transforms"][idx]
+        return pose[:3], pose[3:]
 
     def get_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:

@@ -418,27 +418,15 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         super().set_position_orientation(position, orientation, frame=frame)
 
-        if frame == "world":
 
-            # Move the joint frame for the world_base_joint
-            if self._world_base_fixed_joint_prim is not None:
-                if position is not None:
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                if orientation is not None:
-                    self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                        lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
-                    )
-
-        elif frame == "scene":
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-            # TODO: Implement this for parent frame
-            pass
-
-        else:
-            raise ValueError(f"Invalid frame {frame}")
+        # Move the joint frame for the world_base_joint
+        if self._world_base_fixed_joint_prim is not None:
+            if position is not None:
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+            if orientation is not None:
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
+                    lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
+                )
 
     @property
     def assisted_grasp_start_points(self):
@@ -622,15 +610,12 @@ class BRPart(ABC):
 
         elif frame == "scene":
 
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-
-            return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
+            position, orientation = self._root_link.get_position_orientation()
+            return T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
 
         else:
-            raise ValueError(f"Invalid frame {frame}")
+
+            return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
     def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float], frame: Literal["world", "parent", "scene"] = "world") -> None:
         """
