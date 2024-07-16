@@ -1079,6 +1079,14 @@ class ControllableObjectViewAPI:
         for view in cls._view_by_pattern.values():
             view.initialize_view()
 
+        # Assert that the views' prim paths are disjoint
+        all_prim_paths = []
+        for view in cls._view_by_pattern.values():
+            all_prim_paths.extend(view._idx.keys())
+        counts = collections.Counter(all_prim_paths)
+        more_than_once = {prim_path: count for prim_path, count in counts.items() if count > 1}
+        assert len(more_than_once) == 0, f"Prim paths {more_than_once} are present in multiple views!"
+
     @classmethod
     def _get_pattern_from_prim_path(cls, prim_path):
         """
