@@ -222,7 +222,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Set the wheels back to using sphere approximations
         for wheel_name in ["l_wheel_link", "r_wheel_link"]:
             log.warning(
-                "Fetch wheel links are post-processed to use sphere approximation collision meshes."
+                "Fetch wheel links are post-processed to use sphere approximation collision meshes. "
                 "Please ignore any previous errors about these collision meshes."
             )
             wheel_link = self.links[wheel_name]

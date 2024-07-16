@@ -109,9 +109,9 @@ class PhysxParticleInstancer(BasePrim):
     def remove(self):
         # We need to create this parent prim to avoid calling the low level omniverse delete prim method
         parent_absolute_path = self.prim.GetParent().GetPath().pathString
-        parent_relative_path = absolute_prim_path_to_scene_relative(self._scene, parent_absolute_path)
+        parent_relative_path = absolute_prim_path_to_scene_relative(self.scene, parent_absolute_path)
         self._parent_prim = BasePrim(relative_prim_path=parent_relative_path, name=f"{self._name}_parent")
-        self._parent_prim.load(self._scene)
+        self._parent_prim.load(self.scene)
         super().remove()
         self._parent_prim.remove()
 
@@ -358,12 +358,15 @@ class PhysxParticleInstancer(BasePrim):
 
         local_positions = np.array(state["particle_positions"])
         local_orientations = np.array(state["particle_orientations"])
-        global_positions, global_orientations = zip(
-            *[
-                T.pose_transform(*self.scene.prim.get_position_orientation(), local_pos, local_ori)
-                for local_pos, local_ori in zip(local_positions, local_orientations)
-            ]
-        )
+        if local_positions.size == 0 and local_orientations.size == 0:
+            global_positions, global_orientations = [], []
+        else:
+            global_positions, global_orientations = zip(
+                *[
+                    T.pose_transform(*self.scene.prim.get_position_orientation(), local_pos, local_ori)
+                    for local_pos, local_ori in zip(local_positions, local_orientations)
+                ]
+            )
         setattr(self, "particle_positions", np.array(global_positions))
         setattr(self, "particle_orientations", np.array(global_orientations))
 
@@ -423,7 +426,7 @@ class PhysxParticleInstancer(BasePrim):
 
         idx = 3
         for key, size in zip(keys, sizes):
-            length = np.product(size)
+            length = np.prod(size)
             state_dict[key] = state[idx : idx + length].reshape(size)
             idx += length
 
@@ -552,7 +555,7 @@ class MicroParticleSystem(BaseSystem):
         """
         # Default is PBR material
         return MaterialPrim.get_material(
-            scene=self._scene,
+            scene=self.scene,
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
@@ -685,10 +688,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self._particle_density = particle_density
 
         # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
-        self.particle_prototypes = None
+        self.particle_prototypes = list()
 
         # Particle instancers -- maps name to particle instancer prims (dict)
-        self.particle_instancers = None
+        self.particle_instancers = dict()
 
         self._particle_contact_offset = particle_contact_offset
 
@@ -706,11 +709,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @property
     def n_particles(self):
-        return (
-            sum([instancer.n_particles for instancer in self.particle_instancers.values()])
-            if self.particle_instancers is not None
-            else 0
-        )
+        return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
 
     @property
     def n_instancers(self):
@@ -718,7 +717,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return len(self.particle_instancers) if self.particle_instancers is not None else 0
+        return len(self.particle_instancers)
 
     @property
     def instancer_idns(self):
@@ -726,7 +725,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Returns:
             int: Number of active particles in this system
         """
-        return [inst.idn for inst in self.particle_instancers.values()] if self.particle_instancers is not None else []
+        return [inst.idn for inst in self.particle_instancers.values()]
 
     @property
     def self_collision(self):
@@ -771,8 +770,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         super()._clear()
 
-        self.particle_prototypes = None
-        self.particle_instancers = None
+        self.particle_prototypes = list()
+        self.particle_instancers = dict()
 
     @property
     def next_available_instancer_idn(self):
@@ -795,14 +794,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # We have the number of particle instancers (1), the instancer groups, particle groups, and,
         # number of particles in each instancer (3n),
         # and the corresponding states in each instancer (X)
-        if self.particle_instancers is None:
-            return 1
-        else:
-            return (
-                1
-                + 3 * len(self.particle_instancers)
-                + sum(inst.state_size for inst in self.particle_instancers.values())
-            )
+        return (
+            1 + 3 * len(self.particle_instancers) + sum(inst.state_size for inst in self.particle_instancers.values())
+        )
 
     @property
     def default_particle_instancer(self):
@@ -815,7 +809,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
         return (
             self.particle_instancers[name]
-            if self.particle_instancers and name in self.particle_instancers
+            if name in self.particle_instancers
             else self.generate_particle_instancer(n_particles=0, idn=self.default_instancer_idn)
         )
 
@@ -875,7 +869,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     def generate_particles(
         self,
-        scene,
         positions,
         instancer_idn=None,
         particle_group=0,
@@ -1031,16 +1024,13 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             enabled=not self.visual_only,
         )
 
-        if self.particle_instancers is None:
-            self.particle_instancers = dict()
-
         # Create the instancer object that wraps the raw prim
         instancer = PhysxParticleInstancer(
-            relative_prim_path=absolute_prim_path_to_scene_relative(self._scene, instance.GetPrimPath().pathString),
+            relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, instance.GetPrimPath().pathString),
             name=name,
             idn=idn,
         )
-        instancer.load(self._scene)
+        instancer.load(self.scene)
         instancer.initialize()
         self.particle_instancers[name] = instancer
 
@@ -1227,7 +1217,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         idn_to_info_mapping = {
             idn: {"group": group, "count": count} for idn, group, count in zip(idns, particle_groups, particle_counts)
         }
-        current_instancer_names = set(self.particle_instancers.keys()) if self.particle_instancers else set()
+        current_instancer_names = set(self.particle_instancers.keys())
         desired_instancer_names = set(self.particle_instancer_idn_to_name(idn=idn) for idn in idns)
         instancers_to_delete = current_instancer_names - desired_instancer_names
         instancers_to_create = desired_instancer_names - current_instancer_names
@@ -1262,16 +1252,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
-            instancer_particle_groups=(
-                [inst.particle_group for inst in self.particle_instancers.values()] if self.particle_instancers else []
-            ),
-            instancer_particle_counts=(
-                [inst.n_particles for inst in self.particle_instancers.values()] if self.particle_instancers else []
-            ),
-            particle_states=(
-                dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
-                if self.particle_instancers
-                else dict()
+            instancer_particle_groups=[inst.particle_group for inst in self.particle_instancers.values()],
+            instancer_particle_counts=[inst.n_particles for inst in self.particle_instancers.values()],
+            particle_states=dict(
+                ((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items())
             ),
         )
 
@@ -1456,10 +1440,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, prototype_prim_path)
         prototype.CreateRadiusAttr().Set(self.particle_radius)
         relative_prototype_prim_path = absolute_prim_path_to_scene_relative(self._scene, prototype_prim_path)
-        load_config = {"created_manually": True}
-        prototype = VisualGeomPrim(
-            relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0", load_config=load_config
-        )
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(
@@ -1472,7 +1453,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
     def _get_particle_material_template(self):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
         return MaterialPrim.get_material(
-            scene=self._scene,
+            scene=self.scene,
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
@@ -1581,10 +1562,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
-        load_config = {"created_manually": True}
-        prototype = VisualGeomPrim(
-            relative_prim_path=relative_prototype_path, name=prototype_path, load_config=load_config
-        )
+        prototype = VisualGeomPrim(relative_prim_path=relative_prototype_path, name=prototype_path)
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False

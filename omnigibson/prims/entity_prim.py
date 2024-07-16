@@ -249,6 +249,7 @@ class EntityPrim(XFormPrim):
                 ),
                 "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
                 "remesh": self._load_config.get("remesh", True),
+                "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
             }
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
@@ -1502,7 +1503,7 @@ class EntityPrim(XFormPrim):
         Enable physics for this articulation
         """
         if self.articulated:
-            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
@@ -1513,7 +1514,7 @@ class EntityPrim(XFormPrim):
         Disable physics for this articulation
         """
         if self.articulated:
-            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.articulation_root_path)
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():

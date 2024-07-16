@@ -17,6 +17,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.system_base import (
     BaseSystem,
@@ -25,6 +26,7 @@ from omnigibson.systems.system_base import (
     create_system_from_metadata,
 )
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES, RelativeFrame
+from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -83,35 +85,32 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
         self._use_skybox = use_skybox
+        self._transition_rule_api = None
 
         # Call super init
         super().__init__()
 
         # Prepare the initialization dicts
-        self._init_info = {}
+        self._init_objs = {}
         self._init_state = {}
         self._init_systems = []
-        self._task_metadata = None
-        self._init_objs = {}
 
         # If we have any scene file specified, use it to create the objects within it
         if self.scene_file is not None:
             # Grab objects info from the scene file
             with open(self.scene_file, "r") as f:
                 scene_info = json.load(f)
-            self._init_info = scene_info["objects_info"]["init_info"]
+            init_info = scene_info["objects_info"]["init_info"]
             self._init_state = scene_info["state"]["object_registry"]
             self._init_systems = list(scene_info["state"]["system_registry"].keys())
-            self._task_metadata = {}
-            if "metadata" in scene_info and "task" in scene_info["metadata"]:
-                self._task_metadata = scene_info["metadata"]["task"]
+            task_metadata = (
+                scene_info["metadata"]["task"] if "metadata" in scene_info and "task" in scene_info["metadata"] else {}
+            )
 
-            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
-            # accordingly
-            self._init_objs = {}
-            for obj_name, obj_info in self._init_info.items():
+            # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage accordingly
+            for obj_name, obj_info in init_info.items():
                 # Check whether we should load the object or not
-                if not self._should_load_object(obj_info=obj_info, task_metadata=self._task_metadata):
+                if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
                     continue
                 # Create object class instance
                 obj = create_object_from_init_info(obj_info)
@@ -207,6 +206,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def use_floor_plane(self):
         return self._use_floor_plane
 
+    @property
+    def transition_rule_api(self):
+        return self._transition_rule_api
+
     def prebuild(self):
         """
         Prebuild the scene USD before loading it into the simulator. This is useful for caching the scene USD for faster
@@ -261,9 +264,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for system_name in system_names:
                 self.system_registry.add(create_system_from_metadata(system_name=system_name))
 
-        from omnigibson import systems
-
-        cloth_system = systems.Cloth(name="cloth")
+        cloth_system = Cloth(name="cloth")
         self.system_registry.add(cloth_system)
 
     def _load_scene_prim_with_objects(self, last_scene_edge, initial_scene_prim_z_offset, scene_margin):
@@ -285,7 +286,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._scene_prim = XFormPrim(
             relative_prim_path=scene_relative_path,
             name=f"scene_{self.idx}",
-            load_config={"created_manually": True},
         )
         self._scene_prim.load(None)
         if self.scene_file is not None:
@@ -393,6 +393,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
+        if gm.ENABLE_TRANSITION_RULES:
+            self._transition_rule_api = TransitionRuleAPI(scene=self)
+
         # Always stop the sim if we started it internally
         if not og.sim.is_stopped():
             og.sim.stop()
@@ -404,7 +407,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Clears any internal state before the scene is destroyed
         """
         # Clears systems so they can be re-initialized.
-        for system in self.get_active_systems():
+        for system in self.active_systems.values():
             system.clear()
 
         # Remove all of the scene's objects.
@@ -412,6 +415,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Remove the scene prim.
         self._scene_prim.remove()
+
+        if gm.ENABLE_TRANSITION_RULES:
+            # Clear the transition rule API
+            self._transition_rule_api.clear()
 
     def _initialize(self):
         """
@@ -652,38 +659,30 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         }
 
     def is_system_active(self, system_name):
-        system = self.system_registry("name", system_name)
-        if system is None:
-            return False
-        return system.initialized
+        return self.get_system(system_name, force_init=False).initialized
 
     def is_visual_particle_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, VisualParticleSystem)
+        return isinstance(self.get_system(system_name, force_init=False), VisualParticleSystem)
 
     def is_physical_particle_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, PhysicalParticleSystem)
+        return isinstance(self.get_system(system_name, force_init=False), PhysicalParticleSystem)
 
     def is_fluid_system(self, system_name):
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
-        return isinstance(system, FluidSystem)
+        return isinstance(self.get_system(system_name, force_init=False), FluidSystem)
 
-    def get_system(self, system_name, force_active=True):
+    def get_system(self, system_name, force_init=True):
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
         # If system_name is not in REGISTERED_SYSTEMS, create from metadata
         system = self.system_registry("name", system_name)
         assert system is not None, f"System {system_name} not in system registry."
-        if not system.initialized and force_active:
+        if not system.initialized and force_init:
             system.initialize(scene=self)
         return system
 
-    def get_active_systems(self):
-        return [system for system in self.systems if system.initialized]
+    @property
+    def active_systems(self):
+        return {system.name: system for system in self.systems if system.initialized and not isinstance(system, Cloth)}
 
     def get_random_floor(self):
         """

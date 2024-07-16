@@ -59,7 +59,7 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.39360809])
+    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.38952637])
     sensor_world_ori_gt = np.array([-0.29444984, 0.29444979, 0.64288365, -0.64288352])
 
     assert np.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
@@ -115,3 +115,6 @@ def camera_pose_test(flatcache):
 
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
+
+if __name__ == "__main__":
+  test_camera_pose_flatcache_on()

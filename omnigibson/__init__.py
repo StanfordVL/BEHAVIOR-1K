@@ -55,7 +55,6 @@ def clear():
     from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
     from omnigibson.prims.material_prim import MaterialPrim
     from omnigibson.sensors.vision_sensor import VisionSensor
-    from omnigibson.transition_rules import TransitionRuleAPI
     from omnigibson.utils.python_utils import clear as clear_python_utils
     from omnigibson.utils.usd_utils import clear as clear_usd_utils
 
@@ -89,10 +88,6 @@ def clear():
 
     # Clear all materials
     MaterialPrim.clear()
-
-    if gm.ENABLE_TRANSITION_RULES:
-        # Clear all transition rules
-        TransitionRuleAPI.clear()
 
     # Clear uniquely named items and other internal states
     clear_python_utils()

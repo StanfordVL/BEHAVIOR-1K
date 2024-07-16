@@ -401,16 +401,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
-            return self.base_footprint_link.get_position_orientation()
-        elif frame == RelativeFrame.SCENE:
+        return self.base_footprint_link.get_position_orientation()
 
-            # TODO: Implement this for SCENE frame
-            pass
-        else:
-
-            # TODO: Implement this for PARENT frame
-            pass
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
         """

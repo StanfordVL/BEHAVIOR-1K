@@ -712,17 +712,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
-            return self.base_footprint_link.get_position_orientation()
+        return self.base_footprint_link.get_position_orientation()
 
-        elif frame == RelativeFrame.SCENE:
-
-            # TODO: Add the ability to get the position and orientation of the robot in the scene frame
-            pass
-        else:
-
-            # TODO: Add the ability to get the position and orientation of the robot in the parent frame
-            pass
 
     def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
         """
