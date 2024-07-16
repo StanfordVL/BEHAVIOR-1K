@@ -630,24 +630,12 @@ class BRPart(ABC):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == "world":
-            self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
-            self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
-            self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
-            self.parent.joints[f"{self.name}_rx_joint"].set_pos(orn[0], drive=False)
-            self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
-            self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
-
-        elif frame == "scene":
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-            # TODO: Implement this for parent frame
-            pass
-
-        else:
-            raise ValueError(f"Invalid frame {frame}")
+        self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
+        self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
+        self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
+        self.parent.joints[f"{self.name}_rx_joint"].set_pos(orn[0], drive=False)
+        self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
+        self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
 
     def update_ghost_hands(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """

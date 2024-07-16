@@ -312,7 +312,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             obj.set_position_orientation(
                 position=self._init_state[obj_name]["root_link"]["pos"],
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
-                frame="parent",
+                frame="scene",
             )
 
         # Position the scene prim based on the last scene's right edge

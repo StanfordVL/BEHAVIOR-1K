@@ -270,7 +270,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
                 # TODO: Fix this after scene_local_position_orientation API is fixed
-                robot.set_position_orientation(position=position, orientation=orientation, frame="parent")
+                robot.set_position_orientation(position=position, orientation=orientation, frame="scene")
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -294,7 +294,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             )
             # Import the robot into the simulator and set the pose
             self.scene.add_object(obj)
-            obj.set_position_orientation(position=position, orientation=orientation, frame="parent")
+            obj.set_position_orientation(position=position, orientation=orientation, frame="scene")
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -325,7 +325,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Load an initialize this sensor
                 sensor.load(self.scene)
                 sensor.initialize()
-                sensor.set_position_orientation(local_position, local_orientation, frame="parent")
+                sensor.set_position_orientation(local_position, local_orientation, frame="scene")
                 self._external_sensors[sensor.name] = sensor
                 self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 

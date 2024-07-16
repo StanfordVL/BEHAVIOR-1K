@@ -318,6 +318,16 @@ class RigidPrim(XFormPrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        # If we are in a scene, compute the scene-local transform before setting the pose
+        if frame == "scene" and self.scene is not None:
+
+            # if position or orientation is None, get the current position and orientation relative to scene
+            current_position, current_orientation = self.get_position_orientation(frame="scene")
+            position = current_position if position is None else np.array(position, dtype=float)
+            orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+
+            position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
             self.clear_kinematic_only_cache()
@@ -329,12 +339,8 @@ class RigidPrim(XFormPrim):
             ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
 
-        if frame == "world":
+        if frame == "world" or frame == "scene":
             self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
-        elif frame == "scene":
-
-            # TODO: FRANK
-            pass
         else:
             self._rigid_prim_view.set_local_poses(positions=position, orientations=orientation)
 

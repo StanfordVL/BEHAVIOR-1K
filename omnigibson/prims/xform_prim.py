@@ -183,12 +183,16 @@ class XFormPrim(BasePrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == "world":
+        if frame == "world" or frame == "scene":
 
             current_position, current_orientation = self.get_position_orientation()
-
             position = current_position if position is None else np.array(position, dtype=float)
             orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+
+            # If we are in a scene, compute the scene-local transform before setting the pose
+            if frame == "scene" and self.scene is None:
+                position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+
             assert np.isclose(
                 np.linalg.norm(orientation), 1, atol=1e-3
             ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
@@ -206,12 +210,7 @@ class XFormPrim(BasePrim):
             ), f"{self.prim_path} local transform is not diagonal."
             self.set_position_orientation(*T.mat2pose(local_transform), frame="parent")
 
-        elif frame == "scene":
-
-            # TODO: Implement this for the scene frame
-            pass
-
-        elif frame == "parent":
+        else:
 
             properties = self.prim.GetPropertyNames()
             if position is not None:
@@ -245,9 +244,6 @@ class XFormPrim(BasePrim):
                     not xformable_prim.HasWorldXform()
                 ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
                 xformable_prim.SetLocalXformFromUsd()
-
-        else:
-            raise ValueError(f"frame {frame} is not supported.")
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
@@ -497,10 +493,9 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
+        
         pos, orn = np.array(state["pos"]), np.array(state["ori"])
-        if self.scene is not None:
-            pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
-        self.set_position_orientation(pos, orn)
+        self.set_position_orientation(pos, orn, frame="scene")
 
     def serialize(self, state):
         return np.concatenate([state["pos"], state["ori"]]).astype(float)

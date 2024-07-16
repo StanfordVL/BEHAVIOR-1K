@@ -331,28 +331,16 @@ class ManipulationRobot(BaseRobot):
 
         # Now for each hand, if it was holding an AG object, teleport it.
 
-        if frame == "world":
-            for arm in self.arm_names:
-                if self._ag_obj_in_hand[arm] is not None:
-                    original_eef_pose = T.pose2mat(original_poses[arm])
-                    inv_original_eef_pose = T.pose_inv(pose_mat=original_eef_pose)
-                    original_obj_pose = T.pose2mat(self._ag_obj_in_hand[arm].get_position_orientation())
-                    new_eef_pose = T.pose2mat((self.get_eef_position(arm), self.get_eef_orientation(arm)))
-                    # New object pose is transform:
-                    # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
-                    new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
-                    self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-
-        elif frame == "scene":
-            # TODO: Implement this for scene frame
-            pass
-
-        elif frame == "parent":
-            # TODO: Implement this for parent frame
-            pass
-
-        else:
-            raise ValueError(f"Invalid frame {frame}")
+        for arm in self.arm_names:
+            if self._ag_obj_in_hand[arm] is not None:
+                original_eef_pose = T.pose2mat(original_poses[arm])
+                inv_original_eef_pose = T.pose_inv(pose_mat=original_eef_pose)
+                original_obj_pose = T.pose2mat(self._ag_obj_in_hand[arm].get_position_orientation())
+                new_eef_pose = T.pose2mat((self.get_eef_position(arm), self.get_eef_orientation(arm)))
+                # New object pose is transform:
+                # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
+                new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
+                self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
     def deploy_control(self, control, control_type):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
