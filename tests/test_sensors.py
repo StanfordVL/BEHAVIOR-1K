@@ -24,13 +24,13 @@ def test_seg(env):
         # Sample two particles for each system
         pos = th.tensor([-0.2 + i * 0.2, 0, 0.55])
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[pos, pos + th.tensor([0.1, 0.0, 0.0])])
+            system.generate_particles(positions=[pos.tolist(), (pos + th.tensor([0.1, 0.0, 0.0])).tolist()])
         else:
             if system.get_group_name(breakfast_table) not in system.groups:
                 system.create_attachment_group(breakfast_table)
             system.generate_group_particles(
                 group=system.get_group_name(breakfast_table),
-                positions=th.tensor([pos, pos + th.tensor([0.1, 0.0, 0.0])]),
+                positions=[pos, pos + th.tensor([0.1, 0.0, 0.0])],
                 link_prim_paths=[breakfast_table.root_link.prim_path],
             )
 
@@ -45,7 +45,7 @@ def test_seg(env):
 
     seg_semantic = all_observation["seg_semantic"]
     seg_semantic_info = all_info["seg_semantic"]
-    assert set(th.unique(seg_semantic)) == set(seg_semantic_info.keys())
+    assert set(int(x.item()) for x in th.unique(seg_semantic)) == set(seg_semantic_info.keys())
     expected_dict = {
         335706086: "diced__apple",
         825831922: "floors",
@@ -60,7 +60,7 @@ def test_seg(env):
 
     seg_instance = all_observation["seg_instance"]
     seg_instance_info = all_info["seg_instance"]
-    assert set(th.unique(seg_instance)) == set(seg_instance_info.keys())
+    assert set(int(x.item()) for x in th.unique(seg_instance)) == set(seg_instance_info.keys())
     expected_dict = {
         2: "robot0",
         3: "groundPlane",
@@ -75,7 +75,7 @@ def test_seg(env):
 
     seg_instance_id = all_observation["seg_instance_id"]
     seg_instance_id_info = all_info["seg_instance_id"]
-    assert set(th.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
+    assert set(int(x.item()) for x in th.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
     expected_dict = {
         3: "/World/robot0/gripper_link/visuals",
         4: "/World/robot0/wrist_roll_link/visuals",

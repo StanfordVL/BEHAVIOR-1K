@@ -1316,10 +1316,10 @@ class ParticleApplier(ParticleModifier):
                 velocities = (
                     None
                     if self._initial_speed == 0
-                    else -self._initial_speed * th.tensor([hit[1] for hit in hits[:n_particles]])
+                    else -self._initial_speed * th.stack([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
-                    positions=th.tensor([hit[0] for hit in hits[:n_particles]]),
+                    positions=th.stack([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
                 # Update our particle count

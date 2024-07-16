@@ -1,4 +1,5 @@
 from collections import namedtuple
+import math
 
 import torch as th
 from scipy.spatial import ConvexHull, QhullError, distance_matrix
@@ -60,8 +61,8 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         normals = cloth.compute_face_normals(face_ids=cloth.keyface_idx)
 
         # projection onto the z-axis
-        proj = th.abs(th.dot(normals, th.tensor([0.0, 0.0, 1.0])))
-        percentage = th.mean(proj > th.cos(m.NORMAL_Z_ANGLE_DIFF))
+        proj = th.abs(th.matmul(normals, th.tensor([0.0, 0.0, 1.0])))
+        percentage = th.mean((proj > math.cos(m.NORMAL_Z_ANGLE_DIFF)).float())
         return percentage
 
     def calculate_projection_area_and_diagonal_maximum(self):

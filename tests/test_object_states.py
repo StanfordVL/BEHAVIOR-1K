@@ -10,7 +10,7 @@ from omnigibson.macros import macros as m
 from omnigibson.object_states import *
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
+from omnigibson.utils.physx_utils import apply_force_at_pos
 
 
 @og_test
@@ -236,14 +236,17 @@ def test_aabb(env):
     # Need to take one sim step
     og.sim.step()
 
-    assert th.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
+    assert th.allclose(breakfast_table.states[AABB].get_value()[0], breakfast_table.aabb[0])
+    assert th.allclose(breakfast_table.states[AABB].get_value()[1], breakfast_table.aabb[1])
     assert th.all(
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
     pp = dishtowel.root_link.compute_particle_positions()
     offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    assert th.allclose(dishtowel.states[AABB].get_value(), (pp.min(dim=0) - offset, pp.max(dim=0) + offset))
+    particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
+    assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
+    assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
     assert th.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
     with pytest.raises(NotImplementedError):
@@ -790,7 +793,7 @@ def test_particle_sink(env):
     assert water_system.n_particles == 0
 
     sink_pos = sink.states[ParticleSink].link.get_position()
-    water_system.generate_particles(positions=[sink_pos + th.tensor([0, 0, 0.05])])
+    water_system.generate_particles(positions=[(sink_pos + th.tensor([0, 0, 0.05])).tolist()])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
 
@@ -885,7 +888,7 @@ def test_particle_remover(env):
     water_system = env.scene.get_system("water")
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        positions=[th.tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
     )
     assert water_system.n_particles > 0
 
@@ -912,7 +915,7 @@ def test_particle_remover(env):
     og.sim.step()
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        positions=[th.tensor([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
     )
 
     # Water should be present
@@ -949,7 +952,7 @@ def test_saturated(env):
     remover_dishtowel.states[Saturated].set_limit(water_system, n_particles)
     water_system.generate_particles(
         positions=[
-            th.tensor([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)])
+            [0, 0, remover_dishtowel.aabb[1][2].item() + water_system.particle_radius * (1 + 2 * i)]
             for i in range(n_particles)
         ],
     )
@@ -1043,8 +1046,17 @@ def test_folded_unfolded(env):
     end[:, 0] += x_extent * 0.9
 
     increments = 25
-    for ctrl_pts in th.cat([th.linspace(start, mid, increments), th.linspace(mid, end, increments)]):
-        carpet.root_link.set_particle_positions(ctrl_pts, idxs=indices)
+    total_points = increments * 2
+
+    # Create interpolation weights
+    t = th.linspace(0, 1, total_points).unsqueeze(1).unsqueeze(2)
+
+    # Interpolate between start, mid, and end
+    first_half = t < 0.5
+    ctrl_pts = th.where(first_half, start * (1 - 2 * t) + mid * (2 * t), mid * (2 - 2 * t) + end * (2 * t - 1))
+
+    for pt in ctrl_pts:
+        carpet.root_link.set_particle_positions(pt, idxs=indices)
         og.sim.step()
 
     assert carpet.states[Folded].get_value()
@@ -1124,13 +1136,13 @@ def test_contains(env):
 
         # Sample single particle
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])])
+            system.generate_particles(positions=[[0, 0, stockpot.aabb[1][2].item() - 0.1]])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
             system.generate_group_particles(
                 group=system.get_group_name(stockpot),
-                positions=th.tensor([th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])]),
+                positions=[th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])],
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 

@@ -231,7 +231,7 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            raw_scan = self._rs.get_linear_depth_data(self.prim_path)
+            raw_scan = th.tensor(self._rs.get_linear_depth_data(self.prim_path), dtype=th.float32)
             # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
             raw_scan = th.clip(raw_scan, self.min_range, self.max_range)
             obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)

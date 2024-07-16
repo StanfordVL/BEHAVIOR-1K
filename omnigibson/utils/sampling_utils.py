@@ -337,11 +337,15 @@ def raytest(
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
     if only_closest and ignore_bodies is None and ignore_collisions is None:
-        return og.sim.psqi.raycast_closest(
+        result = og.sim.psqi.raycast_closest(
             origin=start_point.tolist(),
             dir=direction.tolist(),
             distance=distance.tolist(),
         )
+        if result["hit"]:
+            result["position"] = th.tensor(result["position"])
+            result["normal"] = th.tensor(result["normal"])
+        return result
     else:
         # Compose callback function for finding raycasts
         hits = []
@@ -900,8 +904,8 @@ def sample_cuboid_on_object(
                         filtered_center_idx = len(filtered_cast_results) - 1
 
             # Process the hit positions and normals.
-            hit_positions = th.tensor([ray_res["position"] for ray_res in filtered_cast_results])
-            hit_normals = th.tensor([ray_res["normal"] for ray_res in filtered_cast_results])
+            hit_positions = th.stack([ray_res["position"] for ray_res in filtered_cast_results])
+            hit_normals = th.stack([ray_res["normal"] for ray_res in filtered_cast_results])
             hit_normals /= th.norm(hit_normals, dim=1, keepdim=True)
 
             assert filtered_center_idx is not None
@@ -958,9 +962,7 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = th.tensor(
-                    [ray_res.get("position", lazy.carb.Float3([0.0] * 3)) for ray_res in cast_results]
-                )
+                hit_positions = th.stack([ray_res.get("position", th.tensor([0.0] * 3)) for ray_res in cast_results])
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
