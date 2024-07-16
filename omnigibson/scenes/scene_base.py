@@ -25,7 +25,7 @@ from omnigibson.systems.system_base import (
     VisualParticleSystem,
     create_system_from_metadata,
 )
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES, RelativeFrame
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -312,7 +312,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             obj.set_position_orientation(
                 position=self._init_state[obj_name]["root_link"]["pos"],
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
-                frame=RelativeFrame.PARENT,
+                frame="parent",
             )
 
         # Position the scene prim based on the last scene's right edge

@@ -3,6 +3,7 @@ from collections import namedtuple
 
 import networkx as nx
 import numpy as np
+from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -19,7 +20,6 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.utils.constants import JointType, PrimType, RelativeFrame
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
@@ -308,7 +308,7 @@ class ManipulationRobot(BaseRobot):
 
         return contact_data, robot_contact_links
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Sets manipulation robot's pose with respect to the specified frame
 
@@ -317,8 +317,8 @@ class ManipulationRobot(BaseRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD.PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
         # Store the original EEF poses.
@@ -331,7 +331,7 @@ class ManipulationRobot(BaseRobot):
 
         # Now for each hand, if it was holding an AG object, teleport it.
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
             for arm in self.arm_names:
                 if self._ag_obj_in_hand[arm] is not None:
                     original_eef_pose = T.pose2mat(original_poses[arm])
@@ -343,12 +343,12 @@ class ManipulationRobot(BaseRobot):
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
-        elif frame == RelativeFrame.SCENE:
-            # TODO: Implement this for SCENE frame
+        elif frame == "scene":
+            # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
-            # TODO: Implement this for PARENT frame
+        elif frame == "parent":
+            # TODO: Implement this for parent frame
             pass
 
         else:

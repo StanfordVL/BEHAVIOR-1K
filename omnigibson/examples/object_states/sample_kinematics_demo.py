@@ -129,7 +129,7 @@ def sample_microwave_plates_apples(env):
     cabinet.set_orientation([0, 0, 0, 1.0])
     env.step(np.array([]))
     offset = cabinet.get_position_orientation()[0][2] - cabinet.aabb_center[2]
-    cabinet.set_position_orientations(position=np.array([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
+    cabinet.set_position_orientation(position=np.array([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
     env.step(np.array([]))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
@@ -173,7 +173,7 @@ def sample_boxes_on_shelf(env):
     shelf.set_orientation([0, 0, 0, 1.0])
     env.step(np.array([]))
     offset = shelf.get_position_orientation()[0][2] - shelf.aabb_center[2]
-    shelf.set_position_orientations(position=np.array([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
+    shelf.set_position_orientation(position=np.array([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
     env.step(np.array([]))  # One step is needed for the object to be fully initialized
 
     og.log.info("Shelf placed.")

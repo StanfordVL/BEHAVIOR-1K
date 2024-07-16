@@ -4,7 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.utils.constants import ParticleModifyCondition, RelativeFrame
+from omnigibson.utils.constants import ParticleModifyCondition
 
 
 def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
@@ -72,11 +72,11 @@ def test_multi_scene_displacement():
 def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)
 
-    robot_1_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.PARENT)[0]
-    robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    robot_1_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="parent")[0]
+    robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="world")[0]
 
     scene_prim = vec_env.envs[1].scene.prim
-    pos_scene = scene_prim.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    pos_scene = scene_prim.get_position_orientation(frame="world")[0]
 
     assert np.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
     og.clear()
@@ -90,7 +90,7 @@ def test_multi_scene_set_local_position():
     robot = vec_env.envs[1].scene.robots[0]
 
     # Get the initial global position of the robot
-    initial_global_pos = robot.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    initial_global_pos = robot.get_position_orientation(frame="world")[0]
 
     # Define a new global position
     new_global_pos = initial_global_pos + np.array([1.0, 0.5, 0.0])
@@ -99,13 +99,13 @@ def test_multi_scene_set_local_position():
     robot.set_position_orientation(position=new_global_pos)
 
     # Get the updated global position
-    updated_global_pos = robot.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    updated_global_pos = robot.get_position_orientation(frame="world")[0]
 
     # Get the scene's global position
-    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation(frame=RelativeFrame.WORLD)[0]
+    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation(frame="world")[0]
 
     # Get the updated local position
-    updated_local_pos = robot.get_position_orientation(frame=RelativeFrame.PARENT)[0]
+    updated_local_pos = robot.get_position_orientation(frame="parent")[0]
 
     # Calculate expected local position
     expected_local_pos = new_global_pos - scene_pos

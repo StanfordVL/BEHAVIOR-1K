@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import Literal
 
 import numpy as np
 import trimesh.transformations
@@ -10,7 +11,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import PoseAPI
 
@@ -170,7 +170,7 @@ class XFormPrim(BasePrim):
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
         return material_path != ""
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Sets prim's pose with respect to the specified frame
 
@@ -179,11 +179,11 @@ class XFormPrim(BasePrim):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             current_position, current_orientation = self.get_position_orientation()
 
@@ -204,14 +204,14 @@ class XFormPrim(BasePrim):
             assert np.allclose(
                 product, np.diag(np.diag(product)), atol=1e-3
             ), f"{self.prim_path} local transform is not diagonal."
-            self.set_position_orientation(*T.mat2pose(local_transform), frame=RelativeFrame.PARENT)
+            self.set_position_orientation(*T.mat2pose(local_transform), frame="parent")
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: Implement this for the scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
             properties = self.prim.GetPropertyNames()
             if position is not None:
@@ -249,13 +249,13 @@ class XFormPrim(BasePrim):
         else:
             raise ValueError(f"frame {frame} is not supported.")
 
-    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -278,7 +278,8 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "This method is deprecated. Use set_position_orientation(position=position) instead.", DeprecationWarning
+            "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead", 
+            DeprecationWarning
         )
         return self.set_position_orientation(position=position)
 
@@ -292,7 +293,10 @@ class XFormPrim(BasePrim):
 
         import warnings
 
-        warnings.warn("This method is deprecated. Use get_position_orientation()[0] instead.", DeprecationWarning)
+        warnings.warn(
+            "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead.", 
+            DeprecationWarning
+        )
         return self.get_position_orientation()[0]
 
     def set_orientation(self, orientation):
@@ -306,7 +310,7 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "This method is deprecated. Use set_position_orientation(orientation=orientation) instead.",
+            "set_orientation is deprecated and will be removed in a future release. Use set_position_orientation(orientation=orientation) instead",
             DeprecationWarning,
         )
         self.set_position_orientation(orientation=orientation)
@@ -321,7 +325,7 @@ class XFormPrim(BasePrim):
 
         import warnings
 
-        warnings.warn("This method is deprecated. Use get_position_orientation()[1] instead.", DeprecationWarning)
+        warnings.warn("get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead", DeprecationWarning)
         return self.get_position_orientation()[1]
 
     def get_local_pose(self):
@@ -337,13 +341,13 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "This method is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead",
             DeprecationWarning,
         )
 
-        return PoseAPI.get_position_orientation(self.prim_path, RelativeFrame.PARENT)
+        return PoseAPI.get_position_orientation(self.prim_path, "parent")
 
-    def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
+    def set_local_pose(self, position=None, orientation=None, frame="parent"):
         """
         Sets prim's pose with respect to the local frame (the prim's parent frame).
 
@@ -357,7 +361,7 @@ class XFormPrim(BasePrim):
         import warnings
 
         warnings.warn(
-            "This method is deprecated. Use set_position_orientation(position, orientation, frame=RelativeFrame.PARENT) instead.",
+            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead",
             DeprecationWarning,
         )
 

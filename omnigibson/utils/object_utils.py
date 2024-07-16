@@ -8,7 +8,6 @@ from scipy.spatial.transform import Rotation as R
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.scenes import Scene
-from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
 
 
@@ -87,7 +86,7 @@ def compute_base_aligned_bboxes(obj):
             pts_in_link_frame = []
             for mesh_name, mesh in mesh_list.items():
                 pts = mesh.get_attribute("points")
-                local_pos, local_orn = mesh.get_position_orientation(RelativeFrame.PARENT)
+                local_pos, local_orn = mesh.get_position_orientation("parent")
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
             pts_in_link_frame = np.concatenate(pts_in_link_frame, axis=0)
             max_pt = np.max(pts_in_link_frame, axis=0)

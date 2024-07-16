@@ -8,7 +8,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
 
@@ -140,7 +139,7 @@ class GeomPrim(XFormPrim):
         points = self.points
         if points is None:
             return None
-        position, orientation = self.get_position_orientation(RelativeFrame.PARENT)
+        position, orientation = self.get_position_orientation("parent")
         scale = self.scale
         points_scaled = points * scale
         points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T

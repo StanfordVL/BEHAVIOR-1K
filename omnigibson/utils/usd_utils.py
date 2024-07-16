@@ -7,12 +7,13 @@ from collections.abc import Iterable
 
 import numpy as np
 import trimesh
+from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType, RelativeFrame
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -632,10 +633,10 @@ class FlatcacheAPI:
             from omnigibson.prims.xform_prim import XFormPrim
 
             # 1. For every link, update its xformOp properties based on the delta_tf between object frame and link frame
-            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame=RelativeFrame.PARENT)
+            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame="parent")
             for link in prim.links.values():
                 rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_position_orientation(link, rel_pos, rel_quat, frame=RelativeFrame.PARENT)
+                XFormPrim.set_position_orientation(link, rel_pos, rel_quat, frame="parent")
             # 2. For every joint, update its linear / angular joint state
             if prim.n_joints > 0:
                 joints_pos = prim.get_joint_positions()
@@ -680,7 +681,7 @@ class FlatcacheAPI:
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
                 XFormPrim.set_position_orientation(
-                    link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame=RelativeFrame.PARENT
+                    link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame="parent"
                 )
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
@@ -738,13 +739,13 @@ class PoseAPI:
             cls.mark_valid()
 
     @classmethod
-    def get_position_orientation(cls, prim_path, frame=RelativeFrame.WORLD):
+    def get_position_orientation(cls, prim_path, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -753,14 +754,14 @@ class PoseAPI:
         """
 
         cls._refresh()
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: implement get_scene_pose
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
         else:
             raise ValueError(f"Invalid frame {frame}")
@@ -922,13 +923,13 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path, frame=RelativeFrame.WORLD):
+    def get_position_orientation(self, prim_path, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -936,7 +937,7 @@ class BatchControlViewAPIImpl:
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
             if "root_transforms" not in self._read_cache:
                 self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
@@ -944,14 +945,14 @@ class BatchControlViewAPIImpl:
             pose = self._read_cache["root_transforms"][idx]
             return pose[:3], pose[3:]
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
-            # TODO: implement get_position_orientation for SCENE frame
+            # TODO: implement get_position_orientation for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
-            # TODO: implement get_position_orientation for PARENT frame
+            # TODO: implement get_position_orientation for parent frame
             pass
 
         else:

@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 from bddl.object_taxonomy import ObjectTaxonomy
+from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -26,7 +27,7 @@ from omnigibson.object_states.on_fire import OnFire
 from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.utils.constants import EmitterType, PrimType, RelativeFrame
+from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -591,15 +592,15 @@ class StatefulObject(BaseObject):
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Set the position and orientation of stateful object.
 
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)

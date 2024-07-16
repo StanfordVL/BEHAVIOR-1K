@@ -2,7 +2,7 @@ import itertools
 import os
 from abc import ABC
 from collections import OrderedDict
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Literal
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -15,7 +15,6 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.constants import RelativeFrame
 from omnigibson.utils.python_utils import classproperty
 
 m = create_module_macros(module_path=__file__)
@@ -387,13 +386,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets robot's pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -404,7 +403,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return self.base_footprint_link.get_position_orientation()
 
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Sets behavior robot's pose with respect to the specified frame
 
@@ -413,13 +412,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
         super().set_position_orientation(position, orientation, frame=frame)
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
@@ -430,12 +429,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                         lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
                     )
 
-        elif frame == RelativeFrame.SCENE:
-            # TODO: Implement this for SCENE frame
+        elif frame == "scene":
+            # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
-            # TODO: Implement this for PARENT frame
+        elif frame == "parent":
+            # TODO: Implement this for parent frame
             pass
 
         else:
@@ -527,7 +526,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                     if self._use_ghost_hands:
                         self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
             else:
-                des_world_part_pos, des_world_part_orn = eef_part.get_position_orientation(frame=RelativeFrame.PARENT)
+                des_world_part_pos, des_world_part_orn = eef_part.get_position_orientation(frame="parent")
 
             # Get local pose with respect to the new body frame
             des_local_part_pos, des_local_part_orn = T.relative_pose_transform(
@@ -601,15 +600,15 @@ class BRPart(ABC):
         warnings.warn(
             "local_position_orientation is deprecated. Use get_position_orientation instead.", DeprecationWarning
         )
-        return self.get_position_orientation(frame=RelativeFrame.PARENT)
+        return self.get_position_orientation(frame="parent")
 
-    def get_position_orientation(self, frame=RelativeFrame.WORLD) -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world") -> Tuple[Iterable[float], Iterable[float]]:
         """
         Gets robot's pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -617,23 +616,23 @@ class BRPart(ABC):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             return self._root_link.get_position_orientation()
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
-            # TODO: Implement this for SCENE frame
+            # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
             return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
         else:
             raise ValueError(f"Invalid frame {frame}")
 
-    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float], frame=RelativeFrame.WORLD) -> None:
+    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float], frame: Literal["world", "parent", "scene"] = "world") -> None:
         """
         Sets BRPart's pose with respect to the specified frame
 
@@ -642,11 +641,11 @@ class BRPart(ABC):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (RelativeFrame): frame to set the pose with respect to, defaults to RelativeFrame.WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
             self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
             self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
             self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
@@ -654,12 +653,12 @@ class BRPart(ABC):
             self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
             self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
 
-        elif frame == RelativeFrame.SCENE:
-            # TODO: Implement this for SCENE frame
+        elif frame == "scene":
+            # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
-            # TODO: Implement this for PARENT frame
+        elif frame == "parent":
+            # TODO: Implement this for parent frame
             pass
 
         else:

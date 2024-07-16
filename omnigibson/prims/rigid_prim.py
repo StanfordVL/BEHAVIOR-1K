@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Literal
 
 import numpy as np
 from scipy.spatial import ConvexHull, QhullError
@@ -9,7 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import GEOM_TYPES, RelativeFrame
+from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
@@ -211,7 +212,7 @@ class RigidPrim(XFormPrim):
 
                     volume, com = get_mesh_volume_and_com(mesh_prim)
                     # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
-                    local_pos, local_orn = mesh.get_position_orientation(frame=RelativeFrame.PARENT)
+                    local_pos, local_orn = mesh.get_position_orientation(frame="parent")
                     vols.append(volume * np.prod(mesh.scale))
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                     # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
@@ -306,18 +307,18 @@ class RigidPrim(XFormPrim):
         """
         return self._rigid_prim_view.get_angular_velocities()[0]
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Set the position and orientation of XForm Prim.
 
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             # Invalidate kinematic-only object pose caches when new pose is set
             if self.kinematic_only:
@@ -332,7 +333,7 @@ class RigidPrim(XFormPrim):
             self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
             PoseAPI.invalidate()
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: implement for scene frame
             pass
@@ -349,13 +350,13 @@ class RigidPrim(XFormPrim):
             self._rigid_prim_view.set_local_poses(position, orientation)
             PoseAPI.invalidate()
 
-    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -363,7 +364,7 @@ class RigidPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             if self.kinematic_only and self._kinematic_world_pose_cache is not None:
                 return self._kinematic_world_pose_cache
@@ -381,12 +382,12 @@ class RigidPrim(XFormPrim):
             if self.kinematic_only:
                 self._kinematic_world_pose_cache = (positions, orientations)
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: implement for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
             # Return cached pose if we're kinematic-only
             if self.kinematic_only and self._kinematic_local_pose_cache is not None:
@@ -406,25 +407,25 @@ class RigidPrim(XFormPrim):
 
         return positions, orientations
 
-    def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
+    def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
         import warnings
 
         warnings.warn(
-            "set_local_pose is deprecated. Use set_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead",
             DeprecationWarning,
         )
-        return self.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
+        return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
     def get_local_pose(self):
 
         import warnings
 
         warnings.warn(
-            "get_local_pose is deprecated. Use get_position_orientation(frame=RelativeFrame.PARENT) instead.",
+            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead",
             DeprecationWarning,
         )
-        return self.get_position_orientation(frame=RelativeFrame.PARENT)
+        return self.get_position_orientation(frame="parent")
 
     @property
     def _rigid_prim_view(self):

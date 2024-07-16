@@ -19,7 +19,7 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
-from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType, RelativeFrame
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
     get_particle_positions_from_frame,
@@ -420,7 +420,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             self.projection_mesh.set_position_orientation(
-                position=np.array([0, 0, -z_offset]), orientation=T.euler2quat([0, 0, 0]), frame=RelativeFrame.PARENT
+                position=np.array([0, 0, -z_offset]), orientation=T.euler2quat([0, 0, 0]), frame="parent"
             )
 
             # Generate the function for checking whether points are within the projection mesh
@@ -1078,13 +1078,13 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
             self.projection_source_sphere.set_position_orientation(
-                orientation=T.euler2quat([0, np.pi / 2, 0]), frame=RelativeFrame.PARENT
+                orientation=T.euler2quat([0, np.pi / 2, 0]), frame="parent"
             )
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
-            local_pos, local_quat = self.projection_mesh.get_position_orientation(RelativeFrame.PARENT)
+            local_pos, local_quat = self.projection_mesh.get_position_orientation("parent")
             assert np.all(
                 np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)
             ), "Projection mesh tip should align with metalink position!"

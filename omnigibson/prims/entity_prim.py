@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Literal
 
 import networkx as nx
 import numpy as np
@@ -11,7 +12,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import JointAxis, JointType, PrimType, RelativeFrame
+from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
@@ -328,7 +329,7 @@ class EntityPrim(XFormPrim):
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame
-                        _, link_local_orn = link.get_position_orientation(frame=RelativeFrame.PARENT)
+                        _, link_local_orn = link.get_position_orientation(frame="parent")
 
                         # Find the joint frame orientation in the parent link frame
                         joint_local_orn = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
@@ -964,18 +965,18 @@ class EntityPrim(XFormPrim):
         """
         return T.quat2mat(self.get_position_orientation()[1]).T @ self.get_angular_velocity()
 
-    def set_position_orientation(self, position=None, orientation=None, frame=RelativeFrame.WORLD):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
         """
         Set the position and orientation of entry prim object.
 
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (RelativeFrame): The frame in which to set the position and orientation. Defaults to WORLD. PARENT frame
-            set position relative to the object parent. SCENE frame set position relative to the scene.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
 
             # If kinematic only, clear cache for the root link
             if self.kinematic_only:
@@ -995,12 +996,12 @@ class EntityPrim(XFormPrim):
                 self._articulation_view.set_world_poses(position, orientation)
                 PoseAPI.invalidate()
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
             # If kinematic only, clear cache for the root link
             if self.kinematic_only:
@@ -1023,13 +1024,13 @@ class EntityPrim(XFormPrim):
         else:
             raise ValueError(f"Invalid frame: {frame}")
 
-    def get_position_orientation(self, frame=RelativeFrame.WORLD):
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
         """
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (RelativeFrame): frame to get the pose with respect to. Default to WORLD. PARENT frame
-            get position relative to the object parent. SCENE frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
+            get position relative to the object parent. scene frame get position relative to the scene.
 
         Returns:
             2-tuple:
@@ -1037,7 +1038,7 @@ class EntityPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == RelativeFrame.WORLD:
+        if frame == "world":
             # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
             if og.sim.is_stopped():
                 return XFormPrim.get_position_orientation(self)
@@ -1048,12 +1049,12 @@ class EntityPrim(XFormPrim):
             else:
                 positions, orientations = self._articulation_view.get_world_poses()
 
-        elif frame == RelativeFrame.SCENE:
+        elif frame == "scene":
 
             # TODO: Implement this for scene frame
             pass
 
-        elif frame == RelativeFrame.PARENT:
+        elif frame == "parent":
 
             # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
             if og.sim.is_stopped():
@@ -1070,23 +1071,25 @@ class EntityPrim(XFormPrim):
 
         return positions[0], orientations[0][[1, 2, 3, 0]]
 
-    def set_local_pose(self, position=None, orientation=None, frame=RelativeFrame.PARENT):
+    def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
         import warnings
 
         warnings.warn(
-            "set_local_pose is not implemented for articulated objects. Use set_position_orientation(frame=RelativeFrame.PARENT) instead."
+            "set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame=\"parent\") instead", 
+            DeprecationWarning
         )
-        return self.set_position_orientation(position=position, orientation=orientation, frame=RelativeFrame.PARENT)
+        return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
     def get_local_pose(self):
 
         import warnings
 
         warnings.warn(
-            "get_local_pose is not implemented for articulated objects. Use get_position_orientation(frame=RelativeFrame.PARENT) instead."
+            "get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame=\"parent\") instead", 
+            DeprecationWarning
         )
-        return self.get_position_orientation(frame=RelativeFrame.PARENT)
+        return self.get_position_orientation(frame="parent")
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
