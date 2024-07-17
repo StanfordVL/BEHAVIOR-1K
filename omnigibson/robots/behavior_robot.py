@@ -604,14 +604,14 @@ class BRPart(ABC):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
-        if frame == "world":
-
-            return self._root_link.get_position_orientation()
-
-        elif frame == "scene":
+        if frame == "world" or frame == "scene":
 
             position, orientation = self._root_link.get_position_orientation()
-            return T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
+
+            if frame == "scene" and self.scene is not None:
+                position, orientation = T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
+            
+            return position, orientation
 
         else:
 

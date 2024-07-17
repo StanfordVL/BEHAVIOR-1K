@@ -146,6 +146,8 @@ def test_multi_scene_scene_prim():
     assert np.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
     assert np.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
 
+    og.clear()
+
 
 def test_multi_scene_particle_source():
     sink_cfg = dict(
@@ -181,6 +183,8 @@ def test_multi_scene_particle_source():
 
     for _ in range(50):
         og.sim.step()
+    
+    og.clear()
 
 def test_multi_scene_position_orientation_relative_to_scene():
     vec_env = setup_multi_environment(3)
@@ -210,10 +214,10 @@ def test_multi_scene_position_orientation_relative_to_scene():
         f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
     
     # Get the scene's global position and orientation
-    scene_pos, scene_ori = scene_prim.get_position_orientation(frame="world")
+    scene_pos, scene_ori = scene_prim.get_position_orientation()
 
     # Get the robot's global position and orientation
-    global_pos, global_ori = robot.get_position_orientation(frame="world")
+    global_pos, global_ori = robot.get_position_orientation()
 
     # Calculate expected global position
     expected_global_pos = scene_pos + updated_relative_pos
@@ -228,5 +232,3 @@ def test_multi_scene_position_orientation_relative_to_scene():
     # Assert that the global orientation is correct
     assert np.allclose(global_ori, expected_global_ori, atol=1e-3), \
         f"Global orientation {global_ori} does not match expected {expected_global_ori}"
-
-    og.clear() 

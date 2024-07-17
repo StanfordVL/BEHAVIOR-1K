@@ -393,7 +393,7 @@ class RigidPrim(XFormPrim):
                 self._kinematic_local_pose_cache = (position, orientation)
 
         # If we are in a scene, compute the scene-local transform
-        if frame == "scene":
+        if frame == "scene" and self.scene is not None:
             position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
 
         return position, orientation
