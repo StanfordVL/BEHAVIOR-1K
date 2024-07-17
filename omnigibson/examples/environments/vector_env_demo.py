@@ -14,7 +14,7 @@ from omnigibson.macros import gm
 NUM_STEPS = 100
 
 
-def main():
+def main(random_selection=False, headless=False, short_exec=False):
     # Load the config
     gm.RENDER_VIEWER_CAMERA = False
     gm.ENABLE_FLATCACHE = True
@@ -28,7 +28,8 @@ def main():
     vec_env = og.VectorEnvironment(5, config)
     import time
 
-    while True:
+    max_iterations = 100 if not short_exec else 1
+    for _ in range(max_iterations):
         start_time = time.time()
         for _ in range(NUM_STEPS):
             actions = []

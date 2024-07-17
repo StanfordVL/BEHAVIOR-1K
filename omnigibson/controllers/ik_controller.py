@@ -161,8 +161,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
                     ]
                 else:
-                    command_input_limits[0][3:] = -math.pi
-                    command_input_limits[1][3:] = math.pi
+                    command_input_limits[0][3:] = [-math.pi] * len(command_input_limits[0][3:])
+                    command_input_limits[1][3:] = [math.pi] * len(command_input_limits[1][3:])
             if command_output_limits is not None:
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
@@ -170,8 +170,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
                     ]
                 else:
-                    command_output_limits[0][3:] = -math.pi
-                    command_output_limits[1][3:] = math.pi
+                    command_output_limits[0][3:] = [-math.pi] * len(command_output_limits[0][3:])
+                    command_output_limits[1][3:] = [math.pi] * len(command_output_limits[1][3:])
 
         # Run super init
         super().__init__(
