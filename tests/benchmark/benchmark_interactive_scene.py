@@ -63,9 +63,9 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         )
         scene.add_object(cloth)
         og.sim.step()
-        water_system = scene.system_registry("name", "water")
+        water_system = scene.get_system("water")
         for i in range(100):
-            water_system.generate_particles(scene=scene, positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
+            water_system.generate_particles(positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
         og.sim.step()
 
     og.sim.play()

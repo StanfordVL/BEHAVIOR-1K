@@ -218,7 +218,7 @@ class TestSymbolicPrimitives:
 
     @pytest.mark.skip(reason="primitives are broken")
     def test_soak_under(self, env, prim_gen, robot, sponge, sink):
-        water_system = env.scene.system_registry("name", "water", force_active=True)
+        water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
         assert not sink.states[object_states.ToggledOn].get_value()
 
@@ -243,12 +243,12 @@ class TestSymbolicPrimitives:
     @pytest.mark.skip(reason="primitives are broken")
     def test_wipe(self, env, prim_gen, sponge, sink, countertop):
         # Some pre-assertions
-        water_system = env.scene.system_registry("name", "water", force_active=True)
+        water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
         assert not sink.states[object_states.ToggledOn].get_value()
 
         # Dirty the countertop as the setup
-        mud_system = env.scene.system_registry("name", "mud", force_active=True)
+        mud_system = env.scene.get_system("mud")
         countertop.states[object_states.Covered].set_value(mud_system, True)
         assert countertop.states[object_states.Covered].get_value(mud_system)
 

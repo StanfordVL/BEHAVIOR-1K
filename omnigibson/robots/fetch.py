@@ -159,10 +159,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         )
 
     @property
-    def model_name(self):
-        return "Fetch"
-
-    @property
     def tucked_default_joint_pos(self):
         return np.array(
             [
@@ -222,7 +218,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Set the wheels back to using sphere approximations
         for wheel_name in ["l_wheel_link", "r_wheel_link"]:
             log.warning(
-                "Fetch wheel links are post-processed to use sphere approximation collision meshes."
+                "Fetch wheel links are post-processed to use sphere approximation collision meshes. "
                 "Please ignore any previous errors about these collision meshes."
             )
             wheel_link = self.links[wheel_name]
@@ -365,36 +361,12 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         }
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([0, 1])
-
-    @property
     def trunk_control_idx(self):
         """
         Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joint.
+            n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return np.array([2])
-
-    @property
-    def camera_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
-        """
-        return np.array([3, 5])
-
-    @property
-    def arm_control_idx(self):
-        return {self.default_arm: np.array([4, 6, 7, 8, 9, 10, 11])}
-
-    @property
-    def gripper_control_idx(self):
-        return {self.default_arm: np.array([12, 13])}
+        return np.array([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def disabled_collision_pairs(self):
@@ -418,6 +390,18 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["wrist_flex_link", "wrist_roll_link"],
             ["wrist_roll_link", "gripper_link"],
         ]
+
+    @property
+    def base_joint_names(self):
+        return ["l_wheel_joint", "r_wheel_joint"]
+
+    @property
+    def camera_joint_names(self):
+        return ["head_pan_joint", "head_tilt_joint"]
+
+    @property
+    def trunk_joint_names(self):
+        return ["torso_lift_joint"]
 
     @property
     def manipulation_link_names(self):
@@ -455,7 +439,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def arm_joint_names(self):
         return {
             self.default_arm: [
-                "torso_lift_joint",
                 "shoulder_pan_joint",
                 "shoulder_lift_joint",
                 "upperarm_roll_joint",

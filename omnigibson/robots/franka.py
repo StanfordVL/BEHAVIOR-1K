@@ -164,17 +164,16 @@ class FrankaPanda(ManipulationRobot):
                 ([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(12))
             )
             self._teleop_rotation_offset = np.array([0, 0, 0.707, 0.707])
-            # TODO: add ag support for inspire hand
             self._ag_start_points = [
-                # GraspingPoint(link_name=f"base_link", position=[0, -0.025, 0.035]),
-                # GraspingPoint(link_name=f"base_link", position=[0, 0.03, 0.035]),
-                # GraspingPoint(link_name=f"link14", position=[-0.0115, -0.07, -0.015]),
+                GraspingPoint(link_name=f"base_link", position=[-0.025, -0.07, 0.012]),
+                GraspingPoint(link_name=f"base_link", position=[-0.015, -0.11, 0.012]),
+                GraspingPoint(link_name=f"link14", position=[-0.01, 0.015, 0.004]),
             ]
             self._ag_end_points = [
-                # GraspingPoint(link_name=f"link22", position=[-0.0115, -0.06, 0.015]),
-                # GraspingPoint(link_name=f"link32", position=[-0.0115, -0.06, 0.015]),
-                # GraspingPoint(link_name=f"link42", position=[-0.0115, -0.06, 0.015]),
-                # GraspingPoint(link_name=f"link52", position=[-0.0115, -0.06, 0.015]),
+                GraspingPoint(link_name=f"link22", position=[0.006, 0.04, 0.003]),
+                GraspingPoint(link_name=f"link32", position=[0.006, 0.045, 0.003]),
+                GraspingPoint(link_name=f"link42", position=[0.006, 0.04, 0.003]),
+                GraspingPoint(link_name=f"link52", position=[0.006, 0.04, 0.003]),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for FrankaPanda")
@@ -208,6 +207,7 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def model_name(self):
+        # Override based on specified Franka variant
         return self._model_name
 
     @property
@@ -250,18 +250,6 @@ class FrankaPanda(ManipulationRobot):
     @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
-
-    @property
-    def arm_control_idx(self):
-        return {self.default_arm: np.arange(7)}
-
-    @property
-    def gripper_control_idx(self):
-        return {
-            self.default_arm: np.array(
-                [list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]]
-            )
-        }
 
     @property
     def arm_link_names(self):
