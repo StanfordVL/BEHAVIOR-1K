@@ -1,7 +1,7 @@
 import os
+from typing import Literal
 
 import numpy as np
-from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -714,8 +714,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         return self.base_footprint_link.get_position_orientation()
 
-
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene", "parent"] = "world"):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "scene", "parent"] = "world"
+    ):
         """
         Sets tiago's pose with respect to the specified frame
 

@@ -4,10 +4,10 @@ import math
 import os
 import re
 from collections.abc import Iterable
+from typing import Literal
 
 import numpy as np
 import trimesh
-from typing import Literal
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -680,9 +680,7 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_position_orientation(
-                    link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame="parent"
-                )
+                XFormPrim.set_position_orientation(link, np.zeros(3), np.array([0, 0, 0, 1.0]), frame="parent")
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():

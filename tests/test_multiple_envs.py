@@ -186,6 +186,7 @@ def test_multi_scene_particle_source():
     
     og.clear()
 
+
 def test_multi_scene_position_orientation_relative_to_scene():
     vec_env = setup_multi_environment(3)
 
@@ -206,13 +207,15 @@ def test_multi_scene_position_orientation_relative_to_scene():
     updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
 
     # Assert that the relative position has been updated correctly
-    assert np.allclose(updated_relative_pos, new_relative_pos, atol=1e-3), \
-        f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
+    assert np.allclose(
+        updated_relative_pos, new_relative_pos, atol=1e-3
+    ), f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
 
     # Assert that the relative orientation has been updated correctly
-    assert np.allclose(updated_relative_ori, new_relative_ori, atol=1e-3), \
-        f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
-    
+    assert np.allclose(
+        updated_relative_ori, new_relative_ori, atol=1e-3
+    ), f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
+
     # Get the scene's global position and orientation
     scene_pos, scene_ori = scene_prim.get_position_orientation()
 
@@ -223,12 +226,21 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_pos = scene_pos + updated_relative_pos
 
     # Assert that the global position is correct
-    assert np.allclose(global_pos, expected_global_pos, atol=1e-3), \
-        f"Global position {global_pos} does not match expected {expected_global_pos}"
+    assert np.allclose(
+        global_pos, expected_global_pos, atol=1e-3
+    ), f"Global position {global_pos} does not match expected {expected_global_pos}"
 
     # Calculate expected global orientation
     expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
 
     # Assert that the global orientation is correct
+<<<<<<< HEAD
     assert np.allclose(global_ori, expected_global_ori, atol=1e-3), \
         f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+=======
+    assert np.allclose(
+        global_ori, expected_global_ori, atol=1e-3
+    ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+
+    og.clear()
+>>>>>>> 0019f1d54a06e2558311ed81f51f3b5f3dddaf43
