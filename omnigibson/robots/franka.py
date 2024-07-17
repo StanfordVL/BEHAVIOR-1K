@@ -202,6 +202,7 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def model_name(self):
+        # Override based on specified Franka variant
         return self._model_name
 
     @property
@@ -244,18 +245,6 @@ class FrankaPanda(ManipulationRobot):
     @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
-
-    @property
-    def arm_control_idx(self):
-        return {self.default_arm: th.arange(7)}
-
-    @property
-    def gripper_control_idx(self):
-        return {
-            self.default_arm: th.tensor(
-                [list(self.joints.keys()).index(name) for name in self.finger_joint_names[self.default_arm]]
-            )
-        }
 
     @property
     def arm_link_names(self):

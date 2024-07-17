@@ -264,20 +264,17 @@ class PointNavigationTask(BaseTask):
         log.info("Sampled goal position: {}".format(goal_pos))
         return initial_pos, initial_quat, goal_pos
 
-    def _get_geodesic_potential(self, env, no_path_reward=-1.0):
+    def _get_geodesic_potential(self, env):
         """
         Get potential based on geodesic distance
 
         Args:
             env: environment instance
-            no_path_reward (float): Reward to return if no path is found to the goal position
 
         Returns:
             float: geodesic distance to the target position
         """
         _, geodesic_dist = self.get_shortest_path_to_goal(env=env)
-        if geodesic_dist is None:
-            return no_path_reward
         return geodesic_dist
 
     def _get_l2_potential(self, env):
@@ -292,25 +289,27 @@ class PointNavigationTask(BaseTask):
         """
         return T.l2_distance(env.robots[self._robot_idn].states[Pose].get_value()[0][:2], self._goal_pos[:2])
 
-    def get_potential(self, env, no_path_reward=-1.0):
+    def get_potential(self, env):
         """
         Compute task-specific potential: distance to the goal
 
         Args:
             env (Environment): Environment instance
-            no_path_reward (float): Reward to return if no path is found to the goal position
 
         Returns:
             float: Computed potential
         """
         if self._reward_type == "l2":
-            reward = self._get_l2_potential(env)
+            potentail = self._get_l2_potential(env)
         elif self._reward_type == "geodesic":
-            reward = self._get_geodesic_potential(env, no_path_reward=no_path_reward)
+            potential = self._get_geodesic_potential(env)
+            # If no path is found, fall back to L2 potential
+            if potential is None:
+                potentail = self._get_l2_potential(env)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
-        return reward
+        return potential
 
     def _reset_agent(self, env):
         # Reset agent

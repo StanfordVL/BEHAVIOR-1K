@@ -193,12 +193,23 @@ class LocomotionRobot(BaseRobot):
 
     @property
     @abstractmethod
+    def base_joint_names(self):
+        """
+        Returns:
+            list: Array of joint names corresponding to this robot's base joints (e.g.: wheels).
+
+                Note: the ordering within the list is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
+        """
+        raise NotImplementedError
+
+    @property
     def base_control_idx(self):
         """
         Returns:
             n-array: Indices in low-level control vector corresponding to base joints.
         """
-        raise NotImplementedError
+        return np.array([list(self.joints.keys()).index(name) for name in self.base_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):

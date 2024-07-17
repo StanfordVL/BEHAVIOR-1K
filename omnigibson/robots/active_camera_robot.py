@@ -116,12 +116,23 @@ class ActiveCameraRobot(BaseRobot):
 
     @property
     @abstractmethod
+    def camera_joint_names(self):
+        """
+        Returns:
+            list: Array of joint names corresponding to this robot's camera joints.
+
+                Note: the ordering within the list is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
+        """
+        raise NotImplementedError
+
+    @property
     def camera_control_idx(self):
         """
         Returns:
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
-        raise NotImplementedError
+        return np.array([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):

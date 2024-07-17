@@ -552,6 +552,9 @@ class ManipulationRobot(BaseRobot):
         Returns:
             dict: Dictionary mapping arm appendage name to corresponding arm link names,
                 should correspond to specific link names in this robot's underlying model file
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding idxs.
         """
         raise NotImplementedError
 
@@ -562,6 +565,9 @@ class ManipulationRobot(BaseRobot):
         Returns:
             dict: Dictionary mapping arm appendage name to corresponding arm joint names,
                 should correspond to specific joint names in this robot's underlying model file
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
         """
         raise NotImplementedError
 
@@ -582,6 +588,9 @@ class ManipulationRobot(BaseRobot):
         Returns:
             dict: Dictionary mapping arm appendage name to array of link names corresponding to
                 this robot's fingers
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding idxs.
         """
         raise NotImplementedError
 
@@ -591,29 +600,36 @@ class ManipulationRobot(BaseRobot):
         """
         Returns:
             dict: Dictionary mapping arm appendage name to array of joint names corresponding to
-                this robot's fingers
+                this robot's fingers.
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
         """
         raise NotImplementedError
 
     @property
-    @abstractmethod
     def arm_control_idx(self):
         """
         Returns:
             dict: Dictionary mapping arm appendage name to indices in low-level control
                 vector corresponding to arm joints.
         """
-        raise NotImplementedError
+        return {
+            arm: np.array([list(self.joints.keys()).index(name) for name in self.arm_joint_names[arm]])
+            for arm in self.arm_names
+        }
 
     @property
-    @abstractmethod
     def gripper_control_idx(self):
         """
         Returns:
             dict: Dictionary mapping arm appendage name to indices in low-level control
                 vector corresponding to gripper joints.
         """
-        raise NotImplementedError
+        return {
+            arm: np.array([list(self.joints.keys()).index(name) for name in self.finger_joint_names[arm]])
+            for arm in self.arm_names
+        }
 
     @property
     def arm_links(self):

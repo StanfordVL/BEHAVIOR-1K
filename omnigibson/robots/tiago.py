@@ -180,12 +180,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_joint_names(self):
         names = dict()
         for arm in self.arm_names:
-            names[arm] = ["torso_lift_joint"] + [f"arm_{arm}_{i}_joint" for i in range(1, 8)]
+            names[arm] = [f"arm_{arm}_{i}_joint" for i in range(1, 8)]
         return names
-
-    @property
-    def model_name(self):
-        return "Tiago"
 
     @classproperty
     def n_arms(cls):
@@ -453,15 +449,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to the three controllable 1DoF base joints
-        """
-        joints = list(self.joints.keys())
-        return th.tensor([joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "rz"]])
-
-    @property
     def base_idx(self):
         """
         Returns:
@@ -476,29 +463,16 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def trunk_control_idx(self):
         """
         Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joint.
+            n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return th.tensor([6])
-
-    @property
-    def camera_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
-        """
-        return th.tensor([9, 12])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def arm_control_idx(self):
-        return {
-            "left": th.tensor([7, 10, 13, 15, 17, 19, 21]),
-            "right": th.tensor([8, 11, 14, 16, 18, 20, 22]),
-            "combined": th.tensor([7, 8, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]),
-        }
-
-    @property
-    def gripper_control_idx(self):
-        return {"left": th.tensor([23, 24]), "right": th.tensor([25, 26])}
+        # Add combined entry
+        idxs = super().arm_control_idx
+        idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))
+        return idxs
 
     @property
     def finger_lengths(self):
@@ -589,6 +563,18 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         ]
 
     @property
+    def base_joint_names(self):
+        return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
+
+    @property
+    def camera_joint_names(self):
+        return ["head_1_joint", "head_2_joint"]
+
+    @property
+    def trunk_joint_names(self):
+        return ["torso_lift_joint"]
+
+    @property
     def manipulation_link_names(self):
         return [
             "torso_fixed_link",
@@ -638,16 +624,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def finger_link_names(self):
-        return {
-            arm: ["gripper_{}_right_finger_link".format(arm), "gripper_{}_left_finger_link".format(arm)]
-            for arm in self.arm_names
-        }
+        return {arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"] for arm in self.arm_names}
 
     @property
     def finger_joint_names(self):
         return {
-            arm: ["gripper_{}_right_finger_joint".format(arm), "gripper_{}_left_finger_joint".format(arm)]
-            for arm in self.arm_names
+            arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"] for arm in self.arm_names
         }
 
     @property
