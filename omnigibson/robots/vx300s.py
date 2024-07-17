@@ -113,10 +113,6 @@ class VX300S(ManipulationRobot):
         )
 
     @property
-    def model_name(self):
-        return "VX300S"
-
-    @property
     def discrete_action_list(self):
         # Not supported for this robot
         raise NotImplementedError()
@@ -143,16 +139,6 @@ class VX300S(ManipulationRobot):
     @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
-
-    @property
-    def arm_control_idx(self):
-        # The first 7 joints
-        return {self.default_arm: np.arange(6)}
-
-    @property
-    def gripper_control_idx(self):
-        # The last two joints
-        return {self.default_arm: np.arange(6, 8)}
 
     @property
     def disabled_collision_pairs(self):
