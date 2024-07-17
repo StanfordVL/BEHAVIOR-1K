@@ -761,10 +761,6 @@ class BatchControlViewAPIImpl:
     def __init__(self, pattern):
         # The prim path pattern that will be passed into the view
         self._pattern = pattern
-        # TODO: Remove this once we loosen the constraint that everything must end with /base_link
-        assert self._pattern.endswith(
-            "/base_link"
-        ), "BatchControlViewAPIImpl can only be created with a pattern ending in /base_link!"
 
         # The unified ArticulationView used to access all of the controllable objects in the scene.
         self._view = None
@@ -820,14 +816,9 @@ class BatchControlViewAPIImpl:
         }
         expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
 
-        # Apply the pattern -- we manually check for the two cases:
-        # 1) (Non-fixed base objects) Articulation root path exists at the root link level, i.e.: /PRIM/PATH/object/base_link
-        # 2) (Fixed-base objects) Articulation root path exists at the object prim level, i.e.: /PRIM/PATH/object
+        # Apply the pattern to find the expected prim paths
         expected_prim_paths = {
-            prim_path
-            for prim_path in expected_prim_paths
-            if re.fullmatch(self._pattern.replace("*", ".*"), prim_path)
-            or re.fullmatch(self._pattern.replace("*", ".*").split("/base_link")[0], prim_path)
+            prim_path for prim_path in expected_prim_paths if re.fullmatch(self._pattern.replace("*", ".*"), prim_path)
         }
 
         # Make sure we have at least one controllable object
@@ -1049,8 +1040,6 @@ class ControllableObjectViewAPI:
         for view in cls._view_by_pattern.values():
             view.clear()
 
-        cls._view_by_pattern = {}
-
     @classmethod
     def flush_control(cls):
         for view in cls._view_by_pattern.values():
@@ -1093,6 +1082,10 @@ class ControllableObjectViewAPI:
         for view in cls._view_by_pattern.values():
             all_prim_paths.extend(view._idx.keys())
         counts = collections.Counter(all_prim_paths)
+
+        missing = set(expected_prim_paths) - set(all_prim_paths)
+        assert len(missing) == 0, f"Prim paths {missing} are missing from the views!"
+
         more_than_once = {prim_path: count for prim_path, count in counts.items() if count > 1}
         assert len(more_than_once) == 0, f"Prim paths {more_than_once} are present in multiple views!"
 
