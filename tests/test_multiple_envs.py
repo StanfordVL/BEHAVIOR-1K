@@ -234,13 +234,5 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
 
     # Assert that the global orientation is correct
-<<<<<<< HEAD
     assert np.allclose(global_ori, expected_global_ori, atol=1e-3), \
         f"Global orientation {global_ori} does not match expected {expected_global_ori}"
-=======
-    assert np.allclose(
-        global_ori, expected_global_ori, atol=1e-3
-    ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
-
-    og.clear()
->>>>>>> 0019f1d54a06e2558311ed81f51f3b5f3dddaf43
