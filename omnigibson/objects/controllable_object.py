@@ -149,14 +149,6 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-        # If we haven't already created a physics callback, do so now so control gets updated every sim step
-        callback_name = f"{self.name}_controller_callback"
-        if not og.sim.physics_callback_exists(callback_name=callback_name):
-            og.sim.add_physics_callback(
-                callback_name=callback_name,
-                callback_fn=lambda x: self.step(),
-            )
-
     def load(self, scene):
         # Run super first
         prim = super().load(scene)
@@ -560,7 +552,7 @@ class ControllableObject(BaseObject):
         # TODO: Move gravity force computation dummy to this class instead of BaseRobot
         fcns["gravity_force"] = lambda: (
             ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
-            if not self.fixed_base
+            if self.fixed_base
             else ControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
