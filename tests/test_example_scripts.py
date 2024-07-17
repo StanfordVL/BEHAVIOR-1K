@@ -1,8 +1,9 @@
-import pytest
 import importlib
 import os
 import sys
 from pathlib import Path
+
+import pytest
 
 current_dir = Path(__file__).parent.absolute()
 EXAMPLES_DIR = os.path.normpath(os.path.join(current_dir, "..", "omnigibson", "examples"))

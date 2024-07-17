@@ -6,11 +6,11 @@ import math
 from typing import Callable, List, Optional, Tuple, Union
 
 import carb
+import numpy as np
 import omni
 import omni.graph.core as ogc
 import omni.timeline
 import omni.usd as ou
-import numpy as np
 import torch
 import torch as th
 import warp as wp
