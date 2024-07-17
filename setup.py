@@ -1,15 +1,49 @@
 # read the contents of your README file
-from os import path
+import os
+import urllib.request
+import subprocess
 
 from setuptools import find_packages, setup
 
-this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
     lines = f.readlines()
 
 # remove images from README
 lines = [x for x in lines if ".png" not in x]
 long_description = "".join(lines)
+
+isaac_sim_packages = [
+    "omniverse_kit-106.0.0",
+    "isaacsim_kernel-4.0.0.0", "isaacsim_app-4.0.0.0", "isaacsim_core-4.0.0.0",
+    "isaacsim_gui-4.0.0.0", "isaacsim_utils-4.0.0.0", "isaacsim_storage-4.0.0.0",
+    "isaacsim_asset-4.0.0.0", "isaacsim_sensor-4.0.0.0", "isaacsim_robot_motion-4.0.0.0",
+    "isaacsim_robot-4.0.0.0", "isaacsim_benchmark-4.0.0.0", "isaacsim_code_editor-4.0.0.0",
+    "isaacsim_ros1-4.0.0.0", "isaacsim_cortex-4.0.0.0", "isaacsim_example-4.0.0.0",
+    "isaacsim_replicator-4.0.0.0", "isaacsim_rl-4.0.0.0", "isaacsim_robot_setup-4.0.0.0",
+    "isaacsim_ros2-4.0.0.0", "isaacsim_template-4.0.0.0", "isaacsim_test-4.0.0.0",
+    "isaacsim-4.0.0.0", "isaacsim_extscache_physics-4.0.0.0", "isaacsim_extscache_kit-4.0.0.0",
+    "isaacsim_extscache_kit_sdk-4.0.0.0"
+]
+
+base_url = "https://pypi.nvidia.com"
+for package in isaac_sim_packages:
+    package_name = package.split('-')[0]
+    old_filename = f"{package}-cp310-none-manylinux_2_34_x86_64.whl"
+    new_filename = f"{package}-cp310-none-manylinux_2_31_x86_64.whl"
+    url = f"{base_url}/{package_name}/{old_filename}"
+
+    print(f"Downloading {old_filename}...")
+    urllib.request.urlretrieve(url, old_filename)
+
+    print(f"Renaming {old_filename} to {new_filename}...")
+    os.rename(old_filename, new_filename)
+
+    print(f"Installing {new_filename}...")
+    subprocess.run(["pip", "install", new_filename], check=True)
+
+    print(f"Removing {new_filename}...")
+    os.remove(new_filename)
 
 setup(
     name="omnigibson",
@@ -45,6 +79,8 @@ setup(
         "click~=8.1.3",
         "aenum~=3.1.15",
         "rtree~=1.2.0",
+        "numba~=0.59.1",
+        "telemoma~=0.1.2",
     ],
     tests_require=[],
     python_requires=">=3",
