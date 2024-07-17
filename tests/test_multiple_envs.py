@@ -183,7 +183,7 @@ def test_multi_scene_particle_source():
 
     for _ in range(50):
         og.sim.step()
-    
+
     og.clear()
 
 
@@ -234,5 +234,6 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
 
     # Assert that the global orientation is correct
-    assert np.allclose(global_ori, expected_global_ori, atol=1e-3), \
-        f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+    assert np.allclose(
+        global_ori, expected_global_ori, atol=1e-3
+    ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
