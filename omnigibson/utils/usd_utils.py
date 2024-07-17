@@ -1105,7 +1105,7 @@ class ControllableObjectViewAPI:
         non-fixed base robots. Fixed and non-fixed versions of the same robot will be mapped to different
         patterns since they have different articulation root paths (object prim vs base link prim).
         """
-        scene_id, robot_name = prim_path.split("/")[1:3]
+        scene_id, robot_name = prim_path.split("/")[2:4]
         assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
         components = robot_name.split("__")
         assert len(components) == 3, f"Robot name {robot_name} does not match expected format"
