@@ -97,9 +97,16 @@ class ControllableObject(BaseObject):
         if relative_prim_path:
             # If prim path is specified, assert that the last element starts with the right prefix to ensure that
             # the object will be included in the ControllableObjectViewAPI.
-            assert relative_prim_path.split("/")[-1].startswith(
-                f"controllable__{class_name}__"
-            ), f"If relative_prim_path is specified, the last element of the path must start with 'controllable__{class_name}__'."
+            assert relative_prim_path.split("/")[-1].startswith(f"controllable__{class_name}__"), (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+            assert relative_prim_path.split("/")[-1].count("__") == 2, (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
         else:
             # If prim path is not specified, set it to the default path, but prepend controllable.
             relative_prim_path = f"/controllable__{class_name}__{name}"
@@ -121,6 +128,23 @@ class ControllableObject(BaseObject):
         )
 
     def _initialize(self):
+        # Assert that the prim path matches ControllableObjectViewAPI's expected format
+        scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
+        assert scene_id.startswith(
+            "scene_"
+        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
+        robot_name_components = robot_name.split("__")
+        assert (
+            len(robot_name_components) == 3
+        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
+        assert robot_name_components[0] in (
+            "controllable",
+            "dummy",
+        ), "Third component of articulation root path (robot name) must start with 'controllable' or 'dummy'"
+        assert (
+            robot_name_components[1] == self.__class__.__name__.lower()
+        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
+
         # Run super first
         super()._initialize()
         # Fill in the DOF to joint mapping

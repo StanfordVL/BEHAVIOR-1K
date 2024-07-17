@@ -1101,7 +1101,9 @@ class ControllableObjectViewAPI:
         scene_id, robot_name = prim_path.split("/")[2:4]
         assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
         components = robot_name.split("__")
-        assert len(components) == 3, f"Robot name {robot_name} does not match expected format"
+        assert (
+            len(components) == 3
+        ), f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
         assert components[0] in (
             "controllable",
             "dummy",
