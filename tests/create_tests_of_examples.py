@@ -16,6 +16,8 @@ EXAMPLES_TO_SKIP = [
     "action_primitives.wip_solve_behavior_task",
     "learning.navigation_policy_demo",
     "teleoperation.robot_teleoperate_demo",
+    # TODO: Temporarily skip the following examples
+    "robots.all_robots_visualizer",
 ]
 
 

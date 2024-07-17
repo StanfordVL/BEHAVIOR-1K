@@ -340,10 +340,10 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         )
         return controllers
 
-    def load(self):
-        prim = super(BehaviorRobot, self).load()
+    def load(self, scene):
+        prim = super(BehaviorRobot, self).load(scene)
         for part in self.parts.values():
-            part.load()
+            part.load(scene)
         return prim
 
     def _post_load(self):
@@ -510,7 +510,7 @@ class BRPart(ABC):
     """This is the interface that all BehaviorRobot eef parts must implement."""
 
     def __init__(
-        self, name: str, parent: BehaviorRobot, prim_path: str, eef_type: str, offset_to_body: List[float]
+        self, name: str, parent: BehaviorRobot, relative_prim_path: str, eef_type: str, offset_to_body: List[float]
     ) -> None:
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
@@ -518,21 +518,22 @@ class BRPart(ABC):
         Args:
             name (str): unique name of this BR part
             parent (BehaviorRobot): the parent BR object
-            prim_path (str): prim path to the root link of the eef
+            relative_prim_path (str): relative prim path to the root link of the eef
             eef_type (str): type of eef. One of hand, head
             offset_to_body (List[float]): relative POSITION offset between the rz link and the eef link.
         """
         self.name = name
         self.parent = parent
-        self.prim_path = prim_path
+        self.relative_prim_path = relative_prim_path
         self.eef_type = eef_type
         self.offset_to_body = offset_to_body
 
         self.ghost_hand = None
         self._root_link = None
 
-    def load(self) -> None:
-        self._root_link = self.parent.links[self.prim_path]
+    def load(self, scene) -> None:
+        self.scene = scene
+        self._root_link = self.parent.links[self.relative_prim_path.replace("/", "")]
         # setup ghost hand
         if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
