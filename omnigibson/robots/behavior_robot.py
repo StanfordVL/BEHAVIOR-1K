@@ -611,8 +611,10 @@ class BRPart(ABC):
             position, orientation = self._root_link.get_position_orientation()
 
             if frame == "scene" and self.scene is not None:
-                position, orientation = T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
-            
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, *self.parent.get_position_orientation()
+                )
+
             return position, orientation
 
         else:

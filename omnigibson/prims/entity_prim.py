@@ -1042,8 +1042,10 @@ class EntityPrim(XFormPrim):
 
         # If we are in a scene, compute the scene-local transform
         if frame == "scene" and self.scene is not None:
-            position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
-        
+            position, orientation = T.relative_pose_transform(
+                position, orientation, *self.scene.prim.get_position_orientation()
+            )
+
         return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
