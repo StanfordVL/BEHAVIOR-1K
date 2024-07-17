@@ -38,7 +38,7 @@ jobs:
 
       - name: Generate example tests
         working-directory: omnigibson-src
-        run: python create_tests_of_examples.py
+        run: python tests/create_tests_of_examples.py
 
       - name: Get list of generated tests
         id: get-test-list
