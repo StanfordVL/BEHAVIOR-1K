@@ -163,6 +163,7 @@ def get_all_system_categories():
     og_categories_path = os.path.join(og_dataset_path, "systems")
 
     categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    categories.append("cloth")
     return sorted(categories)
 
 

@@ -327,7 +327,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
             material.emissive_color = (
-                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
+                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
             )
             material.emissive_intensity = (
                 m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]

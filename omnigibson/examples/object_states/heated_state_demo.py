@@ -8,7 +8,7 @@ from omnigibson.macros import gm
 gm.ENABLE_OBJECT_STATES = True
 
 
-def main():
+def main(random_selection=False, headless=False, short_exec=False):
     # Define object configurations for objects to load -- we want to load a light and three bowls
     obj_configs = []
 
@@ -70,8 +70,9 @@ def main():
     print("==== Initial state ====")
     report_states(objs)
 
-    # Notify user that we're about to heat the object
-    input("Objects will be heated, and steam will slowly rise. Press ENTER to continue.")
+    if not short_exec:
+        # Notify user that we're about to heat the object
+        input("Objects will be heated, and steam will slowly rise. Press ENTER to continue.")
 
     # Heated.
     for obj in objs:
@@ -83,7 +84,8 @@ def main():
     # After a while, objects will be below the Steam temperature threshold.
     print("==== Objects are now heated... ====")
     print()
-    for _ in range(2000):
+    max_iterations = 2000 if not short_exec else 100
+    for _ in range(max_iterations):
         env.step(th.empty(0))
         # Also print temperatures
         temps = [f"{obj.states[object_states.Temperature].get_value():>7.2f}" for obj in objs]
@@ -94,8 +96,10 @@ def main():
     print("==== Objects are no longer heated... ====")
     report_states(objs)
 
-    # Close environment at the end
-    input("Demo completed. Press ENTER to shutdown environment.")
+    if not short_exec:
+        # Close environment at the end
+        input("Demo completed. Press ENTER to shutdown environment.")
+
     env.close()
 
 

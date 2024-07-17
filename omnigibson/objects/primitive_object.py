@@ -184,7 +184,11 @@ class PrimitiveObject(StatefulObject):
             raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
 
         visual_geom_prim.color = self._load_config["color"]
-        visual_geom_prim.opacity = self._load_config["opacity"].item()
+        visual_geom_prim.opacity = (
+            self._load_config["opacity"].item()
+            if isinstance(self._load_config["opacity"], th.Tensor)
+            else self._load_config["opacity"]
+        )
 
     @property
     def radius(self):
@@ -326,10 +330,13 @@ class PrimitiveObject(StatefulObject):
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
                     vals = th.tensor(attr.Get()).double() * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 

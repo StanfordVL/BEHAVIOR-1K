@@ -153,7 +153,7 @@ class Remapper:
                     f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled."
                 )
                 self.warning_printed.add(semantic_id)
-            return semantic_class_name_to_id(scene)["unlabelled"]
+            return semantic_class_name_to_id()["unlabelled"]
         return self.key_array[semantic_id]
 
 

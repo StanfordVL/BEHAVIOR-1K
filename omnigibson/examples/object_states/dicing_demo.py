@@ -95,15 +95,17 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=T.euler2quat([-math.pi / 2, 0, 0]),
     )
 
-    input("The knife will fall on the apple and dice it. Press [ENTER] to continue.")
+    if short_exec == False:
+        input("The knife will fall on the apple and dice it. Press [ENTER] to continue.")
 
     # Step simulation for a bit so that apple is diced
-    for i in range(1000):
+    for _ in range(1000):
         env.step(th.empty(0))
 
-    input("Apple has been diced! Press [ENTER] to terminate the demo.")
+    if short_exec == False:
+        input("Apple has been diced! Press [ENTER] to terminate the demo.")
 
-    # Always close environment at the end
+    # Always close simulator at the end
     env.close()
 
 

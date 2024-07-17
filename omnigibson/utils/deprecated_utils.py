@@ -10,6 +10,7 @@ import omni
 import omni.graph.core as ogc
 import omni.timeline
 import omni.usd as ou
+import numpy as np
 import torch
 import torch as th
 import warp as wp
@@ -681,10 +682,10 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
     for bbox_2d in bboxes_2d_data:
         semantic_id_list.append(bbox_2d["semanticId"])
         bbox_2d_list.append(bbox_2d)
-    semantic_id_list_np = th.unique(th.tensor(semantic_id_list))
+    semantic_id_list_np = np.unique(np.array(semantic_id_list))
     color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
     for bbox_2d in bbox_2d_list:
-        index = th.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
+        index = np.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
         bbox_color = color_list[index]
         outline = (bbox_color[0], bbox_color[1], bbox_color[2])
         if num_channels == 4:
@@ -697,5 +698,5 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         rgb_img_draw.rectangle(
             [(bbox_2d["x_min"], bbox_2d["y_min"]), (bbox_2d["x_max"], bbox_2d["y_max"])], outline=outline, width=2
         )
-    bboxes_2d_rgb = th.tensor(rgb_img)
+    bboxes_2d_rgb = np.array(rgb_img)
     return bboxes_2d_rgb

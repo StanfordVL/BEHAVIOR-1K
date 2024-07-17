@@ -8,7 +8,7 @@ from omnigibson.macros import gm
 gm.ENABLE_OBJECT_STATES = True
 
 
-def main():
+def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene with a stove object added
     cfg = {
         "scene": {
@@ -56,7 +56,8 @@ def main():
     assert not heat_source_state
 
     # Toggle on stove, notify user
-    input("Heat source will now turn ON: Press ENTER to continue.")
+    if not short_exec:
+        input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
 
     assert stove.states[object_states.ToggledOn].get_value()
@@ -71,20 +72,23 @@ def main():
         env.step(th.empty(0))
 
     # Toggle off stove, notify user
-    input("Heat source will now turn OFF: Press ENTER to continue.")
+    if not short_exec:
+        input("Heat source will now turn OFF: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(False)
     assert not stove.states[object_states.ToggledOn].get_value()
     for _ in range(200):
         env.step(th.empty(0))
 
     # Move stove, notify user
-    input("Heat source is now moving: Press ENTER to continue.")
+    if not short_exec:
+        input("Heat source is now moving: Press ENTER to continue.")
     stove.set_position(th.tensor([0, 1.0, 0.61]))
     for i in range(100):
         env.step(th.empty(0))
 
     # Toggle on stove again, notify user
-    input("Heat source will now turn ON: Press ENTER to continue.")
+    if not short_exec:
+        input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
     assert stove.states[object_states.ToggledOn].get_value()
     for i in range(500):
