@@ -93,13 +93,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=T.euler2quat([-math.pi / 2, 0, 0]),
     )
 
-    input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
+    if not short_exec:
+        input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
 
     # Step simulation for a bit so that apple is sliced
     for i in range(1000):
         env.step(th.empty(0))
 
-    input("Apple has been sliced! Press [ENTER] to terminate the demo.")
+    if not short_exec:
+        input("Apple has been sliced! Press [ENTER] to terminate the demo.")
 
     # Always close environment at the end
     env.close()

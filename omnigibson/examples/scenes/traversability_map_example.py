@@ -34,12 +34,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         plt.figure(figsize=(12, 12))
         plt.imshow(trav_map)
         plt.title(f"Traversable area of {scene_model} scene")
-
-    if not headless:
         plt.show()
-
-    # Shut down omnigibson at the end
-    og.shutdown()
 
 
 if __name__ == "__main__":

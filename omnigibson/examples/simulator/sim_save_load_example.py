@@ -86,9 +86,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     while not completed:
         og.sim.step()
 
-    # Shutdown omnigibson at the end
-    og.shutdown()
-
 
 if __name__ == "__main__":
     main()

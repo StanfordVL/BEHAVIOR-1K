@@ -63,12 +63,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     assert renderer_setting == renderer_setting2
 
     # Set current renderer.
-    input("Setting renderer to Real-Time. Press [ENTER] to continue.")
+    if not short_exec:
+        input("Setting renderer to Real-Time. Press [ENTER] to continue.")
     renderer_setting.set_current_renderer("Real-Time")
     assert renderer_setting.get_current_renderer() == "Real-Time"
     steps(5)
 
-    input("Setting renderer to Interactive (Path Tracing). Press [ENTER] to continue.")
+    if not short_exec:
+        input("Setting renderer to Interactive (Path Tracing). Press [ENTER] to continue.")
     renderer_setting.set_current_renderer("Interactive (Path Tracing)")
     assert renderer_setting.get_current_renderer() == "Interactive (Path Tracing)"
     steps(5)
@@ -76,10 +78,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Get all available settings.
     print(renderer_setting.settings.keys())
 
-    input(
-        "Showcasing how to use RendererSetting APIs. Please see example script for more information. "
-        "Press [ENTER] to continue."
-    )
+    if not short_exec:
+        input(
+            "Showcasing how to use RendererSetting APIs. Please see example script for more information. "
+            "Press [ENTER] to continue."
+        )
 
     # Set setting (2 lines below are equivalent).
     renderer_setting.set_setting(path="/app/renderer/skipMaterialLoading", value=True)
@@ -119,8 +122,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     renderer_setting.set_setting(path="/rtx/fog/fogColorIntensity", value=1.0)
 
     # Shutdown sim
-    input("Completed demo. Press [ENTER] to shutdown simulation.")
-    og.shutdown()
+    if not short_exec:
+        input("Completed demo. Press [ENTER] to shutdown simulation.")
+    env.close()
 
 
 if __name__ == "__main__":

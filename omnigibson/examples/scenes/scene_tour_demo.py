@@ -101,8 +101,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     print(f"\t ESC: Terminate the demo")
 
     # Loop indefinitely
-    while True:
+    steps = 0
+    max_steps = -1 if not short_exec else 100
+    while steps != max_steps:
         env.step([])
+        steps += 1
 
 
 if __name__ == "__main__":

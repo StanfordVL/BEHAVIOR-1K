@@ -21,6 +21,7 @@ EXAMPLES_TO_SKIP = [
     "object_states.attachment_demo",  # seg fualt??
     "environments.behavior_env_demo",  # This only works with pre-sampled cached BEHAVIOR activity scene
     "robots.advanced.ik_example",  # waiting for base link bug to be fixed; Fetch is fix base in this example
+    "robots.robot_control_example",  # waiting for base link bug to be fixed
 ]
 
 

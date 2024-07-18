@@ -132,7 +132,7 @@ class ActiveCameraRobot(BaseRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
-        return np.array([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):
