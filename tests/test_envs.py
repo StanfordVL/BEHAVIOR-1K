@@ -21,7 +21,7 @@ def task_tester(task_type):
         "task": {
             "type": task_type,
             # BehaviorTask-specific
-            "activity_name": "assembling_gift_baskets",
+            "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
         },
     }
@@ -59,9 +59,6 @@ def test_point_navigation_task():
     task_tester("PointNavigationTask")
 
 
-@pytest.mark.skip(
-    reason="currently broken because wicker baskets become fillable but do no have fillable volume annotation"
-)
 def test_behavior_task():
     task_tester("BehaviorTask")
 

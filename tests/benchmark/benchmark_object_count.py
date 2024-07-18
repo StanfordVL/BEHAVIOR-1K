@@ -8,7 +8,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from omnigibson import app, launch_simulator
+from omnigibson import app, launch
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.utils.asset_utils import get_og_assets_version
@@ -94,7 +94,7 @@ def benchmark_scene(sim):
 def main():
     assert MAX_NUM_OBJS <= 1000
 
-    sim = launch_simulator()
+    sim = launch()
     benchmark_scene(sim)
     app.close()
 

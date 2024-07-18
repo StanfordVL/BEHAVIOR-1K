@@ -2,30 +2,26 @@
 icon: material/server-network
 ---
 
-# 🔌 **Running on a SLURM cluster**
+# 🔌 **Running on a Server**
 
 _This documentation is a work in progress._
 
-OmniGibson can be run on a SLURM cluster using the _enroot_ container software, which is a replacement
-for Docker that allows containers to be run as the current user rather than as root. _enroot_ needs
-to be installed on your SLURM cluster by an administrator.
+**OmniGibson** can be run on an external server. Currently, only a SLURM-based cluster server is supported. Below, we describe the different methods for running **OmniGibson** on external servers.
+
+## Running on a SLURM Cluster
+
+We assume the SLURM cluster using the _enroot_ container software, which is a replacement for Docker that allows containers to be run as the current user rather than as root. _enroot_ needs to be installed on your SLURM cluster by an administrator.
 
 With enroot installed, you can follow the below steps to run OmniGibson on SLURM: 
 
-1. Download the dataset to a location that is accessible by cluster nodes. To do this, you can use
-the download_dataset.py script inside OmniGibson's scripts directory, and move it to the right spot
-later. In the below example, /cvgl/ is a networked drive that is accessible by the cluster nodes.
-**For Stanford users, this step is already done for SVL and Viscam nodes**
+1. Download the dataset to a location that is accessible by cluster nodes. To do this, you can use the download_dataset.py script inside OmniGibson's scripts directory, and move it to the right spot later. In the below example, /cvgl/ is a networked drive that is accessible by the cluster nodes. **For Stanford users, this step is already done for SVL and Viscam nodes**
 ```{.shell .annotate}
 OMNIGIBSON_NO_OMNIVERSE=1 python scripts/download_dataset.py
 mv omnigibson/data /cvgl/group/Gibson/og-data-0-2-1
 ```
 
 2. (Optional) Distribute the dataset to the individual nodes.
-This will make load times much better than reading from a network drive.
-To do this, run the below command on your SLURM head node (replace `svl` with your partition
-name and `cvgl` with your account name, as well as the paths with the respective network
-and local paths). Confirm via `squeue -u $USER` that all jobs have finished. **This step is already done for SVL and Viscam nodes**
+This will make load times much better than reading from a network drive. To do this, run the below command on your SLURM head node (replace `svl` with your partition name and `cvgl` with your account name, as well as the paths with the respective network and local paths). Confirm via `squeue -u $USER` that all jobs have finished. **This step is already done for SVL and Viscam nodes**
 ```{.shell .annotate}
 sinfo -p svl -o "%N,%n" -h | \
   sed s/,.*//g | \

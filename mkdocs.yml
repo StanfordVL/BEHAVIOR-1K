@@ -90,7 +90,6 @@ nav:
     - Quickstart: getting_started/quickstart.md
     - Important Concepts: getting_started/important_concepts.md
     - Examples: getting_started/examples.md
-    - Running on SLURM: getting_started/slurm.md
   - OmniGibson Modules:
     - Overview: modules/overview.md
     - Prims: modules/prims.md
@@ -109,6 +108,9 @@ nav:
     - Under the Hood - Isaac Sim: modules/under_the_hood.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
+    - Using Macros: tutorials/using_macros.md
+    - Customizing Robots: tutorials/customizing_robots.md
+    - Running on a Server: tutorials/running_on_a_server.md
     - Saving and Loading Simulation State: tutorials/save_load.md
     - BEHAVIOR Tasks: tutorials/behavior_tasks.md
     - BEHAVIOR Knowledgebase: tutorials/behavior_knowledgebase.md

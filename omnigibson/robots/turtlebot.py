@@ -22,12 +22,8 @@ class Turtlebot(TwoWheelRobot):
         return 0.23
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([0, 1])
+    def base_joint_names(self):
+        return ["wheel_left_joint", "wheel_right_joint"]
 
     @property
     def _default_joint_pos(self):
