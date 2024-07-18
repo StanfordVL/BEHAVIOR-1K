@@ -1,11 +1,12 @@
 name: Examples as Tests
 
-on: 
-  pull_request: 
-  push: 
-    branches: 
-      - og-develop
-      - main
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # Format: minute hour day-of-month month day-of-week(starts on sunday)
+    # Scheduled for 2 am, every sunday, tuesday, friday
+    - cron: '0 10 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
@@ -49,7 +50,7 @@ jobs:
       example_tests: ${{ steps.get-test-list.outputs.example_tests }}
   
   run_test:
-    name: Run Tests
+    name: Run Example Tests
     needs: [generate_example_tests]
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
@@ -97,7 +98,7 @@ jobs:
           path: ${{ matrix.test_file }}.xml
 
   upload_report:
-    name: Compile Report
+    name: Compile Example Test Report
     runs-on: [self-hosted, linux]
     defaults:
       run:
@@ -116,7 +117,7 @@ jobs:
       - name: Test Report0
         uses: dorny/test-reporter@v1
         with:
-          name: Test Results
+          name: Example Test Results
           working-directory: omnigibson-src
           path: ${{ github.run_id }}-tests-*/test_*.xml
           reporter: java-junit
