@@ -138,14 +138,6 @@ class JointType:
 AVERAGE_OBJ_DENSITY = 67.0
 
 
-def get_collision_group_mask(groups_to_exclude=[]):
-    """Get a collision group mask that has collisions enabled for every group except those in groups_to_exclude."""
-    collision_mask = ALL_COLLISION_GROUPS_MASK
-    for group in groups_to_exclude:
-        collision_mask &= ~(1 << group)
-    return collision_mask
-
-
 class OccupancyGridState:
     OBSTACLES = 0.0
     UNKNOWN = 0.5
@@ -178,7 +170,7 @@ UNDER_OBJECTS = [
 
 
 @cache
-def semantic_class_name_to_id():
+def semantic_class_name_to_id(scene):
     """
     Get mapping from semantic class name to class id
 
@@ -186,9 +178,8 @@ def semantic_class_name_to_id():
         dict: class name to class id
     """
     categories = get_all_object_categories()
-    from omnigibson.systems.system_base import REGISTERED_SYSTEMS
 
-    systems = sorted(REGISTERED_SYSTEMS)
+    systems = sorted(scene.system_registry.object_names)
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
     # Assign a unique class id to each class name with hashing
@@ -198,11 +189,11 @@ def semantic_class_name_to_id():
 
 
 @cache
-def semantic_class_id_to_name():
+def semantic_class_id_to_name(scene):
     """
     Get mapping from semantic class id to class name
 
     Returns:
         dict: class id to class name
     """
-    return {v: k for k, v in semantic_class_name_to_id().items()}
+    return {v: k for k, v in semantic_class_name_to_id(scene).items()}

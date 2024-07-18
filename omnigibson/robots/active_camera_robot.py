@@ -4,6 +4,7 @@ import numpy as np
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -36,8 +37,8 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
         dic["camera_qpos_sin"] = np.sin(joint_positions[self.camera_control_idx])
         dic["camera_qpos_cos"] = np.cos(joint_positions[self.camera_control_idx])
@@ -115,12 +116,23 @@ class ActiveCameraRobot(BaseRobot):
 
     @property
     @abstractmethod
+    def camera_joint_names(self):
+        """
+        Returns:
+            list: Array of joint names corresponding to this robot's camera joints.
+
+                Note: the ordering within the list is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
+        """
+        raise NotImplementedError
+
+    @property
     def camera_control_idx(self):
         """
         Returns:
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
-        raise NotImplementedError
+        return np.array([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):

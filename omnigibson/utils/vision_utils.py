@@ -138,11 +138,12 @@ class Remapper:
 
         return remapped_img, remapped_labels
 
-    def remap_bbox(self, semantic_id):
+    def remap_bbox(self, semantic_id, scene):
         """
         Remaps a semantic id to a new id using the key_array.
         Args:
             semantic_id (int): The semantic id to remap.
+            scene: The scene we are remapping for.
         Returns:
             int: The remapped id.
         """
@@ -152,7 +153,7 @@ class Remapper:
                     f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled."
                 )
                 self.warning_printed.add(semantic_id)
-            return semantic_class_name_to_id()["unlabelled"]
+            return semantic_class_name_to_id(scene)["unlabelled"]
         return self.key_array[semantic_id]
 
 

@@ -1,0 +1,20 @@
+--- /scr/OmniGibson/omnigibson/omnigibson.kit	2024-05-31 13:49:52.291417266 -0700
++++ /scr/home/yinhang/.local/share/ov/pkg/isaac_sim-2023.1.1/apps/omni.isaac.sim.python.kit	2024-03-16 12:03:21.560061977 -0700
+@@ -12,6 +12,7 @@
+ "omni.kit.renderer.core" = {}
+ 
+ # Livestream - OV Streaming Client
++"omni.kit.livestream.native" = {version = "2.4.0", exact = true}
+ "omni.kit.streamsdk.plugins" = {version = "2.5.2", exact = true}
+ 
+ # Status Bar
+
+@@ -596,7 +597,7 @@
+ "omni.isaac.cortex.sample_behaviors" = {}
+ "omni.isaac.dofbot" = {}
+ "omni.isaac.surface_gripper" = {}
+-# "omni.kit.property.isaac" = {}
++"omni.kit.property.isaac" = {}
+ "omni.isaac.scene_blox" = {}
+ "omni.isaac.sensor" = {}
+ "omni.isaac.debug_draw" = {}

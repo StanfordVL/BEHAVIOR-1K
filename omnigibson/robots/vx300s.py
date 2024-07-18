@@ -17,7 +17,7 @@ class VX300S(ManipulationRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -60,7 +60,7 @@ class VX300S(ManipulationRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -90,7 +90,7 @@ class VX300S(ManipulationRobot):
         """
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,
@@ -111,10 +111,6 @@ class VX300S(ManipulationRobot):
             grasping_mode=grasping_mode,
             **kwargs,
         )
-
-    @property
-    def model_name(self):
-        return "VX300S"
 
     @property
     def discrete_action_list(self):
@@ -143,16 +139,6 @@ class VX300S(ManipulationRobot):
     @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
-
-    @property
-    def arm_control_idx(self):
-        # The first 7 joints
-        return {self.default_arm: np.arange(6)}
-
-    @property
-    def gripper_control_idx(self):
-        # The last two joints
-        return {self.default_arm: np.arange(6, 8)}
 
     @property
     def disabled_collision_pairs(self):

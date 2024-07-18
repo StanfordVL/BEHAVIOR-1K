@@ -12,7 +12,12 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, check_extent_radius_ratio, get_mesh_volume_and_com
+from omnigibson.utils.usd_utils import (
+    PoseAPI,
+    absolute_prim_path_to_scene_relative,
+    check_extent_radius_ratio,
+    get_mesh_volume_and_com,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -34,11 +39,11 @@ class RigidPrim(XFormPrim):
         it will apply it.
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-            @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
+            @relative_prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
             specified:
 
             scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
@@ -48,16 +53,18 @@ class RigidPrim(XFormPrim):
             visual_only (None or bool): If specified, whether this prim should include collisions or not.
                 Default is True.
             kinematic_only (None or bool): If specified, whether this prim should be kinematic-only or not.
+            belongs_to_articulation (None or bool): If specified, whether this prim is part of an articulation or not.
     """
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
         # Other values that will be filled in at runtime
         self._rigid_prim_view_direct = None
+        self._belongs_to_articulation = None
         self._cs = None  # Contact sensor interface
         self._body_name = None
 
@@ -72,7 +79,7 @@ class RigidPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -82,12 +89,17 @@ class RigidPrim(XFormPrim):
         # Import now to avoid too-eager load of Omni classes due to inheritance
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
-        self._rigid_prim_view_direct = RigidPrimView(self._prim_path)
+        self._rigid_prim_view_direct = RigidPrimView(self.prim_path)
 
         # Set it to be kinematic if necessary
         kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
         self.set_attribute("physics:kinematicEnabled", kinematic_only)
         self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
+
+        # Check if it's part of an articulation view
+        self._belongs_to_articulation = (
+            "belongs_to_articulation" in self._load_config and self._load_config["belongs_to_articulation"]
+        )
 
         # run super first
         super()._post_load()
@@ -146,7 +158,7 @@ class RigidPrim(XFormPrim):
 
         # Get contact info first
         if self.contact_reporting_enabled:
-            self._cs.get_rigid_body_raw_data(self._prim_path)
+            self._cs.get_rigid_body_raw_data(self.prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -171,16 +183,6 @@ class RigidPrim(XFormPrim):
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
         additional bodies are added manually
         """
-        # Make sure to clean up all pre-existing names for all collision_meshes
-        if self._collision_meshes is not None:
-            for collision_mesh in self._collision_meshes.values():
-                collision_mesh.remove_names()
-
-        # Make sure to clean up all pre-existing names for all visual_meshes
-        if self._visual_meshes is not None:
-            for visual_mesh in self._visual_meshes.values():
-                visual_mesh.remove_names()
-
         self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
         coms, vols = [], []
@@ -195,11 +197,12 @@ class RigidPrim(XFormPrim):
                 mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
-                    "prim_path": mesh_path,
+                    "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
                     "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}",
                 }
                 if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
+                    mesh.load(self.scene)
                     # We also modify the collision mesh's contact and rest offsets, since omni's default values result
                     # in lightweight objects sometimes not triggering contacts correctly
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
@@ -209,15 +212,16 @@ class RigidPrim(XFormPrim):
                     volume, com = get_mesh_volume_and_com(mesh_prim)
                     # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
-                    vols.append(volume * np.product(mesh.scale))
+                    vols.append(volume * np.prod(mesh.scale))
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
                     # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                     # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                    if not check_extent_radius_ratio(mesh_prim):
+                    if not check_extent_radius_ratio(mesh, com):
                         log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                         mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+                    self._visual_meshes[mesh_name].load(self.scene)
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
@@ -261,7 +265,7 @@ class RigidPrim(XFormPrim):
         # Make sure we have the ability to grab contacts for this object
         contacts = []
         if self.contact_reporting_enabled:
-            raw_data = self._cs.get_rigid_body_raw_data(self._prim_path)
+            raw_data = self._cs.get_rigid_body_raw_data(self.prim_path)
             for c in raw_data:
                 # convert handles to prim paths for comparison
                 c = [*c]  # CsRawData enforces body0 and body1 types to be ints, but we want strings
@@ -502,7 +506,7 @@ class RigidPrim(XFormPrim):
         """
         self._rigid_prim_view.set_densities([density])
 
-    @property
+    @cached_property
     def kinematic_only(self):
         """
         Returns:
@@ -798,6 +802,11 @@ class RigidPrim(XFormPrim):
         return state
 
     def _load_state(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self._belongs_to_articulation:
+            return
+
         # Call super first
         super()._load_state(state=state)
 
@@ -805,9 +814,9 @@ class RigidPrim(XFormPrim):
         self.set_linear_velocity(np.array(state["lin_vel"]))
         self.set_angular_velocity(np.array(state["ang_vel"]))
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         return np.concatenate(
             [
@@ -817,9 +826,9 @@ class RigidPrim(XFormPrim):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Call supermethod first
-        state_dic, idx = super()._deserialize(state=state)
+        state_dic, idx = super().deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
         state_dic["lin_vel"] = state[idx : idx + 3]
         state_dic["ang_vel"] = state[idx + 3 : idx + 6]

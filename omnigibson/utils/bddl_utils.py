@@ -20,8 +20,6 @@ from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_st
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots import BaseRobot
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.systems.system_base import get_system, is_system_active
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,
@@ -570,9 +568,7 @@ class BDDLSampler:
     def __init__(self, env, activity_conditions, object_scope, backend):
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = (
-            self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
-        )
+        self._scene_model = self._env.scene.scene_model
         self._agent = self._env.robots[0]
         self._backend = backend
         self._activity_conditions = activity_conditions
@@ -716,7 +712,7 @@ class BDDLSampler:
                         f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
                         f"Only non-sampleable (scene) objects can have room assignment."
                     )
-                if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in self._env.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
@@ -939,11 +935,13 @@ class BDDLSampler:
                     for cat, models in valid_models.items()
                 }
                 room_insts = (
-                    [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None]
+                    if self._scene_model is None
+                    else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
-                    room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    room_objs = self._env.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [
                         obj
                         for obj in room_objs
@@ -1014,8 +1012,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: np.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.prod(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1211,7 +1209,9 @@ class BDDLSampler:
                 system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(system_name),
+                    entity=(
+                        None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
+                    ),
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
@@ -1265,7 +1265,7 @@ class BDDLSampler:
 
                 # create the object
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(og.sim.scene.objects)}",
+                    name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
                     prim_type=(
@@ -1276,8 +1276,7 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert og.sim.scene.loaded, "Scene is not loaded"
-                og.sim.import_object(simulator_obj)
+                self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
@@ -1364,8 +1363,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: np.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.prod(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1424,11 +1423,11 @@ class BDDLSampler:
                             og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
-                            og.sim.scene.object_registry.update(keys=["in_rooms"])
+                            self._env.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
-        og.sim.scene.object_registry.update(keys=["in_rooms"])
+        self._env.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step

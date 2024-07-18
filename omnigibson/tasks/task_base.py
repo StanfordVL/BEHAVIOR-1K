@@ -96,9 +96,10 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         obs_space = self._load_non_low_dim_observation_space()
 
         # Create the low dim obs space and add to the main obs space dict -- make sure we're flattening low dim obs
-        obs_space["low_dim"] = self._build_obs_box_space(
-            shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64
-        )
+        if self._low_dim_obs_dim > 0:
+            obs_space["low_dim"] = self._build_obs_box_space(
+                shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64
+            )
 
         return obs_space
 
@@ -115,6 +116,10 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
 
         # Run internal method
         self._load(env=env)
+
+        # Load the obs space dim
+        obs = self.get_obs(env=env, flatten_low_dim=True)
+        self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
 
         # We're now initialized
         self._loaded = True
@@ -189,9 +194,6 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         for reward_function in self._reward_functions.values():
             reward_function.reset(self, env)
 
-        # Fill in low dim obs dim so we can use this to create the observation space later
-        self._low_dim_obs_dim = len(self.get_obs(env=env, flatten_low_dim=True)["low_dim"])
-
     def _step_termination(self, env, action, info=None):
         """
         Step and aggregate termination conditions
@@ -209,16 +211,22 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Get all dones and successes from individual termination conditions
         dones = []
         successes = []
-        for termination_condition in self._termination_conditions.values():
+        info = dict() if info is None else info
+        if "termination_conditions" not in info:
+            info["termination_conditions"] = dict()
+        for name, termination_condition in self._termination_conditions.items():
             d, s = termination_condition.step(self, env, action)
             dones.append(d)
             successes.append(s)
+            info["termination_conditions"][name] = {
+                "done": d,
+                "success": s,
+            }
         # Any True found corresponds to a done / success
         done = sum(dones) > 0
         success = sum(successes) > 0
 
         # Populate info
-        info = dict() if info is None else info
         info["success"] = success
         return done, info
 
@@ -290,7 +298,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         low_dim_obs, obs = self._get_obs(env=env)
 
         # Possibly flatten low dim and add to main observation dictionary
-        obs["low_dim"] = self._flatten_low_dim_obs(obs=low_dim_obs) if flatten_low_dim else low_dim_obs
+        if low_dim_obs:
+            obs["low_dim"] = self._flatten_low_dim_obs(obs=low_dim_obs) if flatten_low_dim else low_dim_obs
 
         return obs
 

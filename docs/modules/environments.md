@@ -42,12 +42,12 @@ Creating a minimal environment requires the definition of a config dictionary. T
     
     env = og.Environment(configs=cfg)
     action = ...
-    obs, reward, done, info = env.step(action)
+    obs, reward, terminated, truncated, info = env.step(action)
     ```
 
 ### Runtime
 
-Once created, the environment can be interfaced roughly in the same way as an OpenAI gym environment, and include common methods such as `step`, `reset`, `render`, as well as properties such as `observation_space` and `action_space`. Stepping the environment is done via `obs, reward, done, info = env.step(action)`, and resetting can manually be executed via `obs = env.reset()`. Robots are tracked explicitly via `env.robots`, and the underlying scene and all corresponding objects within the scene can be accessed via `env.scene`.
+Once created, the environment can be interfaced roughly in the same way as an OpenAI gym environment, and include common methods such as `step`, `reset`, `render`, as well as properties such as `observation_space` and `action_space`. Stepping the environment is done via `obs, reward, terminated, truncated, info = env.step(action)`, and resetting can manually be executed via `obs = env.reset()`. Robots are tracked explicitly via `env.robots`, and the underlying scene and all corresponding objects within the scene can be accessed via `env.scene`.
 
 
 ## Types

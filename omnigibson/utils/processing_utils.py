@@ -26,11 +26,6 @@ class Filter(Serializable):
         """
         pass
 
-    @property
-    def state_size(self):
-        # No state by default
-        return 0
-
     def _dump_state(self):
         # Default is no state (empty dict)
         return dict()
@@ -39,11 +34,11 @@ class Filter(Serializable):
         # Default is no state (empty dict), so this is a no-op
         pass
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Default is no state, so do nothing
         return np.array([])
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Default is no state, so do nothing
         return dict(), 0
 
@@ -103,10 +98,6 @@ class MovingAverageFilter(Filter):
         self.current_idx = 0
         self.fully_filled = False
 
-    @property
-    def state_size(self):
-        return super().state_size + self.filter_width * self.obs_dim + 2
-
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
@@ -127,9 +118,9 @@ class MovingAverageFilter(Filter):
         self.current_idx = state["current_idx"]
         self.fully_filled = state["fully_filled"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
         return np.concatenate(
@@ -141,9 +132,9 @@ class MovingAverageFilter(Filter):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this filter
         samples_len = self.filter_width * self.obs_dim
@@ -194,10 +185,6 @@ class ExponentialAverageFilter(Filter):
         self.avg *= 0.0
         self.num_samples = 0
 
-    @property
-    def state_size(self):
-        return super().state_size + self.obs_dim + 1
-
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
@@ -216,9 +203,9 @@ class ExponentialAverageFilter(Filter):
         self.avg = np.array(state["avg"])
         self.num_samples = state["num_samples"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
         return np.concatenate(
@@ -229,9 +216,9 @@ class ExponentialAverageFilter(Filter):
             ]
         ).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this filter
         state_dict["avg"] = state[idx : idx + self.obs_dim]

@@ -64,7 +64,7 @@ Robots can be added to a given `Environment` instance by specifying them in the 
 
 ### Runtime
 
-Usually, actions are passed to robots and observations retrieved via the `obs, info, reward, done = env.step(action)`. However, actions can be directly deployed and observations retrieved from the robot using the following APIs:
+Usually, actions are passed to robots and observations retrieved via the `obs, info, terminated, truncated, done = env.step(action)`. However, actions can be directly deployed and observations retrieved from the robot using the following APIs:
 
 <div class="annotate" markdown>
 - **Applying actions**: `robot.apply_action(action)` (1)
@@ -76,7 +76,7 @@ Usually, actions are passed to robots and observations retrieved via the `obs, i
 2. `obs` is a dict mapping observation name to observation data, and `info` is a dict of relevant metadata about the observations. For more information, please see the [Sensor](./sensors.md) section!
 
 
-Controllers and sensors can be accessed directly via the `controllers` and `sensors` properties, respectively. And, like all objects in **`OmniGibson`**, common information such as joint data and object states can also be directly accessed from the `robot` class.
+Controllers and sensors can be accessed directly via the `controllers` and `sensors` properties, respectively. And, like all objects in **`OmniGibson`**, common information such as joint data and object states can also be directly accessed from the `robot` class. Note that by default, control signals are updated and deployed every physics timestep via the robot's internal `step()` callback function. To disable controllers from automatically deploying control signals, set `robot.control_enabled = False`. This means that additional `step()` calls will **not** update the control signals sent, and so the most recent control signal will still be propagated until the user either re-enables control or manually sets the robot's joint positions / velocities / efforts.
 
 
 ## Types
@@ -147,7 +147,7 @@ These are manipulation-only robots (an instance of [`ManipulationRobot`](../refe
     <tr>
         <td valign="top" width="60%">
             [**`Franka`**](../reference/robots/franka.html)<br><br>  
-            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes two alternative versions of Franka: FrankaAllegro (equipped with an Allegro hand) and FrankaLeap (equipped with a Leap hand).<br><br>
+            The popular 7-DOF <a href="https://franka.de/">Franka Research 3</a> model equipped with a parallel jaw gripper. Note that OmniGibson also includes three alternative versions of Franka with dexterous hands: FrankaAllegro (equipped with an Allegro hand), FrankaLeap (equipped with a Leap hand) and FrankaInspire (equipped with an inspire hand).<br><br>
             <ul>
                 <li>_Controllers_: Arm, Gripper</li>
                 <li>_Sensors_: Wrist Camera</li>

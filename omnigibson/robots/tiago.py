@@ -10,7 +10,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -47,7 +47,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -98,7 +98,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be the render frequency by default.
+                we will automatically set the control frequency to be the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -152,7 +152,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,
@@ -179,12 +179,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_joint_names(self):
         names = dict()
         for arm in self.arm_names:
-            names[arm] = ["torso_lift_joint"] + [f"arm_{arm}_{i}_joint" for i in range(1, 8)]
+            names[arm] = [f"arm_{arm}_{i}_joint" for i in range(1, 8)]
         return names
-
-    @property
-    def model_name(self):
-        return "Tiago"
 
     @classproperty
     def n_arms(cls):
@@ -279,7 +275,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visible = False
 
         self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
-            f"{self._prim_path}/rootJoint"
+            f"{self.prim_path}/rootJoint"
         )
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
@@ -323,8 +319,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
@@ -452,15 +448,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to the three controllable 1DoF base joints
-        """
-        joints = list(self.joints.keys())
-        return np.array([joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "rz"]])
-
-    @property
     def base_idx(self):
         """
         Returns:
@@ -475,29 +462,16 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def trunk_control_idx(self):
         """
         Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joint.
+            n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return np.array([6])
-
-    @property
-    def camera_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
-        """
-        return np.array([9, 12])
+        return np.array([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def arm_control_idx(self):
-        return {
-            "left": np.array([7, 10, 13, 15, 17, 19, 21]),
-            "right": np.array([8, 11, 14, 16, 18, 20, 22]),
-            "combined": np.array([7, 8, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]),
-        }
-
-    @property
-    def gripper_control_idx(self):
-        return {"left": np.array([23, 24]), "right": np.array([25, 26])}
+        # Add combined entry
+        idxs = super().arm_control_idx
+        idxs["combined"] = np.sort(np.concatenate([val for val in idxs.values()]))
+        return idxs
 
     @property
     def finger_lengths(self):
@@ -588,6 +562,18 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         ]
 
     @property
+    def base_joint_names(self):
+        return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
+
+    @property
+    def camera_joint_names(self):
+        return ["head_1_joint", "head_2_joint"]
+
+    @property
+    def trunk_joint_names(self):
+        return ["torso_lift_joint"]
+
+    @property
     def manipulation_link_names(self):
         return [
             "torso_fixed_link",
@@ -637,16 +623,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def finger_link_names(self):
-        return {
-            arm: ["gripper_{}_right_finger_link".format(arm), "gripper_{}_left_finger_link".format(arm)]
-            for arm in self.arm_names
-        }
+        return {arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"] for arm in self.arm_names}
 
     @property
     def finger_joint_names(self):
         return {
-            arm: ["gripper_{}_right_finger_joint".format(arm), "gripper_{}_left_finger_joint".format(arm)]
-            for arm in self.arm_names
+            arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"] for arm in self.arm_names
         }
 
     @property

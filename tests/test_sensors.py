@@ -5,24 +5,23 @@ from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.sensors import VisionSensor
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 
 
 @og_test
-def test_seg():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    dishtowel = og.sim.scene.object_registry("name", "dishtowel")
-    robot = og.sim.scene.robots[0]
+def test_seg(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
+    robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
     robot.reset()
 
-    systems = [get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
+    systems = [env.scene.get_system(system_name) for system_name in SYSTEM_EXAMPLES.keys()]
     for i, system in enumerate(systems):
         # Sample two particles for each system
         pos = np.array([-0.2 + i * 0.2, 0, 0.55])
-        if is_physical_particle_system(system_name=system.name):
+        if env.scene.is_physical_particle_system(system_name=system.name):
             system.generate_particles(positions=[pos, pos + np.array([0.1, 0.0, 0.0])])
         else:
             if system.get_group_name(breakfast_table) not in system.groups:
@@ -34,7 +33,8 @@ def test_seg():
             )
 
     og.sim.step()
-    og.sim.render()
+    for _ in range(3):
+        og.sim.render()
 
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
@@ -94,4 +94,4 @@ def test_seg():
 
 
 def test_clear_sim():
-    og.sim.clear()
+    og.clear()

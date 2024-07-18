@@ -3,7 +3,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState
-from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -28,7 +27,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             set of int: Set of particle IDs in contact
         """
         # Make sure system is valid
-        assert is_physical_particle_system(
+        assert self.obj.scene.is_physical_particle_system(
             system_name=system.name
         ), "Can only get ContactParticles for a PhysicalParticleSystem!"
 

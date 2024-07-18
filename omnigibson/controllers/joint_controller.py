@@ -101,7 +101,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self._use_delta_commands and command_output_limits == "default"
+            self._use_delta_commands and type(command_output_limits) == str and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
@@ -186,7 +186,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = tuple(np.meshgrid(self.dof_idx, self.dof_idx))
+            dof_idxs_mat = np.ix_(self.dof_idx, self.dof_idx)
             mm = control_dict["mass_matrix"][dof_idxs_mat]
             u = np.dot(mm, u)
 

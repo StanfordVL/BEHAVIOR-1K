@@ -10,7 +10,7 @@ from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.transform_utils import euler2quat
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 log = create_module_logger(module_name=__name__)
 
@@ -38,7 +38,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
+        relative_prim_path=None,
         uuid=None,
         scale=None,
         visible=True,
@@ -87,7 +87,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -135,7 +135,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             uuid=uuid,
             scale=scale,
@@ -157,10 +157,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
-
-    @property
-    def model_name(self):
-        return "Fetch"
 
     @property
     def tucked_default_joint_pos(self):
@@ -222,7 +218,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Set the wheels back to using sphere approximations
         for wheel_name in ["l_wheel_link", "r_wheel_link"]:
             log.warning(
-                "Fetch wheel links are post-processed to use sphere approximation collision meshes."
+                "Fetch wheel links are post-processed to use sphere approximation collision meshes. "
                 "Please ignore any previous errors about these collision meshes."
             )
             wheel_link = self.links[wheel_name]
@@ -275,8 +271,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
@@ -365,36 +361,12 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         }
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([0, 1])
-
-    @property
     def trunk_control_idx(self):
         """
         Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joint.
+            n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return np.array([2])
-
-    @property
-    def camera_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
-        """
-        return np.array([3, 5])
-
-    @property
-    def arm_control_idx(self):
-        return {self.default_arm: np.array([4, 6, 7, 8, 9, 10, 11])}
-
-    @property
-    def gripper_control_idx(self):
-        return {self.default_arm: np.array([12, 13])}
+        return np.array([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def disabled_collision_pairs(self):
@@ -418,6 +390,18 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["wrist_flex_link", "wrist_roll_link"],
             ["wrist_roll_link", "gripper_link"],
         ]
+
+    @property
+    def base_joint_names(self):
+        return ["l_wheel_joint", "r_wheel_joint"]
+
+    @property
+    def camera_joint_names(self):
+        return ["head_pan_joint", "head_tilt_joint"]
+
+    @property
+    def trunk_joint_names(self):
+        return ["torso_lift_joint"]
 
     @property
     def manipulation_link_names(self):
@@ -455,7 +439,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def arm_joint_names(self):
         return {
             self.default_arm: [
-                "torso_lift_joint",
                 "shoulder_pan_joint",
                 "shoulder_lift_joint",
                 "upperarm_roll_joint",

@@ -115,7 +115,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(np.sum([np.product(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(np.sum([np.prod(shape) for shape in self._goal_shapes.values()]))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -125,13 +125,17 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._command_input_transform = None
 
         # Standardize command input / output limits to be (min_array, max_array)
-        command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
+        command_input_limits = (
+            (-1.0, 1.0)
+            if type(command_input_limits) == str and command_input_limits == "default"
+            else command_input_limits
+        )
         command_output_limits = (
             (
                 np.array(self._control_limits[self.control_type][0])[self.dof_idx],
                 np.array(self._control_limits[self.control_type][1])[self.dof_idx],
             )
-            if command_output_limits == "default"
+            if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (
@@ -313,7 +317,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
         )
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
             np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])
@@ -328,14 +332,14 @@ class BaseController(Serializable, Registerable, Recreatable):
             ]
         )
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         goal_is_valid = bool(state[0])
         if goal_is_valid:
             # Un-flatten all the keys
             idx = 1
             goal = dict()
             for key, shape in self._goal_shapes.items():
-                length = np.product(shape)
+                length = np.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:
