@@ -12,7 +12,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, DummyControllableObjectViewAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -93,15 +93,23 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
+        class_name = self.__class__.__name__.lower()
         if relative_prim_path:
-            # If prim path is specified, assert that the last element starts with controllable_ to ensure that
+            # If prim path is specified, assert that the last element starts with the right prefix to ensure that
             # the object will be included in the ControllableObjectViewAPI.
-            assert relative_prim_path.split("/")[-1].startswith(
-                "controllable_"
-            ), "If relative_prim_path is specified, the last element of the path must start with 'controllable_'."
+            assert relative_prim_path.split("/")[-1].startswith(f"controllable__{class_name}__"), (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+            assert relative_prim_path.split("/")[-1].count("__") == 2, (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
         else:
             # If prim path is not specified, set it to the default path, but prepend controllable.
-            relative_prim_path = f"/controllable_{name}"
+            relative_prim_path = f"/controllable__{class_name}__{name}"
 
         # Run super init
         super().__init__(
@@ -120,6 +128,23 @@ class ControllableObject(BaseObject):
         )
 
     def _initialize(self):
+        # Assert that the prim path matches ControllableObjectViewAPI's expected format
+        scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
+        assert scene_id.startswith(
+            "scene_"
+        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
+        robot_name_components = robot_name.split("__")
+        assert (
+            len(robot_name_components) == 3
+        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
+        assert robot_name_components[0] in (
+            "controllable",
+            "dummy",
+        ), "Third component of articulation root path (robot name) must start with 'controllable' or 'dummy'"
+        assert (
+            robot_name_components[1] == self.__class__.__name__.lower()
+        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
+
         # Run super first
         super()._initialize()
         # Fill in the DOF to joint mapping
@@ -552,7 +577,7 @@ class ControllableObject(BaseObject):
         fcns["gravity_force"] = lambda: (
             ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
             if self.fixed_base
-            else DummyControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
+            else ControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
             self.articulation_root_path

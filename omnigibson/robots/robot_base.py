@@ -177,7 +177,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # requires generalized gravity forces. We incur a relatively heavy cost at every step if we
         # have to move the dummy. So we only do this if we absolutely need to.
         if not self.fixed_base:
-            dummy_path = self.prim_path.replace("controllable_", "dummy_")
+            dummy_path = self.prim_path.replace("controllable__", "dummy__")
             dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
             self._dummy = BaseObject(
                 name=f"{self.name}_dummy",
