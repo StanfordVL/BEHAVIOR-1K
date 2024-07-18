@@ -300,12 +300,12 @@ class PointNavigationTask(BaseTask):
             float: Computed potential
         """
         if self._reward_type == "l2":
-            potentail = self._get_l2_potential(env)
+            potential = self._get_l2_potential(env)
         elif self._reward_type == "geodesic":
             potential = self._get_geodesic_potential(env)
             # If no path is found, fall back to L2 potential
             if potential is None:
-                potentail = self._get_l2_potential(env)
+                potential = self._get_l2_potential(env)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
