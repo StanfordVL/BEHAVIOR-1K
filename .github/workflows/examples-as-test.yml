@@ -1,81 +1,129 @@
-name: Examples as Test
+name: Examples as Tests
 
-on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # Format: minute hour day-of-month month day-of-week(starts on sunday)
-    # Scheduled for 2 am, every sunday, tuesday, friday
-    - cron: '0 10 * * 0,2,5'
-  workflow_dispatch:
+on: 
+  pull_request: 
+  push: 
+    branches: 
+      - og-develop
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: [self-hosted, linux, gpu]
-    if: github.repository == 'StanfordVL/OmniGibson-dev'
+  generate_example_tests:
+    name: Generate Example Tests
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+    defaults:
+      run:
+        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+    steps:
+      - name: Fix home
+        run: echo "HOME=/root" >> $GITHUB_ENV
 
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+          path: omnigibson-src
+      
+      - name: Install dev requirements
+        working-directory: omnigibson-src
+        run: pip install -r requirements-dev.txt
+        
+      - name: Install
+        working-directory: omnigibson-src
+        run: pip install -e .
+
+      - name: Generate example tests
+        working-directory: omnigibson-src
+        run: python tests/create_tests_of_examples.py
+
+      - name: Get list of generated tests
+        id: get-test-list
+        run: |
+          echo "example_tests=$(ls omnigibson-src/tests/tests_of_examples/*_test.py | xargs -n 1 basename | sed 's/.py$//' | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+
+    outputs:
+      example_tests: ${{ steps.get-test-list.outputs.example_tests }}
+  
+  run_test:
+    name: Run Tests
+    needs: [generate_example_tests]
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+
+    strategy:
+      matrix:
+        test_file:
+          - ${{ needs.generate_example_tests.outputs.example_tests != '' && fromJson(needs.generate_example_tests.outputs.example_tests) || '[]' }}
+
+    defaults:
+      run:
+        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+
+    steps:
+      - name: Fix home
+        run: echo "HOME=/root" >> $GITHUB_ENV
+
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+          path: omnigibson-src
+
+      - name: Install dev requirements
+        working-directory: omnigibson-src
+        run: pip install -r requirements-dev.txt
+
+      - name: Install
+        working-directory: omnigibson-src
+        run: pip install -e .
+
+      - name: Run tests
+        working-directory: omnigibson-src
+        run: |
+          if [[ "${{ matrix.test_file }}" == *"_test" ]]; then
+            pytest -s tests/tests_of_examples/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
+          else
+            pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
+          fi
+          cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
+
+      - name: Deploy artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
+          path: ${{ matrix.test_file }}.xml
+
+  upload_report:
+    name: Compile Report
+    runs-on: [self-hosted, linux]
+    defaults:
+      run:
+        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+    needs: [run_test]
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           submodules: true
-          path: omnigibson
-
-      - name: Add CUDA to env
-        run: echo "/usr/local/cuda/bin" >> $GITHUB_PATH
-
-      - name: Setup python
-        uses: actions/setup-python@v2
+          path: omnigibson-src
+      - name: Pull reports
+        uses: actions/download-artifact@v3
         with:
-          python-version: "3.8"
-          architecture: x64
-
-      - name: Install dev requirements
-        working-directory: omnigibson
-        run: pip install -r requirements-dev.txt
-
-      - name: Install additional dev requirements
-        working-directory: omnigibson
-        run: pip install -r tests/requirements-tests.txt
-
-      - name: Install
-        working-directory: omnigibson
-        run: pip install -e .
-
-      - name: Uninstall pip bddl
-        working-directory: omnigibson
-        run: pip uninstall -y bddl
-
-      - name: Checkout BDDL
-        uses: actions/checkout@v2
+          path: omnigibson-src
+      - name: Test Report0
+        uses: dorny/test-reporter@v1
         with:
-          repository: StanfordVL/bddl-dev
-          ref: 581be50e7cfd2b3a1447aaa1b4fc2424b673339c
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-          path: bddl
-          submodules: recursive
-          lfs: true
+          name: Test Results
+          working-directory: omnigibson-src
+          path: ${{ github.run_id }}-tests-*/test_*.xml
+          reporter: java-junit
+          fail-on-error: 'true'
+          fail-on-empty: 'true'
 
-      - name: Install BDDL
-        working-directory: bddl
-        run: pip install -e .
-
-      - name: Link Dataset
-        working-directory: omnigibson
-        run: ln -s /scr/ig-data omnigibson/data
-
-      - name: Create tests of examples
-        working-directory: omnigibson
-        run: python tests/create_tests_of_examples.py
-
-      - name: Run tests
-        working-directory: omnigibson
-        run: pytest /tmp/tests_of_examples
-
-      - name: Remove Files
-        uses: JesseTG/rm@v1.0.2
-        with:
-          path: /tmp/tests_of_examples
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v2.1.0
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}

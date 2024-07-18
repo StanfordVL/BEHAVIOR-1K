@@ -12,45 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  generate_example_tests:
-    name: Generate Example Tests
-    runs-on: [self-hosted, linux, gpu, dataset-enabled]
-    defaults:
-      run:
-        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
-    steps:
-      - name: Fix home
-        run: echo "HOME=/root" >> $GITHUB_ENV
-
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-          path: omnigibson-src
-      
-      - name: Install dev requirements
-        working-directory: omnigibson-src
-        run: pip install -r requirements-dev.txt
-        
-      - name: Install
-        working-directory: omnigibson-src
-        run: pip install -e .
-
-      - name: Generate example tests
-        working-directory: omnigibson-src
-        run: python tests/create_tests_of_examples.py
-
-      - name: Get list of generated tests
-        id: get-test-list
-        run: |
-          echo "example_tests=$(ls omnigibson-src/tests/tests_of_examples/*_test.py | xargs -n 1 basename | sed 's/.py$//' | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
-
-    outputs:
-      example_tests: ${{ steps.get-test-list.outputs.example_tests }}
-  
   run_test:
     name: Run Tests
-    needs: [generate_example_tests]
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
     strategy:
@@ -68,7 +31,6 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transition_rules
-          - ${{ needs.generate_example_tests.outputs.example_tests != '' && fromJson(needs.generate_example_tests.outputs.example_tests) || '[]' }}
 
     defaults:
       run:
