@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from PIL import Image
 
 from omnigibson import object_states
-from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.sensors import VisionSensor
@@ -24,9 +23,12 @@ class SceneGraphBuilder(object):
         robot_name=None,
         egocentric=False,
         full_obs=False,
-        only_true=False,
+        only_true=True,
         merge_parallel_edges=False,
-        exclude_states=(object_states.Touching,),
+        exclude_states=(
+            object_states.Touching,
+            object_states.NextTo,
+        ),
     ):
         """
         A utility that builds a scene graph with objects as nodes and relative states as edges,
@@ -167,16 +169,9 @@ class SceneGraphBuilder(object):
         # Go through the objects in FOV of the robot.
         objs_to_add = set(scene.objects)
         if not self._full_obs:
-            # TODO: Reenable this once InFOV state is fixed.
             # If we're not in full observability mode, only pick the objects in FOV of robot.
-            # bids_in_fov = self._robot.states[object_states.ObjectsInFOVOfRobot].get_value()
-            # objs_in_fov = set(
-            #     scene.objects_by_id[bid]
-            #     for bid in bids_in_fov
-            #     if bid in scene.objects_by_id
-            # )
-            # objs_to_add &= objs_in_fov
-            raise NotImplementedError("Partial observability not supported in scene graph builder yet.")
+            objs_in_fov = self._robot.states[object_states.ObjectsInFOVOfRobot].get_value()
+            objs_to_add &= set(objs_in_fov)
 
         for obj in objs_to_add:
             # Add the object if not already in the graph
@@ -218,9 +213,10 @@ class SceneGraphBuilder(object):
         self._last_desired_frame_to_world = desired_frame_to_world
 
 
-def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=False):
+def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=False):
     """
     Converts the graph into an image and shows it in a cv2 window if preferred.
+    Note: Currently, this function only works when we merge parallel edges, i.e. the graph is a DiGraph.
 
     Args:
         show_window (bool): Whether a cv2 GUI window containing the visualization should be shown.
@@ -231,17 +227,14 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     def _draw_graph():
         nodes = list(G.nodes)
         node_labels = {obj: obj.category for obj in nodes}
+        # get all objects in fov of robot
+        objects_in_fov = scene.robots[0].states[object_states.ObjectsInFOVOfRobot].get_value()
         colors = [
-            (
-                "yellow"
-                if obj.category == "agent"
-                else ("green" if obj.states[object_states.InFOVOfRobot].get_value() else "red")
-            )
-            for obj in nodes
+            ("yellow" if obj.category == "agent" else ("green" if obj in objects_in_fov else "red")) for obj in nodes
         ]
         positions = (
-            {obj: (-pose[0][1], pose[0][0]) for obj, pose in G.nodes.data("pose")}
-            if realistic_positioning
+            {obj: (-pose[1][-1], pose[0][-1]) for obj, pose in G.nodes.data("pose")}
+            if cartesian_positioning
             else nx.nx_pydot.pydot_layout(G, prog="neato")
         )
         nx.drawing.draw_networkx(
@@ -250,14 +243,24 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
             labels=node_labels,
             nodelist=nodes,
             node_color=colors,
-            font_size=4,
+            font_size=5,
             arrowsize=5,
-            node_size=150,
+            node_size=200,
         )
 
-        edge_labels = {
-            edge: ", ".join(state + "=" + str(value) for state, value in G.edges[edge]["states"]) for edge in G.edges
-        }
+        edge_labels = {}
+        for edge in G.edges:
+            state_value_pairs = []
+            if len(edge) == 3:
+                # When we don't merge parallel edges
+                raise ValueError("Visualization does not support parallel edges.")
+            else:
+                # When we merge parallel edges
+                assert len(edge) == 2, "Invalid graph format for scene graph visualization."
+            for state, value in G.edges[edge]["states"]:
+                state_value_pairs.append(state + "=" + str(value))
+            edge_labels[edge] = ", ".join(state_value_pairs)
+
         nx.drawing.draw_networkx_edge_labels(G, pos=positions, edge_labels=edge_labels, font_size=4)
 
     # Prepare pyplot figure that's sized to match the robot video.
@@ -267,6 +270,11 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
     ]
     robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
+
+    # check imgheight and imgwidth; if they are too small, we need to upsample the image to 1280x1280
+    if imgheight < 640 or imgwidth < 640:
+        robot_view = np.array(Image.fromarray(robot_view).resize((640, 640), Image.BILINEAR))
+        imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
     figdpi = imgheight / figheight
@@ -292,6 +300,6 @@ def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=Fals
 
         cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imshow("SceneGraph", cv_img)
-        cv2.waitKey(1)
+        cv2.waitKey(0)
 
-    return Image.fromarray(img).save(r"D:\test.png")
+    return Image.fromarray(img)

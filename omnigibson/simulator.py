@@ -224,7 +224,7 @@ def _launch_app():
     return app
 
 
-def launch_simulator(*args, **kwargs):
+def _launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = _launch_app()
 
@@ -243,8 +243,6 @@ def launch_simulator(*args, **kwargs):
                 current application and not only rendering a frame to the viewports/ cameras. So UI elements of
                 Isaac Sim will be refreshed with this dt as well if running non-headless. If None, will use default
                 value 1 / gm.DEFAULT_RENDERING_FREQ
-            stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
-                Defaults to 0.01.
             viewer_width (int): width of the camera image, in pixels
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
@@ -255,7 +253,6 @@ def launch_simulator(*args, **kwargs):
             gravity=9.81,
             physics_dt=None,
             rendering_dt=None,
-            stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
@@ -284,7 +281,6 @@ def launch_simulator(*args, **kwargs):
             super().__init__(
                 physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt,
                 rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt,
-                stage_units_in_meters=stage_units_in_meters,
                 device=device,
             )
 
@@ -1426,6 +1422,43 @@ def launch_simulator(*args, **kwargs):
                 return jsons
 
             return None
+
+        def _partial_clear(self):
+            """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
+            # Stop the physics
+            self.stop()
+
+            # Clear all scenes
+            for scene in self.scenes:
+                scene.clear()
+
+            # Remove the skybox, floor plane and viewer camera
+            if self._skybox is not None:
+                self._skybox.remove()
+
+            if self._floor_plane is not None:
+                self._floor_plane.remove()
+
+            if self._viewer_camera is not None:
+                self._viewer_camera.remove()
+
+            if self._camera_mover is not None:
+                self._camera_mover.clear()
+
+            # Clear the vision sensor cache
+            VisionSensor.clear()
+
+            # Clear all global update states
+            for state in self.object_state_types_requiring_update:
+                if issubclass(state, GlobalUpdateStateMixin):
+                    state.global_initialize()
+
+            # Clear all materials
+            MaterialPrim.clear()
+
+            # Clear uniquely named items and other internal states
+            clear_python_utils()
+            clear_usd_utils()
 
         def close(self):
             """

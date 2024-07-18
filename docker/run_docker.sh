@@ -55,6 +55,7 @@ while true; do
     esac
 done
 
+docker pull stanfordvl/omnigibson:latest
 DOCKER_DISPLAY=""
 OMNIGIBSON_HEADLESS=1
 if [ "$GUI" = true ] ; then
@@ -65,10 +66,8 @@ fi
 docker run \
     --gpus all \
     --privileged \
-    -v /tmp/.X11-unix:/tmp/.X11-unix \
     -e DISPLAY=${DOCKER_DISPLAY} \
     -e OMNIGIBSON_HEADLESS=${OMNIGIBSON_HEADLESS} \
-    -v /scr/OmniGibson:/omnigibson-src:rw \
     -v $DATA_PATH/datasets:/data \
     -v $DATA_PATH/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit:rw \
     -v $DATA_PATH/isaac-sim/cache/ov:/root/.cache/ov:rw \

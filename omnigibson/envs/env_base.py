@@ -10,7 +10,6 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import VisionSensor, create_sensor
-from omnigibson.simulator import launch_simulator
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.gym_utils import (
@@ -81,14 +80,22 @@ class Environment(gym.Env, GymObservable, Recreatable):
         viewer_height = self.render_config["viewer_height"]
         # If the sim is launched, check that the parameters match
         if og.sim is not None:
-            assert og.sim.initial_physics_dt == physics_frequency
-            assert og.sim.initial_rendering_dt == rendering_frequency
-            assert og.sim.device == self.device
-            assert og.sim.viewer_width == viewer_width
-            assert og.sim.viewer_height == viewer_height
-        # Otherwise, launch Isaac Sim
+            assert (
+                og.sim.initial_physics_dt == physics_frequency
+            ), f"Physics frequency mismatch! Expected {physics_frequency}, got {og.sim.initial_physics_dt}"
+            assert (
+                og.sim.initial_rendering_dt == rendering_frequency
+            ), f"Rendering frequency mismatch! Expected {rendering_frequency}, got {og.sim.initial_rendering_dt}"
+            assert og.sim.device == self.device, f"Device mismatch! Expected {self.device}, got {og.sim.device}"
+            assert (
+                og.sim.viewer_width == viewer_width
+            ), f"Viewer width mismatch! Expected {viewer_width}, got {og.sim.viewer_width}"
+            assert (
+                og.sim.viewer_height == viewer_height
+            ), f"Viewer height mismatch! Expected {viewer_height}, got {og.sim.viewer_height}"
+        # Otherwise, launch a simulator instance
         else:
-            launch_simulator(
+            og.launch(
                 physics_dt=physics_frequency,
                 rendering_dt=rendering_frequency,
                 device=self.device,
