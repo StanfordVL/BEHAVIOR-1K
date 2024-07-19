@@ -52,7 +52,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="particle type",
         random_selection=random_selection,
     )
-    
+
     table_cfg = dict(
         type="DatasetObject",
         name="table",
