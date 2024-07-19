@@ -405,8 +405,8 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     # Then compose 3x3 rotation matrix and convert into quaternion
     vec_n = vec / th.norm(vec)  # x
     up_n = up / th.norm(up)
-    s_n = th.cross(up_n, vec_n)  # y
-    u_n = th.cross(vec_n, s_n)  # z
+    s_n = th.linalg.cross(up_n, vec_n)  # y
+    u_n = th.linalg.cross(vec_n, s_n)  # z
     return mat2quat(th.tensor([vec_n, s_n, u_n]).T)
 
 
@@ -456,8 +456,8 @@ def pose2mat(pose):
         th.tensor: 4x4 homogeneous matrix
     """
     homo_pose_mat = th.zeros((4, 4), dtype=th.float32)
-    homo_pose_mat[:3, :3] = th.tensor(quat2mat(pose[1]))
-    homo_pose_mat[:3, 3] = th.tensor(pose[0], dtype=th.float32)
+    homo_pose_mat[:3, :3] = quat2mat(pose[1])
+    homo_pose_mat[:3, 3] = pose[0].float() if isinstance(pose[0], th.Tensor) else th.tensor(pose[0], dtype=th.float32)
     homo_pose_mat[3, 3] = 1.0
     return homo_pose_mat
 
@@ -992,7 +992,7 @@ def get_pose_error(target_pose, current_pose):
     r1d = target_pose[:3, 0]
     r2d = target_pose[:3, 1]
     r3d = target_pose[:3, 2]
-    rot_err = 0.5 * (th.cross(r1, r1d) + th.cross(r2, r2d) + th.cross(r3, r3d))
+    rot_err = 0.5 * (th.linalg.cross(r1, r1d) + th.linalg.cross(r2, r2d) + th.linalg.cross(r3, r3d))
 
     error[:3] = pos_err
     error[3:] = rot_err
@@ -1025,7 +1025,7 @@ def vecs2axisangle(vec0, vec1):
     vec1 = normalize(vec1, dim=-1)
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return th.cross(vec0, vec1) * th.arccos((vec0 * vec1).sum(-1, keepdims=True))
+    return th.linalg.cross(vec0, vec1) * th.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
 def vecs2quat(vec0, vec1, normalized=False):
@@ -1046,7 +1046,7 @@ def vecs2quat(vec0, vec1, normalized=False):
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = th.sum(vec0 * vec1, dim=-1, keepdims=True)
     quat_unnormalized = th.where(
-        cos_theta == -1, th.tensor([1.0, 0, 0, 0]), th.cat([th.cross(vec0, vec1), 1 + cos_theta], dim=-1)
+        cos_theta == -1, th.tensor([1.0, 0, 0, 0]), th.cat([th.linalg.cross(vec0, vec1), 1 + cos_theta], dim=-1)
     )
     return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdims=True)
 

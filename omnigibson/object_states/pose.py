@@ -15,7 +15,7 @@ class Pose(AbsoluteObjectState):
     def _get_value(self):
         pos = self.obj.get_position()
         orn = self.obj.get_orientation()
-        return th.tensor(pos), th.tensor(orn)
+        return pos, orn
 
     def _has_changed(self, get_value_args, value, info):
         # Only changed if the squared distance between old position and current position has

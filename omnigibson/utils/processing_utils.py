@@ -76,7 +76,7 @@ class MovingAverageFilter(Filter):
             n-array: New estimate of state.
         """
         # Write the newest observation at the appropriate index
-        self.past_samples[self.current_idx, :] = th.tensor(observation)
+        self.past_samples[self.current_idx, :] = observation
 
         # Compute value based on whether we're fully filled or not
         if not self.fully_filled:
@@ -103,7 +103,7 @@ class MovingAverageFilter(Filter):
         state = super()._dump_state()
 
         # Add info from this filter
-        state["past_samples"] = th.tensor(self.past_samples)
+        state["past_samples"] = self.past_samples
         state["current_idx"] = self.current_idx
         state["fully_filled"] = self.fully_filled
 
@@ -114,7 +114,7 @@ class MovingAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.past_samples = th.tensor(state["past_samples"])
+        self.past_samples = state["past_samples"]
         self.current_idx = state["current_idx"]
         self.fully_filled = state["fully_filled"]
 

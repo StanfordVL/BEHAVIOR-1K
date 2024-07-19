@@ -156,11 +156,11 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
 
     # Get an orthogonal vector using a random vector.
     random_vector = th.rand(3)
-    orthogonal_vector_1 = th.cross(ray_direction, random_vector)
+    orthogonal_vector_1 = th.linalg.cross(ray_direction, random_vector)
     orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 
     # Get a second vector orthogonal to both the ray and the first vector.
-    orthogonal_vector_2 = -th.cross(ray_direction, orthogonal_vector_1)
+    orthogonal_vector_2 = -th.linalg.cross(ray_direction, orthogonal_vector_1)
     orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
     orthogonal_vectors = th.stack([orthogonal_vector_1, orthogonal_vector_2])
@@ -329,8 +329,9 @@ def raytest(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
-    # Make sure start point, end point are numpy arrays
-    start_point, end_point = th.tensor(start_point), th.tensor(end_point)
+    # Make sure start point, end point are torch tensors
+    start_point = th.tensor(start_point) if not isinstance(start_point, th.Tensor) else start_point
+    end_point = th.tensor(end_point) if not isinstance(end_point, th.Tensor) else end_point
     point_diff = end_point - start_point
     distance = th.norm(point_diff)
     direction = point_diff / distance
@@ -834,7 +835,6 @@ def sample_cuboid_on_object(
     ), "the start and end points of raycasting are expected to have the same shape."
     num_samples = start_points.shape[0]
 
-    cuboid_dimensions = th.tensor(cuboid_dimensions)
     if th.any(cuboid_dimensions > 50.0):
         log.warning(
             "WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50). "

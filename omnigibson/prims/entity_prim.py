@@ -969,8 +969,16 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
-        position = th.tensor(position, dtype=th.float32) if position is not None else None
-        orientation = th.tensor(orientation, dtype=th.float32) if orientation is not None else None
+        position = (
+            position.float()
+            if isinstance(position, th.Tensor)
+            else th.tensor(position, dtype=th.float32) if position is not None else None
+        )
+        orientation = (
+            orientation.float()
+            if isinstance(orientation, th.Tensor)
+            else th.tensor(orientation, dtype=th.float32) if orientation is not None else None
+        )
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()

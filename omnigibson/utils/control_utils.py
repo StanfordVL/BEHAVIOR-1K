@@ -108,12 +108,22 @@ class IKSolver:
             None or n-array: Joint positions for reaching desired target_pos and target_quat, otherwise None if no
                 solution was found
         """
-        pos = th.tensor(target_pos, dtype=th.float64).reshape(3, 1)
-        rot = th.tensor(T.quat2mat(th.tensor([0, 0, 0, 1.0]) if target_quat is None else target_quat), dtype=th.float64)
+        pos = (
+            target_pos.to(th.float64) if isinstance(target_pos, th.Tensor) else th.tensor(target_pos, dtype=th.float64)
+        ).reshape(3, 1)
+
+        if target_quat is None:
+            rot = T.quat2mat(th.tensor([0, 0, 0, 1.0], dtype=th.float64))
+        else:
+            rot = T.quat2mat(
+                target_quat.to(th.float64)
+                if isinstance(target_quat, th.Tensor)
+                else th.tensor(target_quat, dtype=th.float64)
+            )
         ik_target_pose = lazy.lula.Pose3(lazy.lula.Rotation3(rot), pos)
 
         # Set the cspace seed and tolerance
-        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else th.tensor(initial_joint_pos)
+        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else initial_joint_pos
         self.config.cspace_seeds = [initial_joint_pos]
         self.config.position_tolerance = tolerance_pos
         self.config.orientation_tolerance = 100.0 if target_quat is None else tolerance_quat
@@ -159,7 +169,7 @@ def orientation_error(desired, current):
     rd2 = desired[:, :, 1]
     rd3 = desired[:, :, 2]
 
-    error = 0.5 * (th.cross(rc1, rd1) + th.cross(rc2, rd2) + th.cross(rc3, rd3))
+    error = 0.5 * (th.linalg.cross(rc1, rd1) + th.linalg.cross(rc2, rd2) + th.linalg.cross(rc3, rd3))
 
     # Reshape
     error = error.reshape(*input_shape, 3)

@@ -85,9 +85,9 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     rand_vec = th.rand(3)
     rand_vec /= th.norm(rand_vec)
     grasp_x = towards_object_in_world_frame
-    grasp_y = th.cross(rand_vec, grasp_x)
+    grasp_y = th.linalg.cross(rand_vec, grasp_x)
     grasp_y /= th.norm(grasp_y)
-    grasp_z = th.cross(grasp_x, grasp_y)
+    grasp_z = th.linalg.cross(grasp_x, grasp_y)
     grasp_z /= th.norm(grasp_z)
     grasp_mat = th.tensor([grasp_x, grasp_y, grasp_z]).T
     grasp_quat = R.from_matrix(grasp_mat).as_quat()
@@ -351,9 +351,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     joint_axis /= th.norm(joint_axis)
     origin_towards_bbox = th.tensor(bbox_wrt_origin[0])
-    open_direction = th.cross(joint_axis, origin_towards_bbox)
+    open_direction = th.linalg.cross(joint_axis, origin_towards_bbox)
     open_direction /= th.norm(open_direction)
-    lateral_axis = th.cross(open_direction, joint_axis)
+    lateral_axis = th.linalg.cross(open_direction, joint_axis)
 
     # Match the axes to the canonical axes of the link bb.
     lateral_axis_idx = th.argmax(th.abs(lateral_axis))
@@ -472,9 +472,9 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     forward = vector / th.norm(vector)
     rand_vec = th.rand(3)
     rand_vec /= th.norm(3)
-    side = th.cross(rand_vec, forward)
+    side = th.linalg.cross(rand_vec, forward)
     side /= th.norm(3)
-    up = th.cross(forward, side)
+    up = th.linalg.cross(forward, side)
     # assert th.isclose(th.norm(up), 1, atol=1e-3)
     rotmat = th.tensor([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()

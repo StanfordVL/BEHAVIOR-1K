@@ -233,7 +233,7 @@ class DatasetObject(USDObject):
                 th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
             )
         else:
-            scale = th.ones(3) if self._load_config["scale"] is None else th.tensor(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
         # Assert that the scale does not have too small dimensions
         assert th.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"

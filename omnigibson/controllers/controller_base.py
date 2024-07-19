@@ -107,12 +107,12 @@ class BaseController(Serializable, Registerable, Recreatable):
                 continue
 
             self._control_limits[ControlType.get_type(motor_type)] = [
-                th.tensor(control_limits[motor_type][0]),
-                th.tensor(control_limits[motor_type][1]),
+                control_limits[motor_type][0],
+                control_limits[motor_type][1],
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = th.tensor(dof_idx, dtype=int)
+        self._dof_idx = dof_idx.int()
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
@@ -169,7 +169,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             Array[float]: Processed command vector
         """
         # Make sure command is a th.tensor
-        command = th.tensor([command]) if type(command) in {int, float} else th.tensor(command)
+        command = th.tensor([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -209,7 +209,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
         # Preprocess and run internal command
-        self._goal = self._update_goal(command=self._preprocess_command(th.tensor(command)), control_dict=control_dict)
+        self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
 
     def _update_goal(self, command, control_dict):
         """
@@ -312,11 +312,7 @@ class BaseController(Serializable, Registerable, Recreatable):
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = (
-            None
-            if state["goal"] is None
-            else {name: th.tensor(goal_state) for name, goal_state in state["goal"].items()}
-        )
+        self._goal = None if state["goal"] is None else {name: goal_state for name, goal_state in state["goal"].items()}
 
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
@@ -373,7 +369,15 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Check if input is an Iterable, if so, we simply convert the input to th.tensor and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
-        return th.tensor(nums) if isinstance(nums, Iterable) else th.ones(dim) * nums
+        return (
+            nums.float()
+            if isinstance(nums, th.Tensor)
+            else (
+                th.tensor(nums, dtype=th.float32)
+                if isinstance(nums, Iterable)
+                else th.ones(dim, dtype=th.float32) * nums
+            )
+        )
 
     @property
     def state_size(self):
@@ -461,7 +465,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return th.tensor(self._dof_idx)
+        return self._dof_idx
 
     @classproperty
     def _do_not_register_classes(cls):

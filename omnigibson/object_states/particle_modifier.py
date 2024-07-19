@@ -404,7 +404,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     ), f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
 
             # Set the scale based on projection mesh params
-            self.projection_mesh.scale = th.tensor(self._projection_mesh_params["extents"])
+            self.projection_mesh.scale = self._projection_mesh_params["extents"]
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             self.link.update_meshes()
@@ -1141,7 +1141,7 @@ class ParticleApplier(ParticleModifier):
         # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
         # We sample over the entire object AABB, assuming most will be filtered out
         sampling_distance = 2 * system.particle_radius
-        extent = th.tensor(self._projection_mesh_params["extents"])
+        extent = self._projection_mesh_params["extents"]
         h = extent[2]
         low, high = self.obj.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int()

@@ -179,10 +179,15 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
         """
-        current_position, current_orientation = self.get_position_orientation()
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation()
+            position = current_position if position is None else position
+            orientation = current_orientation if orientation is None else orientation
 
-        position = current_position if position is None else th.tensor(position, dtype=th.float32)
-        orientation = current_orientation if orientation is None else th.tensor(orientation, dtype=th.float32)
+        position = position.float() if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = (
+            orientation.float() if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+        )
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
@@ -287,23 +292,28 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*th.tensor(position, dtype=th.float32).tolist())
+            position = position.float().tolist() if isinstance(position, th.Tensor) else position
+            position = lazy.pxr.Gf.Vec3d(*position)
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
-            orientation = th.tensor(orientation, dtype=float)[[3, 0, 1, 2]]
+            orientation = (
+                orientation.float()[[3, 0, 1, 2]].tolist()
+                if isinstance(orientation, th.Tensor)
+                else [float(orientation[i]) for i in [3, 0, 1, 2]]
+            )
             if "xformOp:orient" not in properties:
                 lazy.carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
                 )
             xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*orientation.tolist())
+                rotq = lazy.pxr.Gf.Quatf(*orientation)
             else:
-                rotq = lazy.pxr.Gf.Quatd(*orientation.tolist())
+                rotq = lazy.pxr.Gf.Quatd(*orientation)
             xform_op.Set(rotq)
         PoseAPI.invalidate()
         if gm.ENABLE_FLATCACHE:
@@ -362,7 +372,12 @@ class XFormPrim(BasePrim):
             scale (float or th.tensor): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        scale = th.tensor(scale, dtype=float) if isinstance(scale, Iterable) else th.ones(3) * scale
+        if isinstance(scale, th.Tensor):
+            scale = scale.float()
+        elif isinstance(scale, Iterable):
+            scale = th.tensor(scale, dtype=th.float32)
+        else:
+            scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
@@ -424,7 +439,7 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        pos, orn = th.tensor(state["pos"]), th.tensor(state["ori"])
+        pos, orn = state["pos"], state["ori"]
         if self.scene is not None:
             pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
         self.set_position_orientation(pos, orn)

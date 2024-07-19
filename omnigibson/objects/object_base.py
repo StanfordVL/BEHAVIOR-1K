@@ -94,7 +94,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = th.tensor(scale) if isinstance(scale, Iterable) else scale
+        if isinstance(scale, th.Tensor):
+            load_config["scale"] = scale.float()
+        elif isinstance(scale, Iterable):
+            load_config["scale"] = th.tensor(scale, dtype=th.float32)
+        else:
+            load_config["scale"] = scale
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["kinematic_only"] = kinematic_only
@@ -142,7 +147,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # merely set this to be a static collider, i.e.: kinematic-only
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = th.ones(3) if self._load_config["scale"] is None else th.tensor(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
             if (
                 self.n_joints == 0
                 and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)

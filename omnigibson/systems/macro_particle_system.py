@@ -1063,9 +1063,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_attached_references=particle_attached_references,
         )
         state["n_particles"] -= len(indices_to_remove)
-        state["positions"] = torch_delete(th.tensor(state["positions"]), indices_to_remove, dim=0)
-        state["orientations"] = torch_delete(th.tensor(state["orientations"]), indices_to_remove, dim=0)
-        state["scales"] = torch_delete(th.tensor(state["scales"]), indices_to_remove, dim=0)
+        state["positions"] = torch_delete(state["positions"], indices_to_remove, dim=0)
+        state["orientations"] = torch_delete(state["orientations"], indices_to_remove, dim=0)
+        state["scales"] = torch_delete(state["scales"], indices_to_remove, dim=0)
 
         # Run super
         super()._load_state(state=state)

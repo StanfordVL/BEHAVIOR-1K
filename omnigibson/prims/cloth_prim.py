@@ -191,7 +191,7 @@ class ClothPrim(GeomPrim):
         # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
         p_local = th.as_tensor(self.get_attribute(attr="points"))
         p_local = p_local[idxs] if idxs is not None else p_local
-        p_world = (ori @ (p_local * scale).T).T + pos
+        p_world = (ori @ (p_local * scale).mT).mT + pos
 
         return p_world
 
@@ -341,7 +341,7 @@ class ClothPrim(GeomPrim):
         # Shape [F, 3]
         v1 = positions[:, 2, :] - positions[:, 0, :]
         v2 = positions[:, 1, :] - positions[:, 0, :]
-        normals = th.cross(v1, v2)
+        normals = th.linalg.cross(v1, v2)
         return normals / th.norm(normals, dim=1).reshape(-1, 1)
 
     def contact_list(self, keypoints_only=True):
@@ -568,7 +568,7 @@ class ClothPrim(GeomPrim):
             if not isinstance(state["particle_velocities"], th.Tensor)
             else state["particle_velocities"]
         )
-        self.set_particle_positions(positions=th.tensor(state["particle_positions"], dtype=th.float32))
+        self.set_particle_positions(positions=state["particle_positions"].float())
 
     def serialize(self, state):
         # Run super first

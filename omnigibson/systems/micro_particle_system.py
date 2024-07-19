@@ -368,8 +368,8 @@ class PhysxParticleInstancer(BasePrim):
             f"instancer when loading state! Should be: {self.particle_group}, got: {state['particle_group']}."
         )
 
-        local_positions = th.tensor(state["particle_positions"])
-        local_orientations = th.tensor(state["particle_orientations"])
+        local_positions = state["particle_positions"]
+        local_orientations = state["particle_orientations"]
         if local_positions.numel() == 0 and local_orientations.numel() == 0:
             global_positions, global_orientations = th.tensor([]), th.tensor([])
             setattr(self, "particle_positions", global_positions)

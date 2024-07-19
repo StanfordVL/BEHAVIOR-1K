@@ -818,8 +818,12 @@ class RigidPrim(XFormPrim):
         super()._load_state(state=state)
 
         # Set velocities if not kinematic
-        self.set_linear_velocity(th.tensor(state["lin_vel"]))
-        self.set_angular_velocity(th.tensor(state["ang_vel"]))
+        self.set_linear_velocity(
+            state["lin_vel"] if isinstance(state["lin_vel"], th.Tensor) else th.tensor(state["lin_vel"])
+        )
+        self.set_angular_velocity(
+            state["ang_vel"] if isinstance(state["ang_vel"], th.Tensor) else th.tensor(state["ang_vel"])
+        )
 
     def serialize(self, state):
         # Run super first

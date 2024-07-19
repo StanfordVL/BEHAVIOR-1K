@@ -197,7 +197,8 @@ def create_physx_particleset_pointinstancer(
     if orientations is None:
         orientations = th.zeros((n_particles, 4))
         orientations[:, -1] = 1.0
-    orientations = th.tensor(orientations)[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
+    orientations = th.tensor(orientations) if not isinstance(orientations, th.Tensor) else orientations
+    orientations = orientations[:, [3, 0, 1, 2]]  # x,y,z,w --> w,x,y,z
     velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
     angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
     scales = th.ones((n_particles, 3)) if scales is None else scales

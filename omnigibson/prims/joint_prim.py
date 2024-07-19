@@ -764,7 +764,15 @@ class JointPrim(BasePrim):
             ), "Trying to set joint position target, but control type is not position!"
 
         # Standardize input
-        pos = th.tensor([pos]) if self._n_dof == 1 and not isinstance(pos, Iterable) else th.tensor(pos)
+        pos = (
+            pos.float()
+            if isinstance(pos, th.Tensor)
+            else (
+                th.tensor([pos], dtype=th.float32)
+                if self._n_dof == 1 and not isinstance(pos, Iterable)
+                else th.tensor(pos, dtype=th.float32)
+            )
+        )
 
         # Potentially de-normalize if the input is normalized
         if normalized:
@@ -800,7 +808,15 @@ class JointPrim(BasePrim):
             ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
         # Standardize input
-        vel = th.tensor([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else th.tensor(vel)
+        vel = (
+            vel.float()
+            if isinstance(vel, th.Tensor)
+            else (
+                th.tensor([vel], dtype=th.float32)
+                if self._n_dof == 1 and not isinstance(vel, Iterable)
+                else th.tensor(vel, dtype=th.float32)
+            )
+        )
 
         # Potentially de-normalize if the input is normalized
         if normalized:
@@ -828,7 +844,15 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set effort for articulated joints!"
 
         # Standardize input
-        effort = th.tensor([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else th.tensor(effort)
+        effort = (
+            effort.float()
+            if isinstance(effort, th.Tensor)
+            else (
+                th.tensor([effort], dtype=th.float32)
+                if self._n_dof == 1 and not isinstance(effort, Iterable)
+                else th.tensor(effort, dtype=th.float32)
+            )
+        )
 
         # Potentially de-normalize if the input is normalized
         if normalized:
