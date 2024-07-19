@@ -46,14 +46,13 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="particle modifier type",
         random_selection=random_selection,
     )
-
     particle_types = ["salt", "water"]
     particle_type = choose_from_options(
         options={name: f"{name} particles will be applied or removed from the simulator" for name in particle_types},
         name="particle type",
         random_selection=random_selection,
     )
-
+    
     table_cfg = dict(
         type="DatasetObject",
         name="table",
@@ -62,7 +61,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         bounding_box=[3.402, 1.745, 1.175],
         position=[0, 0, 0.98],
     )
-
     tool_cfg = dict(
         type="DatasetObject",
         name="tool",
@@ -71,9 +69,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     if modifier_type == "particleRemover":
-
         if particle_type == "salt":
-
             # only ask this question if the modifier type is salt particleRemover
             method_type = choose_from_options(
                 options={
@@ -84,33 +80,26 @@ def main(random_selection=False, headless=False, short_exec=False):
                 random_selection=random_selection,
             )
         else:
-
             # If the particle type is water, the remover is always adjacency type
             method_type = "Adjacency"
-
         if method_type == "Adjacency":
-
             # use dishtowel to remove adjacent particles
             tool_cfg["category"] = "dishtowel"
             tool_cfg["model"] = "dtfspn"
             tool_cfg["bounding_box"] = [0.34245, 0.46798, 0.07]
         elif method_type == "Projection":
-
             # use vacuum to remove projections particles
             tool_cfg["category"] = "vacuum"
             tool_cfg["model"] = "wikhik"
     else:
-
         # If the modifier type is particleApplier, the applier is always projection type
         method_type = "Projection"
 
         if particle_type == "salt":
-
             # use salt shaker to apply salt particles
             tool_cfg["category"] = "salt_shaker"
             tool_cfg["model"] = "iomwtn"
         else:
-
             # use water atomizer to apply water particles
             tool_cfg["category"] = "water_atomizer"
             tool_cfg["model"] = "lfarai"
@@ -148,7 +137,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
         table.states[Covered].set_value(env.scene.get_system(particle_type), True)
-
         # Take a few steps to let particles settle
         for _ in range(25):
             env.step(np.array([]))
@@ -164,25 +152,21 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the modifier object to be in position to modify particles
     if modifier_type == "particleRemover" and method_type == "Projection":
-
         tool.set_position_orientation(
             position=np.array([0, 0.3, 1.45]),
             orientation=np.array([0, 0, 0, 1.0]),
         )
     elif modifier_type == "particleRemover" and method_type == "Adjacency":
-
         tool.set_position_orientation(
             position=np.array([0, 0.3, 1.175]),
             orientation=np.array([0, 0, 0, 1.0]),
         )
     elif modifier_type == "particleApplier" and particle_type == "water":
-
         tool.set_position_orientation(
             position=np.array([0, 0.3, 1.4]),
             orientation=np.array([0.3827, 0, 0, 0.9239]),
         )
     else:
-
         tool.set_position_orientation(
             position=np.array([0, 0.3, 1.5]),
             orientation=np.array([0.7071, 0, 0.7071, 0]),
