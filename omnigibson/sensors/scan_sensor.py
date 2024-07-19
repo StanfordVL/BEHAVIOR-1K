@@ -165,15 +165,18 @@ class ScanSensor(BaseSensor):
         assert "occupancy_grid" in self._modalities, "Occupancy grid is not enabled for this range sensor!"
         assert self.n_vertical_rays == 1, "Occupancy grid is only valid for a 1D range sensor (n_vertical_rays = 1)!"
 
-        # Grab vector of corresponding angles for each scan line
-        angles = th.arange(
+        # Calculate the number of points
+        num_points = int(self.horizontal_fov / self.horizontal_resolution)
+
+        # Generate angles using linspace
+        angles = th.linspace(
             -th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
             th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
-            th.deg2rad(th.tensor([self.horizontal_resolution])).item(),
+            num_points,
         )
 
         # Convert into 3D unit vectors for each angle
-        unit_vector_laser = th.tensor([[th.cos(ang), th.sin(ang), 0.0] for ang in angles])
+        unit_vector_laser = th.stack([th.cos(angles), th.sin(angles), th.zeros_like(angles)], dim=1)
 
         # Scale unit vectors by corresponding laser scan distnaces
         assert ((scan >= 0.0) & (scan <= 1.0)).all(), "scan out of valid range [0, 1]"
@@ -181,11 +184,11 @@ class ScanSensor(BaseSensor):
 
         # Convert scans from laser frame to world frame
         pos, ori = self.get_position_orientation()
-        scan_world = quat2mat(ori).dot(scan_laser.T).T + pos
+        scan_world = th.matmul(th.tensor(quat2mat(ori)), scan_laser.T).T + pos
 
         # Convert scans from world frame to local base frame
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
-        scan_local = quat2mat(base_ori).T.dot((scan_world - base_pos).T).T
+        scan_local = th.matmul(th.tensor(quat2mat(base_ori)).T, (scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
         scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
 
@@ -193,8 +196,11 @@ class ScanSensor(BaseSensor):
         scan_local[:, 1] *= -1
 
         # Initialize occupancy grid -- default is unknown values
-        occupancy_grid = th.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).to(th.uint8)
-        occupancy_grid.fill(int(OccupancyGridState.UNKNOWN * 2.0))
+        occupancy_grid = th.full(
+            (self.occupancy_grid_resolution, self.occupancy_grid_resolution),
+            fill_value=int(OccupancyGridState.UNKNOWN * 2.0),
+            dtype=th.uint8,
+        )
 
         # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since
         # OG ranges from [0, resolution] x [0, resolution])
@@ -202,6 +208,9 @@ class ScanSensor(BaseSensor):
             self.occupancy_grid_resolution / 2
         )
         scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).int()
+
+        occupancy_grid = occupancy_grid.numpy()
+        scan_local_in_map = scan_local_in_map.numpy()
 
         # For each scan hit,
         for i in range(scan_local_in_map.shape[1]):
@@ -223,7 +232,7 @@ class ScanSensor(BaseSensor):
             thickness=-1,
         )
 
-        return occupancy_grid[:, :, None].float() / 2.0
+        return th.tensor(occupancy_grid[:, :, None]).float() / 2.0
 
     def _get_obs(self):
         # Run super first to grab any upstream obs

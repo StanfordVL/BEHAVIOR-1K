@@ -1037,6 +1037,8 @@ class ControllableObjectViewAPI:
     non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
     """
 
+    _view_by_pattern = {}
+
     @classmethod
     def clear(cls):
         for view in cls._view_by_pattern.values():
