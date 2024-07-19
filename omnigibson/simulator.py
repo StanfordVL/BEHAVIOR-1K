@@ -30,13 +30,11 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
 from omnigibson.utils.python_utils import create_object_from_init_info
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from omnigibson.utils.ui_utils import (
     CameraMover,
     create_module_logger,
@@ -71,6 +69,11 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
+m.KIT_FILES = {
+    (4, 0, 0): "omnigibson_4_0_0.kit",
+    (2023, 1, 1): "omnigibson_2023_1_1.kit",
+}
+
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
@@ -103,27 +106,28 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
-    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
-    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
-    # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
-    kit_file = Path(__file__).parent / "omnigibson.kit"
-    kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
-    try:
-        shutil.copy(kit_file, kit_file_target)
-    except Exception as e:
-        raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
-
-    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
-
+    # First obtain the Isaac Sim version
     version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
-        isaac_version = version_content.split("-")[0]
-        assert meets_minimum_isaac_version(
-            "2023.1.1", current_version=isaac_version
-        ), "This version of OmniGibson supports Isaac Sim 2023.1.1 and above. Please update Isaac Sim."
+        isaac_version_str = version_content.split("-")[0]
+        isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
+        assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
+        kit_file_name = m.KIT_FILES[isaac_version_tuple]
+
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    kit_file = Path(__file__).parent / kit_file_name
+    kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    try:
+        shutil.copy(kit_file, kit_file_target)
+    except Exception as e:
+        raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
+
+    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
         app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
@@ -542,7 +546,6 @@ def launch_simulator(*args, **kwargs):
             self._floor_plane = XFormPrim(
                 relative_prim_path=ground_plane_relative_path,
                 name=plane.name,
-                load_config={"created_manually": True},
             )
             self._floor_plane.load(None)
 
@@ -669,19 +672,22 @@ def launch_simulator(*args, **kwargs):
                 # One physics timestep will elapse
                 self.step_physics()
 
+            scenes_modified = set()
             for ob in objs:
+                scenes_modified.add(ob.scene)
                 self._remove_object(ob)
 
             if self.is_playing():
                 # Update all handles that are now broken because objects have changed
                 self.update_handles()
 
+                if gm.ENABLE_TRANSITION_RULES:
+                    # Prune the transition rules that are currently active
+                    for scene in scenes_modified:
+                        scene.transition_rule_api.prune_active_rules()
+
                 # Load the state back
                 self.load_state(state)
-
-            if gm.ENABLE_TRANSITION_RULES:
-                # Refresh all current rules
-                TransitionRuleAPI.prune_active_rules()
 
         def _remove_object(self, obj):
             """
@@ -747,7 +753,7 @@ def launch_simulator(*args, **kwargs):
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
                             obj.update_handles()
-                    for system in scene.get_active_systems():
+                    for system in scene.active_systems.values():
                         if isinstance(system, MacroPhysicalParticleSystem):
                             system.refresh_particles_view()
 
@@ -779,9 +785,11 @@ def launch_simulator(*args, **kwargs):
                     # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
                     # First call zero-physics step update, so that handles are properly propagated
                     og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+                    scenes_modified = set()
                     for i in range(n_objects_to_initialize):
                         obj = self._objects_to_initialize[i]
                         obj.initialize()
+                        scenes_modified.add(obj.scene)
                         if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
                             self._objects_require_contact_callback = True
                         if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
@@ -793,12 +801,13 @@ def launch_simulator(*args, **kwargs):
                     self.update_handles()
 
                     if gm.ENABLE_TRANSITION_RULES:
-                        # Also refresh the transition rules that are currently active
-                        TransitionRuleAPI.refresh_all_rules()
+                        # Refresh the transition rules
+                        for scene in scenes_modified:
+                            scene.transition_rule_api.refresh_all_rules()
 
                 # Update any system-related state
                 for scene in self.scenes:
-                    for system in scene.get_active_systems():
+                    for system in scene.active_systems.values():
                         system.update()
 
                 # Propagate states if the feature is enabled
@@ -823,7 +832,8 @@ def launch_simulator(*args, **kwargs):
 
                 # Possibly run transition rule step
                 if gm.ENABLE_TRANSITION_RULES:
-                    TransitionRuleAPI.step()
+                    for scene in self.scenes:
+                        scene.transition_rule_api.step()
 
         def _omni_update_step(self):
             """
@@ -875,8 +885,10 @@ def launch_simulator(*args, **kwargs):
                             for robot in scene.robots:
                                 if robot.initialized:
                                     robot.update_controller_mode()
-                        if gm.ENABLE_TRANSITION_RULES:
-                            TransitionRuleAPI.refresh_all_rules()
+
+                            # Also refresh any transition rules that became stale while sim was stopped
+                            if gm.ENABLE_TRANSITION_RULES:
+                                scene.transition_rule_api.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -1327,6 +1339,10 @@ def launch_simulator(*args, **kwargs):
                 json_paths (List[str]): Full paths of JSON file to load, which contains information
                     to recreate a scene.
             """
+            if len(self.scenes) > 0:
+                log.error("There are already scenes loaded. Please call og.clear() to relaunch the simulator first.")
+                return
+
             for json_path in json_paths:
                 if not json_path.endswith(".json"):
                     log.error(f"You have to define the full json_path to load from. Got: {json_path}")

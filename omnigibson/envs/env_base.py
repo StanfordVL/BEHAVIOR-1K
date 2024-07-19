@@ -15,6 +15,7 @@ from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.gym_utils import (
     GymObservable,
+    maxdim,
     recursively_generate_compatible_dict,
     recursively_generate_flat_dict,
 )
@@ -337,12 +338,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for robot in self.robots:
             # Load the observation space for the robot
             robot_obs = robot.load_observation_space()
-            if gym.spaces.utils.flatdim(robot_obs) > 0:
+            if maxdim(robot_obs) > 0:
                 obs_space[robot.name] = robot_obs
 
         # Also load the task obs space
         task_space = self._task.load_observation_space()
-        if gym.spaces.utils.flatdim(task_space) > 0:
+        if maxdim(task_space) > 0:
             obs_space["task"] = task_space
 
         # Also load any external sensors
@@ -411,7 +412,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
-        # Save the state
+        # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
+        self.scene.reset()
+
+        # Save the state for objects from load_robots / load_objects / load_task
         self.scene.update_initial_state()
 
         # Load the obs / action spaces
@@ -470,11 +474,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab all observations from each robot
         for robot in self.robots:
-            if gym.spaces.utils.flatdim(robot.observation_space) > 0:
+            if maxdim(robot.observation_space) > 0:
                 obs[robot.name], info[robot.name] = robot.get_obs()
 
         # Add task observations
-        if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
+        if maxdim(self._task.observation_space) > 0:
             obs["task"] = self._task.get_obs(env=self)
 
         # Add external sensor observations if they exist
@@ -590,14 +594,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - bool: truncated, i.e. whether this episode ended due to a time limit etc.
                 - dict: info, i.e. dictionary with any useful information
         """
-        try:
-            self._pre_step(action)
-            og.sim.step()
-            return self._post_step(action)
-        except:
-            raise ValueError(
-                f"Failed to execute environment step {self._current_step} in episode {self._current_episode}"
-            )
+        self._pre_step(action)
+        og.sim.step()
+        return self._post_step(action)
 
     def render(self):
         """Render the environment for debug viewing."""

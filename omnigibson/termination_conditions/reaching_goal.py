@@ -5,7 +5,7 @@ from omnigibson.termination_conditions.termination_condition_base import Success
 class ReachingGoal(SuccessCondition):
     """
     ReachingGoal (success condition) used for reaching-type tasks
-    Episode terminates if reaching goal is reached within @distance_tol by the @robot_idn robot's base
+    Episode terminates if reaching goal is reached within @distance_tol by the @robot_idn robot's end effector
 
     Args:
 

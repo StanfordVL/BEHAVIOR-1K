@@ -1,3 +1,5 @@
+import pytest
+
 import omnigibson as og
 from omnigibson.macros import gm
 
@@ -19,7 +21,7 @@ def task_tester(task_type):
         "task": {
             "type": task_type,
             # BehaviorTask-specific
-            "activity_name": "assembling_gift_baskets",
+            "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
         },
     }
