@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import site
 import shutil
 import signal
 import socket
@@ -107,7 +108,16 @@ def _launch_app():
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
     # First obtain the Isaac Sim version
-    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    # check if ISAAC_PATH exists, if not proceed with the pip installed version
+    try:
+        version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    except KeyError:
+        version_file_path = os.path.join(site.getsitepackages()[0], "isaacsim", "VERSION")
+    except:
+        # if neither of these paths exist, raise error to user
+        raise ValueError(f"Could not find Isaac Sim version file path. Please set this variable to the path of your Isaac Sim installation.")
+
+
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
@@ -119,9 +129,17 @@ def _launch_app():
     # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    
+    # check if EXP_PATH exists, if not proceed with pip install path
     kit_file = Path(__file__).parent / kit_file_name
-    kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    try:
+        kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    except KeyError:
+        kit_file_target = os.path.join(site.getsitepackages()[0], "isaacsim", "apps", kit_file_name)
+    except:
+        # if neither of these paths exist, raise error to user
+        raise ValueError(f"Could not find the Isaac sim file file path. Please set this variable to the path of your Isaac Sim installation.")
+
     try:
         shutil.copy(kit_file, kit_file_target)
     except Exception as e:

@@ -51,7 +51,6 @@ def test_multi_scene_dump_and_load():
     initial_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
     vec_env.envs[0].scene._load_state(scene_three_state)
     new_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position()
-    breakpoint()
     assert np.allclose(new_robot_pos_scene_one - initial_robot_pos_scene_one, robot_displacement, atol=1e-3)
 
     og.clear()

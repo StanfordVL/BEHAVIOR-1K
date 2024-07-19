@@ -74,98 +74,9 @@ conda activate $conda_name
 # Install omnigibson!
 pip install -e .
 
-# Install Isaac Sim using pip if the user chooses to install it from pip
-if [ $isaac_sim_installation_method -eq 1 ]; then
-    echo -e "\nInstalling Isaac Sim using pip...\n"
-    
-    # Get the Isaac Sim whl file from the NVIDIA Omniverse website
-    wget https://pypi.nvidia.com/omniverse-kit/omniverse_kit-106.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-kernel/isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-app/isaacsim_app-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-core/isaacsim_core-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-gui/isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-utils/isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-storage/isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-asset/isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-sensor/isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-robot-motion/isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-robot/isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-benchmark/isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-code-editor/isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-ros1/isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-cortex/isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-example/isaacsim_example-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-replicator/isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-rl/isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-robot-setup/isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-ros2/isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-template/isaacsim_template-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-test/isaacsim_test-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim/isaacsim-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-extscache-physics/isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-extscache-kit/isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-    wget https://pypi.nvidia.com/isaacsim-extscache-kit-sdk/isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl
-
-    # Rename the whl file, as the pip install version only support GLIBC 2.34
-    # https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_python.html
-    mv omniverse_kit-106.0.0-cp310-none-manylinux_2_34_x86_64.whl omniverse_kit-106.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_app-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_app-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_core-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_core-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_example-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_example-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_template-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_template-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_test-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_test-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    mv isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_34_x86_64.whl isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    
-    # Install Isaac Sim using pip
-    pip install omniverse_kit-106.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_app-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_core-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_example-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_template-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_test-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    pip install numba
-    pip install telemoma
-
-fi
+# # Install Isaac Sim using pip if the user chooses to install it from pip
+# if [ $isaac_sim_installation_method -eq 1 ]; then
+#     echo -e "\nInstalling Isaac Sim using pip...\n"
 
 
 mkdir -p ${CONDA_PREFIX}/etc/conda/activate.d
@@ -189,11 +100,11 @@ echo "unset LD_LIBRARY_PATH_OLD" >> ${CONDA_DEACT_FILE}
 echo "unset PYTHONPATH_OLD" >> ${CONDA_DEACT_FILE}
 echo "unset EXP_PATH" >> ${CONDA_DEACT_FILE}
 
-# Add the Isaac Sim paths to the conda environment for pip install 
-if [ $isaac_sim_installation_method -eq 1 ]; then
-    echo "export ISAAC_PATH=$(python -c 'import site; print(site.getsitepackages()[0] + "/isaacsim")')" >> ${CONDA_ACT_FILE}
-    echo "export EXP_PATH=\$ISAAC_PATH/apps" >> ${CONDA_ACT_FILE}
-fi
+# # Add the Isaac Sim paths to the conda environment for pip install 
+# if [ $isaac_sim_installation_method -eq 1 ]; then
+#     echo "export ISAAC_PATH=$(python -c 'import site; print(site.getsitepackages()[0] + "/isaacsim")')" >> ${CONDA_ACT_FILE}
+#     echo "export EXP_PATH=\$ISAAC_PATH/apps" >> ${CONDA_ACT_FILE}
+# fi
 
 # Add the Isaac Sim paths to the conda environment for Omniverse Launcher install
 if [ $isaac_sim_installation_method -eq 2 ]; then
@@ -206,34 +117,34 @@ echo -e "\nPerforming clean up...\n"
 # Cycle conda environment so that all dependencies are propagated
 conda deactivate
 
-# If using pip install, remove the downloaded whl files
-if [ $isaac_sim_installation_method -eq 1 ]; then
-    rm omniverse_kit-106.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_app-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_core-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_example-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_template-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_test-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-    rm isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
-fi
+# # If using pip install, remove the downloaded whl files
+# if [ $isaac_sim_installation_method -eq 1 ]; then
+#     rm omniverse_kit-106.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_kernel-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_app-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_core-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_gui-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_utils-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_storage-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_asset-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_sensor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_robot_motion-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_robot-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_benchmark-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_code_editor-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_ros1-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_cortex-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_example-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_replicator-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_rl-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_robot_setup-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_ros2-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_template-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_test-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_extscache_physics-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_extscache_kit-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+#     rm isaacsim_extscache_kit_sdk-4.0.0.0-cp310-none-manylinux_2_31_x86_64.whl
+# fi
 
 echo -e "\nOmniGibson successfully installed! Please run [4mconda activate $conda_name[0m to activate the environment.\n"
