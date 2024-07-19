@@ -64,7 +64,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     print("Re-loading scene...")
     og.clear()
-    og.sim.restore(json_paths=[save_path])
+    og.sim.restore(scene_files=[save_path])
 
     # env is no longer valid after og.clear()
     del env

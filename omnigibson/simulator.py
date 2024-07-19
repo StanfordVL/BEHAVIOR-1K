@@ -1317,19 +1317,19 @@ def _launch_simulator(*args, **kwargs):
             """
             return self.world_prim.GetCustomDataByKey(key)
 
-        def restore(self, json_paths):
+        def restore(self, scene_files):
             """
             Restore simulation environments from @json_paths.
 
             Args:
-                json_paths (List[str]): Full paths of JSON file to load, which contains information
-                    to recreate a scene.
+                scene_files (List[str] or List[dict]): Full paths of either JSON files or loaded scene files to load,
+                    which contains information to recreate a scene.
             """
             # Note whether we're loading from scratch or not
             load_from_scratch = len(self.scenes) == 0
 
             # We don't support smart diff'ing if there's a mismatch in number of scenes
-            if not load_from_scratch and len(self.scenes) != len(json_paths):
+            if not load_from_scratch and len(self.scenes) != len(scene_files):
                 log.error("There is a mismatch between the number of active scenes and number of json_paths to be "
                           "loaded. Please call og.clear() to relaunch the simulator first.")
                 return
@@ -1337,21 +1337,24 @@ def _launch_simulator(*args, **kwargs):
             # Parse each json path individually
             states = []
             og.sim.stop()
-            for i, json_path in enumerate(json_paths):
-                if not json_path.endswith(".json"):
-                    log.error(f"You have to define the full json_path to load from. Got: {json_path}")
-                    return
+            for i, scene_file in enumerate(scene_files):
+                if isinstance(scene_file, str):
+                    if not scene_file.endswith(".json"):
+                        log.error(f"You have to define the full json_path to load from. Got: {json_path}")
+                        return
 
-                # Load the info from the json
-                with open(json_path, "r") as f:
-                    scene_info = json.load(f)
+                    # Load the info from the json
+                    with open(scene_file, "r") as f:
+                        scene_info = json.load(f)
+                else:
+                    scene_info = scene_file
                 init_info = scene_info["init_info"]
                 state = scene_info["state"]
                 states.append(state)
 
                 if load_from_scratch:
                     # Override the init info with our json path
-                    init_info["args"]["scene_file"] = json_path
+                    init_info["args"]["scene_file"] = scene_file
 
                     # Also make sure we have any additional modifications necessary from the specific scene
                     og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
@@ -1394,12 +1397,12 @@ def _launch_simulator(*args, **kwargs):
             Saves the current simulation environment to @json_path.
 
             Args:
-                json_paths (None or List[str]): Full path of JSON files to save (should end with .json), which contains information
-                    to recreate the current scenes, if specified. List should have one element per currently loaded scene.
-                    If None, will return a list of JSON strings instead.
+                json_paths (None or List[str]): Full path of JSON files to save (should end with .json), each of which
+                    contain information to recreate the current scenes, if specified. List should have one element per
+                    currently loaded scene. If None, will return a list of JSON strings instead.
 
             Returns:
-                None or str: If @json_paths is None, returns list of dumped json strings. Else, None
+                None or list of str: If @json_paths is None, returns list of dumped json strings. Else, None
             """
             # Make sure the sim is not stopped, since we need to grab joint states
             assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"

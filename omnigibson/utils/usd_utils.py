@@ -1034,6 +1034,7 @@ class ControllableObjectViewAPI:
     of the same type are grouped together. If there are fixed base robots, they will be grouped separately from
     non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
     """
+    _view_by_pattern = dict()
 
     @classmethod
     def clear(cls):
@@ -1047,7 +1048,7 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def initialize_view(cls):
-        cls._view_by_pattern = {}
+        cls._view_by_pattern = dict()
 
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.objects.controllable_object import ControllableObject

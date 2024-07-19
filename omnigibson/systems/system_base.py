@@ -131,7 +131,7 @@ class BaseSystem(Serializable):
             scene.transition_rule_api.refresh_all_rules()
 
         # Run any callbacks
-        for callback in og.sim.get_callbacks_on_system_init():
+        for callback in og.sim.get_callbacks_on_system_init().values():
             callback(self)
 
     @property
@@ -199,7 +199,7 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
-        for callback in og.sim.get_callbacks_on_system_clear():
+        for callback in og.sim.get_callbacks_on_system_clear().values():
             callback(self)
 
         self.reset()
@@ -207,6 +207,9 @@ class BaseSystem(Serializable):
 
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()
+
+        # Clear from scene active system registry
+        self.scene.system_registry.remove(self)
 
         self.initialized = False
         self._scene = None

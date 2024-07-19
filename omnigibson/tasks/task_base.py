@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 
+import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import Registerable, classproperty
 
@@ -118,11 +119,39 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._load(env=env)
 
         # Load the obs space dim
+        og.sim.play()
         obs = self.get_obs(env=env, flatten_low_dim=True)
         self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
+        og.sim.stop()
 
         # We're now initialized
         self._loaded = True
+
+    @property
+    def task_metadata(self):
+        """
+        Returns:
+            dict: Relevant metadata for the current task
+        """
+        # Default is empty dictionary
+        return dict()
+
+    def write_task_metadata(self):
+        """
+        Store any relevant task metadata that should be written when the simulation state is saved
+        """
+        # Write to sim
+        og.sim.write_metadata(key="task", data=self.task_metadata)
+
+    def load_task_metadata(self):
+        """
+        Load relevant task metadata stored in the simulator
+
+        Returns:
+            dict: Relevant metadata for the ucrrent task
+        """
+        # Load from sim
+        return og.sim.get_metadata(key="task")
 
     @abstractmethod
     def _create_termination_conditions(self):

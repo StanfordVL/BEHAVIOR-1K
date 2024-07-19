@@ -583,7 +583,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._current_step += 1
         return obs, reward, terminated, truncated, info
 
-    def step(self, action):
+    def step(self, action, n_render_iterations=1):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
@@ -592,6 +592,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             action (gym.spaces.Dict or dict or np.array): robot actions. If a dict is specified, each entry should
                 map robot name to corresponding action. If a np.array, it should be the flattened, concatenated set
                 of actions
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             5-tuple:
@@ -603,6 +604,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         self._pre_step(action)
         og.sim.step()
+        for _ in range(n_render_iterations - 1):
+            og.sim.render()
         return self._post_step(action)
 
     def render(self):

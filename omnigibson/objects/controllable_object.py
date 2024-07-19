@@ -339,6 +339,9 @@ class ControllableObject(BaseObject):
         if self._action_type == "discrete":
             action = np.array(self.discrete_action_list[action])
 
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
+
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
             self.action_dim, len(action)

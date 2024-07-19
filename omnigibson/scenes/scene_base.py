@@ -28,6 +28,7 @@ from omnigibson.systems.system_base import (
 )
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -65,7 +66,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     ):
         """
         Args:
-            scene_file (None or str): If specified, full path of JSON file to load (with .json).
+            scene_file (None or str or dict): If specified, full path of JSON file to load (with .json) or the
+                pre-loaded scene state from that json.
                 None results in no additional objects being loaded into the scene
             use_floor_plane (bool): whether to load a flat floor plane into the simulator
             floor_plane_visible (bool): whether to render the additionally added floor plane
@@ -100,8 +102,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # If we have any scene file specified, use it to create the objects within it
         if self.scene_file is not None:
             # Grab objects info from the scene file
-            with open(self.scene_file, "r") as f:
-                scene_info = json.load(f)
+            if isinstance(self.scene_file, str):
+                with open(self.scene_file, "r") as f:
+                    scene_info = json.load(f)
+            else:
+                scene_info = self.scene_file
             init_info = scene_info["objects_info"]["init_info"]
             self._init_state = scene_info["state"]["object_registry"]
             self._init_systems = list(scene_info["state"]["system_registry"].keys())
@@ -231,12 +236,20 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             str: Path to the prebuilt USD file
         """
         # Prebuild and cache the scene USD using the objects
-        if self.scene_file not in PREBUILT_USDS:
+        if isinstance(self.scene_file, str):
+            scene_file_path = self.scene_file
+        else:
+            # The scene file is a dict, so write it to disk directly
+            decrypted_fd, scene_file_path = tempfile.mkstemp("scene_file.json", dir=og.tempdir)
+            with open(scene_file_path, "w+") as f:
+                json.dump(self.scene_file, f, cls=NumpyEncoder, indent=4)
+
+        if scene_file_path not in PREBUILT_USDS:
             # Prebuild the scene USD
-            log.info(f"Prebuilding scene file {self.scene_file}...")
+            log.info(f"Prebuilding scene file {scene_file_path}...")
 
             # Create a new stage inside the tempdir, named after this scene's file.
-            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
             os.close(decrypted_fd)
             stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
 
@@ -251,12 +264,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             stage.Save()
             del stage
 
-            PREBUILT_USDS[self.scene_file] = usd_path
+            PREBUILT_USDS[scene_file_path] = usd_path
 
         # Copy the prebuilt USD to a new path
-        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
         os.close(decrypted_fd)
-        shutil.copyfile(PREBUILT_USDS[self.scene_file], instance_usd_path)
+        shutil.copyfile(PREBUILT_USDS[scene_file_path], instance_usd_path)
         return instance_usd_path
 
     def _load(self):
@@ -346,8 +359,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Loads metadata from self.scene_file and stores it within the world prim's CustomData
         """
-        with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
+        if isinstance(self.scene_file, str):
+            with open(self.scene_file, "r") as f:
+                scene_info = json.load(f)
+        else:
+            scene_info = self.scene_file
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
@@ -421,7 +437,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Clears systems so they can be re-initialized.
         for system in self.active_systems.values():
-            system.clear()
+            self.remove_system(system_name=system.name)
 
         # Remove all of the scene's objects.
         og.sim.remove_object(list(self.objects))
@@ -459,8 +475,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.scene_file is None:
             init_state = self.dump_state(serialized=False)
         else:
-            with open(self.scene_file, "r") as f:
-                scene_info = json.load(f)
+            if isinstance(self.scene_file, str):
+                with open(self.scene_file, "r") as f:
+                    scene_info = json.load(f)
+            else:
+                scene_info = self.scene_file
             init_state = scene_info["state"]
             self.load_state(init_state, serialized=False)
         self._initial_state = init_state
@@ -485,6 +504,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name="system_registry",
                 class_types=BaseSystem,
                 default_key="name",
+                hash_key="uuid",
                 unique_keys=["name", "prim_path", "uuid"],
             )
         )
@@ -495,6 +515,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name=f"object_registry",
                 class_types=BaseObject,
                 default_key="name",
+                hash_key="uuid",
                 unique_keys=self.object_registry_unique_keys,
                 group_keys=self.object_registry_group_keys,
             )
@@ -684,6 +705,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return isinstance(self.get_system(system_name, force_init=False), FluidSystem)
 
     def get_system(self, system_name, force_init=True):
+        """
+        Grab the system @system_name, and optionally initialize it if @force_init is set
+
+        Args:
+            system_name (str): Name of the system to grab
+            force_init (bool): Whether to force the system to be initialized and added to set of active_systems
+                if not already
+
+        Returns:
+            BaseSystem: Requested system
+        """
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
         assert system_name in self._available_systems, f"System {system_name} is not a valid system name"
@@ -694,9 +726,20 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self.system_registry.add(system)
         return system
 
+    def remove_system(self, system_name):
+        """
+        Clear the system @system_name and remove it from our set of active systems
+
+        Args:
+            system_name (str): Name of the system to remove
+        """
+        system = self.system_registry("name", system_name)
+        if system is not None:
+            system.clear()
+
     @property
     def active_systems(self):
-        return {system.name: system for system in self.systems if system.initialized and not isinstance(system, Cloth)}
+        return {system.name: system for system in self.systems if not isinstance(system, Cloth)}
 
     def get_random_floor(self):
         """

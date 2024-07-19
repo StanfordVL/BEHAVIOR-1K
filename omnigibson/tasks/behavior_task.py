@@ -162,18 +162,12 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    def write_task_metadata(self):
+    @property
+    def task_metadata(self):
         # Store mapping from entity name to its corresponding BDDL instance name
-        metadata = dict(
+        return dict(
             inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
         )
-
-        # Write to sim
-        og.sim.write_metadata(key="task", data=metadata)
-
-    def load_task_metadata(self):
-        # Load from sim
-        return og.sim.get_metadata(key="task")
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
