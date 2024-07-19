@@ -12,7 +12,7 @@ from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import ALL_SENSOR_MODALITIES
-from omnigibson.simulator import launch_simulator as launch
+from omnigibson.simulator import _launch_simulator as launch
 from omnigibson.tasks import REGISTERED_TASKS
 
 # Create logger
@@ -47,56 +47,37 @@ tempdir = tempfile.mkdtemp()
 
 def clear():
     """
-    Clear the stage and then call launch_simulator again to make og.sim point to a new simulator instance
+    Clear the stage and then call launch again to make og.sim point to a new simulator instance
     """
     global sim
 
     import omnigibson.lazy as lazy
-    from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
-    from omnigibson.prims.material_prim import MaterialPrim
-    from omnigibson.sensors.vision_sensor import VisionSensor
-    from omnigibson.utils.python_utils import clear as clear_python_utils
-    from omnigibson.utils.usd_utils import clear as clear_usd_utils
 
-    # Stop the physics
-    sim.stop()
+    # First save important simulator settings
+    init_kwargs = dict(
+        gravity=sim.gravity,
+        physics_dt=sim.get_physics_dt(),
+        rendering_dt=sim.get_rendering_dt(),
+        viewer_width=sim.viewer_width,
+        viewer_height=sim.viewer_height,
+        device=sim.device,
+    )
 
-    # Clear all scenes
-    for scene in sim.scenes:
-        scene.clear()
+    # First let the simulator clear everything it owns.
+    sim._partial_clear()
 
-    # Remove the skybox, floor plane and viewer camera
-    if sim._skybox is not None:
-        sim._skybox.remove()
-
-    if sim._floor_plane is not None:
-        sim._floor_plane.remove()
-
-    if sim._viewer_camera is not None:
-        sim._viewer_camera.remove()
-
-    if sim._camera_mover is not None:
-        sim._camera_mover.clear()
-
-    # Clear the vision sensor cache
-    VisionSensor.clear()
-
-    # Clear all global update states
-    for state in sim.object_state_types_requiring_update:
-        if issubclass(state, GlobalUpdateStateMixin):
-            state.global_initialize()
-
-    # Clear all materials
-    MaterialPrim.clear()
-
-    # Clear uniquely named items and other internal states
-    clear_python_utils()
-    clear_usd_utils()
-
+    # Then close the stage and remove pointers to the simulator object.
     assert lazy.omni.isaac.core.utils.stage.close_stage()
     sim = None
     lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
-    launch()
+
+    # Then relaunch the simulator.
+    launch(**init_kwargs)
+
+    # Check that the device remains the same
+    assert (
+        sim.device == init_kwargs["device"]
+    ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
 
 
 def cleanup(*args, **kwargs):
