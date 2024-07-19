@@ -191,7 +191,7 @@ class ClothPrim(GeomPrim):
         # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
         p_local = th.as_tensor(self.get_attribute(attr="points"))
         p_local = p_local[idxs] if idxs is not None else p_local
-        p_world = (ori @ (p_local * scale).mT).mT + pos
+        p_world = (ori @ (p_local * scale).T).T + pos
 
         return p_world
 
