@@ -42,7 +42,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         name,
         relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -58,8 +57,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             name (str): Name for the object. Names need to be unique per scene
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -82,8 +79,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         relative_prim_path = f"/{name}" if relative_prim_path is None else relative_prim_path
 
         # Store values
-        self.uuid = get_uuid(name) if uuid is None else uuid
-        assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
+        self._uuid = get_uuid(name, deterministic=True)
         self.category = category
         self.fixed_base = fixed_base
 
@@ -110,7 +106,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # TODO: Super hacky, think of a better way to preserve this info
         # Update init info for this
         self._init_info["args"]["name"] = self.name
-        self._init_info["args"]["uuid"] = self.uuid
 
     def prebuild(self, stage):
         """
@@ -248,6 +243,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # Fixed objects that are not kinematic only, or non-fixed objects that have no articulated joints but do
             # have fixed joints
             return self.prim_path
+
+    @property
+    def uuid(self):
+        """
+        Returns:
+            int: 8-digit unique identifier for this object. It is randomly generated from this object's name
+                but deterministic
+        """
+        return self._uuid
 
     @property
     def mass(self):
