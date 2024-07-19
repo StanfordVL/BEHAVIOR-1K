@@ -1330,8 +1330,10 @@ def _launch_simulator(*args, **kwargs):
 
             # We don't support smart diff'ing if there's a mismatch in number of scenes
             if not load_from_scratch and len(self.scenes) != len(scene_files):
-                log.error("There is a mismatch between the number of active scenes and number of json_paths to be "
-                          "loaded. Please call og.clear() to relaunch the simulator first.")
+                log.error(
+                    "There is a mismatch between the number of active scenes and number of json_paths to be "
+                    "loaded. Please call og.clear() to relaunch the simulator first."
+                )
                 return
 
             # Parse each json path individually
@@ -1367,7 +1369,9 @@ def _launch_simulator(*args, **kwargs):
                     scene = self.scenes[i]
                     # Make sure the class type is the same
                     if scene.__class__.__name__ != init_info["class_name"]:
-                        log.error(f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}")
+                        log.error(
+                            f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}"
+                        )
 
                     current_obj_names = set(scene.object_registry.get_dict("name").keys())
                     load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
@@ -1417,7 +1421,9 @@ def _launch_simulator(*args, **kwargs):
                 return
             if json_paths is not None:
                 if isinstance(json_paths, str):
-                    log.error(f"You must define a list of .json paths, one for each scene. Number of scenes: {len(self.scenes)}")
+                    log.error(
+                        f"You must define a list of .json paths, one for each scene. Number of scenes: {len(self.scenes)}"
+                    )
                     return
                 if not all([json_path.endswith(".json") for json_path in json_paths]):
                     log.error(f"You have to define the full json_path to save the scene to. Got: {json_paths}")

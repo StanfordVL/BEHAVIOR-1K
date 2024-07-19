@@ -1,11 +1,12 @@
+import tempfile
+
+import numpy as np
 import pytest
 
 import omnigibson as og
 from omnigibson.envs import DataCollectionWrapper, DataPlaybackWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
-import tempfile
-import numpy as np
 
 
 def test_data_collect_and_playback():
@@ -22,8 +23,8 @@ def test_data_collect_and_playback():
                         "image_width": 128,
                         "focal_length": 12.0,
                     },
-                    "local_position": np.array([-0.26549, -0.30288,  1.0 + 0.861]),
-                    "local_orientation": np.array([0.36165891, -0.24745751, -0.50752921,  0.74187715]),
+                    "local_position": np.array([-0.26549, -0.30288, 1.0 + 0.861]),
+                    "local_orientation": np.array([0.36165891, -0.24745751, -0.50752921, 0.74187715]),
                 },
             ],
         },
@@ -127,6 +128,7 @@ def test_data_collect_and_playback():
     )
     env.playback_dataset(record=True)
     env.save_data()
+
 
 test_data_collect_and_playback()
 og.shutdown()

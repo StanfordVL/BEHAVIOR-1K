@@ -301,9 +301,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 cond_type, cond_sys = cond
                 if cond_type == ParticleModifyCondition.SATURATED:
                     cond[1] = (
-                        cond_sys
-                        if cond_sys in scene.available_systems.keys()
-                        else get_system_name_by_synset(cond_sys)
+                        cond_sys if cond_sys in scene.available_systems.keys() else get_system_name_by_synset(cond_sys)
                     )
         return params
 

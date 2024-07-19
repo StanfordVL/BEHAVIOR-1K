@@ -23,12 +23,12 @@ from omnigibson.systems.system_base import (
     BaseSystem,
     PhysicalParticleSystem,
     VisualParticleSystem,
-    get_all_system_names,
     create_system_from_metadata,
+    get_all_system_names,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,

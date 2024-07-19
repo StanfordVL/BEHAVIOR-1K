@@ -8,8 +8,8 @@ from abc import ABCMeta
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import cache, wraps
-from importlib import import_module
 from hashlib import md5
+from importlib import import_module
 
 import numpy as np
 

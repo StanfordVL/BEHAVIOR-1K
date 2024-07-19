@@ -1034,6 +1034,7 @@ class ControllableObjectViewAPI:
     of the same type are grouped together. If there are fixed base robots, they will be grouped separately from
     non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
     """
+
     _view_by_pattern = dict()
 
     @classmethod

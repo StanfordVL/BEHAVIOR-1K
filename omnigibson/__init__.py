@@ -46,12 +46,12 @@ tempdir = tempfile.mkdtemp()
 
 
 def clear(
-        gravity=None,
-        physics_dt=None,
-        rendering_dt=None,
-        viewer_width=None,
-        viewer_height=None,
-        device=None,
+    gravity=None,
+    physics_dt=None,
+    rendering_dt=None,
+    viewer_width=None,
+    viewer_height=None,
+    device=None,
 ):
     """
     Clear the stage and then call launch again to make og.sim point to a new simulator instance
