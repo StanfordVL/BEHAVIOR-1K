@@ -21,10 +21,65 @@ Please make sure your system meets the following specs:
 
 There are two ways to setup **`OmniGibson`**:
 
+- **🐍 Pip Install (Linux / Windows, Recommended)**: You can clone **`Omnigibson`** and pip install Isaacsim to quickly start testing
+
 - **🐳 Install with Docker (Linux only)**: You can quickly get **`OmniGibson`** immediately up and running from our pre-built docker image.
 - **🧪 Install from source (Linux / Windows)**: This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
 
 !!! tip ""
+    === "🐍 Pip Install (Linux / Windows)"
+
+        <div class="annotate" markdown>
+
+        1. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
+
+            ```shell
+            git clone https://github.com/StanfordVL/OmniGibson.git
+            cd OmniGibson
+            ```
+
+        2. Setup a virtual conda environment:
+
+            ```shell
+            conda create -n omnigibson python=3.10
+            conda activate omnigibson
+            ```
+
+        3. Install Isaac Sim and OmniGibson:
+
+            ```shell
+            pip install isaacsim-for-omnigibson
+            pip install -e .
+            ```
+
+        4. Accept the EULA:
+
+            ```shell
+            isaacsim
+            ```
+
+            !!! important "EULA Acceptance"
+                It is necessary to agree and accept the Omniverse License Agreement (EULA) in order to use Isaac Sim. The first time `isaacsim` is imported, you will be prompted to accept the EULA:
+
+                ```
+                By installing or using Omniverse Kit, I agree to the terms of NVIDIA OMNIVERSE LICENSE AGREEMENT (EULA)
+                in https://docs.omniverse.nvidia.com/platform/latest/common/NVIDIA_Omniverse_License_Agreement.html
+                Do you accept the EULA? (Yes/No)
+                ```
+
+                You must respond with 'Yes' to proceed. Once the EULA is accepted, it should not appear on subsequent Isaac Sim calls. If the EULA is not accepted, the execution will be terminated.
+
+        5. Download **`OmniGibson`** dataset:
+
+            ```shell
+            python scripts/download_datasets.py
+            ```
+
+        </div>
+
+        !!! note "More information"
+            For more details on installing Isaac Sim via pip, please refer to the [official Isaac Sim documentation](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_python.html).
+
     === "🐳 Install with Docker (Linux only)"
 
         Install **`OmniGibson`** with Docker is supported for **🐧 Linux** only.
