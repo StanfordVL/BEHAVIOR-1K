@@ -117,6 +117,6 @@ def test_multi_scene_particle_source():
     for _ in range(50):
         og.sim.step()
 
+
 if __name__ == "__main__":
     test_multi_scene_dump_and_load()
-

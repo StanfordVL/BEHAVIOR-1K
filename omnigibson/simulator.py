@@ -5,9 +5,9 @@ import json
 import logging
 import os
 import re
-import site
 import shutil
 import signal
+import site
 import socket
 from collections import defaultdict
 from contextlib import nullcontext
@@ -114,8 +114,9 @@ def _launch_app():
         version_file_path = os.path.join(site.getsitepackages()[0], "isaacsim", "VERSION")
     except:
         # if neither of these paths exist, raise error to user
-        raise ValueError(f"Could not find Isaac Sim version file path. Please set this variable to the path of your Isaac Sim installation.")
-
+        raise ValueError(
+            f"Could not find Isaac Sim version file path. Please set this variable to the path of your Isaac Sim installation."
+        )
 
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
@@ -128,7 +129,7 @@ def _launch_app():
     # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
-    
+
     # check if EXP_PATH exists, if not proceed with pip install path
     kit_file = Path(__file__).parent / kit_file_name
     try:
@@ -137,7 +138,9 @@ def _launch_app():
         kit_file_target = os.path.join(site.getsitepackages()[0], "isaacsim", "apps", kit_file_name)
     except:
         # if neither of these paths exist, raise error to user
-        raise ValueError(f"Could not find the Isaac sim file file path. Please set this variable to the path of your Isaac Sim installation.")
+        raise ValueError(
+            f"Could not find the Isaac sim file file path. Please set this variable to the path of your Isaac Sim installation."
+        )
 
     try:
         shutil.copy(kit_file, kit_file_target)
