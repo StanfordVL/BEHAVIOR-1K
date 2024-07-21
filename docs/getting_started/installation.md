@@ -38,14 +38,14 @@ There are two ways to setup **`OmniGibson`**:
             cd OmniGibson
             ```
 
-        2. Setup a virtual conda environment:
+        2. Setup a virtual conda environment with Python version **`3.10`**:
 
             ```shell
             conda create -n omnigibson python=3.10
             conda activate omnigibson
             ```
 
-        3. Install Isaac Sim and OmniGibson:
+        3. Install **`isaacsim-for-omnigibson`** and dependencies for **`Omnigibson`**:
 
             ```shell
             pip install isaacsim-for-omnigibson
@@ -79,6 +79,13 @@ There are two ways to setup **`OmniGibson`**:
 
         !!! note "More information"
             For more details on installing Isaac Sim via pip, please refer to the [official Isaac Sim documentation](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_python.html).
+        
+        !!! note "Isaacsim: command not found"
+            If no isaacsim is found, reset the pip cache by running:
+            ```shell
+            pip cache purge
+            ```
+            then, install **`isaacsim-for-omnigibson`** again. 
 
     === "🐳 Install with Docker (Linux only)"
 
