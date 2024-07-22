@@ -42,7 +42,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
             ```shell
             git clone https://github.com/StanfordVL/OmniGibson.git
             cd OmniGibson
-            pip install -e .[isaac]
+            pip install --no-cache-dir -e .[isaac]
             ```
 
             If this step fails, we recommend trying the [source installation](#-install-from-source-linux--windows) method.
