@@ -148,7 +148,6 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
-    # Do not attempt to lazy load the SimulationApp class, as it prevents the app from importing correctly
     with launch_context(None):
         if isaacsim is not None:
             app = isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
