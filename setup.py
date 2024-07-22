@@ -47,7 +47,6 @@ setup(
         "rtree~=1.2.0",
         "graphviz~=0.20",
         "numba~=0.60.0",
-        "telemoma~=0.1.2",
     ],
     tests_require=[],
     python_requires=">=3",
