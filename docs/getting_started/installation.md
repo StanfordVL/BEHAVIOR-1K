@@ -19,47 +19,43 @@ Please make sure your system meets the following specs:
 
 ## 💻 **Setup**
 
-There are two ways to setup **`OmniGibson`**:
+There are three ways to setup **`OmniGibson`**, all built upon different ways of installing NVIDIA Isaac Sim:
 
-- **🐍 Pip Install (Linux / Windows, Recommended)**: You can clone **`Omnigibson`** and pip install Isaacsim to quickly start testing
-
-- **🐳 Install with Docker (Linux only)**: You can quickly get **`OmniGibson`** immediately up and running from our pre-built docker image.
-- **🧪 Install from source (Linux / Windows)**: This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
+- **🐍 Pip Install (Linux / Windows, Recommended)**: You can clone **`Omnigibson`** and automatically install Isaac Sim through pip for the fastest startup.
+- **🐳 Install with Docker (Linux only)**: You can quickly get **`OmniGibson`** immediately up and running from our pre-built docker image that includes Isaac Sim.
+- **🧪 Install with Omniverse Launcher (Linux / Windows)**: You can install Isaac Sim via the Omniverse launcher and hook **`OmniGibson`** up to it.
 
 !!! tip ""
     === "🐍 Pip Install (Linux / Windows)"
 
         <div class="annotate" markdown>
 
-        1. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
-
-            ```shell
-            git clone https://github.com/StanfordVL/OmniGibson.git
-            cd OmniGibson
-            ```
-
-        2. Setup a virtual conda environment with Python version **`3.10`**:
+        1. Create a conda environment with Python version **`3.10`**:
 
             ```shell
             conda create -n omnigibson python=3.10
             conda activate omnigibson
             ```
 
-        3. Install **`isaacsim-for-omnigibson`** and dependencies for **`Omnigibson`**:
+        2. Install OmniGibson with the optional Isaac Sim dependency:
 
             ```shell
-            pip install isaacsim-for-omnigibson
-            pip install -e .
+            git clone https://github.com/StanfordVL/OmniGibson.git
+            cd OmniGibson
+            pip install -e .[isaac]
             ```
 
-        4. Accept the EULA:
+            If this step fails, we recommend trying the [source installation](#-install-from-source-linux--windows) method.
+
+        4. Run Isaac Sim to accept the EULA:
 
             ```shell
             isaacsim
             ```
 
             !!! important "EULA Acceptance"
-                It is necessary to agree and accept the Omniverse License Agreement (EULA) in order to use Isaac Sim. The first time `isaacsim` is imported, you will be prompted to accept the EULA:
+                It is necessary to accept the Omniverse License Agreement (EULA) in order to use Isaac Sim.
+                The first time `isaacsim` is imported, you will be prompted to accept the EULA:
 
                 ```
                 By installing or using Omniverse Kit, I agree to the terms of NVIDIA OMNIVERSE LICENSE AGREEMENT (EULA)
@@ -69,7 +65,9 @@ There are two ways to setup **`OmniGibson`**:
 
                 You must respond with 'Yes' to proceed. Once the EULA is accepted, it should not appear on subsequent Isaac Sim calls. If the EULA is not accepted, the execution will be terminated.
 
-        5. Download **`OmniGibson`** dataset:
+                **You might get some error dialogs that are safe to ignore. After accepting the EULA, you can close Isaac Sim.**
+
+        5. Download **`OmniGibson`** dataset and assets:
 
             ```shell
             python scripts/download_datasets.py
@@ -79,13 +77,6 @@ There are two ways to setup **`OmniGibson`**:
 
         !!! note "More information"
             For more details on installing Isaac Sim via pip, please refer to the [official Isaac Sim documentation](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_python.html).
-        
-        !!! note "Isaacsim: command not found"
-            If no isaacsim is found, reset the pip cache by running:
-            ```shell
-            pip cache purge
-            ```
-            then, install **`isaacsim-for-omnigibson`** again. 
 
     === "🐳 Install with Docker (Linux only)"
 

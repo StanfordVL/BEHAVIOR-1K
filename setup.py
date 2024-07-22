@@ -48,6 +48,9 @@ setup(
         "graphviz~=0.20",
         "numba~=0.60.0",
     ],
+    extras_require={
+        "isaac": ["isaacsim-for-omnigibson>=4.0.0"],
+    },
     tests_require=[],
     python_requires=">=3",
     include_package_data=True,
