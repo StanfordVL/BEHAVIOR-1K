@@ -1035,19 +1035,22 @@ class ControllableObjectViewAPI:
     non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
     """
 
+    # Dictionary mapping from pattern to BatchControlViewAPIImpl
+    _VIEWS_BY_PATTERN = {}
+
     @classmethod
     def clear(cls):
-        for view in cls._view_by_pattern.values():
+        for view in cls._VIEWS_BY_PATTERN.values():
             view.clear()
 
     @classmethod
     def flush_control(cls):
-        for view in cls._view_by_pattern.values():
+        for view in cls._VIEWS_BY_PATTERN.values():
             view.flush_control()
 
     @classmethod
     def initialize_view(cls):
-        cls._view_by_pattern = {}
+        cls._VIEWS_BY_PATTERN = {}
 
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.objects.controllable_object import ControllableObject
@@ -1070,16 +1073,16 @@ class ControllableObjectViewAPI:
 
         # Create the view for each robot type / fixedness combo
         for pattern in patterns:
-            if pattern not in cls._view_by_pattern:
-                cls._view_by_pattern[pattern] = BatchControlViewAPIImpl(pattern)
+            if pattern not in cls._VIEWS_BY_PATTERN:
+                cls._VIEWS_BY_PATTERN[pattern] = BatchControlViewAPIImpl(pattern)
 
         # Initialize the views
-        for view in cls._view_by_pattern.values():
+        for view in cls._VIEWS_BY_PATTERN.values():
             view.initialize_view()
 
         # Assert that the views' prim paths are disjoint
         all_prim_paths = []
-        for view in cls._view_by_pattern.values():
+        for view in cls._VIEWS_BY_PATTERN.values():
             all_prim_paths.extend(view._idx.keys())
         counts = collections.Counter(all_prim_paths)
 
@@ -1115,93 +1118,95 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):
-        cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
             prim_path, positions, indices
         )
 
     @classmethod
     def set_joint_velocity_targets(cls, prim_path, velocities, indices):
-        cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
             prim_path, velocities, indices
         )
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
-        cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].set_joint_efforts(prim_path, efforts, indices)
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_efforts(prim_path, efforts, indices)
 
     @classmethod
     def get_position_orientation(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
 
     @classmethod
     def get_linear_velocity(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
 
     @classmethod
     def get_angular_velocity(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(prim_path)
 
     @classmethod
     def get_relative_linear_velocity(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(prim_path)
 
     @classmethod
     def get_relative_angular_velocity(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
+            prim_path
+        )
 
     @classmethod
     def get_joint_positions(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
 
     @classmethod
     def get_joint_velocities(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(prim_path)
 
     @classmethod
     def get_joint_efforts(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
 
     @classmethod
     def get_mass_matrix(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
 
     @classmethod
     def get_generalized_gravity_forces(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
             prim_path
         )
 
     @classmethod
     def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
             prim_path
         )
 
     @classmethod
     def get_link_relative_position_orientation(cls, prim_path, link_name):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_position_orientation(
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_position_orientation(
             prim_path, link_name
         )
 
     @classmethod
     def get_link_relative_linear_velocity(cls, prim_path, link_name):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
             prim_path, link_name
         )
 
     @classmethod
     def get_link_relative_angular_velocity(cls, prim_path, link_name):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
             prim_path, link_name
         )
 
     @classmethod
     def get_jacobian(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
 
     @classmethod
     def get_relative_jacobian(cls, prim_path):
-        return cls._view_by_pattern[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
 
 
 def clear():
