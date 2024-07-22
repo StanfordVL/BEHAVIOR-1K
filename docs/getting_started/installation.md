@@ -39,11 +39,23 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
         2. Install OmniGibson with the optional Isaac Sim dependency:
 
-            ```shell
-            git clone https://github.com/StanfordVL/OmniGibson.git
-            cd OmniGibson
-            pip install --no-cache-dir -e .[isaac]
-            ```
+            <div class="grid" markdown>
+
+            !!! note "Install from PyPI (source not editable)"
+
+                ```shell
+                pip install --no-cache-dir omnigibson[isaac]
+                ```
+
+            !!! example "Install from GitHub (source editable)"
+
+                ```shell
+                git clone https://github.com/StanfordVL/OmniGibson.git
+                cd OmniGibson
+                pip install --no-cache-dir -e .[isaac]
+                ```
+
+            </div>
 
             If this step fails, we recommend trying the [source installation](#-install-from-source-linux--windows) method.
 
