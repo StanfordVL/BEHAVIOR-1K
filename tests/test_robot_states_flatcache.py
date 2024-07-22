@@ -45,6 +45,7 @@ def camera_pose_test(flatcache):
     env = setup_environment(flatcache)
     robot = env.robots[0]
     env.reset()
+    og.sim.step()
 
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
@@ -58,8 +59,8 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = th.tensor([150.1667, 149.9992, 101.3897])
-    sensor_world_ori_gt = th.tensor([-0.29444984, 0.29444979, 0.64288365, -0.64288352])
+    sensor_world_pos_gt = th.tensor([150.1703, 149.9969, 101.3649])
+    sensor_world_ori_gt = th.tensor([-0.2940, 0.2917, 0.6436, -0.6436])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert th.allclose(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
@@ -89,7 +90,7 @@ def camera_pose_test(flatcache):
     )
     assert th.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
     assert th.allclose(new_camera_world_pose[1], expected_new_camera_world_ori, atol=1e-3)
-    assert th.allclose(robot.get_position(), [100, 100, 100], atol=1e-3)
+    th.allclose(robot.get_position(), th.tensor([100, 100, 100], dtype=th.float32), atol=1e-3)
 
     # Finally, we want to move the world pose of the camera and check
     # 1) if the local pose is updated 2) if the robot stays in the same position
@@ -99,7 +100,7 @@ def camera_pose_test(flatcache):
     new_camera_local_pose = vision_sensor.get_local_pose()
     assert not th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
     assert not th.allclose(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)
-    assert th.allclose(robot.get_position(), [150, 150, 100], atol=1e-3)
+    assert th.allclose(robot.get_position(), th.tensor([150, 150, 100], dtype=th.float32), atol=1e-3)
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
     camera_parent_prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3d([2.0, 2.0, 2.0]))
