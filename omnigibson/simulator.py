@@ -106,18 +106,20 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
-    # First obtain the Isaac Sim version
-    # check if ISAAC_PATH exists, if not proceed with the pip installed version
+    # Try to import the isaacsim module that only shows up when pip installing omniverse
     try:
-        version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
-    except KeyError:
-        version_file_path = os.path.join(site.getsitepackages()[0], "isaacsim", "VERSION")
-    except:
-        # if neither of these paths exist, raise error to user
-        raise ValueError(
-            f"Could not find Isaac Sim version file path. Please set this variable to the path of your Isaac Sim installation."
-        )
+        import isaacsim  # noqa: F401
+    except ImportError:
+        isaacsim = None
 
+    # Compute the Isaac Path next
+    if isaacsim is not None:
+        isaac_path = os.path.dirname(isaacsim.__file__)
+    else:
+        isaac_path = os.environ["ISAAC_PATH"]
+
+    # First obtain the Isaac Sim version
+    version_file_path = os.path.join(isaac_path, "VERSION")
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
@@ -129,18 +131,15 @@ def _launch_app():
     # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
-
-    # check if EXP_PATH exists, if not proceed with pip install path
+    if isaacsim is not None:
+        exp_path = os.path.join(isaac_path, "apps")
+    else:
+        assert (
+            "EXP_PATH" in os.environ
+        ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+        exp_path = os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
-    try:
-        kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
-    except KeyError:
-        kit_file_target = os.path.join(site.getsitepackages()[0], "isaacsim", "apps", kit_file_name)
-    except:
-        # if neither of these paths exist, raise error to user
-        raise ValueError(
-            f"Could not find the Isaac sim file file path. Please set this variable to the path of your Isaac Sim installation."
-        )
+    kit_file_target = Path(exp_path) / kit_file_name
 
     try:
         shutil.copy(kit_file, kit_file_target)
@@ -149,12 +148,12 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
-    from isaacsim import SimulationApp
-
     # Do not attempt to lazy load the SimulationApp class, as it prevents the app from importing correctly
     with launch_context(None):
-        app = SimulationApp(config_kwargs)
-        # app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        if isaacsim is not None:
+            app = isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        else:
+            app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.omni.isaac.core.utils.stage.close_stage()
