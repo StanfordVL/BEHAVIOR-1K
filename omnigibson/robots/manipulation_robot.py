@@ -1290,7 +1290,8 @@ class ManipulationRobot(BaseRobot):
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             threshold = th.mean(
-                [self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]], dim=0
+                th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
+                dim=0,
             )
             if controller.control is None:
                 applying_grasp = False
