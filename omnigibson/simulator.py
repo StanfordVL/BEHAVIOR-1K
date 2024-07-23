@@ -255,7 +255,7 @@ def _launch_simulator(*args, **kwargs):
             rendering_dt=None,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            device=None,
+            device="cuda",
         ):
             assert (
                 lazy.omni.isaac.core.utils.stage.get_current_stage() is None
