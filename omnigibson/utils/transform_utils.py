@@ -5,6 +5,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
+from typing import Optional
 
 import torch as th
 from scipy.spatial.transform import Rotation as R
@@ -46,120 +47,151 @@ _AXES2TUPLE = {
 _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
 
-def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
+@th.jit.script
+def unit_vector(data: th.Tensor, dim: Optional[int] = None, out: Optional[th.Tensor] = None) -> th.Tensor:
+    """
+    Returns tensor normalized by length, i.e. Euclidean norm, along axis.
+
+    Args:
+        data (th.Tensor): data to normalize
+        dim (Optional[int]): If specified, determines specific dimension along data to normalize
+        out (Optional[th.Tensor]): If specified, will store computation in this variable
+
+    Returns:
+        th.Tensor: Normalized vector
+    """
+    if out is None:
+        if not isinstance(data, th.Tensor):
+            data = th.tensor(data, dtype=th.float32)
+        else:
+            data = data.clone().to(th.float32)
+
+        if data.ndim == 1:
+            return data / th.sqrt(th.dot(data, data))
+    else:
+        if out is not data:
+            out.copy_(data)
+        data = out
+
+    if dim is None:
+        dim = -1
+
+    length = th.sum(data * data, dim=dim, keepdim=True).sqrt()
+    data = data / (length + 1e-8)  # Add small epsilon to avoid division by zero
+
+    return data
+
+
+@th.jit.script
+def ewma_vectorized(
+    data: th.Tensor, alpha: float, offset: Optional[float] = None, dtype: Optional[str] = None, order: str = "C"
+) -> th.Tensor:
     """
     Calculates the exponential moving average over a vector.
     Will fail for large inputs.
 
     Args:
-        data (Iterable): Input data
+        data (th.Tensor): Input data
         alpha (float): scalar in range (0,1)
             The alpha parameter for the moving average.
-        offset (None or float): If specified, the offset for the moving average. None defaults to data[0].
-        dtype (None or type): Data type used for calculations. If None, defaults to float64 unless
-            data.dtype is float32, then it will use float32.
-        order (None or str): Order to use when flattening the data. Valid options are {'C', 'F', 'A'}.
-            None defaults to 'C'.
-        out (None or th.tensor): If specified, the location into which the result is stored. If provided, it must have
-            the same shape as the input. If not provided or `None`,
-            a freshly-allocated array is returned.
+        offset (Optional[float]): If specified, the offset for the moving average. None defaults to data[0].
+        dtype (Optional[str]): Data type used for calculations. If None, defaults to float64 unless
+            data.dtype is float32, then it will use float32. Valid options are 'float32' and 'float64'.
+        order (str): Order to use when flattening the data. Valid options are {'C', 'F', 'A'}.
 
     Returns:
-        th.tensor: Exponential moving average from @data
+        th.Tensor: Exponential moving average from @data
     """
-    data = th.tensor(data, copy=False)
-
     if dtype is None:
-        if data.dtype == th.float32:
-            dtype = th.float32
-        else:
-            dtype = th.float64
+        dtype = "float32" if data.dtype == th.float32 else "float64"
+
+    if dtype == "float32":
+        data = data.to(th.float32)
     else:
-        dtype = th.dtype(dtype)
+        data = data.to(th.float64)
 
     if data.ndim > 1:
         # flatten input
-        data = data.reshape(-1, order)
+        data = data.reshape(-1)
 
-    if out is None:
-        out = th.empty_like(data, dtype=dtype)
-    else:
-        assert out.shape == data.shape
-        assert out.dtype == dtype
+    out = th.empty_like(data)
 
-    if data.size < 1:
+    if data.size(0) < 1:
         # empty input, return empty array
         return out
 
     if offset is None:
-        offset = data[0]
+        offset = data[0].item()
 
-    alpha = th.tensor(alpha, copy=False).to(dtype, copy=False)
+    alpha = th.tensor(alpha, dtype=data.dtype)
 
     # scaling_factors -> 0 as len(data) gets large
     # this leads to divide-by-zeros below
-    scaling_factors = th.pow(1.0 - alpha, th.arange(data.numel() + 1, dtype=dtype), dtype=dtype)
+    scaling_factors = th.pow(1.0 - alpha, th.arange(data.size(0) + 1, dtype=data.dtype))
     # create cumulative sum array
-    th.mul(data, (alpha * scaling_factors[-2]) / scaling_factors[:-1], dtype=dtype, out=out)
-    th.cumsum(out, dtype=dtype, out=out)
+    out = data * (alpha * scaling_factors[-2]) / scaling_factors[:-1]
+    out = th.cumsum(out, dim=0)
 
     # cumsums / scaling
-    out /= scaling_factors[-2::-1]
+    out = out / scaling_factors[-2::-1]
 
     if offset != 0:
-        offset = th.tensor(offset, copy=False).to(dtype, copy=False)
+        offset = th.tensor(offset, dtype=data.dtype)
         # add offsets
-        out += offset * scaling_factors[1:]
+        out = out + offset * scaling_factors[1:]
 
     return out
 
 
-def convert_quat(q, to="xyzw"):
+@th.jit.script
+def convert_quat(q: th.Tensor, to: str = "xyzw") -> th.Tensor:
     """
     Converts quaternion from one convention to another.
     The convention to convert TO is specified as an optional argument.
     If to == 'xyzw', then the input is in 'wxyz' format, and vice-versa.
 
     Args:
-        q (th.tensor): a 4-dim array corresponding to a quaternion
+        q (th.Tensor): a 4-dim array corresponding to a quaternion
         to (str): either 'xyzw' or 'wxyz', determining which convention to convert to.
+
+    Returns:
+        th.Tensor: The converted quaternion
     """
     if to == "xyzw":
-        return q[[1, 2, 3, 0]]
-    if to == "wxyz":
-        return q[[3, 0, 1, 2]]
-    raise Exception("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
+        return th.stack([q[1], q[2], q[3], q[0]], dim=0)
+    elif to == "wxyz":
+        return th.stack([q[3], q[0], q[1], q[2]], dim=0)
+    else:
+        raise ValueError("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
 
 
-def quat_multiply(quaternion1, quaternion0):
+@th.jit.script
+def quat_multiply(quaternion1: th.Tensor, quaternion0: th.Tensor) -> th.Tensor:
     """
     Return multiplication of two quaternions (q1 * q0).
 
-    E.g.:
-    >>> q = quat_multiply([1, -2, 3, 4], [-5, 6, 7, 8])
-    >>> th.allclose(q, [-44, -14, 48, 28])
-    True
-
     Args:
-        quaternion1 (th.tensor): (x,y,z,w) quaternion
-        quaternion0 (th.tensor): (x,y,z,w) quaternion
+        quaternion1 (th.Tensor): (x,y,z,w) quaternion
+        quaternion0 (th.Tensor): (x,y,z,w) quaternion
 
     Returns:
-        th.tensor: (x,y,z,w) multiplied quaternion
+        th.Tensor: (x,y,z,w) multiplied quaternion
     """
-    x0, y0, z0, w0 = quaternion0
-    x1, y1, z1, w1 = quaternion1
-    return th.tensor(
-        (
+    x0, y0, z0, w0 = quaternion0[0], quaternion0[1], quaternion0[2], quaternion0[3]
+    x1, y1, z1, w1 = quaternion1[0], quaternion1[1], quaternion1[2], quaternion1[3]
+
+    return th.stack(
+        [
             x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
             -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
             x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
             -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
-        ),
-        dtype=th.float32,
+        ],
+        dim=0,
     )
 
 
+@th.jit.script
 def quat_conjugate(quaternion):
     """
     Return conjugate of quaternion.
@@ -182,6 +214,7 @@ def quat_conjugate(quaternion):
     )
 
 
+@th.jit.script
 def quat_inverse(quaternion):
     """
     Return inverse of quaternion.
@@ -201,6 +234,7 @@ def quat_inverse(quaternion):
     return quat_conjugate(quaternion) / th.dot(quaternion, quaternion)
 
 
+@th.jit.script
 def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
@@ -215,7 +249,10 @@ def quat_distance(quaternion1, quaternion0):
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
-def quat_slerp(quat0, quat1, fraction, shortestpath=True):
+@th.jit.script
+def quat_slerp(
+    quat0: th.Tensor, quat1: th.Tensor, fraction: float, shortestpath: bool = True, eps: float = EPS
+) -> th.Tensor:
     """
     Return spherical linear interpolation between two quaternions.
 
@@ -247,27 +284,34 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
     """
     q0 = unit_vector(quat0[:4])
     q1 = unit_vector(quat1[:4])
+
     if fraction == 0.0:
         return q0
     elif fraction == 1.0:
         return q1
+
     d = th.dot(q0, q1)
-    if abs(abs(d) - 1.0) < EPS:
+    if abs(abs(d) - 1.0) < eps:
         return q0
+
     if shortestpath and d < 0.0:
         # invert rotation
         d = -d
         q1 *= -1.0
-    angle = math.acos(th.clip(d, -1, 1))
-    if abs(angle) < EPS:
+
+    angle = th.acos(th.clamp(d, -1.0 + eps, 1.0 - eps))
+    if abs(angle) < eps:
         return q0
-    isin = 1.0 / math.sin(angle)
-    q0 *= math.sin((1.0 - fraction) * angle) * isin
-    q1 *= math.sin(fraction * angle) * isin
+
+    isin = 1.0 / th.sin(angle)
+    q0 *= th.sin((1.0 - fraction) * angle) * isin
+    q1 *= th.sin(fraction * angle) * isin
     q0 += q1
+
     return q0
 
 
+@th.jit.script
 def random_quat(rand=None):
     """
     Return uniform random unit quaternion.
@@ -302,6 +346,7 @@ def random_quat(rand=None):
     )
 
 
+@th.jit.script
 def random_axis_angle(angle_limit=None, random_state=None):
     """
     Samples an axis-angle rotation by first sampling a random axis
@@ -336,6 +381,7 @@ def random_axis_angle(angle_limit=None, random_state=None):
     return random_axis, random_angle.item()
 
 
+@th.jit.script
 def vec(values):
     """
     Converts value tuple into a numpy vector.
@@ -349,6 +395,7 @@ def vec(values):
     return th.tensor(values, dtype=th.float32)
 
 
+@th.jit.script
 def mat4(array):
     """
     Converts an array to 4x4 matrix.
@@ -362,6 +409,21 @@ def mat4(array):
     return th.tensor(array, dtype=th.float32).reshape((4, 4))
 
 
+@th.jit.script
+def mat2quat(rmat):
+    """
+    Converts given rotation matrix to quaternion.
+
+    Args:
+        rmat (th.tensor): (..., 3, 3) rotation matrix
+
+    Returns:
+        th.tensor: (..., 4) (x,y,z,w) float quaternion angles
+    """
+    return th.tensor(R.from_matrix(rmat).as_quat(), dtype=th.float32)
+
+
+@th.jit.script
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -379,19 +441,7 @@ def mat2pose(hmat):
     return pos, orn
 
 
-def mat2quat(rmat):
-    """
-    Converts given rotation matrix to quaternion.
-
-    Args:
-        rmat (th.tensor): (..., 3, 3) rotation matrix
-
-    Returns:
-        th.tensor: (..., 4) (x,y,z,w) float quaternion angles
-    """
-    return th.tensor(R.from_matrix(rmat).as_quat(), dtype=th.float32)
-
-
+@th.jit.script
 def vec2quat(vec, up=(0, 0, 1.0)):
     """
     Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
@@ -410,6 +460,7 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     return mat2quat(th.tensor([vec_n, s_n, u_n]).T)
 
 
+@th.jit.script
 def euler2mat(euler):
     """
     Converts euler angles into rotation matrix form
@@ -430,6 +481,7 @@ def euler2mat(euler):
     return th.tensor(R.from_euler("xyz", euler).as_matrix(), dtype=th.float32)
 
 
+@th.jit.script
 def mat2euler(rmat):
     """
     Converts given rotation matrix to euler angles in radian.
@@ -444,6 +496,7 @@ def mat2euler(rmat):
     return th.tensor(R.from_matrix(M).as_euler("xyz"), dtype=th.float32)
 
 
+@th.jit.script
 def pose2mat(pose):
     """
     Converts pose to homogeneous matrix.
@@ -462,6 +515,7 @@ def pose2mat(pose):
     return homo_pose_mat
 
 
+@th.jit.script
 def quat2mat(quaternion):
     """
     Converts given quaternion to matrix.
@@ -475,6 +529,7 @@ def quat2mat(quaternion):
     return th.tensor(R.from_quat(quaternion).as_matrix(), dtype=th.float32)
 
 
+@th.jit.script
 def quat2axisangle(quat):
     """
     Converts quaternion to axis-angle format.
@@ -489,6 +544,7 @@ def quat2axisangle(quat):
     return th.tensor(R.from_quat(quat).as_rotvec(), dtype=th.float32)
 
 
+@th.jit.script
 def axisangle2quat(vec):
     """
     Converts scaled axis-angle to quat.
@@ -502,6 +558,7 @@ def axisangle2quat(vec):
     return th.tensor(R.from_rotvec(vec).as_quat(), dtype=th.float32)
 
 
+@th.jit.script
 def euler2quat(euler):
     """
     Converts euler angles into quaternion form
@@ -518,6 +575,7 @@ def euler2quat(euler):
     return th.tensor(R.from_euler("xyz", euler).as_quat(), dtype=th.float32)
 
 
+@th.jit.script
 def quat2euler(quat):
     """
     Converts euler angles into quaternion form
@@ -534,6 +592,7 @@ def quat2euler(quat):
     return th.tensor(R.from_quat(quat).as_euler("xyz"), dtype=th.float32)
 
 
+@th.jit.script
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     """
     Converts a homogenous matrix corresponding to a point C in frame A
@@ -555,6 +614,7 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     return pose_A_in_B.dot(pose_A)
 
 
+@th.jit.script
 def pose_inv(pose_mat):
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
@@ -584,6 +644,7 @@ def pose_inv(pose_mat):
     return pose_inv
 
 
+@th.jit.script
 def pose_transform(pos1, quat1, pos0, quat0):
     """
     Conducts forward transform from pose (pos0, quat0) to pose (pos1, quat1):
@@ -609,6 +670,7 @@ def pose_transform(pos1, quat1, pos0, quat0):
     return mat2pose(mat1 @ mat0)
 
 
+@th.jit.script
 def invert_pose_transform(pos, quat):
     """
     Inverts a pose transform
@@ -629,6 +691,7 @@ def invert_pose_transform(pos, quat):
     return mat2pose(pose_inv(mat))
 
 
+@th.jit.script
 def relative_pose_transform(pos1, quat1, pos0, quat0):
     """
     Computes relative forward transform from pose (pos0, quat0) to pose (pos1, quat1), i.e.: solves:
@@ -654,6 +717,7 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     return mat2pose(pose_inv(mat0) @ mat1)
 
 
+@th.jit.script
 def _skew_symmetric_translation(pos_A_in_B):
     """
     Helper function to get a skew symmetric translation matrix for converting quantities
@@ -680,6 +744,7 @@ def _skew_symmetric_translation(pos_A_in_B):
     ).reshape((3, 3))
 
 
+@th.jit.script
 def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     """
     Converts linear and angular velocity of a point in frame A to the equivalent in frame B.
@@ -703,6 +768,7 @@ def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     return vel_B, ang_vel_B
 
 
+@th.jit.script
 def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     """
     Converts linear and rotational force at a point in frame A to the equivalent in frame B.
@@ -726,6 +792,7 @@ def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     return force_B, torque_B
 
 
+@th.jit.script
 def rotation_matrix(angle, direction, point=None):
     """
     Returns matrix to rotate about axis defined by point and direction.
@@ -784,6 +851,7 @@ def rotation_matrix(angle, direction, point=None):
     return M
 
 
+@th.jit.script
 def clip_translation(dpos, limit):
     """
     Limits a translation (delta position) to a specified limit
@@ -804,6 +872,7 @@ def clip_translation(dpos, limit):
     return (dpos * limit / input_norm, True) if input_norm > limit else (dpos, False)
 
 
+@th.jit.script
 def clip_rotation(quat, limit):
     """
     Limits a (delta) rotation to a specified limit
@@ -847,6 +916,7 @@ def clip_rotation(quat, limit):
     return quat, clipped
 
 
+@th.jit.script
 def make_pose(translation, rotation):
     """
     Makes a homogeneous pose matrix from a translation vector and a rotation matrix.
@@ -865,64 +935,7 @@ def make_pose(translation, rotation):
     return pose
 
 
-def unit_vector(data, dim=None, out=None):
-    """
-    Returns ndarray normalized by length, i.e. eucledian norm, along axis.
-
-    E.g.:
-        >>> v0 = numpy.random.random(3)
-        >>> v1 = unit_vector(v0)
-        >>> numpy.allclose(v1, v0 / numpy.linalg.norm(v0))
-        True
-
-        >>> v0 = numpy.random.rand(5, 4, 3)
-        >>> v1 = unit_vector(v0, dim=-1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, dim=2)), 2)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> v1 = unit_vector(v0, dim=1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, dim=1)), 1)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> v1 = numpy.empty((5, 4, 3), dtype=numpy.float32)
-        >>> unit_vector(v0, dim=1, out=v1)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> list(unit_vector([]))
-        []
-
-        >>> list(unit_vector([1.0]))
-        [1.0]
-
-    Args:
-        data (th.tensor): data to normalize
-        axis (None or int): If specified, determines specific axis along data to normalize
-        out (None or th.tensor): If specified, will store computation in this variable
-
-    Returns:
-        None or th.tensor: If @out is not specified, will return normalized vector. Otherwise, stores the output in @out
-    """
-    if out is None:
-        data = th.tensor(data, dtype=th.float32, copy=True)
-        if data.ndim == 1:
-            data /= math.sqrt(th.dot(data, data))
-            return data
-    else:
-        if out is not data:
-            out[:] = th.tensor(data, copy=False)
-        data = out
-    length = th.atleast_1d(th.sum(data * data, dim))
-    math.sqrt(length, length)
-    if dim is not None:
-        length = th.unsqueeze(length, dim)
-    data /= length
-    if out is None:
-        return data
-
-
+@th.jit.script
 def get_orientation_error(target_orn, current_orn):
     """
     Returns the difference between two quaternion orientations as a 3 DOF numpy array.
@@ -947,6 +960,7 @@ def get_orientation_error(target_orn, current_orn):
     return orn_error
 
 
+@th.jit.script
 def get_orientation_diff_in_radian(orn0, orn1):
     """
     Returns the difference between two quaternion orientations in radian
@@ -965,6 +979,7 @@ def get_orientation_diff_in_radian(orn0, orn1):
     return th.arccos(th.dot(vec0, vec1))
 
 
+@th.jit.script
 def get_pose_error(target_pose, current_pose):
     """
     Computes the error corresponding to target pose - current pose as a 6-dim vector.
@@ -999,6 +1014,7 @@ def get_pose_error(target_pose, current_pose):
     return error
 
 
+@th.jit.script
 def matrix_inverse(matrix):
     """
     Helper function to have an efficient matrix inversion function.
@@ -1012,6 +1028,7 @@ def matrix_inverse(matrix):
     return th.linalg.inv_ex(matrix).inverse
 
 
+@th.jit.script
 def vecs2axisangle(vec0, vec1):
     """
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into an axis-angle representation of the angle
@@ -1028,6 +1045,7 @@ def vecs2axisangle(vec0, vec1):
     return th.linalg.cross(vec0, vec1) * th.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
+@th.jit.script
 def vecs2quat(vec0, vec1, normalized=False):
     """
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into a quaternion representation of the angle
@@ -1051,11 +1069,13 @@ def vecs2quat(vec0, vec1, normalized=False):
     return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdims=True)
 
 
+@th.jit.script
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return th.norm(th.tensor(v1) - th.tensor(v2))
 
 
+@th.jit.script
 def frustum(left, right, bottom, top, znear, zfar):
     """Create view frustum matrix."""
     assert right != left
@@ -1075,6 +1095,7 @@ def frustum(left, right, bottom, top, znear, zfar):
     return M
 
 
+@th.jit.script
 def ortho(left, right, bottom, top, znear, zfar):
     """Create orthonormal projection matrix."""
     assert right != left
@@ -1092,6 +1113,7 @@ def ortho(left, right, bottom, top, znear, zfar):
     return M
 
 
+@th.jit.script
 def perspective(fovy, aspect, znear, zfar):
     """Create perspective projection matrix."""
     # fovy is in degree
@@ -1101,17 +1123,20 @@ def perspective(fovy, aspect, znear, zfar):
     return frustum(-w, w, -h, h, znear, zfar)
 
 
+@th.jit.script
 def anorm(x, dim=None, keepdim=False):
     """Compute L2 norms alogn specified axes."""
     return th.norm(x, dim=dim, keepdim=keepdim)
 
 
+@th.jit.script
 def normalize(v, dim=None, eps=1e-10):
     """L2 Normalize along specified axes."""
     norm = anorm(v, dim=dim, keepdim=True)
     return v / th.where(norm < eps, eps, norm)
 
 
+@th.jit.script
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
     rho = th.sqrt(x**2 + y**2)
@@ -1127,6 +1152,7 @@ def rad2deg(rad):
     return rad * 180.0 / math.pi
 
 
+@th.jit.script
 def check_quat_right_angle(quat, atol=5e-2):
     """
     Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
@@ -1144,17 +1170,20 @@ def check_quat_right_angle(quat, atol=5e-2):
     return th.any(th.isclose(th.abs(quat).sum(), th.tensor([1.0, 1.414, 2.0]), atol=atol))
 
 
+@th.jit.script
 def z_angle_from_quat(quat):
     """Get the angle around the Z axis produced by the quaternion."""
     rotated_X_axis = R.from_quat(quat).apply([1, 0, 0])
     return th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
 
 
+@th.jit.script
 def z_rotation_from_quat(quat):
     """Get the quaternion for the rotation around the Z axis produced by the quaternion."""
-    return R.from_euler("z", z_angle_from_quat(quat)).as_quat()
+    return th.tensor(R.from_euler("z", z_angle_from_quat(quat)).as_quat(), dtype=th.float32)
 
 
+@th.jit.script
 def integer_spiral_coordinates(n):
     """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
@@ -1167,6 +1196,7 @@ def integer_spiral_coordinates(n):
     return int(x), int(y)
 
 
+@th.jit.script
 def calculate_xy_plane_angle(quaternion):
     """
     Compute the 2D orientation angle from a quaternion assuming the initial forward vector is along the x-axis.
