@@ -82,7 +82,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
         5. Download **`OmniGibson`** dataset and assets:
 
             ```shell
-            python omnigibson/download_datasets.py
+            python -m omnigibson.download_datasets
             ```
 
         </div>
@@ -184,7 +184,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
                 4. Download **`OmniGibson`** dataset (within the conda env):
 
                     ```shell
-                    python omnigibson/download_datasets.py
+                    python -m omnigibson.download_datasets
                     ```
 
                 </div>
@@ -223,7 +223,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
                 4. Download **`OmniGibson`** dataset (within the conda env):
 
                     ```powershell
-                    python scripts\download_datasets.py
+                    python -m omnigibson.download_datasets
                     ```
 
                 </div>
