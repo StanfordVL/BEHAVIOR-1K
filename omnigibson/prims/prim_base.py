@@ -1,3 +1,4 @@
+import string
 from abc import ABC, abstractmethod
 
 import omnigibson as og
@@ -36,6 +37,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         load_config=None,
     ):
         self._relative_prim_path = relative_prim_path
+        assert relative_prim_path.startswith("/"), f"Relative prim path {relative_prim_path} must start with a '/'!"
+        assert all(
+            component[0] in string.ascii_letters for component in relative_prim_path[1:].split("/")
+        ), f"Each component of relative prim path {relative_prim_path} must start with a letter!"
+
         self._name = name
         self._load_config = dict() if load_config is None else load_config
 
