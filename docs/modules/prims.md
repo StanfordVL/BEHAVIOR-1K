@@ -28,48 +28,48 @@ After the prim has been created, it may additionally require further initializat
 Once initialized, a `Prim` instance can be used as a direct interface with the corresponding low-level prim on the omniverse stage. The low-level attributes of the underlying prim can be queried / set via `prim.get_attribute(name)` / `prim.set_attribute(name, val)`. In addition, some `Prim` classes implement higher-level functionality to more easily manipulate the underlying prim, such as `MaterialPrim`'s `bind(prim_path)`, which binds its owned material to the desired prim located at `prim_path`.
 
 ## Types
-**`OmniGibson`** directly supports multiple `Prim` classes, which are intended to encapsulate different types of prims from the omniverse scene stage. The most basic is [`BasePrim`](../reference/prims/prim_base.html), which can capture any arbitrary prim. The more specific classes are shown below:
+**`OmniGibson`** directly supports multiple `Prim` classes, which are intended to encapsulate different types of prims from the omniverse scene stage. The most basic is [`BasePrim`](../reference/prims/prim_base.md), which can capture any arbitrary prim. The more specific classes are shown below:
 
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`XFormPrim`**](../reference/prims/xform_prim.html)<br><br>
+            [**`XFormPrim`**](../reference/prims/xform_prim.md)<br><br>
             Encapsulates a transformable prim. This prim can get and set its local or global pose, as well as its own scale.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`GeomPrim`**](../reference/prims/geom_prim.html#prims.geom_prim.GeomPrim)<br><br>
-            Encapsulates a prim defined by a geom (shape or mesh). It is an `XFormPrim` that can additionally owns geometry defined by its set of `points`. Its subclasses [`VisualGeomPrim`](../reference/prims/geom_prim.html) and [`CollisionGeomPrim`](../reference/prims/geom_prim.html#prims.geom_prim.CollisionGeomPrim) implement additional utility for dealing with those respective types of geometries (e.g.: `CollisionGeomPrim.set_collision_approximation(...)`).<br><br>
+            [**`GeomPrim`**](../reference/prims/geom_prim.md#prims.geom_prim.GeomPrim)<br><br>
+            Encapsulates a prim defined by a geom (shape or mesh). It is an `XFormPrim` that can additionally owns geometry defined by its set of `points`. Its subclasses [`VisualGeomPrim`](../reference/prims/geom_prim.html) and [`CollisionGeomPrim`](../reference/prims/geom_prim.md#prims.geom_prim.CollisionGeomPrim) implement additional utility for dealing with those respective types of geometries (e.g.: `CollisionGeomPrim.set_collision_approximation(...)`).<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`ClothPrim`**](../reference/prims/cloth_prim.html)<br><br>
+            [**`ClothPrim`**](../reference/prims/cloth_prim.md)<br><br>
             Encapsulates a prim defined by a mesh geom that is to be converted into cloth. It is a `GeomPrim` that dynamically transforms its owned (rigid) mesh into a (compliant, particle-based) cloth. Its methods can be used to query and set its individual particles' state, as well as track a subset of keypoints / keyfaces.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`RigidPrim`**](../reference/prims/rigid_prim.html)<br><br>
+            [**`RigidPrim`**](../reference/prims/rigid_prim.md)<br><br>
             Encapsulates a prim defined by a rigid body. It is an `XFormPrim` that is subject to physics and gravity, and may belong to an `EntityPrim`. It additionally has attributes to control its own mass, density, and other physics-related behavior.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`JointPrim`**](../reference/prims/joint_prim.html)<br><br>
+            [**`JointPrim`**](../reference/prims/joint_prim.md)<br><br>
             Encapsulates a prim defined by a joint. It belongs to an `EntityPrim` and has attributes to control its own joint state (position, velocity, effort).<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`EntityPrim`**](../reference/prims/entity_prim.html)<br><br>
+            [**`EntityPrim`**](../reference/prims/entity_prim.md)<br><br>
             Encapsulates the top-level prim of an imported object. Since the underlying object consists of a set of links and joints, this class owns its corresponding set of `RigidPrim`s and `JointPrim`s, and provides high-level functionality to controlling the object's pose, joint state, and physics-related behavior.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`MaterialPrim`**](../reference/prims/material_prim.html)<br><br>
+            [**`MaterialPrim`**](../reference/prims/material_prim.md)<br><br>
             Encapsulates a prim defining a material specification. It provides high-level functionality for directly controlling the underlying material's properties and behavior.<br><br>
         </td>
     </tr>

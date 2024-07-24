@@ -70,7 +70,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`DummyTask`**](../reference/tasks/dummy_task.html)<br><br>
+            [**`DummyTask`**](../reference/tasks/dummy_task.md)<br><br>
             Dummy task with trivial implementations.
             <ul>
                 <li>`termination_conditions`: empty dict.</li>
@@ -83,7 +83,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
     <tr>
         <td valign="top">
-            [**`PointNavigationTask`**](../reference/tasks/point_navigation_task.html)<br><br>
+            [**`PointNavigationTask`**](../reference/tasks/point_navigation_task.md)<br><br>
             PointGoal navigation task with fixed / randomized initial pose and goal location.
             <ul>
                 <li>`termination_conditions`: `MaxCollision`, `Timeout`, `PointGoal`.</li>
@@ -96,7 +96,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
     <tr>
         <td valign="top">
-            [**`PointReachingTask`**](../reference/tasks/point_reaching_task.html)<br><br>
+            [**`PointReachingTask`**](../reference/tasks/point_reaching_task.md)<br><br>
             Similar to PointNavigationTask, except the goal is specified with respect to the robot's end effector.
             <ul>
                 <li>`termination_conditions`: `MaxCollision`, `Timeout`, `PointGoal`.</li>
@@ -109,7 +109,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
     <tr>
         <td valign="top">
-            [**`GraspTask`**](../reference/tasks/grasp_task.html)<br><br>
+            [**`GraspTask`**](../reference/tasks/grasp_task.md)<br><br>
             Grasp task for a single object.
             <ul>
                 <li>`termination_conditions`: `Timeout`.</li>
@@ -122,7 +122,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
     <tr>
         <td valign="top">
-            [**`BehaviorTask`**](../reference/tasks/behavior_task.html)<br><br>
+            [**`BehaviorTask`**](../reference/tasks/behavior_task.md)<br><br>
             BEHAVIOR task of long-horizon household activity.
             <ul>
                 <li>`termination_conditions`: `Timeout`, `PredicateGoal`.</li>
@@ -136,50 +136,50 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
 </table>
 
 !!! info annotate "Follow our tutorial on BEHAVIOR tasks!"
-    To better understand how to use / sample / load / customize BEHAVIOR tasks, please read our [tutorial](../tutorials/behavior_tasks.html)!
+    To better understand how to use / sample / load / customize BEHAVIOR tasks, please read our [tutorial](../tutorials/behavior_tasks.md)!
 
 ### `TerminationCondition`
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`Timeout`**](../reference/termination_conditions/timeout.html)<br><br>
+            [**`Timeout`**](../reference/termination_conditions/timeout.md)<br><br>
             `FailureCondition`: episode terminates if `max_step` steps have passed.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`Falling`**](../reference/termination_conditions/falling.html)<br><br>
+            [**`Falling`**](../reference/termination_conditions/falling.md)<br><br>
             `FailureCondition`: episode terminates if the robot can no longer function (i.e.: falls below the floor height by at least
     `fall_height` or tilt too much by at least `tilt_tolerance`).
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`MaxCollision`**](../reference/termination_conditions/max_collision.html)<br><br>
+            [**`MaxCollision`**](../reference/termination_conditions/max_collision.md)<br><br>
             `FailureCondition`: episode terminates if the robot has collided more than `max_collisions` times.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`PointGoal`**](../reference/termination_conditions/point_goal.html)<br><br>
+            [**`PointGoal`**](../reference/termination_conditions/point_goal.md)<br><br>
             `SuccessCondition`: episode terminates if point goal is reached within `distance_tol` by the robot's base.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`ReachingGoal`**](../reference/termination_conditions/reaching_goal.html)<br><br>
+            [**`ReachingGoal`**](../reference/termination_conditions/reaching_goal.md)<br><br>
             `SuccessCondition`: episode terminates if reaching goal is reached within `distance_tol` by the robot's end effector.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`GraspGoal`**](../reference/termination_conditions/grasp_goal.html)<br><br>
+            [**`GraspGoal`**](../reference/termination_conditions/grasp_goal.md)<br><br>
             `SuccessCondition`: episode terminates if target object has been grasped (by assistive grasping).
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`PredicateGoal`**](../reference/termination_conditions/predicate_goal.html)<br><br>
+            [**`PredicateGoal`**](../reference/termination_conditions/predicate_goal.md)<br><br>
             `SuccessCondition`: episode terminates if all the goal predicates of `BehaviorTask` are satisfied.
         </td>
     </tr>
@@ -190,25 +190,25 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`CollisionReward`**](../reference/reward_functions/collision_reward.html)<br><br>
+            [**`CollisionReward`**](../reference/reward_functions/collision_reward.md)<br><br>
             Penalization of robot collision with non-floor objects, with a negative weight `r_collision`.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`PointGoalReward`**](../reference/reward_functions/point_goal_reward.html)<br><br>
+            [**`PointGoalReward`**](../reference/reward_functions/point_goal_reward.md)<br><br>
             Reward for reaching the goal with the robot's base, with a positive weight `r_pointgoal`.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`ReachingGoalReward`**](../reference/reward_functions/reaching_goal_reward.html)<br><br>
+            [**`ReachingGoalReward`**](../reference/reward_functions/reaching_goal_reward.md)<br><br>
             Reward for reaching the goal with the robot's end-effector, with a positive weight `r_reach`.
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`PotentialReward`**](../reference/reward_functions/potential_reward.html)<br><br>
+            [**`PotentialReward`**](../reference/reward_functions/potential_reward.md)<br><br>
             Reward for decreasing some arbitrary potential function value, with a positive weight `r_potential`.
             It assumes the task already has `get_potential` implemented.
             Generally low potential is preferred (e.g. a common potential for goal-directed task is the distance to goal).
@@ -216,7 +216,7 @@ Internally, `Environment`'s `reset` method will call the task's `reset` method, 
     </tr>
     <tr>
         <td valign="top">
-            [**`GraspReward`**](../reference/reward_functions/grasp_reward.html)<br><br>
+            [**`GraspReward`**](../reference/reward_functions/grasp_reward.md)<br><br>
             Reward for grasping an object. It not only evaluates the success of object grasping but also considers various penalties and efficiencies.
             The reward is calculated based on several factors:
             <ul>

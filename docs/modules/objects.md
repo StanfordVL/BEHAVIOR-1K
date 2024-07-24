@@ -49,42 +49,42 @@ All objects are tracked and organized by the underlying scene, and can quickly b
 
 
 ## Types
-**`OmniGibson`** directly supports multiple `Object` classes, which are intended to encapsulate different types of objects with varying functionalities. The most basic is [`BaseObject`](../reference/objects/object_base.html), which can capture any arbitrary object and thinly wraps an [`EntityPrim`](../reference/objects/entity_prim.html). The more specific classes are shown below:
+**`OmniGibson`** directly supports multiple `Object` classes, which are intended to encapsulate different types of objects with varying functionalities. The most basic is [`BaseObject`](../reference/objects/object_base.html), which can capture any arbitrary object and thinly wraps an [`EntityPrim`](../reference/objects/entity_prim.md). The more specific classes are shown below:
 
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`StatefulObject`**](../reference/objects/stateful_object.html)<br><br>
+            [**`StatefulObject`**](../reference/objects/stateful_object.md)<br><br>
             Encapsulates an object that owns a set of [object states](./object_states.html). In general, this is intended to be a parent class, and not meant to be instantiated directly.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`USDObject`**](../reference/objects/usd_object.html)<br><br>
+            [**`USDObject`**](../reference/objects/usd_object.md)<br><br>
             Encapsulates an object imported from a usd file. Useful when loading custom USD assets into **`OmniGibson`**. Users should specify the absolute `usd_path` to the desired file to import.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`DatasetObject`**](../reference/objects/dataset_object.html)<br><br>
+            [**`DatasetObject`**](../reference/objects/dataset_object.md)<br><br>
             This inherits from `USDObject` and encapsulates an object from the BEHAVIOR-1K dataset. Users should specify the `category` and `model` of object to load, where `model` is a 6 character string unique to each dataset object. For an overview of all possible categories and models, please refer to our [Knowledgebase Dashboard](https://behavior.stanford.edu/knowledgebase/)<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`PrimitiveObject`**](../reference/objects/primitive_object.html)<br><br>
+            [**`PrimitiveObject`**](../reference/objects/primitive_object.md)<br><br>
             Encapsulates an object defined by a single primitive geom, such a sphere, cube, or cylinder. These are often used as visual objects (via `visual_only=True`) in the scene, e.g., for visualizing the target location of a robot reaching task.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`LightObject`**](../reference/objects/light_object.html)<br><br>
+            [**`LightObject`**](../reference/objects/light_object.md)<br><br>
             Encapsulates a virtual light source, where both the shape (sphere, disk, dome, etc.), size, and intensity can be specified.<br><br>
         </td>
     </tr>
     <tr>
         <td valign="top">
-            [**`ControllableObject`**](../reference/objects/controllable_object.html)<br><br>
+            [**`ControllableObject`**](../reference/objects/controllable_object.md)<br><br>
             Encapsulates an object that is motorized, for example, a conveyer belt, and provides functionality to apply actions and deploy control signals to the motors. However, currently this class is used exclusively as a parent class of `BaseRobot`, and should not be instantiated directly by users.<br><br>
         </td>
     </tr>

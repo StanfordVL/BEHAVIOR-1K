@@ -255,7 +255,7 @@ In addition, a scene can always be reset by calling `reset()`. The scene's initi
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Wainscott_0_int`**](../reference/scene/Wainscott_0_int.html)<br><br>  
+            [**`Wainscott_0_int`**](../reference/scene/Wainscott_0_int.md)<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Wainscott_0_int.png" alt="Wainscott_0_int">
@@ -266,7 +266,7 @@ In addition, a scene can always be reset by calling `reset()`. The scene's initi
     </tr>
     <tr>
         <td valign="top" width="30%">
-            [**`Wainscott_1_int`**](../reference/scene/Wainscott_1_int.html)<br><br>  
+            [**`Wainscott_1_int`**](../reference/scene/Wainscott_1_int.md)<br><br>  
         </td>
         <td>
             <img src="../assets/scenes/birds-eye-views/Wainscott_1_int.png" alt="Wainscott_1_int">

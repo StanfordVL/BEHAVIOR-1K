@@ -44,7 +44,7 @@ abilities = OBJECT_TAXONOMY.get_abilities(synset)
 ```
 
 !!! info annotate "Follow our tutorial on BEHAVIOR knowledgebase!"
-    To better understand how to use / visualize / modify BEHAVIOR knowledgebase, please read our [tutorial](../tutorials/behavior_knowledgebase.html)!
+    To better understand how to use / visualize / modify BEHAVIOR knowledgebase, please read our [tutorial](../tutorials/behavior_knowledgebase.md)!
 
 ??? warning annotate "Not all object states are guaranteed to be created!"
 
@@ -66,7 +66,7 @@ These are object states that are agnostic to other objects in a given scene.
 <table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            [**`AABB`**](../reference/object_states/aabb.html)<br><br>  
+            [**`AABB`**](../reference/object_states/aabb.md)<br><br>  
             The axis-aligned bounding box (AABB) of the object in the world frame.<br><br>
             <ul>
                 <li>`get_value()`: returns `aabb_min`, `aabb_max`</li>
@@ -79,7 +79,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`VerticalAdjacency`** / **`HorizontalAdjacency`**](../reference/object_states/adjacency.html)<br><br>  
+            [**`VerticalAdjacency`** / **`HorizontalAdjacency`**](../reference/object_states/adjacency.md)<br><br>  
             The nearby objects that are considered adjacent to the object, either in the +/- global Z axis or +/- global XY plane.<br><br>
             <ul>
                 <li>`get_value()`: returns `AxisAdjacencyList`, a namedtuple with `positive_neighbors` and `negative_neighbors` each of which are lists of nearby objects</li>
@@ -92,7 +92,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Burnt`**](../reference/object_states/burnt.html)<br><br>  
+            [**`Burnt`**](../reference/object_states/burnt.md)<br><br>  
             Whether the object is considered burnt or not. Note that if `True`, this object's visual appearance will also change accordingly. This corresponds to an object hitting some `MaxTemperature` threshold over the course of its lifetime.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -105,7 +105,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`ContactBodies`**](../reference/object_states/contact_bodies.html)<br><br>  
+            [**`ContactBodies`**](../reference/object_states/contact_bodies.md)<br><br>  
             The nearby rigid bodies that this object is currently in contact with.<br><br>
             <ul>
                 <li>`get_value(ignore_objs=None)`: returns `rigid_prims`, a set of `RigidPrim`s the object is in contact with, optionally with `ignore_objs` filtered from the set</li>
@@ -118,7 +118,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Cooked`**](../reference/object_states/cooked.html)<br><br>  
+            [**`Cooked`**](../reference/object_states/cooked.md)<br><br>  
             Whether the object is considered cooked or not. Note that if `True`, this object's visual appearance will also change accordingly. This corresponds to an object hitting some `MaxTemperature` threshold over the course of its lifetime.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -131,7 +131,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Folded`** / **`Unfolded`**](../reference/object_states/folded.html)<br><br>  
+            [**`Folded`** / **`Unfolded`**](../reference/object_states/folded.md)<br><br>  
             A cloth-specific state. Determines whether a cloth object is sufficiently un / folded or not. This is inferred as a function of its overall smoothness, total area to current area ratio, and total diagonal to current diagonal ratio.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -144,7 +144,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Frozen`**](../reference/object_states/frozen.html)<br><br>  
+            [**`Frozen`**](../reference/object_states/frozen.md)<br><br>  
             Whether the object is considered frozen or not. Note that if `True`, this object's visual appearance will also change accordingly. This corresponds to an object's `Temperature` value being under some threshold at the current timestep.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -157,7 +157,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`HeatSourceOrSink`**](../reference/object_states/heat_source_or_sink.html)<br><br>  
+            [**`HeatSourceOrSink`**](../reference/object_states/heat_source_or_sink.md)<br><br>  
             Defines a heat source or sink which raises / lowers the temperature of nearby objects, if enabled. Use `state.affects_obj(obj)` to check whether the given heat source / sink is currently impacting `obj`'s temperature.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False` (whether the source / sink is enabled or not)</li>
@@ -170,7 +170,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Heated`**](../reference/object_states/heated.html)<br><br>  
+            [**`Heated`**](../reference/object_states/heated.md)<br><br>  
             Whether the object is considered heated or not. Note that if `True`, this object's visual appearance will also change accordingly with steam actively coming off of the object. This corresponds to an object's `Temperature` value being above some threshold at the current timestep.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -183,7 +183,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`MaxTemperature`**](../reference/object_states/max_temperature.html)<br><br>  
+            [**`MaxTemperature`**](../reference/object_states/max_temperature.md)<br><br>  
             The object's max temperature over the course of its lifetime. This value gets automatically updated every simulation step and can be affected by nearby `HeatSourceOrSink`-enabled objects.<br><br>
             <ul>
                 <li>`get_value()`: returns `float`</li>
@@ -196,7 +196,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`OnFire`**](../reference/object_states/on_fire.html)<br><br>  
+            [**`OnFire`**](../reference/object_states/on_fire.md)<br><br>  
             Whether the object is lit on fire or not. Note that if `True`, this object's visual appearance will also change accordingly with fire actively coming off of the object. This corresponds to an object's `Temperature` value being above some threshold at the current timestep. Note that if `True`, this object becomes an active `HeatSourceOrSink`-enabled object that will raise the temperature of nearby objects.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -209,7 +209,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
         <tr>
         <td valign="top" width="60%">
-            [**`ObjectsInFOVOfRobot`**](../reference/object_states/objects_in_fov_of_robot.html)<br><br>  
+            [**`ObjectsInFOVOfRobot`**](../reference/object_states/objects_in_fov_of_robot.md)<br><br>  
             A robot-specific state. Comptues the list of objects that are currently in the robot's field of view.<br><br>
             <ul>
                 <li>`get_value()`: returns `obj_list`, the list of `BaseObject`s</li>
@@ -222,7 +222,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Open`**](../reference/object_states/open.html)<br><br>  
+            [**`Open`**](../reference/object_states/open.md)<br><br>  
             Whether the object's joint is considered open or not. This corresponds to at least one joint being above some threshold from its pre-defined annotated closed state.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -235,7 +235,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Pose`**](../reference/object_states/pose.html)<br><br>  
+            [**`Pose`**](../reference/object_states/pose.md)<br><br>  
             The object's current (position, orientation) expressed in (cartesian, quaternion) form in the global frame.<br><br>
             <ul>
                 <li>`get_value()`: returns (`pos`, `quat`), with quat in (x,y,z,w) form</li>
@@ -248,7 +248,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Temperature`**](../reference/object_states/temperature.html)<br><br>  
+            [**`Temperature`**](../reference/object_states/temperature.md)<br><br>  
             The object's current temperature. This value gets automatically updated every simulation step and can be affected by nearby `HeatSourceOrSink`-enabled objects.<br><br>
             <ul>
                 <li>`get_value()`: returns `float`</li>
@@ -261,7 +261,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`ToggledOn`**](../reference/object_states/toggled_on.html)<br><br>  
+            [**`ToggledOn`**](../reference/object_states/toggled_on.md)<br><br>  
             A virtual button that can be "pressed" by a robot's end-effector. Doing so will result in the state being toggled between `True` and `False`, and also corresponds to a visual change in the virtual button's appearance.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>
@@ -280,7 +280,7 @@ These are object states that are computed with respect to other entities in the 
 <table markdown=span>
     <tr>
         <td valign="top" width="60%">
-            [**`AttachedTo`**](../reference/object_states/attached_to.html)<br><br>  
+            [**`AttachedTo`**](../reference/object_states/attached_to.md)<br><br>  
             Defines a rigid or flexible connection between this object and another object (parent). At any given moment, this object can only be attached to at most one parent, but the reverse is not true. That is,
         a parent can have multiple children, but a child can only have one parent. An attachment is triggered and created when the this object makes contact with a compatible parent and is aligned correctly.<br><br>
             <ul>
@@ -294,7 +294,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Contains`**](../reference/object_states/contains.html)<br><br>  
+            [**`Contains`**](../reference/object_states/contains.md)<br><br>  
             Defines whether this object currently contains any quantity of a specific particle system. Note that this state requires that a container virtual volume be pre-annotated in the underlying object asset for it to be created. Particles are considered contained if their position lies within the annotated volume.<br><br>
             <ul>
                 <li>`get_value(system)`: returns `True / False`</li>
@@ -307,7 +307,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Covered`**](../reference/object_states/covered.html)<br><br>  
+            [**`Covered`**](../reference/object_states/covered.md)<br><br>  
             Defines whether this object is currently covered by a specific particle system. This corresponds to checking whether the number of particles either touching or attached to this object surpasses some minimum threshold.<br><br>
             <ul>
                 <li>`get_value(system)`: returns `True / False`</li>
@@ -320,7 +320,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Draped`**](../reference/object_states/draped.html)<br><br>  
+            [**`Draped`**](../reference/object_states/draped.md)<br><br>  
             A cloth-specific state. Defines whether this cloth object is fully covering `other`, e.g., a tablecloth draped over a table. This object is considered draped if it is touching `other` and its center of mass is below the average position of the contact points.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -333,7 +333,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Filled`**](../reference/object_states/filled.html)<br><br>  
+            [**`Filled`**](../reference/object_states/filled.md)<br><br>  
             Defines whether this object is currently filled with a specific particle system. Note that this state requires that a container virtual volume be pre-annotated in the underlying object asset for it to be created. This state corresponds to checking whether the total volume of contained particles surpasses some minimum relative ratio with respect to its total annotated container volume.<br><br>
             <ul>
                 <li>`get_value(system)`: returns `True / False`</li>
@@ -346,7 +346,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Inside`**](../reference/object_states/inside.html)<br><br>  
+            [**`Inside`**](../reference/object_states/inside.md)<br><br>  
             Defines whether this object is considered inside of `other`. This does raycasting in all axes (x,y,z), and checks to make sure that rays shot in at least two of these axes hit `other`.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -359,7 +359,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`IsGrasping`**](../reference/object_states/robot_related_states.html)<br><br> 
+            [**`IsGrasping`**](../reference/object_states/robot_related_states.md)<br><br> 
             A robot-specific state. Determines whether this robot is currently grasping `other`.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -372,7 +372,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`NextTo`**](../reference/object_states/next_to.html)<br><br>  
+            [**`NextTo`**](../reference/object_states/next_to.md)<br><br>  
             Defines whether this object is considered next to `other`. This checks to make sure this object is relatively close to `other` and that `other` is in either of this object's `HorizontalAdjacency` neighbor lists.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -385,7 +385,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`OnTop`**](../reference/object_states/on_top.html)<br><br>  
+            [**`OnTop`**](../reference/object_states/on_top.md)<br><br>  
             Defines whether this object is considered on top of `other`. This checks to make sure that this object is touching `other` and that `other` is in this object's `VerticalAdjacency` `negative_neighbors` list.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -398,7 +398,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Overlaid`**](../reference/object_states/overlaid.html)<br><br>  
+            [**`Overlaid`**](../reference/object_states/overlaid.md)<br><br>  
             A cloth-specific state. Defines whether this object is overlaid over `other`, e.g., a t-shirt overlaid over a table. This checks to make sure that the ratio of this cloth object's XY-projection of its convex hull to `other`'s XY-area of its bounding box surpasses some threshold.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -411,7 +411,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Saturated`**](../reference/object_states/saturated.html)<br><br>  
+            [**`Saturated`**](../reference/object_states/saturated.md)<br><br>  
             Defines whether this object has reached the maximum with respect to a specific particle system, e.g., a sponge fully absorbed with water, or a spray bottle fully emptied of cleaner fluid. This keeps a reference to this object's modified particle count for `system`, and checks whether the current value surpasses a desired limit. Specific limits can be queried via `get_limit(system)` and set via `set_limit(system, limit)`. Note that if `True`, this object's visual appearance will also change accordingly. <br><br>
             <ul>
                 <li>`get_value(system)`: returns `True / False`</li>
@@ -424,7 +424,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Touching`**](../reference/object_states/touching.html)<br><br>  
+            [**`Touching`**](../reference/object_states/touching.md)<br><br>  
             Defines whether this object is in contact with `other`.<br><br>
             <ul>
                 <li>`get_value(system)`: returns `True / False`</li>
@@ -437,7 +437,7 @@ These are object states that are computed with respect to other entities in the 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Under`**](../reference/object_states/under.html)<br><br>  
+            [**`Under`**](../reference/object_states/under.md)<br><br>  
             Defines whether this object is considered under `other`. This checks to make sure that this object is touching `other` and that `other` is in this object's `VerticalAdjacency` `positive_neighbors` list.<br><br>
             <ul>
                 <li>`get_value(other)`: returns `True / False`</li>
@@ -456,7 +456,7 @@ These are object states that that define intrinsic properties of the object and 
 <table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            [**`ParticleApplier` / `ParticleRemover`**](../reference/object_states/particle_modifier.html)<br><br>  
+            [**`ParticleApplier` / `ParticleRemover`**](../reference/object_states/particle_modifier.md)<br><br>  
             Defines an object that has the ability to apply (spawn) or remove (absorb) particles from specific particle systems. This state's `conditions` property defines the per-particle system requirements in order for the applier / remover to be active for that specific system. For example, a spray bottle that is a `ParticleApplier` may require `toggled_on.get_value()` to be `True` in order to allow `cleaning_fluid` particles to be sprayed, simulating a "press" of the nozzle trigger. The `method` flag in the constructor determines the applier / removal behavior, which is triggered **_only_** by direct contact with the object (`ParticleModifyMethod.ADJACENCY`) or contact with a virtual volume (`ParticleModifyMethod.PROJECTION`). The former captures objects such as sponges, while the latter captures objects such as vacuum cleaners or spray bottles. This object state is updated at each simulation step such that particles are automatically added / removed as needed.<br><br>
             <ul>
                 <li>`get_value()`: Not supported.</li>
@@ -469,7 +469,7 @@ These are object states that that define intrinsic properties of the object and 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`ParticleSource` / `ParticleSink`**](../reference/object_states/particle_source_or_sink.html)<br><br>  
+            [**`ParticleSource` / `ParticleSink`**](../reference/object_states/particle_source_or_sink.md)<br><br>  
             Defines an object that has the ability to apply (spawn) or remove (absorb) particles from specific particle systems. The behavior is nearly identical to **`ParticleApplier` / `ParticleRemover`**, with the exception that contact is not strictly necessary to add / remove particles. This is to provide the distinction between, e.g., a particle _source_ such as a sink, which always spawns water every timestep irregardless of whether its faucet volume is in contact with a surface, vs. a particle _applier_ such as a spray bottle, which (for efficiency reasons) only spawns water if its virtual spray cone is overlapping with a surface.<br><br>
             <ul>
                 <li>`get_value()`: Not supported.</li>
