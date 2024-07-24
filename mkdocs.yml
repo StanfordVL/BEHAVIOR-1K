@@ -1,4 +1,4 @@
-yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 site_name: OmniGibson Documentation
 repo_name: StanfordVL/OmniGibson
@@ -77,6 +77,9 @@ plugins:
       handlers:
         python:
           paths: [omnigibson]
+          options:
+            docstring_options:
+              returns_named_value: false
   # - social
   - gen-files:
       scripts:
@@ -108,11 +111,11 @@ nav:
     - Tasks: modules/tasks.md
     - Environments: modules/environments.md
     - Vector Environments: modules/vector_environments.md
-    - Setting Macros: tutorials/setting_macros.md
+    - Setting Macros: modules/setting_macros.md
     - Under the Hood - Isaac Sim: modules/under_the_hood.md
-  - BEHAVIOR Modules:
-    - BEHAVIOR Tasks: behavior_modules/behavior_tasks.md
-    - BEHAVIOR Knowledgebase: behavior_modules/behavior_knowledgebase.md
+  - BEHAVIOR Components:
+    - BEHAVIOR Tasks: behavior_components/behavior_tasks.md
+    - BEHAVIOR Knowledgebase: behavior_components/behavior_knowledgebase.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Running on a Compute Cluster: tutorials/running_on_a_compute_cluster.md

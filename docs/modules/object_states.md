@@ -44,7 +44,7 @@ abilities = OBJECT_TAXONOMY.get_abilities(synset)
 ```
 
 !!! info annotate "Follow our tutorial on BEHAVIOR knowledgebase!"
-    To better understand how to use / visualize / modify BEHAVIOR knowledgebase, please read our [tutorial](../tutorials/behavior_knowledgebase.md)!
+    To better understand how to use / visualize / modify BEHAVIOR knowledgebase, please read our [knowledgebase documentation](../behavior_components/behavior_knowledgebase.md)!
 
 ??? warning annotate "Not all object states are guaranteed to be created!"
 
@@ -52,7 +52,7 @@ abilities = OBJECT_TAXONOMY.get_abilities(synset)
 
 ### Runtime
 
-As mentioned earlier, object states can be potentially read from via `get_state(...)` or written to via `set_state(...)`. The possibility of reading / writing, as well as the arguments expected and return value expected depends on the specific object state class type. For example, object states that inherit the `BooleanStateMixin` class expect `get_state(...)` to return and `set_state(...)` to receive a boolean. `AbsoluteObjectState`s are agnostic to any other object in the scene, and so `get_state()` takes no arguments. In contrast, `RelativeObjectState`s are computed with respect to another object, and so require `other_obj` to be passed into the getter and setter, e.g., `get_state(other_obj)` and `set_state(other_obj, ...)`. A `ValueError` will be raised if a `get_state(...)` or `set_state(...)` is called on an object that does not support that functionality. If `set_state()` is called and is successful, it will return `True`, otherwise, it will return `False`. For more information on specific object state types' behaviors, please see [Object State Types](#object-state-types).
+As mentioned earlier, object states can be potentially read from via `get_state(...)` or written to via `set_state(...)`. The possibility of reading / writing, as well as the arguments expected and return value expected depends on the specific object state class type. For example, object states that inherit the `BooleanStateMixin` class expect `get_state(...)` to return and `set_state(...)` to receive a boolean. `AbsoluteObjectState`s are agnostic to any other object in the scene, and so `get_state()` takes no arguments. In contrast, `RelativeObjectState`s are computed with respect to another object, and so require `other_obj` to be passed into the getter and setter, e.g., `get_state(other_obj)` and `set_state(other_obj, ...)`. A `ValueError` will be raised if a `get_state(...)` or `set_state(...)` is called on an object that does not support that functionality. If `set_state()` is called and is successful, it will return `True`, otherwise, it will return `False`. For more information on specific object state types' behaviors, please see [Object State Types](#types).
 
 It is important to note that object states are usually queried / computed _on demand_ and immediately cached until its value becomes stale (usually the immediately proceeding simulation step). This is done for efficiency reasons, and also means that object states are usually not automatically updated per-step unless absolutely necessary. Calling `state.clear_cache()` forces a clearing of an object state's internal cache.
 
@@ -209,7 +209,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
         <tr>
         <td valign="top" width="60%">
-            [**`ObjectsInFOVOfRobot`**](../reference/object_states/objects_in_fov_of_robot.md)<br><br>  
+            [**`ObjectsInFOVOfRobot`**](../reference/object_states/robot_related_states.md)<br><br>  
             A robot-specific state. Comptues the list of objects that are currently in the robot's field of view.<br><br>
             <ul>
                 <li>`get_value()`: returns `obj_list`, the list of `BaseObject`s</li>
@@ -261,7 +261,7 @@ These are object states that are agnostic to other objects in a given scene.
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`ToggledOn`**](../reference/object_states/toggled_on.md)<br><br>  
+            [**`ToggledOn`**](../reference/object_states/toggle.md)<br><br>  
             A virtual button that can be "pressed" by a robot's end-effector. Doing so will result in the state being toggled between `True` and `False`, and also corresponds to a visual change in the virtual button's appearance.<br><br>
             <ul>
                 <li>`get_value()`: returns `True / False`</li>

@@ -21,7 +21,7 @@ In an [`Environment`](./environments.md) instance, actions are passed to control
 
 **`OmniGibson`** supports multiple types of controllers, which are intended to control a specific subset of a robot's set of joints. Some are more general (such as the `JointController`, which can broadly be applied to any part of a robot), while others are more specific to a robot's morphology (such as the `InverseKinematicsController`, which is intended to be used to control a manipulation robot's end-effector pose).
 
-It is important to note that a single robot can potentially own multiple controllers. For example, `Turtlebot` only owns a single controller (to control its two-wheeled base), whereas the mobile-manipulator `Fetch` robot owns four (one to control its base, head, trunk + arm, and gripper). This allows for modular action space composition, where fine-grained modification of the action space can be achieved by modifying / swapping out individual controllers. For more information about the specific number of controllers each robot has, please see our [list of robots](./robots.md#models).
+It is important to note that a single robot can potentially own multiple controllers. For example, `Turtlebot` only owns a single controller (to control its two-wheeled base), whereas the mobile-manipulator `Fetch` robot owns four (one to control its base, head, trunk + arm, and gripper). This allows for modular action space composition, where fine-grained modification of the action space can be achieved by modifying / swapping out individual controllers. For more information about the specific number of controllers each robot has, please see our [list of robots](./robots.md#types).
 
 ## Usage
 

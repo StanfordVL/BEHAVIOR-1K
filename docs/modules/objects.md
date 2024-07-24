@@ -49,13 +49,13 @@ All objects are tracked and organized by the underlying scene, and can quickly b
 
 
 ## Types
-**`OmniGibson`** directly supports multiple `Object` classes, which are intended to encapsulate different types of objects with varying functionalities. The most basic is [`BaseObject`](../reference/objects/object_base.html), which can capture any arbitrary object and thinly wraps an [`EntityPrim`](../reference/objects/entity_prim.md). The more specific classes are shown below:
+**`OmniGibson`** directly supports multiple `Object` classes, which are intended to encapsulate different types of objects with varying functionalities. The most basic is [`BaseObject`](../reference/objects/object_base.md), which can capture any arbitrary object and thinly wraps an [`EntityPrim`](../reference/prims/entity_prim.md). The more specific classes are shown below:
 
 <table markdown="span">
     <tr>
         <td valign="top">
             [**`StatefulObject`**](../reference/objects/stateful_object.md)<br><br>
-            Encapsulates an object that owns a set of [object states](./object_states.html). In general, this is intended to be a parent class, and not meant to be instantiated directly.<br><br>
+            Encapsulates an object that owns a set of [object states](./object_states.md). In general, this is intended to be a parent class, and not meant to be instantiated directly.<br><br>
         </td>
     </tr>
     <tr>

@@ -174,7 +174,7 @@ These are manipulation-only robots (an instance of [`ManipulationRobot`](../refe
 
 
 ### Mobile Manipulation Robots
-These are robots that can both navigate and manipulate (and inherit from both [`LocomotionRobot`](../reference/robots/locomotion_robot.html) and [`ManipulationRobot`](../reference/robots/manipulation_robot.md)), and are equipped with both a base that can move as well as one or more gripper-equipped arms that can actuate.
+These are robots that can both navigate and manipulate (and inherit from both [`LocomotionRobot`](../reference/robots/locomotion_robot.md) and [`ManipulationRobot`](../reference/robots/manipulation_robot.md)), and are equipped with both a base that can move as well as one or more gripper-equipped arms that can actuate.
 
 <table markdown="span">
     <tr>
