@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import signal
-import site
 import socket
 from collections import defaultdict
 from contextlib import nullcontext
