@@ -12,12 +12,14 @@ _This documentation is a work in progress._
 
 We assume the SLURM cluster using the _enroot_ container software, which is a replacement for Docker that allows containers to be run as the current user rather than as root. _enroot_ needs to be installed on your SLURM cluster by an administrator.
 
+**All of the below commands assume version 1.0.0 of OmniGibson and will not be updated. Please update the paths to match the version you are installing in order to ensure you use the correct version of the dataset going forward.**
+
 With enroot installed, you can follow the below steps to run OmniGibson on SLURM: 
 
 1. Download the dataset to a location that is accessible by cluster nodes. To do this, you can use the download_datasets.py script inside OmniGibson's scripts directory, and move it to the right spot later. In the below example, /cvgl/ is a networked drive that is accessible by the cluster nodes. **For Stanford users, this step is already done for SVL and Viscam nodes**
 ```{.shell .annotate}
 OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/download_datasets.py
-mv omnigibson/data /cvgl/group/Gibson/og-data-0-2-1
+mv omnigibson/data /cvgl/group/Gibson/og-data-1-0-0
 ```
 
 2. (Optional) Distribute the dataset to the individual nodes.
@@ -28,7 +30,7 @@ sinfo -p svl -o "%N,%n" -h | \
   xargs -L1 -I{} \
     sbatch \
       --account=cvgl --partition=svl --nodelist={} --mem=8G --cpus-per-task=4 \
-      --wrap 'cp -R /cvgl/group/Gibson/og-data-0-2-1 /scr-ssd/og-data-0-2-1'
+      --wrap 'cp -R /cvgl/group/Gibson/og-data-1-0-0 /scr-ssd/og-data-1-0-0'
 ```
 
 3. Download your desired image to a location that is accessible by the cluster nodes. (Replace the path with your own path, and feel free to replace `latest` with your desired branch tag). You have the option to mount code (meaning you don't need the container to come with all the code you want to run, just the right dependencies / environment setup)
@@ -69,7 +71,7 @@ done
 
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
-    [/scr-ssd/og-data-0-2-1]=/data
+    [/scr-ssd/og-data-1-0-0]=/data
     [${ISAAC_CACHE_PATH}/isaac-sim/kit/cache/Kit]=/isaac-sim/kit/cache/Kit
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/ov]=/root/.cache/ov
     [${ISAAC_CACHE_PATH}/isaac-sim/cache/pip]=/root/.cache/pip
