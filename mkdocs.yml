@@ -48,7 +48,7 @@ extra_css:
   - stylesheets/extra.css
 
 extra_javascript:
-  - assets/fold_reference.js
+  - assets/fold_api_reference.js
 
 markdown_extensions:
   - pymdownx.emoji:
