@@ -1192,7 +1192,7 @@ def calculate_xy_plane_angle(quaternion):
     fwd /= np.linalg.norm(fwd)
     return np.arctan2(fwd[1], fwd[0])
 
-def compute_pose_transform(prim, position, orientation, frame="scene"):
+def compute_scene_transform(prim, position, orientation, frame="scene"):
 
     """
     Compute the position and orientation of the object. If the frame is scene, compute the position and orientation relative to the scene.

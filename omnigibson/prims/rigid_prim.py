@@ -326,7 +326,7 @@ class RigidPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform before setting the pose
         if frame == "scene":
             # if position or orientation is None, get the current position and orientation relative to scene
-            position, orientation = T.compute_pose_transform(self, position, orientation, frame)
+            position, orientation = T.compute_scene_transform(self, position, orientation, frame)
 
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:

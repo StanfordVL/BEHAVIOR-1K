@@ -982,7 +982,7 @@ class EntityPrim(XFormPrim):
 
         # If we are in a scene, compute the scene-local transform before setting the pose
         if frame == "scene":
-            position, orientation = T.compute_pose_transform(self, position, orientation, frame)
+            position, orientation = T.compute_scene_transform(self, position, orientation, frame)
 
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:

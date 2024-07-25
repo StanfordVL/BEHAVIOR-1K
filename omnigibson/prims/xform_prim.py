@@ -193,12 +193,6 @@ class XFormPrim(BasePrim):
             position = current_position if position is None else np.array(position, dtype=float)
             orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
 
-            # If we are in a scene, compute the scene-local transform before setting the pose
-            if frame == "scene" and self.scene is None:
-                position, orientation = T.pose_transform(
-                    *self.scene.prim.get_position_orientation(), position, orientation
-                )
-
             assert np.isclose(
                 np.linalg.norm(orientation), 1, atol=1e-3
             ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."

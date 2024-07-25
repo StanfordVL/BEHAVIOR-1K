@@ -398,6 +398,10 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         super().set_position_orientation(position, orientation, frame=frame)
 
+        # convert to world pose, use the world pose down 
+        if frame != "world":
+            position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
+
         # Move the joint frame for the world_base_joint
         if self._world_base_fixed_joint_prim is not None:
             if position is not None:
@@ -540,7 +544,7 @@ class BRPart(ABC):
     def load(self, scene) -> None:
         self.scene = scene
         self._root_link = self.parent.links[self.relative_prim_path.replace("/", "")]
-        
+
         # setup ghost hand
         if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
@@ -590,13 +594,9 @@ class BRPart(ABC):
 
             if frame == "scene":
                 if self.scene is None:
-                    og.log.warning(
-                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                    )
+                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
                 else:
-                    position, orientation = T.relative_pose_transform(
-                        position, orientation, *self.parent.get_position_orientation()
-                    )
+                    position, orientation = T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
 
             return position, orientation
 

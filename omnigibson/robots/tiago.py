@@ -695,7 +695,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        return self.base_footprint_link.get_position_orientation()
+        return self.base_footprint_link.get_position_orientation(frame=frame)
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "scene", "parent"] = "world"
@@ -713,12 +713,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
-        position, orientation = np.array(position), np.array(orientation)
+
+        current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else np.array(position, dtype=float)
+        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+
         assert np.isclose(
             np.linalg.norm(orientation), 1, atol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
@@ -729,7 +728,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
-            joint_pos, joint_orn = self.root_link.get_position_orientation()
+            joint_pos, joint_orn = self.root_link.get_position_orientation(frame=frame)
             inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
 
             relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
@@ -745,6 +744,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         else:
             # Call the super() method to move the robot frame first
             super().set_position_orientation(position, orientation, frame=frame)
+
+            # convert the position and orientation to world frame
+            if frame == "parent" or frame == "scene":
+                position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
+
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
