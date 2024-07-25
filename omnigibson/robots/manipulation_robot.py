@@ -1480,10 +1480,11 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         ag_params = self._ag_obj_constraint_params.copy()
         for arm in ag_params.keys():
-            if len(ag_params[arm]) > 0 and self.scene is not None:
-                ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
-                    ag_params[arm]["contact_pos"], [0, 0, 0, 1], *self.scene.prim.get_position_orientation()
-                )
+            if len(ag_params[arm]) > 0:
+                if self.scene is None:
+                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                else:
+                    ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(ag_params[arm]["contact_pos"], [0, 0, 0, 1], *self.scene.prim.get_position_orientation())
         state["ag_obj_constraint_params"] = ag_params
         return state
 
@@ -1506,10 +1507,10 @@ class ManipulationRobot(BaseRobot):
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 contact_pos_global = data["contact_pos"]
-                if self.scene is not None:
-                    contact_pos_global, _ = T.pose_transform(
-                        *self.scene.prim.get_position_orientation(), contact_pos_global, [0, 0, 0, 1]
-                    )
+                if self.scene is None:
+                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                else:
+                    contact_pos_global, _ = T.pose_transform(*self.scene.prim.get_position_orientation(), contact_pos_global, [0, 0, 0, 1])
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
     def serialize(self, state):

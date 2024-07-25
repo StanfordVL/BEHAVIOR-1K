@@ -981,21 +981,15 @@ class EntityPrim(XFormPrim):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
         # If we are in a scene, compute the scene-local transform before setting the pose
-        if frame == "scene" and self.scene is not None:
-
-            # if position or orientation is None, get the current position and orientation relative to scene
-            current_position, current_orientation = self.get_position_orientation(frame="scene")
-            position = current_position if position is None else np.array(position, dtype=float)
-            orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-
-            position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+        if frame == "scene":
+            position, orientation = T.compute_pose_transform(self, position, orientation, frame)
 
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
         # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
-            return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
         # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
             self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
@@ -1045,10 +1039,11 @@ class EntityPrim(XFormPrim):
         position, orientation = positions[0], orientations[0][[1, 2, 3, 0]]
 
         # If we are in a scene, compute the scene-local transform
-        if frame == "scene" and self.scene is not None:
-            position, orientation = T.relative_pose_transform(
-                position, orientation, *self.scene.prim.get_position_orientation()
-            )
+        if frame == "scene":
+            if self.scene is None:
+                og.log.warning("Cannot transform position and orientation relative to scene without a scene, defaulting to world frame")
+            else:
+                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
 
         return position, orientation
 

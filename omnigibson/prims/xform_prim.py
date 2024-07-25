@@ -272,10 +272,11 @@ class XFormPrim(BasePrim):
 
             # If we are in a scene, compute the scene-local transform (and save this as the world transform
             # for legacy compatibility)
-            if frame == "scene" and self.scene is not None:
-                position, orientation = T.relative_pose_transform(
-                    position, orientation, *self.scene.prim.get_position_orientation()
-                )
+            if frame == "scene":
+                if self.scene is None:
+                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                else:
+                    position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
 
             return position, orientation
         else:

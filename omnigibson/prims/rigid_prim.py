@@ -76,6 +76,7 @@ class RigidPrim(XFormPrim):
         # Caches for kinematic-only objects
         # This exists because RigidPrimView uses USD pose read, which is very slow
         self._kinematic_world_pose_cache = None
+        self._kinematic_scene_pose_cache = None
         self._kinematic_local_pose_cache = None
 
         # Run super init
@@ -323,14 +324,9 @@ class RigidPrim(XFormPrim):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
         # If we are in a scene, compute the scene-local transform before setting the pose
-        if frame == "scene" and self.scene is not None:
-
+        if frame == "scene":
             # if position or orientation is None, get the current position and orientation relative to scene
-            current_position, current_orientation = self.get_position_orientation(frame="scene")
-            position = current_position if position is None else np.array(position, dtype=float)
-            orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-
-            position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+            position, orientation = T.compute_pose_transform(self, position, orientation, frame)
 
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
@@ -365,11 +361,12 @@ class RigidPrim(XFormPrim):
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-            
-        if frame == "world" or frame == "scene":
 
-            if self.kinematic_only and self._kinematic_world_pose_cache is not None:
+        if frame == "world" or frame == "scene":
+            if self.kinematic_only and frame == "world" and self._kinematic_world_pose_cache is not None:
                 return self._kinematic_world_pose_cache
+            elif self.kinematic_only and frame == "scene" and self._kinematic_scene_pose_cache is not None:
+                return self._kinematic_scene_pose_cache
 
             positions, orientations = self._rigid_prim_view.get_world_poses()
 
@@ -399,10 +396,14 @@ class RigidPrim(XFormPrim):
                 self._kinematic_local_pose_cache = (position, orientation)
 
         # If we are in a scene, compute the scene-local transform
-        if frame == "scene" and self.scene is not None:
-            position, orientation = T.relative_pose_transform(
-                position, orientation, *self.scene.prim.get_position_orientation()
-            )
+        if frame == "scene":
+            if self.scene is None:
+                og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+            else:
+                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+
+            if self.kinematic_only:
+                self._kinematic_scene_pose_cache = (position, orientation)
 
         return position, orientation
 
@@ -847,6 +848,7 @@ class RigidPrim(XFormPrim):
         """
         assert self.kinematic_only
         self._kinematic_local_pose_cache = None
+        self._kinematic_scene_pose_cache = None
         self._kinematic_world_pose_cache = None
 
     def _dump_state(self):

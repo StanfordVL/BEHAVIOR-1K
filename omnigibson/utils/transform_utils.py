@@ -1211,10 +1211,10 @@ def compute_pose_transform(prim, position, orientation, frame: Literal["world", 
         og.log.warning("Cannot set position and orientation relative to scene without a scene, defaulting to world frame")
     else:
         # if no position or no orientation are given, get the current position and orientation of the object
-        current_position, current_orientation = self.get_position_orientation(frame="scene")	
+        current_position, current_orientation = prim.get_position_orientation(frame="scene")	
         position = current_position if position is None else np.array(position, dtype=float)	
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-        
+
         # perform the transformation only if the frame is scene and the requirements are met
         if frame == "scene":
             position, orientation = pose_transform(*prim.scene.prim.get_position_orientation(), position, orientation)
