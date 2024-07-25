@@ -747,7 +747,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
             # convert the position and orientation to world frame
             if frame == "parent" or frame == "scene":
-                position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, *self.get_position_orientation()
+                )
 
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
