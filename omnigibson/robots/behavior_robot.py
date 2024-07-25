@@ -588,9 +588,13 @@ class BRPart(ABC):
 
             if frame == "scene":
                 if self.scene is None:
-                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                    og.log.warning(
+                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+                    )
                 else:
-                    position, orientation = T.relative_pose_transform(position, orientation, *self.parent.get_position_orientation())
+                    position, orientation = T.relative_pose_transform(
+                        position, orientation, *self.parent.get_position_orientation()
+                    )
 
             return position, orientation
 

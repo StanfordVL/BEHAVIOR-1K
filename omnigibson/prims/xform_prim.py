@@ -274,9 +274,13 @@ class XFormPrim(BasePrim):
             # for legacy compatibility)
             if frame == "scene":
                 if self.scene is None:
-                    og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                    og.log.warning(
+                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+                    )
                 else:
-                    position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+                    position, orientation = T.relative_pose_transform(
+                        position, orientation, *self.scene.prim.get_position_orientation()
+                    )
 
             return position, orientation
         else:
@@ -292,7 +296,9 @@ class XFormPrim(BasePrim):
             position (3-array): (x,y,z) global cartesian position to set
         """
 
-        og.log.warning("set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead")
+        og.log.warning(
+            "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead"
+        )
         return self.set_position_orientation(position=position)
 
     def get_position(self):
@@ -303,7 +309,9 @@ class XFormPrim(BasePrim):
             3-array: (x,y,z) global cartesian position of this prim
         """
 
-        og.log.warning("get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead.")
+        og.log.warning(
+            "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead."
+        )
         return self.get_position_orientation()[0]
 
     def set_orientation(self, orientation):
@@ -314,7 +322,9 @@ class XFormPrim(BasePrim):
             orientation (4-array): (x,y,z,w) global quaternion orientation to set
         """
 
-        og.log.warning("set_orientation is deprecated and will be removed in a future release. Use set_position_orientation(orientation=orientation) instead")
+        og.log.warning(
+            "set_orientation is deprecated and will be removed in a future release. Use set_position_orientation(orientation=orientation) instead"
+        )
         self.set_position_orientation(orientation=orientation)
 
     def get_orientation(self):
@@ -325,7 +335,9 @@ class XFormPrim(BasePrim):
             4-array: (x,y,z,w) global quaternion orientation of this prim
         """
 
-        og.log.warning("get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead")
+        og.log.warning(
+            "get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead"
+        )
         return self.get_position_orientation()[1]
 
     def get_local_pose(self):
@@ -338,7 +350,9 @@ class XFormPrim(BasePrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
 
-        og.log.warning('get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead')
+        og.log.warning(
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
+        )
         return PoseAPI.get_position_orientation(self.prim_path, frame="parent")
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
@@ -352,7 +366,9 @@ class XFormPrim(BasePrim):
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
 
-        og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+        og.log.warning(
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+        )
         return self.set_position_orientation(self.prim_path, position, orientation, frame)
 
     # -----------------------------------------------------------------------------------------------------------------

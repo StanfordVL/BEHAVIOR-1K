@@ -1041,20 +1041,28 @@ class EntityPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
             if self.scene is None:
-                og.log.warning("Cannot transform position and orientation relative to scene without a scene, defaulting to world frame")
+                og.log.warning(
+                    "Cannot transform position and orientation relative to scene without a scene, defaulting to world frame"
+                )
             else:
-                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, *self.scene.prim.get_position_orientation()
+                )
 
         return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
-        og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+        og.log.warning(
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+        )
         return self.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
     def get_local_pose(self):
 
-        og.log.warning('get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead')
+        og.log.warning(
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
+        )
         return self.get_position_orientation(frame="parent")
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
