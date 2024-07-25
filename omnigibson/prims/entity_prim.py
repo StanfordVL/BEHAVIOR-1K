@@ -978,6 +978,8 @@ class EntityPrim(XFormPrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+
         # If we are in a scene, compute the scene-local transform before setting the pose
         if frame == "scene" and self.scene is not None:
 
@@ -1025,6 +1027,8 @@ class EntityPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.get_position_orientation(self, frame=frame)
@@ -1050,22 +1054,12 @@ class EntityPrim(XFormPrim):
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
-        import warnings
-
-        warnings.warn(
-            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead',
-            DeprecationWarning,
-        )
-        return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
+        og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+        return self.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
     def get_local_pose(self):
 
-        import warnings
-
-        warnings.warn(
-            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead',
-            DeprecationWarning,
-        )
+        og.log.warning('get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead')
         return self.get_position_orientation(frame="parent")
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?

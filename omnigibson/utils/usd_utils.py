@@ -743,7 +743,7 @@ class PoseAPI:
 
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
+            get position relative to the object parent.
 
         Returns:
             2-tuple:
@@ -751,6 +751,7 @@ class PoseAPI:
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent"], f"Invalid frame '{frame}'. Must be 'world', 'parent'"
         cls._refresh()
         if frame == "world":
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
@@ -762,9 +763,7 @@ class PoseAPI:
     @classmethod
     def get_world_pose(cls, prim_path):
 
-        import warnings
-
-        warnings.warn("This method is deprecated. Use get_position_orientation() instead.", DeprecationWarning)
+        og.log.warning("This method is deprecated. Use get_position_orientation() instead.")
         return cls.get_position_orientation(prim_path)
 
     @classmethod
@@ -909,19 +908,20 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path, frame: Literal["world", "scene", "parent"] = "world"):
+    def get_position_orientation(self, prim_path, frame= "world"):
         """
-        Gets pose with respect to the specified frame.
+        Gets pose with respect to the world frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to world.
 
         Returns:
             2-tuple:
-                - 3-array: (x,y,z) position in the specified frame
-                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+                - 3-array: (x,y,z) position in the world frame
+                - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
+
+        assert frame == "world", f"Invalid frame '{frame}'. Must be 'world'"
 
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = self._view.get_root_transforms()

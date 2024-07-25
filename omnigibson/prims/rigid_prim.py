@@ -320,6 +320,8 @@ class RigidPrim(XFormPrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+
         # If we are in a scene, compute the scene-local transform before setting the pose
         if frame == "scene" and self.scene is not None:
 
@@ -362,6 +364,8 @@ class RigidPrim(XFormPrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+            
         if frame == "world" or frame == "scene":
 
             if self.kinematic_only and self._kinematic_world_pose_cache is not None:
@@ -404,22 +408,12 @@ class RigidPrim(XFormPrim):
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
-        import warnings
-
-        warnings.warn(
-            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead',
-            DeprecationWarning,
-        )
+        og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
         return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
     def get_local_pose(self):
 
-        import warnings
-
-        warnings.warn(
-            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead',
-            DeprecationWarning,
-        )
+        og.log.warning('get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead')
         return self.get_position_orientation(frame="parent")
 
     @property

@@ -200,8 +200,8 @@ class ClothPrim(GeomPrim):
             len(positions) == n_expected
         ), f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
 
-        r = T.quat2mat(self.get_position_orientation()[1])
-        t = self.get_position_orientation()[0]
+        t, r = self.get_position_orientation()
+        r = T.quat2mat(r)
         s = self.scale
         p_local = (r.T @ (positions - t).T).T / s
 

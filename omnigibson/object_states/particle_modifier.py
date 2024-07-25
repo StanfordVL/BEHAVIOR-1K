@@ -1084,7 +1084,7 @@ class ParticleApplier(ParticleModifier):
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
-            local_pos, local_quat = self.projection_mesh.get_position_orientation("parent")
+            local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
             assert np.all(
                 np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)
             ), "Projection mesh tip should align with metalink position!"

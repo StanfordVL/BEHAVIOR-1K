@@ -86,7 +86,7 @@ def compute_base_aligned_bboxes(obj):
             pts_in_link_frame = []
             for mesh_name, mesh in mesh_list.items():
                 pts = mesh.get_attribute("points")
-                local_pos, local_orn = mesh.get_position_orientation("parent")
+                local_pos, local_orn = mesh.get_position_orientation(frame="parent")
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
             pts_in_link_frame = np.concatenate(pts_in_link_frame, axis=0)
             max_pt = np.max(pts_in_link_frame, axis=0)

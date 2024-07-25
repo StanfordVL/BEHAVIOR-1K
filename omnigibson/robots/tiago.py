@@ -694,6 +694,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         return self.base_footprint_link.get_position_orientation()
 
     def set_position_orientation(
@@ -711,6 +712,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         current_position, current_orientation = self.get_position_orientation()
         if position is None:
             position = current_position

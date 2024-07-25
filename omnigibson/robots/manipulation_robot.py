@@ -323,6 +323,7 @@ class ManipulationRobot(BaseRobot):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         # Store the original EEF poses.
         original_poses = {}
         for arm in self.arm_names:

@@ -377,6 +377,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         return self.base_footprint_link.get_position_orientation()
 
     def set_position_orientation(
@@ -394,6 +395,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         super().set_position_orientation(position, orientation, frame=frame)
 
         # Move the joint frame for the world_base_joint
@@ -560,11 +562,7 @@ class BRPart(ABC):
             Tuple[Array[x, y, z], Array[x, y, z, w]]
 
         """
-        import warnings
-
-        warnings.warn(
-            "local_position_orientation is deprecated. Use get_position_orientation instead.", DeprecationWarning
-        )
+        og.log.warning("local_position_orientation is deprecated. Use get_position_orientation instead.")
         return self.get_position_orientation(frame="parent")
 
     def get_position_orientation(
@@ -583,6 +581,7 @@ class BRPart(ABC):
                 - 4-array: (x,y,z,w) quaternion orientation in the specified frame
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         if frame == "world" or frame == "scene":
 
             position, orientation = self._root_link.get_position_orientation()
@@ -613,6 +612,7 @@ class BRPart(ABC):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
+        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
         self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
         self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)

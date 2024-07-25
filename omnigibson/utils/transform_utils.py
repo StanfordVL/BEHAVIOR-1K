@@ -8,6 +8,8 @@ import math
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from typing import Literal
+import omnigibson as og
 
 PI = np.pi
 EPS = np.finfo(float).eps * 4.0
@@ -1188,3 +1190,32 @@ def calculate_xy_plane_angle(quaternion):
 
     fwd /= np.linalg.norm(fwd)
     return np.arctan2(fwd[1], fwd[0])
+
+def compute_pose_transform(prim, position, orientation, frame: Literal["world", "scene"] = "scene"):
+
+    '''
+    Compute the position and orientation of the object. If the frame is scene, compute the position and orientation relative to the scene. 
+    If the frame is world, get the position and orientation. 
+    Args:
+        prim (object): The object whose position and orientation are to be computed
+        position (array): The position of the object
+        orientation (array): The orientation of the object
+        frame (str): The frame of reference for the position and orientation
+    Returns:
+        position: The position of the object relative to the frame
+        orientation: The orientation of the object relative to the orientation
+    '''
+
+    assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+    if frame == "scene" and prim.scene is None:
+        og.log.warning("Cannot set position and orientation relative to scene without a scene, defaulting to world frame")
+    else:
+        # if no position or no orientation are given, get the current position and orientation of the object
+        current_position, current_orientation = self.get_position_orientation(frame="scene")	
+        position = current_position if position is None else np.array(position, dtype=float)	
+        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+        
+        # perform the transformation only if the frame is scene and the requirements are met
+        if frame == "scene":
+            position, orientation = pose_transform(*prim.scene.prim.get_position_orientation(), position, orientation)
+    return position, orientation
