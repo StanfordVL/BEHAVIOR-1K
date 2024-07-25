@@ -112,10 +112,7 @@ def _launch_app():
         isaacsim = None
 
     # Compute the Isaac Path next
-    if isaacsim is not None:
-        isaac_path = os.path.dirname(isaacsim.__file__)
-    else:
-        isaac_path = os.environ["ISAAC_PATH"]
+    isaac_path = os.path.dirname(isaacsim.__file__) if isaacsim is not None else os.environ["ISAAC_PATH"]
 
     # First obtain the Isaac Sim version
     version_file_path = os.path.join(isaac_path, "VERSION")
@@ -130,13 +127,10 @@ def _launch_app():
     # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
-    if isaacsim is not None:
-        exp_path = os.path.join(isaac_path, "apps")
-    else:
-        assert (
-            "EXP_PATH" in os.environ
-        ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
-        exp_path = os.environ["EXP_PATH"]
+    assert (
+        "EXP_PATH" in os.environ or isaacsim is not None
+    ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    exp_path = os.path.join(isaac_path, "apps") if isaacsim is not None else os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
     kit_file_target = Path(exp_path) / kit_file_name
 
