@@ -1191,7 +1191,7 @@ def calculate_xy_plane_angle(quaternion):
     fwd /= np.linalg.norm(fwd)
     return np.arctan2(fwd[1], fwd[0])
 
-def compute_pose_transform(prim, position, orientation, frame: Literal["world", "scene"] = "scene"):
+def compute_pose_transform(prim, position, orientation, frame="scene"):
 
     '''
     Compute the position and orientation of the object. If the frame is scene, compute the position and orientation relative to the scene. 
@@ -1206,7 +1206,7 @@ def compute_pose_transform(prim, position, orientation, frame: Literal["world", 
         orientation: The orientation of the object relative to the orientation
     '''
 
-    assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+    assert frame == "scene", f"Invalid frame '{frame}'. Must be scene'."
     if frame == "scene" and prim.scene is None:
         og.log.warning("Cannot set position and orientation relative to scene without a scene, defaulting to world frame")
     else:
