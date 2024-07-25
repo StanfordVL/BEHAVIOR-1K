@@ -540,7 +540,7 @@ class BRPart(ABC):
     def load(self, scene) -> None:
         self.scene = scene
         self._root_link = self.parent.links[self.relative_prim_path.replace("/", "")]
-        
+
         # setup ghost hand
         if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
