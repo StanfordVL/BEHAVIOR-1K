@@ -142,10 +142,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def usd_path(self):
         return os.path.join(gm.ASSET_PATH, "models/behavior_robot/usd/BehaviorRobot.usd")
 
-    @property
-    def model_name(self):
-        return "BehaviorRobot"
-
     @classproperty
     def n_arms(cls):
         return 2
@@ -179,6 +175,10 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return [f"base_{component}_joint" for component in m.COMPONENT_SUFFIXES]
 
     @property
+    def camera_joint_names(self):
+        return [f"head_{component}_joint" for component in m.COMPONENT_SUFFIXES]
+
+    @property
     def arm_joint_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
         return {
@@ -200,29 +200,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             )
             for arm in self.arm_names
         }
-
-    @property
-    def base_control_idx(self):
-        joints = list(self.joints.keys())
-        return [joints.index(joint) for joint in self.base_joint_names]
-
-    @property
-    def arm_control_idx(self):
-        joints = list(self.joints.keys())
-        return {
-            arm: [joints.index(f"{arm}_{component}_joint") for component in m.COMPONENT_SUFFIXES]
-            for arm in self.arm_names
-        }
-
-    @property
-    def gripper_control_idx(self):
-        joints = list(self.joints.values())
-        return {arm: [joints.index(joint) for joint in arm_joints] for arm, arm_joints in self.finger_joints.items()}
-
-    @property
-    def camera_control_idx(self):
-        joints = list(self.joints.keys())
-        return [joints.index(f"head_{component}_joint") for component in m.COMPONENT_SUFFIXES]
 
     @property
     def _default_joint_pos(self):
