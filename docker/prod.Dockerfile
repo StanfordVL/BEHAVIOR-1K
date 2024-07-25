@@ -59,7 +59,7 @@ RUN micromamba run -n omnigibson /bin/bash --login -c 'source /isaac-sim/setup_c
 RUN micromamba run -n omnigibson python -c "from ompl import base"
 
 # Add setup to be executed on bash launch
-RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python scripts/download_datasets.py" >> /root/.bashrc
+RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/download_datasets.py" >> /root/.bashrc
 
 # Copy over omnigibson source
 ADD . /omnigibson-src

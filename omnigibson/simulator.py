@@ -105,8 +105,17 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+    # Try to import the isaacsim module that only shows up when pip installing omniverse
+    try:
+        import isaacsim  # noqa: F401
+    except ImportError:
+        isaacsim = None
+
+    # Compute the Isaac Path next
+    isaac_path = os.path.dirname(isaacsim.__file__) if isaacsim is not None else os.environ["ISAAC_PATH"]
+
     # First obtain the Isaac Sim version
-    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    version_file_path = os.path.join(isaac_path, "VERSION")
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
@@ -118,9 +127,13 @@ def _launch_app():
     # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
-    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    assert (
+        "EXP_PATH" in os.environ or isaacsim is not None
+    ), "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    exp_path = os.path.join(isaac_path, "apps") if isaacsim is not None else os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
-    kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    kit_file_target = Path(exp_path) / kit_file_name
+
     try:
         shutil.copy(kit_file, kit_file_target)
     except Exception as e:
@@ -129,7 +142,10 @@ def _launch_app():
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        if isaacsim is not None:
+            app = isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        else:
+            app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.omni.isaac.core.utils.stage.close_stage()
