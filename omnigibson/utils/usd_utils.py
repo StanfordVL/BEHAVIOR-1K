@@ -908,7 +908,7 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path, frame= "world"):
+    def get_position_orientation(self, prim_path, frame="world"):
         """
         Gets pose with respect to the world frame.
 

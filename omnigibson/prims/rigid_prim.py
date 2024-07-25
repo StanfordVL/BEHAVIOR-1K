@@ -398,9 +398,13 @@ class RigidPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
             if self.scene is None:
-                og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+                og.log.warning(
+                    'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+                )
             else:
-                position, orientation = T.relative_pose_transform(position, orientation, *self.scene.prim.get_position_orientation())
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, *self.scene.prim.get_position_orientation()
+                )
 
             if self.kinematic_only:
                 self._kinematic_scene_pose_cache = (position, orientation)
@@ -409,12 +413,16 @@ class RigidPrim(XFormPrim):
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
 
-        og.log.warning('set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead')
+        og.log.warning(
+            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
+        )
         return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
     def get_local_pose(self):
 
-        og.log.warning('get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead')
+        og.log.warning(
+            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
+        )
         return self.get_position_orientation(frame="parent")
 
     @property
