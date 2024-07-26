@@ -919,14 +919,18 @@ class ManipulationRobot(BaseRobot):
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_start_point.link_name].get_position_orientation()
             # Calculate grasp start point in world frame and add to startpoints
-            start_point, _ = T.pose_transform(link_pos, link_orn, grasp_start_point.position, [0, 0, 0, 1])
+            start_point, _ = T.pose_transform(
+                link_pos, link_orn, grasp_start_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
+            )
             startpoints.append(start_point)
         # Repeat for end points
         for grasp_end_point in self.assisted_grasp_end_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_end_point.link_name].get_position_orientation()
             # Calculate grasp start point in world frame and add to endpoints
-            end_point, _ = T.pose_transform(link_pos, link_orn, grasp_end_point.position, [0, 0, 0, 1])
+            end_point, _ = T.pose_transform(
+                link_pos, link_orn, grasp_end_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
+            )
             endpoints.append(end_point)
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
         n_startpoints, n_endpoints = len(startpoints), len(endpoints)
@@ -1325,7 +1329,9 @@ class ManipulationRobot(BaseRobot):
         """
         attachment_point_pos_local = self._ag_obj_constraint_params[arm]["attachment_point_pos_local"]
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
-        attachment_point_pos, _ = T.pose_transform(eef_link_pos, eef_link_orn, attachment_point_pos_local, [0, 0, 0, 1])
+        attachment_point_pos, _ = T.pose_transform(
+            eef_link_pos, eef_link_orn, attachment_point_pos_local, th.tensor([0, 0, 0, 1], dtype=th.float32)
+        )
         joint_prim = self._ag_obj_constraints[arm]
         joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos.float()))
 
@@ -1416,7 +1422,7 @@ class ManipulationRobot(BaseRobot):
         # Find the attachment point position in the eef frame
         eef_link_pos, eef_link_orn = self.eef_links[arm].get_position_orientation()
         attachment_point_pos_local, _ = T.relative_pose_transform(
-            attachment_point_pos, [0, 0, 0, 1], eef_link_pos, eef_link_orn
+            attachment_point_pos, th.tensor([0, 0, 0, 1], dtype=th.float32), eef_link_pos, eef_link_orn
         )
 
         # Create the joint
@@ -1468,7 +1474,9 @@ class ManipulationRobot(BaseRobot):
         for arm in ag_params.keys():
             if len(ag_params[arm]) > 0 and self.scene is not None:
                 ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
-                    ag_params[arm]["contact_pos"], [0, 0, 0, 1], *self.scene.prim.get_position_orientation()
+                    ag_params[arm]["contact_pos"],
+                    th.tensor([0, 0, 0, 1], dtype=th.float32),
+                    *self.scene.prim.get_position_orientation(),
                 )
         state["ag_obj_constraint_params"] = ag_params
         return state
@@ -1494,7 +1502,9 @@ class ManipulationRobot(BaseRobot):
                 contact_pos_global = data["contact_pos"]
                 if self.scene is not None:
                     contact_pos_global, _ = T.pose_transform(
-                        *self.scene.prim.get_position_orientation(), contact_pos_global, [0, 0, 0, 1]
+                        *self.scene.prim.get_position_orientation(),
+                        contact_pos_global,
+                        th.tensor([0, 0, 0, 1], dtype=th.float32),
                     )
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
