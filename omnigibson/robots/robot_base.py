@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
 
-
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.controllable_object import ControllableObject

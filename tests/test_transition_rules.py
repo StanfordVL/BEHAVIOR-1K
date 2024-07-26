@@ -2,7 +2,6 @@ import math
 
 import pytest
 import torch as th
-
 from utils import (
     get_random_pose,
     og_test,

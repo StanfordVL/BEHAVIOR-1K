@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import torch as th
 import trimesh
 
-
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
