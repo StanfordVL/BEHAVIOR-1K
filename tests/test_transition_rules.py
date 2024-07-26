@@ -95,7 +95,7 @@ def test_washer_rule(env):
 
     # Place the two objects inside the washer
     # (Hacky) use baking_sheet as a stepping stone to elevate the objects so that they are inside the container volume.
-    baking_sheet.set_position_orientation([0.0, 0.0, 0.04], T.euler2quat([math.pi, 0, 0]))
+    baking_sheet.set_position_orientation([0.0, 0.0, 0.04], T.euler2quat(th.tensor([math.pi, 0, 0], dtype=th.float32)))
     remover_dishtowel.set_position_orientation([0.0, 0.0, 0.05], [0, 0, 0, 1])
     bowl.set_position_orientation([0.10, 0.0, 0.08], [0, 0, 0, 1])
     og.sim.step()
@@ -160,7 +160,9 @@ def test_slicing_rule(env):
     place_obj_on_floor_plane(apple)
     og.sim.step()
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.15], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
     assert not table_knife.states[Touching].get_value(apple)
     final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
@@ -168,7 +170,9 @@ def test_slicing_rule(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.10], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.10], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
     final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
     assert len(final_half_apples) > len(initial_half_apples)
@@ -203,7 +207,7 @@ def test_dicing_rule_cooked(env):
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    half_apple.set_orientation(T.euler2quat([0, -math.pi / 2, 0]))
+    half_apple.set_orientation(T.euler2quat(th.tensor([0, -math.pi / 2, 0], dtype=th.float32)))
     place_obj_on_floor_plane(half_apple)
     og.sim.step()
 
@@ -211,7 +215,9 @@ def test_dicing_rule_cooked(env):
 
     assert cooked_diced_apple.n_particles == 0
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.15], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert not table_knife.states[Touching].get_value(half_apple)
@@ -219,7 +225,9 @@ def test_dicing_rule_cooked(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.07], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert cooked_diced_apple.n_particles > 0
@@ -227,7 +235,9 @@ def test_dicing_rule_cooked(env):
         assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
-    table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 1.15], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     # Clean up
@@ -249,13 +259,15 @@ def test_dicing_rule_uncooked(env):
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    half_apple.set_orientation(T.euler2quat([0, -math.pi / 2, 0]))
+    half_apple.set_orientation(T.euler2quat(th.tensor([0, -math.pi / 2, 0], dtype=th.float32)))
     place_obj_on_floor_plane(half_apple)
     og.sim.step()
 
     assert diced_apple.n_particles == 0
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.15], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert not table_knife.states[Touching].get_value(half_apple)
@@ -263,7 +275,9 @@ def test_dicing_rule_uncooked(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 0.07], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert diced_apple.n_particles > 0
@@ -271,7 +285,9 @@ def test_dicing_rule_uncooked(env):
         assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
-    table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-math.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        [-0.05, 0.0, 1.15], T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     # Clean up

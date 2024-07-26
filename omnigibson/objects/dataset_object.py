@@ -320,7 +320,10 @@ class DatasetObject(USDObject):
             orientation = self.get_orientation()
         if position is not None:
             rotated_offset = T.pose_transform(
-                [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]
+                th.tensor([0, 0, 0], dtype=th.float32),
+                orientation,
+                self.scaled_bbox_center_in_base_frame,
+                th.tensor([0, 0, 0, 1], dtype=th.float32),
             )[0]
             position = position + rotated_offset
         self.set_position_orientation(position, orientation)
