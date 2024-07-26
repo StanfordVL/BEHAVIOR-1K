@@ -177,7 +177,10 @@ class MultiFingerGripperController(GripperController):
                 )
         else:
             # Use continuous signal
-            u = target
+            if len(target) == 1:
+                u = np.full(self.control_dim, target[0])
+            else:
+                u = target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
@@ -243,10 +246,7 @@ class MultiFingerGripperController(GripperController):
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                assert np.all((min_pos <= finger_pos) * (finger_pos <= max_pos)), (
-                    f"Got invalid finger joint positions when checking for grasp! "
-                    f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
-                )
+                finger_pos = np.clip(finger_pos, min_pos, max_pos)
 
                 # Check distance from both ends of the joint limits
                 dist_from_lower_limit = finger_pos - min_pos
