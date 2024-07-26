@@ -164,22 +164,6 @@ class BasePrim(Serializable, Recreatable, ABC):
         # This is the cached value
         return self._state_size
 
-    def dump_state(self, serialized=False):
-        """
-        Dumps the state of this object in either dictionary of flattened numerical form.
-
-        Args:
-            serialized (bool): If True, will return the state of this object as a 1D numpy array. Otherewise, will return
-                a (potentially nested) dictionary of states for this object
-
-        Returns:
-            dict or n-array: Either:
-                - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        assert self._initialized, "Prim must be initialized before dumping state!"
-        return super().dump_state(serialized=serialized)
-
     @property
     def prim_path(self):
         """
