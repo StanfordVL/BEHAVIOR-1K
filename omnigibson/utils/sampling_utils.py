@@ -7,7 +7,6 @@ from collections import Counter, defaultdict
 import numpy as np
 import torch as th
 import trimesh
-
 from scipy.stats import truncnorm
 
 import omnigibson as og

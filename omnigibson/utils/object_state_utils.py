@@ -2,7 +2,6 @@ import math
 
 import torch as th
 
-
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import Dict, create_module_macros, macros

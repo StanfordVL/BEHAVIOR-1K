@@ -4,7 +4,6 @@ Helper utility functions for computing relevant object information
 
 import torch as th
 
-
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.scenes import Scene

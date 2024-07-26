@@ -16,7 +16,6 @@ from IPython import embed
 from PIL import Image
 from scipy.integrate import quad
 from scipy.interpolate import CubicSpline
-
 from termcolor import colored
 
 import omnigibson as og
