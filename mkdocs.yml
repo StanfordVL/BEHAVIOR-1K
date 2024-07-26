@@ -1,4 +1,6 @@
-yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+# The above line is included to enable intellisense for mkdocs.yml file in VSCode. It is not a valid
+# part of the mkdocs.yml file and should remain commented out.
 
 site_name: OmniGibson Documentation
 repo_name: StanfordVL/OmniGibson
@@ -47,6 +49,9 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - assets/fold_api_reference.js
+
 markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
@@ -74,6 +79,9 @@ plugins:
       handlers:
         python:
           paths: [omnigibson]
+          options:
+            docstring_options:
+              returns_named_value: false
   # - social
   - gen-files:
       scripts:
@@ -105,18 +113,20 @@ nav:
     - Tasks: modules/tasks.md
     - Environments: modules/environments.md
     - Vector Environments: modules/vector_environments.md
+    - Setting Macros: modules/setting_macros.md
     - Under the Hood - Isaac Sim: modules/under_the_hood.md
+  - BEHAVIOR Components:
+    - BEHAVIOR Tasks: behavior_components/behavior_tasks.md
+    - BEHAVIOR Knowledgebase: behavior_components/behavior_knowledgebase.md
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
-    - Using Macros: tutorials/using_macros.md
-    - Customizing Robots: tutorials/customizing_robots.md
-    - Running on a Server: tutorials/running_on_a_server.md
+    - Running on a Compute Cluster: tutorials/running_on_a_compute_cluster.md
     - Saving and Loading Simulation State: tutorials/save_load.md
-    - BEHAVIOR Tasks: tutorials/behavior_tasks.md
-    - BEHAVIOR Knowledgebase: tutorials/behavior_knowledgebase.md
+    - Customizing Robots: tutorials/customizing_robots.md
     - Custom Robot Import: tutorials/custom_robot_import.md
-    - Speed Optimization: tutorials/speed_optimization.md
   - Miscellaneous:
+    - Roadmap: miscellaneous/roadmap.md
+    - Speed Optimization: miscellaneous/speed_optimization.md
     - FAQ: miscellaneous/faq.md
     - Known Issues & Troubleshooting: miscellaneous/known_issues.md
     - Contributing: miscellaneous/contributing.md

@@ -21,7 +21,7 @@ def main():
         print(f"    dataset (~25GB): {gm.DATASET_PATH}")
         print(f"    assets (~2.5GB): {gm.ASSET_PATH}")
         print(
-            f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun scripts/download_dataset.py."
+            f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun omnigibson/download_datasets.py."
         )
         if click.confirm("Do you want to continue?"):
             # Only download if the dataset path doesn't exist
@@ -37,7 +37,7 @@ def main():
             print("\nOmniGibson setup completed!\n")
         else:
             print(
-                "You chose not to install dataset for now. You can install it later by running python scripts/download_dataset.py."
+                "You chose not to install dataset for now. You can install it later by running python omnigibson/download_datasets.py."
             )
 
 
