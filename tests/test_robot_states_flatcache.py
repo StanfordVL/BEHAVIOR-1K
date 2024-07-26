@@ -8,6 +8,14 @@ from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_t
 from omnigibson.utils.usd_utils import PoseAPI
 
 
+def quaternions_close(q1, q2, atol=1e-3):
+    """
+    Whether two quaternions represent the same rotation,
+    allowing for the possibility that one is the negative of the other.
+    """
+    return th.allclose(q1, q2, atol=atol) or th.allclose(q1, -q2, atol=atol)
+
+
 def setup_environment(flatcache):
     """
     Sets up the environment with or without flatcache based on the flatcache parameter.
@@ -63,7 +71,7 @@ def camera_pose_test(flatcache):
     sensor_world_ori_gt = th.tensor([-0.2940, 0.2917, 0.6436, -0.6436])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
-    assert th.allclose(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
+    assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
 
     # Now, we want to move the robot and check if the sensor pose has been updated
     old_camera_local_pose = vision_sensor.get_local_pose()
@@ -75,7 +83,7 @@ def camera_pose_test(flatcache):
     expected_camera_world_pos, expected_camera_world_ori = mat2pose(robot_pose_mat @ robot_to_sensor_mat)
     assert th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
     assert th.allclose(new_camera_world_pose[0], expected_camera_world_pos, atol=1e-3)
-    assert th.allclose(new_camera_world_pose[1], expected_camera_world_ori, atol=1e-3)
+    assert quaternions_close(new_camera_world_pose[1], expected_camera_world_ori, atol=1e-3)
 
     # Then, we want to move the local pose of the camera and check
     # 1) if the world pose is updated 2) if the robot stays in the same position
@@ -86,11 +94,12 @@ def camera_pose_test(flatcache):
     camera_parent_path = str(camera_parent_prim.GetPath())
     camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
     expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(
-        camera_parent_world_transform @ pose2mat([[10, 10, 10], [0, 0, 0, 1]])
+        camera_parent_world_transform
+        @ pose2mat((th.tensor([10, 10, 10], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)))
     )
     assert th.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
-    assert th.allclose(new_camera_world_pose[1], expected_new_camera_world_ori, atol=1e-3)
-    th.allclose(robot.get_position(), th.tensor([100, 100, 100], dtype=th.float32), atol=1e-3)
+    assert quaternions_close(new_camera_world_pose[1], expected_new_camera_world_ori, atol=1e-3)
+    assert th.allclose(robot.get_position(), th.tensor([100, 100, 100], dtype=th.float32), atol=1e-3)
 
     # Finally, we want to move the world pose of the camera and check
     # 1) if the local pose is updated 2) if the robot stays in the same position
@@ -99,7 +108,7 @@ def camera_pose_test(flatcache):
     vision_sensor.set_position_orientation([150, 150, 101.36912537], [-0.29444987, 0.29444981, 0.64288363, -0.64288352])
     new_camera_local_pose = vision_sensor.get_local_pose()
     assert not th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
-    assert not th.allclose(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)
+    assert not quaternions_close(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)
     assert th.allclose(robot.get_position(), th.tensor([150, 150, 100], dtype=th.float32), atol=1e-3)
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
