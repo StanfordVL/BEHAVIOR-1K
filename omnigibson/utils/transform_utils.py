@@ -471,7 +471,7 @@ def quat2mat(quaternion):
         tensor: (..., 3, 3) tensor whose final two dimensions are 3x3 rotation matrices
     """
     # convert quat convention
-    inds = th.tensor([3, 0, 1, 2])
+    inds = th.tensor([3, 0, 1, 2], dtype=th.long)
     input_shape = quaternion.shape[:-1]
     q = quaternion.reshape(-1, 4)[:, inds]
     # Conduct dot product
@@ -483,9 +483,9 @@ def quat2mat(quaternion):
     q2 = th.bmm(q_.unsqueeze(-1), q_.unsqueeze(1)).squeeze(-1).squeeze(-1)  # shape (-1, 4 ,4)
     # Create return array
     ret = (
-        th.eye(3, 3, dtype=quaternion.dtype, device=q.device)
+        th.eye(3, dtype=quaternion.dtype, device=q.device)
         .reshape(1, 3, 3)
-        .repeat(th.prod(th.tensor(input_shape)), 1, 1)
+        .repeat(int(th.prod(th.tensor(input_shape, dtype=th.long))), 1, 1)
     )
     ret[idx, :, :] = th.stack(
         [
@@ -742,20 +742,16 @@ def mat2euler(rmat):
 
 @th.jit.script
 def pose2mat(pose: Tuple[th.Tensor, th.Tensor]) -> th.Tensor:
-    """
-    Converts pose to homogeneous matrix.
-
-    Args:
-        pose (Tuple[th.Tensor, th.Tensor]): a (pos, orn) tuple where pos is vec3 float cartesian,
-            and orn is vec4 float quaternion.
-
-    Returns:
-        th.Tensor: 4x4 homogeneous matrix
-    """
     pos, orn = pose
+
+    # Ensure pos and orn are the expected shape and dtype
+    pos = pos.to(dtype=th.float32).reshape(3)
+    orn = orn.to(dtype=th.float32).reshape(4)
+
     homo_pose_mat = th.eye(4, dtype=th.float32)
     homo_pose_mat[:3, :3] = quat2mat(orn)
-    homo_pose_mat[:3, 3] = pos.float()
+    homo_pose_mat[:3, 3] = pos
+
     return homo_pose_mat
 
 
