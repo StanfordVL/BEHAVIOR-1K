@@ -1,4 +1,6 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+# The above line is included to enable intellisense for mkdocs.yml file in VSCode. It is not a valid
+# part of the mkdocs.yml file and should remain commented out.
 
 site_name: OmniGibson Documentation
 repo_name: StanfordVL/OmniGibson

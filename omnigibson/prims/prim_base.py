@@ -178,7 +178,7 @@ class BasePrim(Serializable, Recreatable, ABC):
                 - encoded + serialized, 1D numerical np.array capturing this object's state
         """
         assert self._initialized, "Prim must be initialized before dumping state!"
-        return self.dump_state(serialized=serialized)
+        return super().dump_state(serialized=serialized)
 
     @property
     def prim_path(self):
