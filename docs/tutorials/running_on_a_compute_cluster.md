@@ -2,11 +2,11 @@
 icon: material/server-network
 ---
 
-# 🔌 **Running on a Server**
+# 🔌 **Running on a Compute Cluster**
 
 _This documentation is a work in progress._
 
-**OmniGibson** can be run on an external server. Currently, only a SLURM-based cluster server is supported. Below, we describe the different methods for running **OmniGibson** on external servers.
+**OmniGibson** can be run on a compute cluster. Currently, only a SLURM-based cluster server is supported in our documentation, but a similar approach can be followed on other cluster systems that support running Docker containers.
 
 ## Running on a SLURM Cluster
 

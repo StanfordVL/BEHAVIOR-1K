@@ -16,7 +16,7 @@ Here are the important conceptual components of the BEHAVIOR Knowledgebase:
 ### [**Tasks**](https://behavior.stanford.edu/knowledgebase/tasks)
 A family of 1000 long-horizon household activities.
 
-- As illustrated in the [**BEHAVIOR Tasks tutorial**](behavior_tasks.html), each task definition contains a list of task-relevant objects, and their initial and goal conditions.
+- As illustrated in the [**BEHAVIOR Tasks tutorial**](behavior_tasks.md), each task definition contains a list of task-relevant objects, and their initial and goal conditions.
 - The knowledgebase page also shows
     - Which scenes this task is compatible with.
     - (Experimental) The transition paths that help achieve the goal conditions.

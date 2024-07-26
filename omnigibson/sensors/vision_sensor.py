@@ -389,7 +389,7 @@ class VisionSensor(BaseSensor):
                     # Remap instance segmentation labels to object name
                     if not id:
                         # value is the prim path of the object
-                        if value == og.sim.floor_plane.prim_path:
+                        if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
                             value = "groundPlane"
                         else:
                             obj = self.scene.object_registry("prim_path", value)

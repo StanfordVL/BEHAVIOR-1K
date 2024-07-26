@@ -21,7 +21,7 @@ In an [`Environment`](./environments.md) instance, actions are passed to control
 
 **`OmniGibson`** supports multiple types of controllers, which are intended to control a specific subset of a robot's set of joints. Some are more general (such as the `JointController`, which can broadly be applied to any part of a robot), while others are more specific to a robot's morphology (such as the `InverseKinematicsController`, which is intended to be used to control a manipulation robot's end-effector pose).
 
-It is important to note that a single robot can potentially own multiple controllers. For example, `Turtlebot` only owns a single controller (to control its two-wheeled base), whereas the mobile-manipulator `Fetch` robot owns four (one to control its base, head, trunk + arm, and gripper). This allows for modular action space composition, where fine-grained modification of the action space can be achieved by modifying / swapping out individual controllers. For more information about the specific number of controllers each robot has, please see our [list of robots](./robots.md#models).
+It is important to note that a single robot can potentially own multiple controllers. For example, `Turtlebot` only owns a single controller (to control its two-wheeled base), whereas the mobile-manipulator `Fetch` robot owns four (one to control its base, head, trunk + arm, and gripper). This allows for modular action space composition, where fine-grained modification of the action space can be achieved by modifying / swapping out individual controllers. For more information about the specific number of controllers each robot has, please see our [list of robots](./robots.md#types).
 
 ## Usage
 
@@ -67,7 +67,7 @@ These are general-purpose controllers that are agnostic to a robot's morphology,
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`JointController`**](../reference/controllers/joint_controller.html)<br><br>
+            [**`JointController`**](../reference/controllers/joint_controller.md)<br><br>
             Directly controls individual joints. Either outputs low-level joint position or velocity controls if `use_impedance=False`, otherwise will internally compensate the desired gains with the robot's mass matrix and output joint effort controls.<br><br>
             <ul>
                 <li>_Command Dim_: n_joints</li>
@@ -79,7 +79,7 @@ These are general-purpose controllers that are agnostic to a robot's morphology,
     </tr>
     <tr>
         <td valign="top">
-            [**`NullJointController`**](../reference/controllers/null_joint_controller.html)<br><br>
+            [**`NullJointController`**](../reference/controllers/null_joint_controller.md)<br><br>
             Directly controls individual joints via an internally stored `default_command`. Inputted commands will be ignored unless `default_command` is updated.<br><br>
             <ul>
                 <li>_Command Dim_: n_joints</li>
@@ -97,7 +97,7 @@ These are controllers specifically meant for robots with navigation capabilities
 <table markdown="span" width="100%">
     <tr>
         <td valign="top" width="100%">
-            [**`DifferentialDriveController`**](../reference/controllers/dd_controller.html)<br><br>
+            [**`DifferentialDriveController`**](../reference/controllers/dd_controller.md)<br><br>
             Commands 2-wheeled robots by setting linear / angular velocity setpoints and converting them into per-joint velocity control.<br><br>
             <ul>
                 <li>_Command Dim_: n_joints</li>
@@ -116,7 +116,7 @@ These are controllers specifically meant for robots with manipulation capabiliti
 <table markdown="span">
     <tr>
         <td valign="top">
-            [**`InverseKinematicsController`**](../reference/controllers/ik_controller.html)<br><br>
+            [**`InverseKinematicsController`**](../reference/controllers/ik_controller.md)<br><br>
             Controls a robot's end-effector by iteratively solving inverse kinematics to output a desired joint configuration to reach the desired end effector pose, and then runs an underlying `JointController` to reach the target joint configuration. Multiple modes are available, and dictate both the command dimension and behavior of the controller. `condition_on_current_position` can be set to seed the IK solver with the robot's current joint state, and `use_impedance` can be set if the robot's per-joint inertia should be taken into account when attempting to reach the target joint configuration.<br><br>
             Note: Orientation convention is axis-angle `[ax,ay,az]` representation, and commands are expressed in the robot base frame unless otherwise noted.<br><br>
             <ul>
@@ -135,7 +135,7 @@ These are controllers specifically meant for robots with manipulation capabiliti
     </tr>
     <tr>
         <td valign="top">
-            [**`OperationalSpaceController`**](../reference/controllers/osc_controller.html)<br><br>
+            [**`OperationalSpaceController`**](../reference/controllers/osc_controller.md)<br><br>
             Controls a robot's end-effector by applying the [operational space control](https://khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf) algorithm to apply per-joint efforts to perturb the robot's end effector with impedances ("force") along all six (x,y,z,ax,ay,az) axes. Unlike `InverseKinematicsController`, this controller is inherently compliant and especially useful for contact-rich tasks or settings where fine-grained forces are required. For robots with >6 arm joints, an additional null command is used as a secondary objective and is defined as joint state `reset_joint_pos`.<br><br>
             Note: Orientation convention is axis-angle `[ax,ay,az]` representation, and commands are expressed in the robot base frame unless otherwise noted.<br><br>
             <ul>
@@ -161,7 +161,7 @@ These are controllers specifically meant for robots with manipulation capabiliti
 <table markdown="span" width="100%">
     <tr>
         <td valign="top" width="100%">
-            [**`MultiFingerGripperController`**](../reference/controllers/multi_finger_gripper_controller.html)<br><br>
+            [**`MultiFingerGripperController`**](../reference/controllers/multi_finger_gripper_controller.md)<br><br>
             Commands a robot's gripper joints, with behavior defined via `mode`. By default, &lt;closed, open&gt; is assumed to correspond to &lt;q_lower_limit, q_upper_limit&gt; for each joint, though this can be manually set via the `closed_qpos` and `open_qpos` arguments.<br><br>
             <ul>
                 <li>_Command Dim_: 1 / n_gripper_joints</li>
