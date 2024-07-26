@@ -1,8 +1,7 @@
 import math
 
 import torch as th
-from scipy.spatial import ConvexHull, distance_matrix
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -172,20 +171,16 @@ def sample_kinematics(
 
         if sampling_success:
             # Move the object from the original parallel bbox to the sampled bbox
-            parallel_bbox_rotation = R.from_quat(parallel_bbox_orn)
-            sample_rotation = R.from_quat(sampled_quaternion)
-            original_rotation = R.from_quat(orientation)
-
             # The additional orientation to be applied should be the delta orientation
             # between the parallel bbox orientation and the sample orientation
-            additional_rotation = sample_rotation * parallel_bbox_rotation.inv()
-            combined_rotation = additional_rotation * original_rotation
-            orientation = th.tensor(combined_rotation.as_quat())
+            additional_quat = T.quat_multiply(sampled_quaternion, T.quat_inverse(parallel_bbox_orn))
+            combined_quat = T.quat_multiply(additional_quat, orientation)
+            orientation = combined_quat
 
             # The delta vector between the base CoM frame and the parallel bbox center needs to be rotated
             # by the same additional orientation
             diff = old_pos - parallel_bbox_center
-            rotated_diff = additional_rotation.apply(diff)
+            rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
         if pos is None:

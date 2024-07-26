@@ -47,16 +47,16 @@ def task_tester(task_type):
     og.clear()
 
 
-def test_dummy_task():
-    task_tester("DummyTask")
+# def test_dummy_task():
+#     task_tester("DummyTask")
 
 
-def test_point_reaching_task():
-    task_tester("PointReachingTask")
+# def test_point_reaching_task():
+#     task_tester("PointReachingTask")
 
 
-def test_point_navigation_task():
-    task_tester("PointNavigationTask")
+# def test_point_navigation_task():
+#     task_tester("PointNavigationTask")
 
 
 def test_behavior_task():

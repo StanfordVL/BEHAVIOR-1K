@@ -331,9 +331,12 @@ class EntityPrim(XFormPrim):
                         _, link_local_orn = link.get_local_pose()
 
                         # Find the joint frame orientation in the parent link frame
-                        joint_local_orn = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
-                            joint.get_attribute("physics:localRot0")
-                        )[[1, 2, 3, 0]]
+                        joint_local_orn = th.tensor(
+                            lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                                joint.get_attribute("physics:localRot0")
+                            )[[1, 2, 3, 0]],
+                            dtype=th.float32,
+                        )
 
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)

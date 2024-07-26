@@ -3,7 +3,7 @@ import os
 import random
 
 import torch as th
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -148,8 +148,7 @@ class GraspTask(BaseTask):
                 raise ValueError("Robot could not settle")
 
             # Check if the robot has toppled
-            rotation = R.from_quat(robot.get_orientation())
-            robot_up = rotation.apply(th.tensor([0, 0, 1]))
+            robot_up = T.quat_apply(robot.get_orientation(), th.tensor([0, 0, 1], dtype=th.float32))
             if robot_up[2] < 0.75:
                 raise ValueError("Robot has toppled over")
 

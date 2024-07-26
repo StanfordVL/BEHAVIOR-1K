@@ -1,7 +1,7 @@
 import math
 
 import torch as th
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
@@ -88,16 +88,18 @@ class GraspReward(BaseRewardFunction):
             info["position_penalty"] = position_penalty
         self.prev_eef_pos = eef_pos
 
-        eef_rot = R.from_quat(robot.get_eef_orientation(robot.default_arm))
+        eef_quat = robot.get_eef_orientation(robot.default_arm)
         info["rotation_penalty_factor"] = 0.0
         info["rotation_penalty"] = 0.0
-        if self.prev_eef_rot is not None:
-            delta_rot = (eef_rot * self.prev_eef_rot.inv()).magnitude()
+        if self.prev_eef_quat is not None:
+            delta_quat = T.quat_multiply(eef_quat, T.quat_inverse(self.prev_eef_quat))
+            delta_axis_angle = T.quat2axisangle(delta_quat)
+            delta_rot = th.norm(delta_axis_angle)
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
-            info["rotation_penalty_factor"] = delta_rot
-            info["rotation_penalty"] = rotation_penalty
-        self.prev_eef_rot = eef_rot
+            info["rotation_penalty_factor"] = delta_rot.item()
+            info["rotation_penalty"] = rotation_penalty.item()
+        self.prev_eef_quat = eef_quat
 
         # Penalize robot for colliding with an object
         info["collision_penalty_factor"] = 0.0

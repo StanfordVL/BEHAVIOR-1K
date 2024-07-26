@@ -6,7 +6,6 @@ from collections import OrderedDict
 from typing import Iterable, List, Tuple
 
 import torch as th
-from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -438,11 +437,11 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         if teleop_action.is_valid["head"]:
             head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])
             des_body_pos = head_pos - th.tensor([0, 0, m.BODY_HEIGHT_OFFSET])
-            des_body_rpy = th.tensor([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
+            des_body_rpy = th.tensor([0, 0, T.quat2euler(head_orn.unsqueeze(0))[2][0]])
             des_body_orn = T.euler2quat(des_body_rpy)
         else:
             des_body_pos, des_body_orn = self.get_position_orientation()
-            des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
+            des_body_rpy = th.stack(T.quat2euler(des_body_orn.unsqueeze(0))).squeeze(1)
         action[self.controller_action_idx["base"]] = th.cat((des_body_pos, des_body_rpy))
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
@@ -476,7 +475,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             des_local_part_pos, des_local_part_orn = T.pose_transform(
                 eef_part.offset_to_body, [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
             )
-            des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
+            des_part_rpy = th.stack(T.quat2euler(des_local_part_orn.unsqueeze(0))).squeeze(1)
             controller_name = "camera" if part_name == "head" else "arm_" + part_name
             action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose

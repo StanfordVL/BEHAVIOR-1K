@@ -349,7 +349,7 @@ class XFormPrim(BasePrim):
         return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
-        return th.tensor(trimesh.transformations.transform_points(points, self.scaled_transform))
+        return th.tensor(trimesh.transformations.transform_points(points, self.scaled_transform), dtype=th.float32)
 
     @property
     def scale(self):
@@ -440,6 +440,8 @@ class XFormPrim(BasePrim):
 
     def _load_state(self, state):
         pos, orn = state["pos"], state["ori"]
+        pos = pos.float() if isinstance(pos, th.Tensor) else th.tensor(pos, dtype=th.float32)
+        orn = orn.float() if isinstance(orn, th.Tensor) else th.tensor(orn, dtype=th.float32)
         if self.scene is not None:
             pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
         self.set_position_orientation(pos, orn)

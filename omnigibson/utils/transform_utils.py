@@ -147,19 +147,26 @@ def unit_vector(data: th.Tensor, dim: Optional[int] = None, out: Optional[th.Ten
 def quat_apply(quat: th.Tensor, vec: th.Tensor) -> th.Tensor:
     """
     Apply a quaternion rotation to a vector (equivalent to R.from_quat(x).apply(y))
-
     Args:
-        quat (th.Tensor): (..., 4) quaternion in (x, y, z, w) format
-        vec (th.Tensor): (..., 3) vector to rotate
-
+        quat (th.Tensor): (4,) or (N, 4) or (N, 1, 4) quaternion in (x, y, z, w) format
+        vec (th.Tensor): (3,) or (M, 3) or (1, M, 3) vector to rotate
     Returns:
-        th.Tensor: (..., 3) rotated vector
-
-    Raises:
-        AssertionError: If input shapes are invalid
+        th.Tensor: (M, 3) or (N, M, 3) rotated vector
     """
     assert quat.shape[-1] == 4, "Quaternion must have 4 components in last dimension"
     assert vec.shape[-1] == 3, "Vector must have 3 components in last dimension"
+
+    # Ensure quat is at least 2D and vec is at least 2D
+    if quat.dim() == 1:
+        quat = quat.unsqueeze(0)
+    if vec.dim() == 1:
+        vec = vec.unsqueeze(0)
+
+    # Ensure quat is (N, 1, 4) and vec is (1, M, 3)
+    if quat.dim() == 2:
+        quat = quat.unsqueeze(1)
+    if vec.dim() == 2:
+        vec = vec.unsqueeze(0)
 
     # Extract quaternion components
     qx, qy, qz, qw = quat.unbind(-1)
@@ -175,7 +182,10 @@ def quat_apply(quat: th.Tensor, vec: th.Tensor) -> th.Tensor:
     )
 
     # Compute the final rotated vector
-    return vec + qw.unsqueeze(-1) * t + th.cross(quat[..., :3], t, dim=-1)
+    result = vec + qw.unsqueeze(-1) * t + th.cross(quat[..., :3], t, dim=-1)
+
+    # Remove any extra dimensions
+    return result.squeeze()
 
 
 @th.jit.script
@@ -288,30 +298,21 @@ def quat_multiply(quaternion1: th.Tensor, quaternion0: th.Tensor) -> th.Tensor:
 
 
 @th.jit.script
-def quat_conjugate(quaternion):
+def quat_conjugate(quaternion: th.Tensor) -> th.Tensor:
     """
     Return conjugate of quaternion.
 
-    E.g.:
-    >>> q0 = random_quaternion()
-    >>> q1 = quat_conjugate(q0)
-    >>> q1[3] == q0[3] and all(q1[:3] == -q0[:3])
-    True
-
     Args:
-        quaternion (th.tensor): (x,y,z,w) quaternion
+        quaternion (th.Tensor): (x,y,z,w) quaternion
 
     Returns:
-        th.tensor: (x,y,z,w) quaternion conjugate
+        th.Tensor: (x,y,z,w) quaternion conjugate
     """
-    return th.tensor(
-        (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
-        dtype=th.float32,
-    )
+    return th.cat([-quaternion[:3], quaternion[3:]])
 
 
 @th.jit.script
-def quat_inverse(quaternion):
+def quat_inverse(quaternion: th.Tensor) -> th.Tensor:
     """
     Return inverse of quaternion.
 
@@ -395,41 +396,6 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
     # Reshape and return values
     return val.reshape(list(quat_shape))
-
-
-@th.jit.script
-def random_quat(rand=None):
-    """
-    Return uniform random unit quaternion.
-
-    E.g.:
-    >>> q = random_quat()
-    >>> th.allclose(1.0, vector_norm(q))
-    True
-    >>> q = random_quat(th.rand(3))
-    >>> q.shape
-    (4,)
-
-    Args:
-        rand (3-array or None): If specified, must be three independent random variables that are uniformly distributed
-            between 0 and 1.
-
-    Returns:
-        th.tensor: (x,y,z,w) random quaternion
-    """
-    if rand is None:
-        rand = th.rand(3)
-    else:
-        assert len(rand) == 3
-    r1 = math.sqrt(1.0 - rand[0])
-    r2 = math.sqrt(rand[0])
-    pi2 = math.pi * 2.0
-    t1 = pi2 * rand[1]
-    t2 = pi2 * rand[2]
-    return th.tensor(
-        (th.sin(t1) * r1, th.cos(t1) * r1, th.sin(t2) * r2, th.cos(t2) * r2),
-        dtype=th.float32,
-    )
 
 
 @th.jit.script
@@ -548,59 +514,67 @@ def mat2quat(rmat: th.Tensor) -> th.Tensor:
     """
     Converts given rotation matrix to quaternion.
     Args:
-        rmat (th.Tensor): (..., 3, 3) rotation matrix
+        rmat (th.Tensor): (3, 3) or (..., 3, 3) rotation matrix
     Returns:
-        th.Tensor: (..., 4) (x,y,z,w) float quaternion angles
+        th.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
     """
-    # Ensure the input is at least 3D
-    original_shape = rmat.shape
-    if rmat.dim() < 3:
+    # Check if input is a single matrix or a batch
+    is_single = rmat.dim() == 2
+    if is_single:
         rmat = rmat.unsqueeze(0)
 
-    # Check if the matrix is close to identity
-    identity = th.eye(3, device=rmat.device).expand_as(rmat)
-    if th.allclose(rmat, identity, atol=1e-6):
-        quat = th.zeros_like(rmat[..., 0])  # Creates a tensor with shape (..., 3)
-        quat = th.cat([quat, th.ones_like(quat[..., :1])], dim=-1)  # Adds the w component
-    else:
-        m00, m01, m02 = rmat[..., 0, 0], rmat[..., 0, 1], rmat[..., 0, 2]
-        m10, m11, m12 = rmat[..., 1, 0], rmat[..., 1, 1], rmat[..., 1, 2]
-        m20, m21, m22 = rmat[..., 2, 0], rmat[..., 2, 1], rmat[..., 2, 2]
+    batch_shape = rmat.shape[:-2]
+    mat_flat = rmat.reshape(-1, 3, 3)
 
-        trace = m00 + m11 + m22
+    m00, m01, m02 = mat_flat[:, 0, 0], mat_flat[:, 0, 1], mat_flat[:, 0, 2]
+    m10, m11, m12 = mat_flat[:, 1, 0], mat_flat[:, 1, 1], mat_flat[:, 1, 2]
+    m20, m21, m22 = mat_flat[:, 2, 0], mat_flat[:, 2, 1], mat_flat[:, 2, 2]
 
-        if trace > 0:
-            s = 2.0 * th.sqrt(trace + 1.0)
-            w = 0.25 * s
-            x = (m21 - m12) / s
-            y = (m02 - m20) / s
-            z = (m10 - m01) / s
-        elif m00 > m11 and m00 > m22:
-            s = 2.0 * th.sqrt(1.0 + m00 - m11 - m22)
-            w = (m21 - m12) / s
-            x = 0.25 * s
-            y = (m01 + m10) / s
-            z = (m02 + m20) / s
-        elif m11 > m22:
-            s = 2.0 * th.sqrt(1.0 + m11 - m00 - m22)
-            w = (m02 - m20) / s
-            x = (m01 + m10) / s
-            y = 0.25 * s
-            z = (m12 + m21) / s
-        else:
-            s = 2.0 * th.sqrt(1.0 + m22 - m00 - m11)
-            w = (m10 - m01) / s
-            x = (m02 + m20) / s
-            y = (m12 + m21) / s
-            z = 0.25 * s
+    trace = m00 + m11 + m22
 
-        quat = th.stack([x, y, z, w], dim=-1)
+    trace_positive = trace > 0
+    cond1 = (m00 > m11) & (m00 > m22) & ~trace_positive
+    cond2 = (m11 > m22) & ~(trace_positive | cond1)
+    cond3 = ~(trace_positive | cond1 | cond2)
+
+    # Trace positive condition
+    sq = th.where(trace_positive, th.sqrt(trace + 1.0) * 2.0, th.zeros_like(trace))
+    qw = th.where(trace_positive, 0.25 * sq, th.zeros_like(trace))
+    qx = th.where(trace_positive, (m21 - m12) / sq, th.zeros_like(trace))
+    qy = th.where(trace_positive, (m02 - m20) / sq, th.zeros_like(trace))
+    qz = th.where(trace_positive, (m10 - m01) / sq, th.zeros_like(trace))
+
+    # Condition 1
+    sq = th.where(cond1, th.sqrt(1.0 + m00 - m11 - m22) * 2.0, sq)
+    qw = th.where(cond1, (m21 - m12) / sq, qw)
+    qx = th.where(cond1, 0.25 * sq, qx)
+    qy = th.where(cond1, (m01 + m10) / sq, qy)
+    qz = th.where(cond1, (m02 + m20) / sq, qz)
+
+    # Condition 2
+    sq = th.where(cond2, th.sqrt(1.0 + m11 - m00 - m22) * 2.0, sq)
+    qw = th.where(cond2, (m02 - m20) / sq, qw)
+    qx = th.where(cond2, (m01 + m10) / sq, qx)
+    qy = th.where(cond2, 0.25 * sq, qy)
+    qz = th.where(cond2, (m12 + m21) / sq, qz)
+
+    # Condition 3
+    sq = th.where(cond3, th.sqrt(1.0 + m22 - m00 - m11) * 2.0, sq)
+    qw = th.where(cond3, (m10 - m01) / sq, qw)
+    qx = th.where(cond3, (m02 + m20) / sq, qx)
+    qy = th.where(cond3, (m12 + m21) / sq, qy)
+    qz = th.where(cond3, 0.25 * sq, qz)
+
+    quat = th.stack([qx, qy, qz, qw], dim=-1)
 
     # Normalize the quaternion
     quat = quat / th.norm(quat, dim=-1, keepdim=True)
 
-    # Remove extra dimensions if they were added
-    if len(original_shape) == 2:
+    # Reshape to match input batch shape
+    quat = quat.reshape(batch_shape + (4,))
+
+    # If input was a single matrix, remove the batch dimension
+    if is_single:
         quat = quat.squeeze(0)
 
     return quat
@@ -692,34 +666,28 @@ def euler2quat(euler: th.Tensor) -> th.Tensor:
 
 @th.jit.script
 def quat2euler(q):
-    """
-    Converts euler angles into quaternion form
+    if q.dim() == 1:
+        q = q.unsqueeze(0)
 
-    Args:
-        quat (th.tensor): (x,y,z,w) float quaternion angles
-
-    Returns:
-        th.tensor: (r,p,y) angles
-
-    Raises:
-        AssertionError: [Invalid input shape]
-    """
     qx, qy, qz, qw = 0, 1, 2, 3
     # roll (x-axis rotation)
     sinr_cosp = 2.0 * (q[:, qw] * q[:, qx] + q[:, qy] * q[:, qz])
     cosr_cosp = q[:, qw] * q[:, qw] - q[:, qx] * q[:, qx] - q[:, qy] * q[:, qy] + q[:, qz] * q[:, qz]
     roll = th.atan2(sinr_cosp, cosr_cosp)
-
     # pitch (y-axis rotation)
     sinp = 2.0 * (q[:, qw] * q[:, qy] - q[:, qz] * q[:, qx])
     pitch = th.where(th.abs(sinp) >= 1, copysign(math.pi / 2.0, sinp), th.asin(sinp))
-
     # yaw (z-axis rotation)
     siny_cosp = 2.0 * (q[:, qw] * q[:, qz] + q[:, qx] * q[:, qy])
     cosy_cosp = q[:, qw] * q[:, qw] + q[:, qx] * q[:, qx] - q[:, qy] * q[:, qy] - q[:, qz] * q[:, qz]
     yaw = th.atan2(siny_cosp, cosy_cosp)
 
-    return roll % (2 * math.pi), pitch % (2 * math.pi), yaw % (2 * math.pi)
+    euler = th.stack([roll, pitch, yaw], dim=-1) % (2 * math.pi)
+
+    if q.shape[0] == 1:
+        euler = euler.squeeze(0)
+
+    return euler
 
 
 @th.jit.script
@@ -764,7 +732,10 @@ def mat2euler(rmat):
     quat = mat2quat(M)
 
     # Convert quaternion to Euler angles
-    roll, pitch, yaw = quat2euler(quat)
+    euler = quat2euler(quat)
+    roll = euler[..., 0]
+    pitch = euler[..., 1]
+    yaw = euler[..., 2]
 
     return th.stack([roll, pitch, yaw], dim=-1)
 
@@ -1231,22 +1202,25 @@ def get_orientation_error(desired, current):
 
 
 @th.jit.script
-def get_orientation_diff_in_radian(orn0, orn1):
+def get_orientation_diff_in_radian(orn0: th.Tensor, orn1: th.Tensor) -> th.Tensor:
     """
-    Returns the difference between two quaternion orientations in radian
+    Returns the difference between two quaternion orientations in radians.
 
     Args:
-        orn0 (th.tensor): (x, y, z, w)
-        orn1 (th.tensor): (x, y, z, w)
+        orn0 (th.Tensor): (x, y, z, w) quaternion
+        orn1 (th.Tensor): (x, y, z, w) quaternion
 
     Returns:
-        orn_diff (float): orientation difference in radian
+        orn_diff (th.Tensor): orientation difference in radians
     """
-    vec0 = quat2axisangle(orn0)
-    vec0 /= th.norm(vec0)
-    vec1 = quat2axisangle(orn1)
-    vec1 /= th.norm(vec1)
-    return th.arccos(th.dot(vec0, vec1))
+    # Compute the difference quaternion
+    diff_quat = quat_multiply(quat_inverse(orn0), orn1)
+
+    # Convert to axis-angle representation
+    axis_angle = quat2axisangle(diff_quat)
+
+    # The magnitude of the axis-angle vector is the rotation angle
+    return th.norm(axis_angle)
 
 
 @th.jit.script
@@ -1319,13 +1293,11 @@ def vecs2axisangle(vec0, vec1):
 def vecs2quat(vec0: th.Tensor, vec1: th.Tensor, normalized: bool = False) -> th.Tensor:
     """
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into a quaternion representation of the angle
-
     Args:
         vec0 (th.Tensor): (..., 3) (x,y,z) 3D vector, possibly unnormalized
         vec1 (th.Tensor): (..., 3) (x,y,z) 3D vector, possibly unnormalized
         normalized (bool): If True, @vec0 and @vec1 are assumed to already be normalized and we will skip the
             normalization step (more efficient)
-
     Returns:
         th.Tensor: (..., 4) Normalized quaternion representing the rotation from vec0 to vec1
     """
@@ -1336,18 +1308,52 @@ def vecs2quat(vec0: th.Tensor, vec1: th.Tensor, normalized: bool = False) -> th.
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = th.sum(vec0 * vec1, dim=-1, keepdim=True)
+
+    # Create a tensor for the case where cos_theta == -1
+    batch_shape = vec0.shape[:-1]
+    fallback = th.zeros(batch_shape + (4,), device=vec0.device, dtype=vec0.dtype)
+    fallback[..., 0] = 1.0
+
+    # Compute the quaternion
     quat_unnormalized = th.where(
         cos_theta == -1,
-        th.tensor([1.0, 0.0, 0.0, 0.0], device=vec0.device, dtype=vec0.dtype).expand_as(vec0),
+        fallback,
         th.cat([th.linalg.cross(vec0, vec1), 1 + cos_theta], dim=-1),
     )
+
     return quat_unnormalized / th.norm(quat_unnormalized, dim=-1, keepdim=True)
 
 
 @th.jit.script
-def l2_distance(v1, v2):
+def align_vector_sets(vec_set1: th.Tensor, vec_set2: th.Tensor) -> th.Tensor:
+    """
+    Computes a single quaternion representing the rotation that best aligns vec_set1 to vec_set2.
+
+    Args:
+        vec_set1 (th.Tensor): (N, 3) tensor of N 3D vectors
+        vec_set2 (th.Tensor): (N, 3) tensor of N 3D vectors
+
+    Returns:
+        th.Tensor: (4,) Normalized quaternion representing the overall rotation
+    """
+    # Compute average directions
+    avg_dir1 = th.sum(vec_set1, dim=0)
+    avg_dir2 = th.sum(vec_set2, dim=0)
+
+    # Normalize average directions
+    avg_dir1 = avg_dir1 / th.norm(avg_dir1)
+    avg_dir2 = avg_dir2 / th.norm(avg_dir2)
+
+    # Compute quaternion using vecs2quat
+    rotation = vecs2quat(avg_dir1.unsqueeze(0), avg_dir2.unsqueeze(0), normalized=True)
+
+    return rotation.squeeze(0)
+
+
+@th.jit.script
+def l2_distance(v1: th.Tensor, v2: th.Tensor) -> th.Tensor:
     """Returns the L2 distance between vector v1 and v2."""
-    return th.norm(th.tensor(v1) - th.tensor(v2))
+    return th.norm(v1 - v2)
 
 
 @th.jit.script
@@ -1455,7 +1461,7 @@ def z_rotation_from_quat(quat):
         quat = quat.unsqueeze(0)
 
     # Get the yaw angle from the quaternion
-    _, _, yaw = quat2euler(quat)
+    yaw = quat2euler(quat)[:, 2]
 
     # Create a new quaternion representing rotation around Z axis
     z_quat = th.zeros_like(quat)
@@ -1506,3 +1512,36 @@ def calculate_xy_plane_angle(quaternion: th.Tensor) -> th.Tensor:
     angle = th.where(norm < 1e-4, th.zeros_like(norm), th.arctan2(fwd_xy[..., 1], fwd_xy[..., 0]))
 
     return angle.squeeze(-1)
+
+
+@th.jit.script
+def random_quaternion(num_quaternions: int = 1):
+    """
+    Generate random rotation quaternions, uniformly distributed over SO(3).
+
+    Arguments:
+        num_quaternions: int, number of quaternions to generate
+
+    Returns:
+        th.Tensor of shape (num_quaternions, 4) containing random unit quaternions
+    """
+    # Generate three random numbers
+    x0 = th.rand(num_quaternions, 1)
+    x1 = th.rand(num_quaternions, 1)
+    x2 = th.rand(num_quaternions, 1)
+
+    # Calculate random rotation
+    theta1 = 2 * th.pi * x0
+    theta2 = 2 * th.pi * x1
+    r1 = th.sqrt(1 - x2)
+    r2 = th.sqrt(x2)
+
+    qw = r2 * th.cos(theta2)
+    qx = r1 * th.sin(theta1)
+    qy = r1 * th.cos(theta1)
+    qz = r2 * th.sin(theta2)
+
+    # Combine into quaternions
+    quaternions = th.cat([qw, qx, qy, qz], dim=1)
+
+    return quaternions

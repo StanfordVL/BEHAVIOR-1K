@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import torch as th
 import trimesh
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -281,7 +281,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Update the tensors
         n_particles = len(positions)
-        orientations = th.tensor(R.random(num=n_particles).as_quat()) if orientations is None else orientations
+        orientations = T.random_quaternion(n_particles) if orientations is None else orientations
         scales = self.sample_scales(n=n_particles) if scales is None else scales
 
         positions = th.cat([current_positions, positions], dim=0)
@@ -598,7 +598,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         obj = self._group_objects[group]
 
         # Sample scales and corresponding bbox extents
-        scales = self.sample_scales_by_group(group=group, n=max_samples)
+        scales = self.sample_scales_by_group(group=group, n=max_samples).float()
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
         avg_scale = th.pow(th.prod(obj.scale), 1 / 3)

@@ -17,7 +17,6 @@ import gymnasium as gym
 import torch as th
 from aenum import IntEnum, auto
 from matplotlib import pyplot as plt
-from scipy.spatial.transform import Rotation, Slerp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1138,7 +1137,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             delta_pos = target_pos - current_pos
             target_pos_diff = th.norm(delta_pos)
-            target_orn_diff = (Rotation.from_quat(target_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
+            target_orn_diff = T.get_orientation_diff_in_radian(current_orn, target_orn)
             reached_goal = target_pos_diff < pos_thresh and target_orn_diff < ori_thresh
             if reached_goal:
                 return
@@ -1149,9 +1148,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # if i > 0 and stop_if_stuck and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
             if i > 0 and stop_if_stuck:
                 pos_diff = th.norm(prev_pos - current_pos)
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
+                orn_diff = T.get_orientation_diff_in_radian(current_orn, prev_orn)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
                     raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand is stuck")
 
@@ -1190,10 +1187,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
-        combined_rotation = Rotation.from_quat(th.tensor([start_orn, target_pose[1]]))
-        slerp = Slerp([0, 1], combined_rotation)
-        orn_waypoints = slerp(th.linspace(0, 1, num_poses))
-        quat_waypoints = [x.as_quat() for x in orn_waypoints]
+        t_values = th.linspace(0, 1, num_poses)
+        quat_waypoints = [T.quat_slerp(start_orn, target_pose[1], t) for t in t_values]
 
         controller_config = self.robot._controller_config["arm_" + self.arm]
         if controller_config["name"] == "InverseKinematicsController":
@@ -1220,7 +1215,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
                 pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
-                orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
+                orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn).item()
                 if pos_diff < 0.005 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
 
@@ -1265,7 +1260,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
                 pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
-                orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
+                orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn)
                 if pos_diff < 0.001 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
 

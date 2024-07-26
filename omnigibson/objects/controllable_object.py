@@ -324,7 +324,7 @@ class ControllableObject(BaseObject):
             high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(
-            shape=(self.action_dim,), low=np.array(th.cat(low)), high=np.array(th.cat(high)), dtype=float
+            shape=(self.action_dim,), low=np.array(th.cat(low)), high=np.array(th.cat(high)), dtype=np.float32
         )
 
     def apply_action(self, action):
@@ -341,7 +341,7 @@ class ControllableObject(BaseObject):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = th.tensor(self.discrete_action_list[action])
+            action = th.tensor(self.discrete_action_list[action], dtype=th.float32)
 
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(

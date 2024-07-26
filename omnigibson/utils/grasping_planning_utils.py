@@ -2,8 +2,6 @@ import math
 import random
 
 import torch as th
-from scipy.spatial.transform import Rotation as R
-from scipy.spatial.transform import Slerp
 
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
@@ -90,7 +88,7 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     grasp_z = th.linalg.cross(grasp_x, grasp_y)
     grasp_z /= th.norm(grasp_z)
     grasp_mat = th.tensor([grasp_x, grasp_y, grasp_z]).T
-    grasp_quat = R.from_matrix(grasp_mat).as_quat()
+    grasp_quat = T.mat2quat(grasp_mat)
 
     grasp_pose = (grasp_center_pos, grasp_quat)
     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
@@ -184,7 +182,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     joint_orientation = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
-    push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
+    push_axis = T.quat_apply(joint_orientation, th.tensor([1, 0, 0], dtype=th.float32))
     assert math.isclose(th.max(th.abs(push_axis)).values.item(), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = th.argmax(th.abs(push_axis))
     canonical_push_axis = th.eye(3)[push_axis_idx]
@@ -250,8 +248,8 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     )
 
     # Compute the approach direction.
-    approach_direction_in_world_frame = R.from_quat(bbox_quat_in_world).apply(
-        canonical_push_axis * -push_axis_closer_side_sign
+    approach_direction_in_world_frame = T.quat_apply(
+        bbox_quat_in_world, canonical_push_axis * -push_axis_closer_side_sign
     )
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
@@ -303,9 +301,8 @@ def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     pos_waypoints = th.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
-    combined_rotation = R.from_quat(th.tensor([start_orn, end_pose[1]]))
-    slerp = Slerp([0, 1], combined_rotation)
-    orn_waypoints = slerp(th.linspace(0, 1, num_waypoints))
+    fracs = th.linspace(0, 1, num_waypoints)
+    orn_waypoints = T.quat_slerp(start_orn.unsqueeze(0), end_pose[1].unsqueeze(0), fracs.unsqueeze(1))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
     return [waypoint for waypoint in zip(pos_waypoints, quat_waypoints)]
 
@@ -348,7 +345,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     joint_orientation = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
         relevant_joint.get_attribute("physics:localRot0")
     )[[1, 2, 3, 0]]
-    joint_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
+    joint_axis = T.quat_apply(joint_orientation, th.tensor([1, 0, 0], dtype=th.float32))
     joint_axis /= th.norm(joint_axis)
     origin_towards_bbox = th.tensor(bbox_wrt_origin[0])
     open_direction = th.linalg.cross(joint_axis, origin_towards_bbox)
@@ -441,8 +438,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         targets.append(rotated_grasp_pose_in_world_frame)
 
     # Compute the approach direction.
-    approach_direction_in_world_frame = R.from_quat(bbox_quat_in_world).apply(
-        canonical_open_direction * -open_axis_closer_side_sign
+    approach_direction_in_world_frame = T.quat_apply(
+        bbox_quat_in_world, canonical_open_direction * -open_axis_closer_side_sign
     )
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
@@ -477,7 +474,7 @@ def _get_orientation_facing_vector_with_random_yaw(vector):
     up = th.linalg.cross(forward, side)
     # assert th.isclose(th.norm(up), 1, atol=1e-3)
     rotmat = th.tensor([forward, side, up]).T
-    return R.from_matrix(rotmat).as_quat()
+    return T.mat2quat(rotmat)
 
 
 def _rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_origin, joint_axis, yaw_change):
@@ -495,7 +492,7 @@ def _rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_ori
     Returns:
         tuple: The rotated point in the arbitrary frame.
     """
-    rotation = R.from_rotvec(joint_axis * yaw_change).as_quat()
+    rotation = T.euler2quat(joint_axis * yaw_change)
     origin_wrt_arbitrary_frame = T.invert_pose_transform(*arbitrary_frame_wrt_origin)
 
     pose_in_origin_frame = T.pose_transform(*arbitrary_frame_wrt_origin, *point_wrt_arbitrary_frame)

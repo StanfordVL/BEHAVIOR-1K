@@ -40,7 +40,7 @@ def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
 
 def test_multi_scene_dump_and_load():
     vec_env = setup_multi_environment(3)
-    robot_displacement = [1.0, 0.0, 0.0]
+    robot_displacement = th.tensor([1.0, 0.0, 0.0], dtype=th.float32)
     scene_three_robot = vec_env.envs[2].scene.robots[0]
     robot_new_pos = scene_three_robot.get_position() + robot_displacement
     scene_three_robot.set_position(robot_new_pos)
@@ -72,7 +72,7 @@ def test_multi_scene_scene_prim():
     vec_env = setup_multi_environment(1)
     original_robot_pos = vec_env.envs[0].scene.robots[0].get_position()
     scene_state = vec_env.envs[0].scene._dump_state()
-    scene_prim_displacement = [10.0, 0.0, 0.0]
+    scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
     original_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position()
     vec_env.envs[0].scene._scene_prim.set_position(original_scene_prim_pos + scene_prim_displacement)
     vec_env.envs[0].scene._load_state(scene_state)

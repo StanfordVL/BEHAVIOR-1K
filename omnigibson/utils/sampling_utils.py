@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 import numpy as np
 import torch as th
 import trimesh
-from scipy.spatial.transform import Rotation as R
+
 from scipy.stats import truncnorm
 
 import omnigibson as og
@@ -982,20 +982,12 @@ def sample_cuboid_on_object(
                 if rotation is None:
                     continue
 
-                corner_positions = cuboid_centroid[None, :] + (
-                    rotation.apply(
-                        0.5
-                        * this_cuboid_dimensions
-                        * th.tensor(
-                            [
-                                [1, 1, -1],
-                                [-1, 1, -1],
-                                [-1, -1, -1],
-                                [1, -1, -1],
-                            ]
-                        )
-                    )
-                )
+                corner_vectors = (
+                    0.5
+                    * this_cuboid_dimensions
+                    * th.tensor([[1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]], dtype=th.float32)
+                ).float()
+                corner_positions = cuboid_centroid.unsqueeze(0) + T.quat_apply(rotation, corner_vectors)
 
                 # Now we use the cuboid's diagonals to check that the cuboid is actually empty
                 if verify_cuboid_empty and not check_cuboid_empty(
@@ -1015,10 +1007,10 @@ def sample_cuboid_on_object(
                     padding = cuboid_bottom_padding * center_hit_normal
                     cuboid_centroid += padding
                 plane_normal = th.zeros(3)
-                rotation = R.from_quat([0, 0, 0, 1])
+                rotation = th.tensor([0, 0, 0, 1], dtype=th.float32)
 
             # We've found a nice attachment point. Continue onto next point to sample.
-            results[i] = (cuboid_centroid, plane_normal, rotation.as_quat(), hit_link, refusal_reasons)
+            results[i] = (cuboid_centroid, plane_normal, rotation, hit_link, refusal_reasons)
             break
 
     if m.DEBUG_SAMPLING:
@@ -1066,7 +1058,7 @@ def compute_rotation_from_grid_sample(
     projected_hits = projected_hits[hits]
     sampled_grid_relative_vectors = projected_hits - cuboid_centroid
 
-    rotation, _ = R.align_vectors(sampled_grid_relative_vectors, grid_in_object_coordinates)
+    rotation = T.align_vector_sets(sampled_grid_relative_vectors, grid_in_object_coordinates)
 
     return rotation
 

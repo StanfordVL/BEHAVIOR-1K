@@ -2,7 +2,7 @@ import math
 
 import pytest
 import torch as th
-from scipy.spatial.transform import Rotation as R
+
 from utils import (
     get_random_pose,
     og_test,

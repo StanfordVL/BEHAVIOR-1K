@@ -4,7 +4,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 import torch as th
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros

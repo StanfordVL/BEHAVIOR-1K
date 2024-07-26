@@ -5,7 +5,6 @@ from functools import cached_property
 
 import torch as th
 import trimesh
-from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -373,14 +372,15 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             rotated_X_axis = base_frame_to_world[:3, 0]
             rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
             xy_aligned_base_com_to_world = th.tensor(
-                trimesh.transformations.compose_matrix(translate=translate, angles=[0, 0, rotation_around_Z_axis])
+                trimesh.transformations.compose_matrix(translate=translate, angles=[0, 0, rotation_around_Z_axis]),
+                dtype=th.float32,
             )
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
         else:
             # Default desired frame is base CoM frame.
-            desired_frame_to_world = th.tensor(base_frame_to_world)
+            desired_frame_to_world = th.tensor(base_frame_to_world, dtype=th.float32)
 
         # Compute the world-to-base frame transform.
         world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse
@@ -406,7 +406,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     points_in_world.extend(hull_points.tolist())
 
         # Move the points to the desired frame
-        points = th.tensor(trimesh.transformations.transform_points(points_in_world, world_to_desired_frame))
+        points = th.tensor(
+            trimesh.transformations.transform_points(points_in_world, world_to_desired_frame), dtype=th.float32
+        )
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
@@ -416,10 +418,13 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
 
         # Transform the center to the world frame.
-        bbox_center_in_world = trimesh.transformations.transform_points(
-            [bbox_center_in_desired_frame.tolist()], desired_frame_to_world
-        )[0]
-        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
+        bbox_center_in_world = th.tensor(
+            trimesh.transformations.transform_points([bbox_center_in_desired_frame.tolist()], desired_frame_to_world)[
+                0
+            ],
+            dtype=th.float32,
+        )
+        bbox_orn_in_world = T.mat2quat(desired_frame_to_world[:3, :3])
 
         return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 

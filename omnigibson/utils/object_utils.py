@@ -3,7 +3,7 @@ Helper utility functions for computing relevant object information
 """
 
 import torch as th
-from scipy.spatial.transform import Rotation as R
+
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -30,7 +30,7 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     radius = th.norm(aabb_extent) / 2.0
     drop_pos = th.tensor([0, 0, radius + drop_aabb_offset])
     center_offset = obj.get_position() - obj.aabb_center
-    drop_orientations = R.random(n_samples).as_quat()
+    drop_orientations = T.random_quaternion(n_samples)
     stable_orientations = th.zeros_like(drop_orientations)
     for i, drop_orientation in enumerate(drop_orientations):
         # Sample orientation, drop, wait to stabilize, then record
