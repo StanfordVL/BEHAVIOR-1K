@@ -399,18 +399,14 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
 
 @th.jit.script
-def random_axis_angle(angle_limit=None, random_state=None):
+def random_axis_angle(angle_limit=None):
     """
     Samples an axis-angle rotation by first sampling a random axis
     and then sampling an angle. If @angle_limit is provided, the size
     of the rotation angle is constrained.
 
-    If @random_state is provided (instance of th.Generator), it
-    will be used to generate random numbers.
-
     Args:
         angle_limit (None or float): If set, determines magnitude limit of angles to generate
-        random_state (None or th.Generator): RNG to use if specified
 
     Raises:
         AssertionError: [Invalid RNG]
@@ -418,18 +414,12 @@ def random_axis_angle(angle_limit=None, random_state=None):
     if angle_limit is None:
         angle_limit = 2.0 * math.pi
 
-    if random_state is not None:
-        assert isinstance(random_state, th.Generator)
-        generator = random_state
-    else:
-        generator = None
-
     # sample random axis using a normalized sample from spherical Gaussian.
     # see (http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/)
     # for why it works.
-    random_axis = th.randn(3, generator=generator)
+    random_axis = th.randn(3)
     random_axis /= th.norm(random_axis)
-    random_angle = th.rand(1, generator=generator) * angle_limit
+    random_angle = th.rand(1) * angle_limit
     return random_axis, random_angle.item()
 
 
