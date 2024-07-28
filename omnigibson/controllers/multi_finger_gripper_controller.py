@@ -176,11 +176,8 @@ class MultiFingerGripperController(GripperController):
                     else self._closed_qpos
                 )
         else:
-            # Use continuous signal
-            if len(target) == 1:
-                u = np.full(self.control_dim, target[0])
-            else:
-                u = target
+            # Use continuous signal. Make sure to go from command to control dim.
+            u = np.full(self.control_dim, target[0]) if len(target) == 1 else target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
