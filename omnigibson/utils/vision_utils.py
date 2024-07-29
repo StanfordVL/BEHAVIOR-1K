@@ -138,12 +138,11 @@ class Remapper:
 
         return remapped_img, remapped_labels
 
-    def remap_bbox(self, semantic_id, scene):
+    def remap_bbox(self, semantic_id):
         """
         Remaps a semantic id to a new id using the key_array.
         Args:
             semantic_id (int): The semantic id to remap.
-            scene: The scene we are remapping for.
         Returns:
             int: The remapped id.
         """

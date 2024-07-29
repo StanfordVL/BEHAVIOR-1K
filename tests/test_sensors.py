@@ -1,14 +1,14 @@
 import numpy as np
-import pytest
 from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.constants import semantic_class_id_to_name
 from omnigibson.sensors import VisionSensor
 
 
 @og_test
-def test_seg(env):
+def test_segmentation_modalities(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")
     robot = env.scene.robots[0]
@@ -91,6 +91,40 @@ def test_seg(env):
     }
     # Temporarily disable this test because og_assets are outdated on CI machines
     # assert set(seg_instance_id_info.values()) == set(expected_dict.values())
+
+
+@og_test
+def test_bbox_modalities(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
+    robot = env.scene.robots[0]
+    place_obj_on_floor_plane(breakfast_table)
+    dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
+    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
+    robot.reset()
+
+    og.sim.step()
+    for _ in range(3):
+        og.sim.render()
+
+    sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
+    assert len(sensors) > 0
+    vision_sensor = sensors[0]
+    all_observation, all_info = vision_sensor.get_obs()
+
+    bbox_2d_tight = all_observation["bbox_2d_tight"]
+    bbox_2d_loose = all_observation["bbox_2d_loose"]
+    bbox_3d = all_observation["bbox_3d"]
+
+    assert bbox_2d_tight.shape[0] == 4
+    assert bbox_2d_loose.shape[0] == 4
+    assert bbox_3d.shape[0] == 3
+
+    bbox_2d_objs = set("floor")
+
+    for id in bbox_2d_tight:
+        # TODO
+        pass
 
 
 def test_clear_sim():
