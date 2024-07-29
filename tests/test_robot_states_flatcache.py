@@ -2,6 +2,7 @@ import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.robots import *
 from omnigibson.macros import gm
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
@@ -114,3 +115,86 @@ def camera_pose_test(flatcache):
 
 def test_camera_pose_flatcache_on():
     camera_pose_test(True)
+
+
+def test_robot_load_drive():
+    if og.sim is None:
+        # Set global flags
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
+        gm.ENABLE_TRANSITION_RULES = False
+    else:
+        # Make sure sim is stopped
+        og.sim.stop()
+
+    config = {
+        "scene": {
+            "type": "Scene",
+        },
+    }
+
+    env = og.Environment(configs=config)
+
+    # Iterate over all robots and test their motion
+    for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+        robot = robot_cls(
+            name=robot_name,
+            obs_modalities=[],
+        )
+        env.scene.add_object(robot)
+
+        # At least one step is always needed while sim is playing for any imported object to be fully initialized
+        og.sim.play()
+        og.sim.step()
+
+        # Reset robot and make sure it's not moving
+        robot.reset()
+        robot.keep_still()
+
+        # Set viewer in front facing robot
+        og.sim.viewer_camera.set_position_orientation(
+            position=np.array([2.69918369, -3.63686664, 4.57894564]),
+            orientation=np.array([0.39592411, 0.1348514, 0.29286304, 0.85982]),
+        )
+
+        # If this is a locomotion robot, we want to test driving
+        if isinstance(robot, LocomotionRobot):
+            initial_base_pos = robot.get_position()
+            robot.move_forward(0.1)
+            assert np.isclose(robot.get_position()[0], initial_base_pos[0] + 0.1, atol=1e-3)
+
+        # If this is a manipulation robot, we want to test moving the arm
+        if isinstance(robot, ManipulationRobot):
+            arm_key = list(robot.arm_action_idx.keys())[0]
+            arm_action_idx = robot.arm_action_idx[arm_key]
+            all_action = np.zeros(robot.action_dim)
+            all_action[arm_action_idx] = np.random.uniform(-1, 1, len(arm_action_idx))
+            initial_eef_pos = robot.get_eef_position(arm=arm_key)
+            for _ in range(10):
+                env.step(all_action)
+            assert not np.allclose(robot.get_eef_position(arm=arm_key), initial_eef_pos, atol=1e-5)
+
+        # If this is an active camera robot, we want to test moving the camera
+        if isinstance(robot, ActiveCameraRobot):
+            # Create action array with random camera control
+            all_action = np.zeros(robot.action_dim)
+            all_action[robot.camera_control_idx] = np.random.uniform(-1, 1, len(robot.camera_control_idx))
+            initial_camera_pos = [
+                joint.get_state()[0]
+                for joint_name, joint in robot.joints.items()
+                if joint_name in robot.camera_joint_names
+            ]
+            for _ in range(10):
+                env.step(all_action)
+            for (joint_name, joint), initial_pos in zip(robot.joints.items(), initial_camera_pos):
+                if joint_name in robot.camera_joint_names:
+                    current_pos = joint.get_state()[0]
+                    assert not np.isclose(
+                        current_pos, initial_pos, atol=1e-5
+                    ), f"Camera joint {joint_name} did not move as expected"
+
+        # Stop the simulator and remove the robot
+        og.sim.stop()
+        og.sim.remove_object(obj=robot)
+
+    env.close()

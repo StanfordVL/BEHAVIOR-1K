@@ -1,8 +1,7 @@
 from abc import abstractmethod
 
 import numpy as np
-from transforms3d.euler import euler2quat
-from transforms3d.quaternions import qmult, quat2mat
+from omnigibson.utils.transform_utils import euler2quat, quat2mat, quat_multiply
 
 from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
@@ -171,7 +170,7 @@ class LocomotionRobot(BaseRobot):
             delta (float): delta angle to rotate the base left
         """
         quat = self.get_orientation()
-        quat = qmult((euler2quat(-delta, 0, 0)), quat)
+        quat = quat_multiply((euler2quat(-delta, 0, 0)), quat)
         self.set_orientation(quat)
 
     def turn_right(self, delta=0.03):
@@ -182,7 +181,7 @@ class LocomotionRobot(BaseRobot):
             delta (float): angle to rotate the base right
         """
         quat = self.get_orientation()
-        quat = qmult((euler2quat(delta, 0, 0)), quat)
+        quat = quat_multiply((euler2quat(delta, 0, 0)), quat)
         self.set_orientation(quat)
 
     @property
