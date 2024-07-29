@@ -280,6 +280,9 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Compute control, then clip and return
         control = self.compute_control(goal_dict=self._goal, control_dict=control_dict)
+        assert (
+            len(control) == self.control_dim
+        ), f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
         self._control = self.clip_control(control=control)
         return self._control
 
