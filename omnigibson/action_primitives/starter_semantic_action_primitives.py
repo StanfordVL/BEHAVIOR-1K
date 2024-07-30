@@ -34,6 +34,8 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import BaseRobot, Fetch, Tiago
+from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.control_utils import FKSolver, IKSolver
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
@@ -113,6 +115,9 @@ class PlanningContext(object):
         self.robot_copy = robot_copy
         self.robot_copy_type = robot_copy_type if robot_copy_type in robot_copy.prims.keys() else "original"
         self.disabled_collision_pairs_dict = {}
+
+        # For now, the planning context only works with Fetch and Tiago
+        assert isinstance(self.robot, (Fetch, Tiago)), "PlanningContext only works with Fetch and Tiago."
 
     def __enter__(self):
         self._assemble_robot_copy()
@@ -285,23 +290,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
         # Validate the robot
-        assert isinstance(
-            self.robot, (Fetch, Tiago)
-        ), "StarterSemanticActionPrimitives only works with Fetch and Tiago."
-        assert isinstance(
-            self.robot.controllers["base"], (JointController, DifferentialDriveController)
-        ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
-        self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
-        if self._base_controller_is_joint:
-            assert not self.robot.controllers[
-                "base"
-            ].use_delta_commands, (
-                "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
-            )
+        if isinstance(self.robot, LocomotionRobot):
+            assert isinstance(
+                self.robot.controllers["base"], (JointController, DifferentialDriveController)
+            ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
+            if self._base_controller_is_joint:
+                assert not self.robot.controllers[
+                    "base"
+                ].use_delta_commands, (
+                    "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
+                )
 
-        self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
-        self.robot_base_mass = self.robot._links["base_link"].mass
         self.add_context = add_context
 
         self._task_relevant_objects_only = task_relevant_objects_only
@@ -311,6 +311,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._tracking_object = None
 
         self.robot_copy = self._load_robot_copy()
+
+    @property
+    def arm(self):
+        if not isinstance(self.robot, ManipulationRobot):
+            raise ValueError("Cannot use arm for non-manipulation robot")
+        return self.robot.default_arm
+
+    @property
+    def _base_controller_is_joint(self):
+        return isinstance(self.robot.controllers["base"], JointController)
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking and adding context if necessary."""
@@ -1413,6 +1423,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to do nothing
         """
         action = np.zeros(self.robot.action_dim)
+        # TODO: Replace with the new no-op action interface.
         for name, controller in self.robot._controllers.items():
             joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]
@@ -1465,10 +1476,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return np.array([0.28493954, 0.37450749, 1.1512334]), np.array(
                 [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
             )
-        else:
+        elif self.robot_model == "Fetch":
             return np.array([0.48688125, -0.12507881, 0.97888719]), np.array(
                 [0.61324748, 0.61305553, -0.35266518, 0.35173529]
             )
+        else:
+            raise ValueError(f"Unsupported robot model: {self.robot_model}")
 
     def _get_reset_joint_pos(self):
         reset_pose_fetch = np.array(
@@ -1521,7 +1534,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 4.50000000e-02,
             ]
         )
-        return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
+        if self.robot_model == "Fetch":
+            return reset_pose_fetch
+        elif self.robot_model == "Tiago":
+            return reset_pose_tiago
+        else:
+            raise ValueError(f"Unsupported robot model: {self.robot_model}")
 
     def _navigate_to_pose(self, pose_2d):
         """
