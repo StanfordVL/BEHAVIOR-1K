@@ -138,23 +138,6 @@ class Remapper:
 
         return remapped_img, remapped_labels
 
-    def remap_bbox(self, semantic_id):
-        """
-        Remaps a semantic id to a new id using the key_array.
-        Args:
-            semantic_id (int): The semantic id to remap.
-        Returns:
-            int: The remapped id.
-        """
-        if semantic_id >= len(self.key_array):
-            if semantic_id not in self.warning_printed:
-                og.log.warning(
-                    f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled."
-                )
-                self.warning_printed.add(semantic_id)
-            return semantic_class_name_to_id()["unlabelled"]
-        return self.key_array[semantic_id]
-
 
 def randomize_colors(N, bright=True):
     """

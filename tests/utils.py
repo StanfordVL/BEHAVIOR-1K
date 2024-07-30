@@ -170,7 +170,7 @@ def assert_test_env():
             "robots": [
                 {
                     "type": "Fetch",
-                    "obs_modalities": "all",
+                    "obs_modalities": [],
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
                 }

@@ -17,6 +17,10 @@ def test_segmentation_modalities(env):
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
     robot.reset()
 
+    modalities_required = ["seg_semantic", "seg_instance", "seg_instance_id"]
+    for modality in modalities_required:
+        robot.add_obs_modality(modality)
+
     systems = [env.scene.get_system(system_name) for system_name in SYSTEM_EXAMPLES.keys()]
     for i, system in enumerate(systems):
         # Sample two particles for each system
@@ -103,6 +107,10 @@ def test_bbox_modalities(env):
     robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
     robot.reset()
 
+    modalities_required = ["bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
+    for modality in modalities_required:
+        robot.add_obs_modality(modality)
+
     og.sim.step()
     for _ in range(3):
         og.sim.render()
@@ -120,12 +128,11 @@ def test_bbox_modalities(env):
     assert bbox_2d_loose.shape[0] == 4
     assert bbox_3d.shape[0] == 3
 
-    bbox_2d_objs = set("floor")
+    bbox_2d_expected_objs = set(["floors", "agent", "breakfast_table", "dishtowel"])
+    bbox_3d_expected_objs = set(["agent", "breakfast_table", "dishtowel"])
 
-    for id in bbox_2d_tight:
-        # TODO
-        pass
+    bbox_2d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_2d_tight])
+    bbox_3d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_3d])
 
-
-def test_clear_sim():
-    og.clear()
+    assert bbox_2d_objs == bbox_2d_expected_objs
+    assert bbox_3d_objs == bbox_3d_expected_objs
