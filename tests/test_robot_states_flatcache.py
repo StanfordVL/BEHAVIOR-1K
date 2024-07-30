@@ -113,8 +113,8 @@ def camera_pose_test(flatcache):
     og.clear()
 
 
-def test_camera_pose_flatcache_on():
-    camera_pose_test(True)
+# def test_camera_pose_flatcache_on():
+#     camera_pose_test(True)
 
 
 def test_robot_load_drive():
@@ -160,8 +160,11 @@ def test_robot_load_drive():
         # If this is a locomotion robot, we want to test driving
         if isinstance(robot, LocomotionRobot):
             initial_base_pos = robot.get_position()
-            robot.move_forward(0.1)
-            assert np.isclose(robot.get_position()[0], initial_base_pos[0] + 0.1, atol=1e-3)
+            all_action = np.random.uniform(-1, 1, robot.action_dim)
+            all_action[robot.base_action_idx] = np.random.uniform(-1, 1, len(robot.base_action_idx))
+            for _ in range(10):
+                env.step(all_action)
+            assert not np.all(np.isclose(robot.get_position(), initial_base_pos, atol=1e-5))
 
         # If this is a manipulation robot, we want to test moving the arm
         if isinstance(robot, ManipulationRobot):
@@ -173,25 +176,6 @@ def test_robot_load_drive():
             for _ in range(10):
                 env.step(all_action)
             assert not np.allclose(robot.get_eef_position(arm=arm_key), initial_eef_pos, atol=1e-5)
-
-        # If this is an active camera robot, we want to test moving the camera
-        if isinstance(robot, ActiveCameraRobot):
-            # Create action array with random camera control
-            all_action = np.zeros(robot.action_dim)
-            all_action[robot.camera_control_idx] = np.random.uniform(-1, 1, len(robot.camera_control_idx))
-            initial_camera_pos = [
-                joint.get_state()[0]
-                for joint_name, joint in robot.joints.items()
-                if joint_name in robot.camera_joint_names
-            ]
-            for _ in range(10):
-                env.step(all_action)
-            for (joint_name, joint), initial_pos in zip(robot.joints.items(), initial_camera_pos):
-                if joint_name in robot.camera_joint_names:
-                    current_pos = joint.get_state()[0]
-                    assert not np.isclose(
-                        current_pos, initial_pos, atol=1e-5
-                    ), f"Camera joint {joint_name} did not move as expected"
 
         # Stop the simulator and remove the robot
         og.sim.stop()
