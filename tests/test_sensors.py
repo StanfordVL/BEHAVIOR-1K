@@ -3,8 +3,8 @@ from utils import SYSTEM_EXAMPLES, og_test, place_obj_on_floor_plane
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.constants import semantic_class_id_to_name
 from omnigibson.sensors import VisionSensor
+from omnigibson.utils.constants import semantic_class_id_to_name
 
 
 @og_test
