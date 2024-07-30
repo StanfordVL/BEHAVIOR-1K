@@ -2,8 +2,8 @@ import numpy as np
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.robots import *
 from omnigibson.macros import gm
+from omnigibson.robots import *
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
