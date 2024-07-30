@@ -90,6 +90,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._use_skybox = use_skybox
         self._transition_rule_api = None
         self._available_systems = None
+        self._pose = None
+        self._pose_inv = None
+        self._updated_state_objects = None
 
         # Call super init
         super().__init__()
@@ -156,6 +159,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of BaseObject: Standalone object(s) that are currently in this scene
         """
         return self.object_registry.objects
+
+    @property
+    def updated_state_objects(self):
+        """
+        Returns:
+            set of StatefulObject: set of stateful objects in the scene that have had at least a single object state
+                updated since the last simulator's non_physics_step()
+        """
+        return self._updated_state_objects
 
     @property
     def robots(self):
@@ -399,6 +411,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         self._idx = idx
 
+        # Add a callback to non_physics_step for clearing updated objects
+        def clear_updated_objects():
+            self._updated_state_objects = set()
+        clear_updated_objects()
+        og.sim.add_callback_on_pre_sim_step(name=f"scene{self._idx}_clear_update_objects", callback=clear_updated_objects)
+
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
 
@@ -421,6 +439,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         new_scene_edge = self._load_scene_prim_with_objects(**kwargs)
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
+
+        # Cache this scene's pose
+        self._pose = T.pose2mat(self._scene_prim.get_position_orientation())
+        self._pose_inv = np.linalg.inv(self._pose)
 
         if gm.ENABLE_TRANSITION_RULES:
             self._transition_rule_api = TransitionRuleAPI(scene=self)
@@ -691,6 +713,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             for obj in self.object_registry("fixed_base", True, default_val=[])
             if obj.category != robot_macros.ROBOT_CATEGORY
         }
+
+    @property
+    def pose(self):
+        """
+        Returns:
+            np.array: (4,4) homogeneous transformation matrix representing this scene's global pose
+        """
+        return self._pose
+
+    @property
+    def pose_inv(self):
+        """
+        Returns:
+            np.array: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
+        """
+        return self._pose_inv
 
     def is_system_active(self, system_name):
         return self.get_system(system_name, force_init=False).initialized

@@ -129,7 +129,9 @@ gm.ENABLE_TRANSITION_RULES = True
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
 
-# Default physics / rendering frequencies (Hz)
+# Default physics / rendering / sim step frequencies (Hz)
+# rendering must be a multiple of physics frequency, and sim_step must be a multiple of rendering frequency
+gm.DEFAULT_SIM_STEP_FREQ = 30
 gm.DEFAULT_RENDERING_FREQ = 30
 gm.DEFAULT_PHYSICS_FREQ = 120
 

@@ -367,6 +367,10 @@ class SerializableRegistry(Registry, Serializable):
         unique_keys = set() if unique_keys is None else set(unique_keys)
         unique_keys.add(self.hash_key)
 
+        # Set the default dump and load filters, which is a pass-through
+        self._dump_filter = lambda obj: True
+        self._load_filter = lambda obj: True
+
         # Run super
         super().__init__(
             name=name,
@@ -386,11 +390,42 @@ class SerializableRegistry(Registry, Serializable):
         # Run super like normal
         super().add(obj=obj)
 
+    def set_dump_filter(self, dump_filter):
+        """
+        Sets the internal filter that determines whether an object should be dumped or not.
+
+        Args:
+            dump_filter (function): Function that determines whether an object should be dumped or not.
+                Expected signature is:
+
+                def dump_filter(obj) -> bool
+
+                where it takes in a given registered object @obj and returns True if the object should have its state
+                dumped
+        """
+        self._dump_filter = dump_filter
+
+    def set_load_filter(self, load_filter):
+        """
+        Sets the internal filter that determines whether an object's state should be loaded or not.
+
+        Args:
+            load_filter (function): Function that determines whether an object should have its state loaded or not
+                Expected signature is:
+
+                def load_filter(obj) -> bool
+
+                where it takes in a given registered object @obj and returns True if the object should have its
+                state loaded or not
+        """
+        self._load_filter = load_filter
+
     def _dump_state(self):
         # Iterate over all objects and grab their states
         state = dict()
         for obj in self.objects:
-            state[obj.name] = obj.dump_state(serialized=False)
+            if self._dump_filter(obj):
+                state[obj.name] = obj.dump_state(serialized=False)
         return state
 
     def _load_state(self, state):
@@ -399,20 +434,22 @@ class SerializableRegistry(Registry, Serializable):
         # the state might contain additional information about objects that are NOT in the scene. For both cases, state
         # loading will be skipped.
         for obj in self.objects:
-            if obj.name not in state:
-                log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
-                continue
-            obj.load_state(state[obj.name], serialized=False)
+            if self._load_filter(obj):
+                if obj.name not in state:
+                    log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                    continue
+                obj.load_state(state[obj.name], serialized=False)
 
     def serialize(self, state):
         # Iterate over the entire dict and flatten
         # We keep track of how many objects are being saved, as well as the unique identifier for each object so that
         # the saved flattened array is agnostic to object ordering
-        state = (np.concatenate([np.insert(obj.serialize(state[obj.name]), 0, getattr(obj, self.hash_key)) for obj in self.objects])
-            if len(self.objects) > 0
+        n_objs = len(state)
+        state_flat = (np.concatenate([np.insert(self("name", name).serialize(state[name]), 0, getattr(self("name", name), self.hash_key)) for name in state])
+            if len(state) > 0
             else np.array([])
         )
-        return np.insert(state, 0, len(self.objects))
+        return np.insert(state_flat, 0, n_objs)
 
     def deserialize(self, state):
         state_dict = dict()

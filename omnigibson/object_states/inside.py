@@ -2,6 +2,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
@@ -42,10 +43,10 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         if other.prim_type == PrimType.CLOTH:
             raise ValueError("Cannot detect if an object is inside a cloth object.")
 
-        # First check that the inner object's position is inside the outer's AABB.
-        # Since we usually check for a small set of outer objects, this is cheap
-        aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
-        inner_object_pos = (aabb_lower + aabb_upper) / 2.0
+        # For performance sake, we just check the position within the external AABB
+        # Note that this will deprecated shortly, as we'll have explicit "Inside volume"
+        # volume that we can explicitly check against in the future
+        inner_object_pos = self.obj.states[Pose].get_value()[0]
         outer_object_aabb_lo, outer_object_aabb_hi = other.states[AABB].get_value()
 
         if not (

@@ -245,6 +245,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             return self.prim_path
 
     @property
+    def is_active(self):
+        """
+        Returns:
+            bool: True if this object is currently considered active -- e.g.: if this object is currently awake
+        """
+        return not self.kinematic_only and not self.is_asleep
+
+    @property
     def uuid(self):
         """
         Returns:

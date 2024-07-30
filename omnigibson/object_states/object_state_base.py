@@ -344,6 +344,8 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         self.clear_cache()
         # Set the value
         val = self._set_value(*args, **kwargs)
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
         return val
 
     def _set_value(self, *args, **kwargs):

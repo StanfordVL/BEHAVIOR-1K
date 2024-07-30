@@ -197,6 +197,22 @@ class StatefulObject(BaseObject):
         """
         return self._abilities
 
+    @property
+    def is_active(self):
+        """
+        Returns:
+            bool: True if this object is currently considered active -- e.g.: if this object is currently awake
+        """
+        return super().is_active or self in self.scene.updated_state_objects
+
+    def state_updated(self):
+        """
+        Adds this object to this object's scene's updated_state_objects set -- generally called externally
+        by owned object state instances when its state is updated. This is useful for tracking when this object
+        has had its state updated within the last simulation step
+        """
+        self.scene.updated_state_objects.add(self)
+
     def prepare_object_states(self):
         """
         Prepare the state dictionary for an object by generating the appropriate

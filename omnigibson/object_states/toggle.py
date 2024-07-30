@@ -161,10 +161,15 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             # Check to make sure fingers are actually overlapping the toggle button mesh
             robot_can_toggle = self._check_overlap()
 
+        previous_step = self.robot_can_toggle_steps
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1
         else:
             self.robot_can_toggle_steps = 0
+
+        # If step size is different, add this object to the current state update set in its scene
+        if previous_step != self.robot_can_toggle_steps:
+            self.obj.state_updated()
 
         if self.robot_can_toggle_steps == m.CAN_TOGGLE_STEPS:
             self.set_value(not self.value)

@@ -361,8 +361,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def get_position_orientation(self):
-        return self.base_footprint_link.get_position_orientation()
+    def get_position_orientation(self, clone=True):
+        return self.base_footprint_link.get_position_orientation(clone=clone)
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position, orientation)
@@ -530,13 +530,17 @@ class BRPart(ABC):
         """
         return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
-    def get_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(self, clone=True) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get position and orientation in the world space
+
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
         Returns:
             Tuple[Array[x, y, z], Array[x, y, z, w]]
         """
-        return self._root_link.get_position_orientation()
+        return self._root_link.get_position_orientation(clone=clone)
 
     def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """

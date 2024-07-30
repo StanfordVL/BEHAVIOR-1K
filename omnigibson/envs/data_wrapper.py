@@ -1,7 +1,9 @@
 import omnigibson as og
 from omnigibson.macros import gm
+import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import create_object_from_init_info
 from omnigibson.utils.ui_utils import create_module_logger
@@ -218,11 +220,13 @@ class DataCollectionWrapper(DataWrapper):
     dataset!
     """
 
-    def __init__(self, env, output_path, only_successes=True):
+    def __init__(self, env, output_path, viewport_camera_path="/World/viewer_camera", only_successes=True):
         """
         Args:
             env (Environment): The environment to wrap
             output_path (str): path to store hdf5 data file
+            viewport_camera_path (str): prim path to the camera to use when rendering the main viewport during
+                data collection
             only_successes (bool): Whether to only save successful episodes
         """
         # Store additional variables needed for optimized data collection
@@ -234,6 +238,29 @@ class DataCollectionWrapper(DataWrapper):
         og.sim.add_callback_on_system_clear(name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=False))
         og.sim.add_callback_on_import_obj(name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=True))
         og.sim.add_callback_on_remove_obj(name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=False))
+
+        # Disable all render products to save on speed
+        # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
+        for sensor in VisionSensor.SENSORS.values():
+            sensor.render_product.hydra_texture.set_updates_enabled(False)
+
+        # Set the main viewport camera path
+        og.sim.viewer_camera.active_camera_path = viewport_camera_path
+
+        # Use asynchronous rendering for faster performance
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+
+        # Disable mouse grabbing since we're only using the UI passively
+        lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
+        lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
+        lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
+        lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
+
+        # Set the dump filter for better performance
+        env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
+
+        # TODO: load filter mismatch with actual state being loaded?
 
         # Run super
         super().__init__(env=env, output_path=output_path, only_successes=only_successes)

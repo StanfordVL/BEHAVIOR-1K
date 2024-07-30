@@ -519,6 +519,14 @@ class VisionSensor(BaseSensor):
         super().remove()
 
     @property
+    def render_product(self):
+        """
+        Returns:
+            HydraTexture: Render product associated with this viewport and camera
+        """
+        return self._render_product
+
+    @property
     def camera_parameters(self):
         """
         Returns a dictionary of keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
@@ -704,6 +712,27 @@ class VisionSensor(BaseSensor):
             length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
+
+    @property
+    def active_camera_path(self):
+        """
+        Returns:
+            str: prim path of the active camera attached to this vision sensor
+        """
+        return self._viewport.viewport_api.get_active_camera().pathString
+
+    @active_camera_path.setter
+    def active_camera_path(self, path):
+        """
+        Sets the active camera prim path @path for this vision sensor. Note: Must be a valid Camera prim path
+
+        Args:
+            path (str): Prim path to the camera that will be attached to this vision sensor
+        """
+        self._viewport.viewport_api.set_active_camera(path)
+        # Requires 6 updates to propagate changes
+        for i in range(6):
+            render()
 
     @property
     def intrinsic_matrix(self):

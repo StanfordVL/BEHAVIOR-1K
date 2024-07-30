@@ -243,6 +243,9 @@ def _launch_simulator(*args, **kwargs):
                 current application and not only rendering a frame to the viewports/ cameras. So UI elements of
                 Isaac Sim will be refreshed with this dt as well if running non-headless. If None, will use default
                 value 1 / gm.DEFAULT_RENDERING_FREQ
+            sim_step_dt (None or float): dt between self.step() calls. This is the amount of simulation time that
+                passes every time step() is called. Note: This must be a multiple of @rendering_dt. If None, will
+                use default value 1 / gm.DEFAULT_SIM_STEP_FREQ
             viewer_width (int): width of the camera image, in pixels
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
@@ -253,6 +256,7 @@ def _launch_simulator(*args, **kwargs):
             gravity=9.81,
             physics_dt=None,
             rendering_dt=None,
+            sim_step_dt=None,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
@@ -267,8 +271,23 @@ def _launch_simulator(*args, **kwargs):
             assert og.sim is None, "Only one Simulator instance can be created at a time!"
             og.sim = self
 
+            # Sanity check physics vs. rendering vs. sim step dt
+            physics_dt = 1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt
+            rendering_dt = 1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt
+            sim_step_dt = 1.0 / gm.DEFAULT_SIM_STEP_FREQ if sim_step_dt is None else sim_step_dt
+            render_physics_ratio = rendering_dt / physics_dt
+            sim_render_ratio = sim_step_dt / rendering_dt
+            assert np.isclose(render_physics_ratio, np.round(render_physics_ratio)), \
+                f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            assert np.isclose(sim_render_ratio, np.round(sim_render_ratio)), \
+                f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            assert sim_step_dt > rendering_dt, \
+                f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+
             # Store vars needed for initialization
             self.gravity = gravity
+            self._sim_step_dt = sim_step_dt
+            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
@@ -276,11 +295,12 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane = None
             self._skybox = None
             self._last_scene_edge = None
+            self._stage_id = None
 
             # Run super init
             super().__init__(
-                physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt,
-                rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt,
+                physics_dt=physics_dt,
+                rendering_dt=rendering_dt,
                 device=device,
             )
 
@@ -310,6 +330,7 @@ def _launch_simulator(*args, **kwargs):
             # Maps callback name to callback
             self._callbacks_on_play = dict()
             self._callbacks_on_stop = dict()
+            self._callbacks_on_pre_sim_step = dict()
             self._callbacks_on_import_obj = dict()
             self._callbacks_on_remove_obj = dict()
             self._callbacks_on_system_init = dict()
@@ -358,6 +379,9 @@ def _launch_simulator(*args, **kwargs):
             # Disable collision between building structures and fixed base objects
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+
+            # Store stage ID
+            self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
@@ -451,11 +475,14 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/outputVelocitiesLocalSpace", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateTransformations", True)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateVelocities", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateForceSensors", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateResiduals", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUseGPUInterop", True)
 
         @property
         def viewer_visibility(self):
@@ -563,6 +590,48 @@ def _launch_simulator(*args, **kwargs):
             self._skybox.load(None)
             self._skybox.color = (1.07, 0.85, 0.61)
             self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+
+        def get_sim_step_dt(self):
+            """
+            Gets the internal simulation step timestep size
+
+            Returns:
+                float: Simulation timestep size
+            """
+            return self._sim_step_dt
+
+        def set_sim_step_dt(self, sim_step_dt):
+            """
+            Sets the internal simulation step timestep size
+
+            Args:
+                sim_step_dt (float): Timestep size to apply
+            """
+            # Sanity check this new dt with respect to the rendering dt
+            rendering_dt = self.get_rendering_dt()
+            sim_render_ratio = sim_step_dt / rendering_dt
+            assert np.isclose(sim_render_ratio, np.round(sim_render_ratio)), \
+                f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            assert sim_step_dt > rendering_dt, \
+                f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            self._sim_step_dt = sim_step_dt
+            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
+
+        def set_simulation_dt(self, physics_dt=None, rendering_dt=None):
+            # Call super first
+            super().set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+
+            # Sanity check all new dts
+            rendering_dt = self.get_rendering_dt()
+            physics_dt = self.get_physics_dt()
+            render_physics_ratio = rendering_dt / physics_dt
+            sim_render_ratio = self._sim_step_dt / rendering_dt
+            assert np.isclose(render_physics_ratio, np.round(render_physics_ratio)), \
+                f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            assert np.isclose(sim_render_ratio, np.round(sim_render_ratio)), \
+                f"Simulation step dt ({self._sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            assert self._sim_step_dt > rendering_dt, \
+                f"Simulation step dt ({self._sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
 
         def set_lighting_mode(self, mode):
             """
@@ -915,10 +984,7 @@ def _launch_simulator(*args, **kwargs):
 
         def step(self):
             """
-            Step the simulation at self.render_timestep
-
-            Args:
-                render (bool): Whether rendering should occur or not
+            Step the simulation at self.get_sim_step_dt() rate
             """
             render = self._render_on_step
             if self.stage is None:
@@ -928,6 +994,9 @@ def _launch_simulator(*args, **kwargs):
             # step() may not step physics
             if len(self._objects_to_initialize) > 0:
                 self.render()
+            # Run all callbacks
+            for callback in self._callbacks_on_pre_sim_step.values():
+                callback()
 
             if render:
                 super().step(render=True)
@@ -1144,6 +1213,18 @@ def _launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_stop[name] = callback
 
+        def add_callback_on_pre_sim_step(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed at the beginning of every sim.step() call
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback() --> None
+            """
+            self._callbacks_on_pre_sim_step[name] = callback
+
         def add_callback_on_import_obj(self, name, callback):
             """
             Adds a function @callback, referenced by @name, to be executed every time sim.post_import_object() is called
@@ -1197,6 +1278,15 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
             """
             self._callbacks_on_stop.pop(name, None)
+
+        def remove_callback_on_pre_sim_step(self, name):
+            """
+            Remove pre sim step callback whose reference is @name
+
+            Args:
+                name (str): Name of the callback
+            """
+            self._callbacks_on_pre_sim_step.pop(name, None)
 
         def remove_callback_on_import_obj(self, name):
             """
@@ -1490,6 +1580,9 @@ def _launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
+            # Clear pose API cache
+            PoseAPI.clear()
+
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
@@ -1506,7 +1599,7 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 int: ID of the current active stage
             """
-            return lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+            return self._stage_id
 
         @property
         def device(self):

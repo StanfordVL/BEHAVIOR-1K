@@ -668,6 +668,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Update the current step
         self._current_step = (self._current_step + 1) % self.n_steps_per_modification
 
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
+
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()

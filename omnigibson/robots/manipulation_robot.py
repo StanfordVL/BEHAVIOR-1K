@@ -371,7 +371,7 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             if self._ag_obj_constraints[arm] is not None:
                 self._release_grasp(arm=arm)
-                self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
+                self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
                 self._handle_release_window(arm=arm)
                 assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
                 # TODO: Verify not needed!
@@ -948,7 +948,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
-        time_since_release = self._ag_release_counter[arm] * og.sim.get_rendering_dt()
+        time_since_release = self._ag_release_counter[arm] * og.sim.get_sim_step_dt()
         if time_since_release >= m.RELEASE_WINDOW:
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None

@@ -675,9 +675,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "right": [np.deg2rad(-75), np.deg2rad(-15)],
         }
 
-    def get_position_orientation(self):
+    def get_position_orientation(self, clone=True):
         # TODO: Investigate the need for this custom behavior.
-        return self.base_footprint_link.get_position_orientation()
+        return self.base_footprint_link.get_position_orientation(clone=clone)
 
     def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()

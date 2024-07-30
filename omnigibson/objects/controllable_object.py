@@ -174,7 +174,7 @@ class ControllableObject(BaseObject):
         prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
-        expected_control_freq = 1.0 / og.sim.get_rendering_dt()
+        expected_control_freq = 1.0 / og.sim.get_sim_step_dt()
         if self._control_freq is None:
             log.info(
                 "Control frequency is None - being set to default of render_frequency: %.4f", expected_control_freq

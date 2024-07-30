@@ -714,6 +714,13 @@ class PoseAPI:
 
     VALID = False
 
+    # Dictionary mapping prim path to fabric prim
+    PRIMS = dict()
+
+    @classmethod
+    def clear(cls):
+        cls.PRIMS = dict()
+
     @classmethod
     def invalidate(cls):
         cls.VALID = False
@@ -737,9 +744,16 @@ class PoseAPI:
 
     @classmethod
     def get_world_pose(cls, prim_path):
+        # Add to stored prims if not already existing
+        if prim_path not in cls.PRIMS:
+            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+
         cls._refresh()
-        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+        # Avoid premature imports
+        from omnigibson.utils.deprecated_utils import get_world_pose
+        position, orientation = get_world_pose(cls.PRIMS[prim_path])
+        return np.array(position), np.array(orientation)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -747,8 +761,14 @@ class PoseAPI:
         This is used when information about the prim's global scale is needed,
         e.g. when converting points in the prim frame to the world frame.
         """
+        # Add to stored prims if not already existing
+        if prim_path not in cls.PRIMS:
+            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+
         cls._refresh()
-        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+        # Avoid premature imports
+        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
+        return np.array(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path])).T
 
 
 class BatchControlViewAPIImpl:
