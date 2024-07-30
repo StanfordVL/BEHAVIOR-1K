@@ -460,8 +460,9 @@ class SerializableRegistry(Registry, Serializable):
         for _ in range(n_objects):
             # Infer obj based on UUID
             obj = self(self.hash_key, int(state[idx]))
-            assert obj is not None, \
-                f"Could not find object while deserializing with hash_key {self.hash_key}: {int(state[idx])}"
+            assert (
+                obj is not None
+            ), f"Could not find object while deserializing with hash_key {self.hash_key}: {int(state[idx])}"
             idx += 1
             log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states

@@ -5,7 +5,6 @@ import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.systems import *
 
-
 # @og_test
 # def test_dump_load(env):
 #     breakfast_table = env.scene.object_registry("name", "breakfast_table")

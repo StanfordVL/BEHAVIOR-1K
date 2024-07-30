@@ -1,19 +1,21 @@
+import json
+import os
+from collections import defaultdict
+from copy import deepcopy
+from pathlib import Path
+
+import h5py
+import numpy as np
+
 import omnigibson as og
-from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
+from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import create_object_from_init_info
 from omnigibson.utils.ui_utils import create_module_logger
-import json
-import h5py
-from collections import defaultdict
-import numpy as np
-from pathlib import Path
-import os
-from copy import deepcopy
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -34,8 +36,9 @@ class DataWrapper(EnvironmentWrapper):
             only_successes (bool): Whether to only save successful episodes
         """
         # Make sure the wrapped environment inherits correct omnigibson format
-        assert isinstance(env, og.Environment), \
-            "Expected wrapped @env to be a subclass of OmniGibson's Environment class!"
+        assert isinstance(
+            env, og.Environment
+        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class!"
 
         # Only one scene is supported for now
         assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
@@ -50,7 +53,7 @@ class DataWrapper(EnvironmentWrapper):
 
         Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
         log.info(f"\nWriting OmniGibson dataset hdf5 to: {output_path}\n")
-        self.hdf5_file = h5py.File(output_path, 'w')
+        self.hdf5_file = h5py.File(output_path, "w")
         data_grp = self.hdf5_file.create_group("data")
         env.task.write_task_metadata()
         scene_file = og.sim.save()[0]
@@ -203,9 +206,11 @@ class DataWrapper(EnvironmentWrapper):
 
         if self.hdf5_file is not None:
 
-            log.info(f"\nSaved:\n"
-                  f"{self.traj_count} trajectories / {self.step_count} total steps\n"
-                  f"to hdf5: {self.hdf5_file.filename}\n")
+            log.info(
+                f"\nSaved:\n"
+                f"{self.traj_count} trajectories / {self.step_count} total steps\n"
+                f"to hdf5: {self.hdf5_file.filename}\n"
+            )
 
             self.hdf5_file["data"].attrs["n_episodes"] = self.traj_count
             self.hdf5_file["data"].attrs["n_steps"] = self.step_count
@@ -234,10 +239,18 @@ class DataCollectionWrapper(DataWrapper):
         self.current_transitions = dict()
 
         # Add callbacks on import / remove objects and systems
-        og.sim.add_callback_on_system_init(name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=True))
-        og.sim.add_callback_on_system_clear(name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=False))
-        og.sim.add_callback_on_import_obj(name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=True))
-        og.sim.add_callback_on_remove_obj(name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=False))
+        og.sim.add_callback_on_system_init(
+            name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=True)
+        )
+        og.sim.add_callback_on_system_clear(
+            name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=False)
+        )
+        og.sim.add_callback_on_import_obj(
+            name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=True)
+        )
+        og.sim.add_callback_on_remove_obj(
+            name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=False)
+        )
 
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
@@ -286,7 +299,7 @@ class DataCollectionWrapper(DataWrapper):
         for step_data in traj_data:
             state = step_data["state"]
             padded_state = np.zeros(self.max_state_size, dtype=np.float32)
-            padded_state[:len(state)] = state
+            padded_state[: len(state)] = state
             step_data["state"] = padded_state
 
         # Call super
@@ -314,7 +327,10 @@ class DataCollectionWrapper(DataWrapper):
             add (bool): If True, assumes the object is being imported. Else, assumes the object is being removed
         """
         if self.env.episode_steps not in self.current_transitions:
-            self.current_transitions[self.env.episode_steps] = {"systems": {"add": [], "remove": []}, "objects": {"add": [], "remove": []}}
+            self.current_transitions[self.env.episode_steps] = {
+                "systems": {"add": [], "remove": []},
+                "objects": {"add": [], "remove": []},
+            }
 
         # Add info based on type -- only need to store name unless we're an object being added
         info = obj.get_init_info() if isinstance(obj, BaseObject) and add else obj.name
@@ -362,7 +378,7 @@ class DataPlaybackWrapper(DataWrapper):
             DataPlaybackWrapper: Generated playback environment
         """
         # Read from the HDF5 file
-        f = h5py.File(input_path, 'r')
+        f = h5py.File(input_path, "r")
         config = json.loads(f["data"].attrs["config"])
 
         # Hot swap in additional info for playing back data
@@ -414,7 +430,7 @@ class DataPlaybackWrapper(DataWrapper):
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
 
         # Store scene file so we can restore the data upon each episode reset
-        self.input_hdf5 = h5py.File(input_path, 'r')
+        self.input_hdf5 = h5py.File(input_path, "r")
         self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
 
         # Store additional variables
@@ -459,9 +475,7 @@ class DataPlaybackWrapper(DataWrapper):
         og.sim.restore(scene_files=[self.scene_file])
         self.reset()
 
-        for i, (a, s, ss, r, te, tr) in enumerate(zip(
-            action, state, state_size, reward, terminated, truncated
-        )):
+        for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -482,7 +496,7 @@ class DataPlaybackWrapper(DataWrapper):
 
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
-            og.sim.load_state(s[:int(ss)], serialized=True)
+            og.sim.load_state(s[: int(ss)], serialized=True)
             self.current_obs, _, _, _, _ = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
