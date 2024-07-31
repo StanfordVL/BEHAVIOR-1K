@@ -63,4 +63,4 @@ def test_teleop():
     ), "robot base not rotating counter-clockwise"
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()

@@ -21,7 +21,7 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
-        "gym~=0.26.2",
+        "gymnasium>=0.28.1",
         "numpy~=1.23.5",
         "scipy~=1.10.1",
         "GitPython~=3.1.40",
@@ -45,7 +45,12 @@ setup(
         "click~=8.1.3",
         "aenum~=3.1.15",
         "rtree~=1.2.0",
+        "graphviz~=0.20",
+        "numba~=0.60.0",
     ],
+    extras_require={
+        "isaac": ["isaacsim-for-omnigibson>=4.0.0"],
+    },
     tests_require=[],
     python_requires=">=3",
     include_package_data=True,

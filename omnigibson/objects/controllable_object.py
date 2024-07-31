@@ -1,7 +1,8 @@
 from abc import abstractmethod
 from copy import deepcopy
+from functools import cached_property
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 import omnigibson as og
@@ -11,6 +12,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -26,7 +28,7 @@ class ControllableObject(BaseObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         uuid=None,
         scale=None,
@@ -46,8 +48,7 @@ class ControllableObject(BaseObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
                 If None is specified, then it will be auto-generated
@@ -62,7 +63,7 @@ class ControllableObject(BaseObject):
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -92,9 +93,27 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
+        class_name = self.__class__.__name__.lower()
+        if relative_prim_path:
+            # If prim path is specified, assert that the last element starts with the right prefix to ensure that
+            # the object will be included in the ControllableObjectViewAPI.
+            assert relative_prim_path.split("/")[-1].startswith(f"controllable__{class_name}__"), (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+            assert relative_prim_path.split("/")[-1].count("__") == 2, (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+        else:
+            # If prim path is not specified, set it to the default path, but prepend controllable.
+            relative_prim_path = f"/controllable__{class_name}__{name}"
+
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
             uuid=uuid,
@@ -109,6 +128,23 @@ class ControllableObject(BaseObject):
         )
 
     def _initialize(self):
+        # Assert that the prim path matches ControllableObjectViewAPI's expected format
+        scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
+        assert scene_id.startswith(
+            "scene_"
+        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
+        robot_name_components = robot_name.split("__")
+        assert (
+            len(robot_name_components) == 3
+        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
+        assert robot_name_components[0] in (
+            "controllable",
+            "dummy",
+        ), "Third component of articulation root path (robot name) must start with 'controllable' or 'dummy'"
+        assert (
+            robot_name_components[1] == self.__class__.__name__.lower()
+        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
+
         # Run super first
         super()._initialize()
         # Fill in the DOF to joint mapping
@@ -137,17 +173,9 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-        # If we haven't already created a physics callback, do so now so control gets updated every sim step
-        callback_name = f"{self.name}_controller_callback"
-        if not og.sim.physics_callback_exists(callback_name=callback_name):
-            og.sim.add_physics_callback(
-                callback_name=callback_name,
-                callback_fn=lambda x: self.step(),
-            )
-
-    def load(self):
+    def load(self, scene):
         # Run super first
-        prim = super().load()
+        prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
         expected_control_freq = 1.0 / og.sim.get_rendering_dt()
@@ -374,7 +402,7 @@ class ControllableObject(BaseObject):
         u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
 
         # Deploy control signals
-        self.deploy_control(control=u_vec, control_type=u_type_vec, indices=None, normalized=False)
+        self.deploy_control(control=u_vec, control_type=u_type_vec)
 
     def _postprocess_control(self, control, control_type):
         """
@@ -396,7 +424,7 @@ class ControllableObject(BaseObject):
         """
         return control, control_type
 
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
+    def deploy_control(self, control, control_type):
         """
         Deploys control signals @control with corresponding @control_type on this entity.
 
@@ -423,18 +451,12 @@ class ControllableObject(BaseObject):
                 values. Expects a single bool for the entire @control. Default is False.
         """
         # Run sanity check
-        if indices is None:
-            assert len(control) == len(control_type) == self.n_dof, (
-                "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
-            )
-            # Set indices manually so that we're standardized
-            indices = np.arange(self.n_dof)
-        else:
-            assert len(control) == len(control_type) == len(indices), (
-                "Control signals, control types, and indices should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), len(indices))
-            )
+        assert len(control) == len(control_type) == self.n_dof, (
+            "Control signals, control types, and number of DOF should all be the same!"
+            "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
+        )
+        # Set indices manually so that we're standardized
+        indices = np.arange(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -461,8 +483,8 @@ class ControllableObject(BaseObject):
                 ), "Got mismatched control indices for a single joint!"
                 # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
                 for group_name, group in zip(
-                    ("joints", "control_types", "normalized"),
-                    (self._dof_to_joints, control_type, normalized),
+                    ("joints", "control_types"),
+                    (self._dof_to_joints, control_type),
                 ):
                     assert (
                         len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
@@ -501,15 +523,17 @@ class ControllableObject(BaseObject):
 
         # set the targets for joints
         if using_pos:
-            self.set_joint_positions(
-                positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized
+            ControllableObjectViewAPI.set_joint_position_targets(
+                self.articulation_root_path, positions=np.array(pos_vec), indices=np.array(pos_idxs)
             )
         if using_vel:
-            self.set_joint_velocities(
-                velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized
+            ControllableObjectViewAPI.set_joint_velocity_targets(
+                self.articulation_root_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
             )
         if using_eff:
-            self.set_joint_efforts(efforts=np.array(eff_vec), indices=np.array(eff_idxs), normalized=normalized)
+            ControllableObjectViewAPI.set_joint_efforts(
+                self.articulation_root_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
+            )
 
     def get_control_dict(self):
         """
@@ -529,20 +553,35 @@ class ControllableObject(BaseObject):
                 - gravity_force: (n_dof,) per-joint generalized gravity forces
                 - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
+        # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
+        # the functions that this class also implements. The API centralizes access for all of the robots in the scene
+        # removing the need for multiple reads and writes.
+        # TODO(cgokmen): CachedFunctions can now be entirely removed since the ControllableObjectViewAPI already implements caching.
         fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = self.get_position_orientation
+        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = self.get_linear_velocity
-        fcns["root_ang_vel"] = self.get_angular_velocity
-        fcns["root_rel_lin_vel"] = self.get_relative_linear_velocity
-        fcns["root_rel_ang_vel"] = self.get_relative_angular_velocity
-        fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
-        fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
-        fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
-        fcns["mass_matrix"] = lambda: self.get_mass_matrix(clone=False)
-        fcns["gravity_force"] = lambda: self.get_generalized_gravity_forces(clone=False)
-        fcns["cc_force"] = lambda: self.get_coriolis_and_centrifugal_forces(clone=False)
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)
+        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
+            self.articulation_root_path
+        )
+        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
+            self.articulation_root_path
+        )
+        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
+        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
+        # TODO: Move gravity force computation dummy to this class instead of BaseRobot
+        fcns["gravity_force"] = lambda: (
+            ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
+            if self.fixed_base
+            else ControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
+        )
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+            self.articulation_root_path
+        )
 
         return fcns
 
@@ -583,9 +622,9 @@ class ControllableObject(BaseObject):
         for controller_name, controller in self._controllers.items():
             controller.load_state(state=controller_states[controller_name])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
         controller_states_flat = np.concatenate(
@@ -595,16 +634,15 @@ class ControllableObject(BaseObject):
         # Concatenate and return
         return np.concatenate([state_flat, controller_states_flat]).astype(float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            state_size = c.state_size
-            controller_states[c_name] = c.deserialize(state=state[idx : idx + state_size])
-            idx += state_size
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
+            idx += deserialized_items
         state_dict["controllers"] = controller_states
 
         return state_dict, idx
@@ -688,7 +726,8 @@ class ControllableObject(BaseObject):
 
         return dic
 
-    @property
+    # TODO: These are cached, but they are not updated when the joint limit is changed
+    @cached_property
     def control_limits(self):
         """
         Returns:

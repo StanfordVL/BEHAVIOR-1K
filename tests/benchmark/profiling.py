@@ -9,7 +9,6 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import Covered
-from omnigibson.systems import get_system
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.profiling_utils import ProfilingEnv
 
@@ -148,7 +147,7 @@ def main():
         )
         knife.keep_still()
     if args.fluids:
-        table.states[Covered].set_value(get_system("water"), True)
+        table.states[Covered].set_value(env.scene.get_system("water"))
 
     output, results = [], []
 

@@ -1,3 +1,5 @@
+import pytest
+
 import omnigibson as og
 from omnigibson.macros import gm
 
@@ -19,7 +21,7 @@ def task_tester(task_type):
         "task": {
             "type": task_type,
             # BehaviorTask-specific
-            "activity_name": "assembling_gift_baskets",
+            "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
         },
     }
@@ -29,6 +31,7 @@ def task_tester(task_type):
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_FLATCACHE = True
+        gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
         og.sim.stop()
@@ -41,7 +44,7 @@ def task_tester(task_type):
         env.step(env.robots[0].action_space.sample())
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()
 
 
 def test_dummy_task():
@@ -90,4 +93,4 @@ def test_rs_int_full_load():
         env.step(env.robots[0].action_space.sample())
 
     # Clear the sim
-    og.sim.clear()
+    og.clear()

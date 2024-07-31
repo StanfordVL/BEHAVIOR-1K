@@ -1,4 +1,4 @@
-FROM stanfordvl/omnigibson-dev:og-develop
+FROM stanfordvl/omnigibson:og-develop
 
 ARG DUMB_INIT_VERSION="1.2.2"
 ARG GIT_CORE_PPA_KEY="A1715D88E1DF1F24"
@@ -52,6 +52,7 @@ RUN echo en_US.UTF-8 UTF-8 >> /etc/locale.gen \
     libpq-dev \
     gosu \
     pkg-config \
+    graphviz \
   && DPKG_ARCH="$(dpkg --print-architecture)" \
   && LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)" \
   && sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers \

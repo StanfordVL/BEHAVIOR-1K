@@ -7,12 +7,12 @@ from omnigibson.systems import *
 
 
 @og_test
-def test_system_clear():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+def test_system_clear(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):
-            system = get_system(system_name)
-            assert issubclass(system, system_class)
+            system = env.scene.get_system(system_name)
+            assert isinstance(system, system_class)
             if issubclass(system_class, VisualParticleSystem):
                 assert breakfast_table.states[Covered].set_value(system, True)
             else:

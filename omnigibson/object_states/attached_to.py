@@ -362,11 +362,11 @@ class AttachedTo(
         if parent.category == "wall_nail":
             # Temporary hack to disable collision between the attached child object and all walls/floors so that objects
             # attached to the wall_nails do not collide with the walls/floors.
-            for wall in og.sim.scene.object_registry("category", "walls", set()):
+            for wall in parent.scene.object_registry("category", "walls", set()):
                 for wall_link in wall.links.values():
                     for child_link in child.links.values():
                         child_link.add_filtered_collision_pair(wall_link)
-            for wall in og.sim.scene.object_registry("category", "floors", set()):
+            for wall in parent.scene.object_registry("category", "floors", set()):
                 for floor_link in wall.links.values():
                     for child_link in child.links.values():
                         child_link.add_filtered_collision_pair(floor_link)
@@ -411,7 +411,7 @@ class AttachedTo(
         if uuid == -1:
             attached_obj = None
         else:
-            attached_obj = og.sim.scene.object_registry("uuid", uuid)
+            attached_obj = self.obj.scene.object_registry("uuid", uuid)
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.parent != attached_obj:
@@ -435,8 +435,8 @@ class AttachedTo(
                 if self.parent != attached_obj:
                     log.warning(f"parent reference is not updated after attachment")
 
-    def _serialize(self, state):
+    def serialize(self, state):
         return np.array([state["attached_obj_uuid"]], dtype=float)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         return dict(attached_obj_uuid=int(state[0])), 1

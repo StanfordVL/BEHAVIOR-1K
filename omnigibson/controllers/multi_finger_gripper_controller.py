@@ -1,5 +1,6 @@
 import numpy as np
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import assert_valid_key
@@ -175,8 +176,8 @@ class MultiFingerGripperController(GripperController):
                     else self._closed_qpos
                 )
         else:
-            # Use continuous signal
-            u = target
+            # Use continuous signal. Make sure to go from command to control dim.
+            u = np.full(self.control_dim, target[0]) if len(target) == 1 else target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
@@ -220,7 +221,6 @@ class MultiFingerGripperController(GripperController):
             assert np.all(
                 self._control == self._control[0]
             ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
-
             assert m.POS_TOLERANCE > self._limit_tolerance, (
                 "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "
                 "gripper controller's tolerance of zero-ing out velocities, which makes the heuristics invalid."
@@ -243,10 +243,7 @@ class MultiFingerGripperController(GripperController):
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                assert np.all((min_pos <= finger_pos) * (finger_pos <= max_pos)), (
-                    f"Got invalid finger joint positions when checking for grasp! "
-                    f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
-                )
+                finger_pos = np.clip(finger_pos, min_pos, max_pos)
 
                 # Check distance from both ends of the joint limits
                 dist_from_lower_limit = finger_pos - min_pos

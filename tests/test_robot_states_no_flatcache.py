@@ -26,7 +26,7 @@ def test_camera_semantic_segmentation():
     background_label = semantic_class_name_to_id()["background"]
     assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
     assert set(seg_semantic_info.keys()) == {agent_label, background_label}
-    og.sim.clear()
+    og.clear()
 
 
 def test_object_in_FOV_of_robot():
@@ -40,5 +40,5 @@ def test_object_in_FOV_of_robot():
     vision_sensor.set_position_orientation(position=[100, 150, 100])
     og.sim.step()
     og.sim.step()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == []
-    og.sim.clear()
+    assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
+    og.clear()

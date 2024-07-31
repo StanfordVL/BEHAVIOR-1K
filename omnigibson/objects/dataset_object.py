@@ -33,7 +33,7 @@ class DatasetObject(USDObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         model=None,
         uuid=None,
@@ -54,8 +54,7 @@ class DatasetObject(USDObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
@@ -102,6 +101,8 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
+        # All DatasetObjects should have xform properties pre-loaded
+        load_config["xform_props_pre_loaded"] = True
 
         # Infer the correct usd path to use
         if model is None:
@@ -124,7 +125,7 @@ class DatasetObject(USDObject):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=usd_path,
             encrypted=True,
             name=name,
@@ -464,10 +465,10 @@ class DatasetObject(USDObject):
         avg_specs = get_og_avg_category_specs()
         return avg_specs.get(self.category, None)
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=self.category,
             scale=self.scale,

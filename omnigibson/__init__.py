@@ -6,13 +6,13 @@ import signal
 import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.envs import Environment
+from omnigibson.envs import Environment, VectorEnvironment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import ALL_SENSOR_MODALITIES
-from omnigibson.simulator import launch_simulator as launch
+from omnigibson.simulator import _launch_simulator as launch
 from omnigibson.tasks import REGISTERED_TASKS
 
 # Create logger
@@ -43,6 +43,41 @@ sim = None  # (this is a singleton so it's okay that it's global)
 # Create and expose a temporary directory for any use cases. It will get destroyed upon omni
 # shutdown by the shutdown function.
 tempdir = tempfile.mkdtemp()
+
+
+def clear():
+    """
+    Clear the stage and then call launch again to make og.sim point to a new simulator instance
+    """
+    global sim
+
+    import omnigibson.lazy as lazy
+
+    # First save important simulator settings
+    init_kwargs = dict(
+        gravity=sim.gravity,
+        physics_dt=sim.get_physics_dt(),
+        rendering_dt=sim.get_rendering_dt(),
+        viewer_width=sim.viewer_width,
+        viewer_height=sim.viewer_height,
+        device=sim.device,
+    )
+
+    # First let the simulator clear everything it owns.
+    sim._partial_clear()
+
+    # Then close the stage and remove pointers to the simulator object.
+    assert lazy.omni.isaac.core.utils.stage.close_stage()
+    sim = None
+    lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
+
+    # Then relaunch the simulator.
+    launch(**init_kwargs)
+
+    # Check that the device remains the same
+    assert (
+        sim.device == init_kwargs["device"]
+    ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
 
 
 def cleanup(*args, **kwargs):

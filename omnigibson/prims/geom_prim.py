@@ -19,7 +19,7 @@ class GeomPrim(XFormPrim):
     created from scratch.at
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this mesh prim, the below values can be specified:
@@ -27,14 +27,14 @@ class GeomPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -49,10 +49,6 @@ class GeomPrim(XFormPrim):
 
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
-
-    def duplicate(self, prim_path):
-        # Cannot directly duplicate a mesh prim
-        raise NotImplementedError("Cannot directly duplicate a geom prim!")
 
     @property
     def purpose(self):
@@ -199,7 +195,7 @@ class CollisionGeomPrim(GeomPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -211,7 +207,7 @@ class CollisionGeomPrim(GeomPrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -400,11 +396,6 @@ class CollisionGeomPrim(GeomPrim):
             weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
                                                       materials, otherwise False. Defaults to False.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if weaker_than_descendants:
             self._binding_api.Bind(
                 physics_material.material,
@@ -427,11 +418,6 @@ class CollisionGeomPrim(GeomPrim):
         Returns:
             PhysicsMaterial: the current applied physics material.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if self._applied_physics_material is not None:
             return self._applied_physics_material
         else:

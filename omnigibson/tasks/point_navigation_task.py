@@ -153,6 +153,7 @@ class PointNavigationTask(BaseTask):
         # Auto-initialize all markers
         og.sim.play()
         env.scene.reset()
+        self._reset_agent(env=env)
         env.scene.update_initial_state()
         og.sim.stop()
 
@@ -165,7 +166,7 @@ class PointNavigationTask(BaseTask):
         """
         if self._visualize_goal:
             self._initial_pos_marker = PrimitiveObject(
-                prim_path="/World/task_initial_pos_marker",
+                relative_prim_path="/task_initial_pos_marker",
                 primitive_type="Cylinder",
                 name="task_initial_pos_marker",
                 radius=self._goal_tolerance,
@@ -174,7 +175,7 @@ class PointNavigationTask(BaseTask):
                 rgba=np.array([1, 0, 0, 0.3]),
             )
             self._goal_pos_marker = PrimitiveObject(
-                prim_path="/World/task_goal_pos_marker",
+                relative_prim_path="/task_goal_pos_marker",
                 primitive_type="Cylinder",
                 name="task_goal_pos_marker",
                 radius=self._goal_tolerance,
@@ -184,15 +185,15 @@ class PointNavigationTask(BaseTask):
             )
 
             # Load the objects into the simulator
-            og.sim.import_object(self._initial_pos_marker)
-            og.sim.import_object(self._goal_pos_marker)
+            env.scene.add_object(self._initial_pos_marker)
+            env.scene.add_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
             waypoints = []
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
-                    prim_path=f"/World/task_waypoint_marker{i}",
+                    relative_prim_path=f"/task_waypoint_marker{i}",
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
                     radius=self._waypoint_width,
@@ -200,7 +201,7 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                og.sim.import_object(waypoint)
+                env.scene.add_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
@@ -296,13 +297,16 @@ class PointNavigationTask(BaseTask):
             float: Computed potential
         """
         if self._reward_type == "l2":
-            reward = self._get_l2_potential(env)
+            potential = self._get_l2_potential(env)
         elif self._reward_type == "geodesic":
-            reward = self._get_geodesic_potential(env)
+            potential = self._get_geodesic_potential(env)
+            # If no path is found, fall back to L2 potential
+            if potential is None:
+                potential = self._get_l2_potential(env)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
-        return reward
+        return potential
 
     def _reset_agent(self, env):
         # Reset agent

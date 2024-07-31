@@ -38,7 +38,7 @@ class Temperature(TensorizedValueState):
             rate (float): Heating rate of the source / sink
         """
         # Get idxs for objs
-        idxs = [cls.OBJ_IDXS[obj.name] for obj in objs]
+        idxs = [cls.OBJ_IDXS[obj] for obj in objs]
         cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_rendering_dt()
 
     @classmethod

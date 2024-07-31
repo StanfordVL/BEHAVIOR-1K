@@ -6,12 +6,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.systems.system_base import (
-    PhysicalParticleSystem,
-    VisualParticleSystem,
-    is_physical_particle_system,
-    is_visual_particle_system,
-)
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
 
@@ -71,13 +65,13 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         if system.n_particles > 0:
             # First, we check what type of system
             # Currently, we support VisualParticleSystems and PhysicalParticleSystems
-            if is_visual_particle_system(system_name=system.name):
+            if self.obj.scene.is_visual_particle_system(system_name=system.name):
                 # Grab global particle poses and offset them in the direction of their orientation
                 raw_positions, quats = system.get_particles_position_orientation()
                 unit_z = np.zeros((len(raw_positions), 3, 1))
                 unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
                 checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
-            elif is_physical_particle_system(system_name=system.name):
+            elif self.obj.scene.is_physical_particle_system(system_name=system.name):
                 raw_positions = system.get_particles_position_orientation()[0]
                 checked_positions = raw_positions
             else:

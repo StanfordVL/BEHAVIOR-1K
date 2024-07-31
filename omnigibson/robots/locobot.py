@@ -13,10 +13,6 @@ class Locobot(TwoWheelRobot):
     """
 
     @property
-    def model_name(self):
-        return "Locobot"
-
-    @property
     def wheel_radius(self):
         return 0.038
 
@@ -25,12 +21,8 @@ class Locobot(TwoWheelRobot):
         return 0.230
 
     @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([1, 0])
+    def base_joint_names(self):
+        return ["wheel_right_joint", "wheel_left_joint"]
 
     @property
     def _default_joint_pos(self):

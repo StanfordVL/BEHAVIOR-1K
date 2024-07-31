@@ -15,19 +15,18 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
 from omnigibson.objects import DatasetObject
-from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 from omnigibson.transition_rules import REGISTERED_RULES
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 
 
 @og_test
-def test_dryer_rule():
+def test_dryer_rule(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    clothes_dryer = og.sim.scene.object_registry("name", "clothes_dryer")
-    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    water = get_system("water")
+    clothes_dryer = env.scene.object_registry("name", "clothes_dryer")
+    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
+    bowl = env.scene.object_registry("name", "bowl")
+    water = env.scene.get_system("water")
 
     place_obj_on_floor_plane(clothes_dryer)
     og.sim.step()
@@ -72,23 +71,23 @@ def test_dryer_rule():
     assert not clothes_dryer.states[Contains].get_value(water)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_washer_rule():
+def test_washer_rule(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    washer = og.sim.scene.object_registry("name", "washer")
-    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    water = get_system("water")
-    dust = get_system("dust")  # always remove
-    salt = get_system("salt")  # always remove (not explicitly specified)
-    rust = get_system("rust")  # never remove
-    spray_paint = get_system("spray_paint")  # requires acetone
-    acetone = get_system("acetone")  # solvent for spray paint
-    cooking_oil = get_system("cooking_oil")  # requires vinegar, lemon_juice, vinegar, etc.
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    washer = env.scene.object_registry("name", "washer")
+    remover_dishtowel = env.scene.object_registry("name", "remover_dishtowel")
+    bowl = env.scene.object_registry("name", "bowl")
+    water = env.scene.get_system("water")
+    dust = env.scene.get_system("dust")  # always remove
+    salt = env.scene.get_system("salt")  # always remove (not explicitly specified)
+    rust = env.scene.get_system("rust")  # never remove
+    spray_paint = env.scene.get_system("spray_paint")  # requires acetone
+    acetone = env.scene.get_system("acetone")  # solvent for spray paint
+    cooking_oil = env.scene.get_system("cooking_oil")  # requires vinegar, lemon_juice, vinegar, etc.
 
     place_obj_on_floor_plane(washer)
     og.sim.step()
@@ -141,21 +140,21 @@ def test_washer_rule():
     assert bowl.states[Covered].get_value(water)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_slicing_rule():
+def test_slicing_rule(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    apple = og.sim.scene.object_registry("name", "apple")
-    table_knife = og.sim.scene.object_registry("name", "table_knife")
+    apple = env.scene.object_registry("name", "apple")
+    table_knife = env.scene.object_registry("name", "table_knife")
 
     deleted_objs = [apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
     assert apple.states[Cooked].set_value(True)
 
-    initial_half_apples = og.sim.scene.object_registry("category", "half_apple", set()).copy()
+    initial_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
 
     place_obj_on_floor_plane(apple)
     og.sim.step()
@@ -163,17 +162,17 @@ def test_slicing_rule():
     table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
     assert not table_knife.states[Touching].get_value(apple)
-    final_half_apples = og.sim.scene.object_registry("category", "half_apple", set()).copy()
+    final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
     assert len(final_half_apples) == len(initial_half_apples)
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is not None
+        assert env.scene.object_registry("name", obj.name) is not None
 
     table_knife.set_position_orientation([-0.05, 0.0, 0.10], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
-    final_half_apples = og.sim.scene.object_registry("category", "half_apple", set()).copy()
+    final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
     assert len(final_half_apples) > len(initial_half_apples)
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # One more step for the half apples to be initialized
     og.sim.step()
@@ -189,16 +188,16 @@ def test_slicing_rule():
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_dicing_rule_cooked():
+def test_dicing_rule_cooked(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    half_apple = og.sim.scene.object_registry("name", "half_apple")
-    table_knife = og.sim.scene.object_registry("name", "table_knife")
-    cooked_diced_apple = get_system("cooked__diced__apple")
+    half_apple = env.scene.object_registry("name", "half_apple")
+    table_knife = env.scene.object_registry("name", "table_knife")
+    cooked_diced_apple = env.scene.get_system("cooked__diced__apple")
 
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -217,34 +216,34 @@ def test_dicing_rule_cooked():
     assert not table_knife.states[Touching].get_value(half_apple)
     assert cooked_diced_apple.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is not None
+        assert env.scene.object_registry("name", obj.name) is not None
 
     table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
 
     assert cooked_diced_apple.n_particles > 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
     table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_dicing_rule_uncooked():
+def test_dicing_rule_uncooked(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    half_apple = og.sim.scene.object_registry("name", "half_apple")
-    table_knife = og.sim.scene.object_registry("name", "table_knife")
-    diced_apple = get_system("diced__apple")
+    half_apple = env.scene.object_registry("name", "half_apple")
+    table_knife = env.scene.object_registry("name", "table_knife")
+    diced_apple = env.scene.get_system("diced__apple")
 
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -261,35 +260,35 @@ def test_dicing_rule_uncooked():
     assert not table_knife.states[Touching].get_value(half_apple)
     assert diced_apple.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is not None
+        assert env.scene.object_registry("name", obj.name) is not None
 
     table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
 
     assert diced_apple.n_particles > 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
     table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-np.pi / 2, 0, 0]))
     og.sim.step()
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_melting_rule():
+def test_melting_rule(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    swiss_cheese = og.sim.scene.object_registry("name", "swiss_cheese")
-    melted_swiss_cheese = get_system("melted__swiss_cheese")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    swiss_cheese = env.scene.object_registry("name", "swiss_cheese")
+    melted_swiss_cheese = env.scene.get_system("melted__swiss_cheese")
 
     deleted_objs = [swiss_cheese]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -313,7 +312,7 @@ def test_melting_rule():
 
     assert melted_swiss_cheese.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is not None
+        assert env.scene.object_registry("name", obj.name) is not None
 
     # To save time, directly set the temperature of the swiss cheese to be above the melting point
     assert swiss_cheese.states[Temperature].set_value(m.transition_rules.MELTING_TEMPERATURE + 1)
@@ -322,26 +321,26 @@ def test_melting_rule():
     # Recipe should execute successfully: new melted swiss cheese should be created, and the ingredients should be deleted
     assert melted_swiss_cheese.n_particles > 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_cooking_physical_particle_rule_failure_recipe_systems():
+def test_cooking_physical_particle_rule_failure_recipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    arborio_rice = get_system("arborio_rice")
-    water = get_system("water")
-    cooked_water = get_system("cooked__water")
-    cooked_arborio_rice = get_system("cooked__arborio_rice")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    arborio_rice = env.scene.get_system("arborio_rice")
+    water = env.scene.get_system("water")
+    cooked_water = env.scene.get_system("cooked__water")
+    cooked_arborio_rice = env.scene.get_system("cooked__arborio_rice")
 
     place_obj_on_floor_plane(stove)
     og.sim.step()
@@ -370,18 +369,18 @@ def test_cooking_physical_particle_rule_failure_recipe_systems():
     assert cooked_arborio_rice.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_physical_particle_rule_success():
+def test_cooking_physical_particle_rule_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    arborio_rice = get_system("arborio_rice")
-    water = get_system("water")
-    cooked_water = get_system("cooked__water")
-    cooked_arborio_rice = get_system("cooked__arborio_rice")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    arborio_rice = env.scene.get_system("arborio_rice")
+    water = env.scene.get_system("water")
+    cooked_water = env.scene.get_system("cooked__water")
+    cooked_arborio_rice = env.scene.get_system("cooked__arborio_rice")
 
     place_obj_on_floor_plane(stove)
     og.sim.step()
@@ -417,19 +416,19 @@ def test_cooking_physical_particle_rule_success():
     assert cooked_arborio_rice.n_particles > 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_mixing_rule_failure_recipe_systems():
+def test_mixing_rule_failure_recipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    tablespoon = og.sim.scene.object_registry("name", "tablespoon")
-    water = get_system("water")
-    granulated_sugar = get_system("granulated_sugar")
-    lemon_juice = get_system("lemon_juice")
-    lemonade = get_system("lemonade")
-    sludge = get_system("sludge")
+    bowl = env.scene.object_registry("name", "bowl")
+    tablespoon = env.scene.object_registry("name", "tablespoon")
+    water = env.scene.get_system("water")
+    granulated_sugar = env.scene.get_system("granulated_sugar")
+    lemon_juice = env.scene.get_system("lemon_juice")
+    lemonade = env.scene.get_system("lemonade")
+    sludge = env.scene.get_system("sludge")
 
     place_obj_on_floor_plane(bowl)
     og.sim.step()
@@ -458,20 +457,20 @@ def test_mixing_rule_failure_recipe_systems():
     assert granulated_sugar.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_mixing_rule_failure_nonrecipe_systems():
+def test_mixing_rule_failure_nonrecipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    tablespoon = og.sim.scene.object_registry("name", "tablespoon")
-    water = get_system("water")
-    granulated_sugar = get_system("granulated_sugar")
-    lemon_juice = get_system("lemon_juice")
-    lemonade = get_system("lemonade")
-    salt = get_system("salt")
-    sludge = get_system("sludge")
+    bowl = env.scene.object_registry("name", "bowl")
+    tablespoon = env.scene.object_registry("name", "tablespoon")
+    water = env.scene.get_system("water")
+    granulated_sugar = env.scene.get_system("granulated_sugar")
+    lemon_juice = env.scene.get_system("lemon_juice")
+    lemonade = env.scene.get_system("lemonade")
+    salt = env.scene.get_system("salt")
+    sludge = env.scene.get_system("sludge")
 
     place_obj_on_floor_plane(bowl)
     og.sim.step()
@@ -504,18 +503,18 @@ def test_mixing_rule_failure_nonrecipe_systems():
     assert salt.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_mixing_rule_success():
+def test_mixing_rule_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    tablespoon = og.sim.scene.object_registry("name", "tablespoon")
-    water = get_system("water")
-    granulated_sugar = get_system("granulated_sugar")
-    lemon_juice = get_system("lemon_juice")
-    lemonade = get_system("lemonade")
+    bowl = env.scene.object_registry("name", "bowl")
+    tablespoon = env.scene.object_registry("name", "tablespoon")
+    water = env.scene.get_system("water")
+    granulated_sugar = env.scene.get_system("granulated_sugar")
+    lemon_juice = env.scene.get_system("lemon_juice")
+    lemonade = env.scene.get_system("lemonade")
 
     place_obj_on_floor_plane(bowl)
     og.sim.step()
@@ -542,21 +541,21 @@ def test_mixing_rule_success():
     assert lemon_juice.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_system_rule_failure_recipe_systems():
+def test_cooking_system_rule_failure_recipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    chicken = og.sim.scene.object_registry("name", "chicken")
-    chicken_broth = get_system("chicken_broth")
-    diced_carrot = get_system("diced__carrot")
-    diced_celery = get_system("diced__celery")
-    salt = get_system("salt")
-    rosemary = get_system("rosemary")
-    chicken_soup = get_system("cooked__chicken_soup")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    chicken = env.scene.object_registry("name", "chicken")
+    chicken_broth = env.scene.get_system("chicken_broth")
+    diced_carrot = env.scene.get_system("diced__carrot")
+    diced_celery = env.scene.get_system("diced__celery")
+    salt = env.scene.get_system("salt")
+    rosemary = env.scene.get_system("rosemary")
+    chicken_soup = env.scene.get_system("cooked__chicken_soup")
 
     place_obj_on_floor_plane(stove)
     og.sim.step()
@@ -594,25 +593,25 @@ def test_cooking_system_rule_failure_recipe_systems():
     assert diced_celery.n_particles > 0
     assert salt.n_particles > 0
     assert rosemary.n_particles > 0
-    assert og.sim.scene.object_registry("name", "chicken") is not None
+    assert env.scene.object_registry("name", "chicken") is not None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_system_rule_failure_nonrecipe_systems():
+def test_cooking_system_rule_failure_nonrecipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    chicken = og.sim.scene.object_registry("name", "chicken")
-    water = get_system("water")
-    chicken_broth = get_system("chicken_broth")
-    diced_carrot = get_system("diced__carrot")
-    diced_celery = get_system("diced__celery")
-    salt = get_system("salt")
-    rosemary = get_system("rosemary")
-    chicken_soup = get_system("cooked__chicken_soup")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    chicken = env.scene.object_registry("name", "chicken")
+    water = env.scene.get_system("water")
+    chicken_broth = env.scene.get_system("chicken_broth")
+    diced_carrot = env.scene.get_system("diced__carrot")
+    diced_celery = env.scene.get_system("diced__celery")
+    salt = env.scene.get_system("salt")
+    rosemary = env.scene.get_system("rosemary")
+    chicken_soup = env.scene.get_system("cooked__chicken_soup")
 
     place_obj_on_floor_plane(stove)
     og.sim.step()
@@ -653,25 +652,25 @@ def test_cooking_system_rule_failure_nonrecipe_systems():
     assert salt.n_particles > 0
     assert rosemary.n_particles > 0
     assert water.n_particles > 0
-    assert og.sim.scene.object_registry("name", "chicken") is not None
+    assert env.scene.object_registry("name", "chicken") is not None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_system_rule_failure_nonrecipe_objects():
+def test_cooking_system_rule_failure_nonrecipe_objects(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    chicken = og.sim.scene.object_registry("name", "chicken")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    chicken_broth = get_system("chicken_broth")
-    diced_carrot = get_system("diced__carrot")
-    diced_celery = get_system("diced__celery")
-    salt = get_system("salt")
-    rosemary = get_system("rosemary")
-    chicken_soup = get_system("cooked__chicken_soup")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    chicken = env.scene.object_registry("name", "chicken")
+    bowl = env.scene.object_registry("name", "bowl")
+    chicken_broth = env.scene.get_system("chicken_broth")
+    diced_carrot = env.scene.get_system("diced__carrot")
+    diced_celery = env.scene.get_system("diced__celery")
+    salt = env.scene.get_system("salt")
+    rosemary = env.scene.get_system("rosemary")
+    chicken_soup = env.scene.get_system("cooked__chicken_soup")
 
     place_obj_on_floor_plane(stove)
     og.sim.step()
@@ -711,25 +710,25 @@ def test_cooking_system_rule_failure_nonrecipe_objects():
     assert diced_celery.n_particles > 0
     assert salt.n_particles > 0
     assert rosemary.n_particles > 0
-    assert og.sim.scene.object_registry("name", "chicken") is not None
-    assert og.sim.scene.object_registry("name", "bowl") is not None
+    assert env.scene.object_registry("name", "chicken") is not None
+    assert env.scene.object_registry("name", "bowl") is not None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_system_rule_success():
+def test_cooking_system_rule_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    stove = og.sim.scene.object_registry("name", "stove")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    chicken = og.sim.scene.object_registry("name", "chicken")
-    chicken_broth = get_system("chicken_broth")
-    diced_carrot = get_system("diced__carrot")
-    diced_celery = get_system("diced__celery")
-    salt = get_system("salt")
-    rosemary = get_system("rosemary")
-    chicken_soup = get_system("cooked__chicken_soup")
+    stove = env.scene.object_registry("name", "stove")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    chicken = env.scene.object_registry("name", "chicken")
+    chicken_broth = env.scene.get_system("chicken_broth")
+    diced_carrot = env.scene.get_system("diced__carrot")
+    diced_celery = env.scene.get_system("diced__celery")
+    salt = env.scene.get_system("salt")
+    rosemary = env.scene.get_system("rosemary")
+    chicken_soup = env.scene.get_system("cooked__chicken_soup")
 
     deleted_objs = [chicken]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -771,28 +770,28 @@ def test_cooking_system_rule_success():
     assert rosemary.n_particles == 0
 
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_cooking_object_rule_failure_wrong_container():
+def test_cooking_object_rule_failure_wrong_container(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    stockpot = og.sim.scene.object_registry("name", "stockpot")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    stockpot = env.scene.object_registry("name", "stockpot")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -818,24 +817,24 @@ def test_cooking_object_rule_failure_wrong_container():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_failure_recipe_objects():
+def test_cooking_object_rule_failure_recipe_objects(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -860,24 +859,24 @@ def test_cooking_object_rule_failure_recipe_objects():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_failure_unary_states():
+def test_cooking_object_rule_failure_unary_states(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -903,24 +902,24 @@ def test_cooking_object_rule_failure_unary_states():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_failure_binary_system_states():
+def test_cooking_object_rule_failure_binary_system_states(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -946,24 +945,24 @@ def test_cooking_object_rule_failure_binary_system_states():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_failure_binary_object_states():
+def test_cooking_object_rule_failure_binary_object_states(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -989,24 +988,24 @@ def test_cooking_object_rule_failure_binary_object_states():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_failure_wrong_heat_source():
+def test_cooking_object_rule_failure_wrong_heat_source(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    stove = og.sim.scene.object_registry("name", "stove")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    stove = env.scene.object_registry("name", "stove")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     # This fails the recipe because it requires the oven to be the heat source, not the stove
     place_obj_on_floor_plane(stove)
@@ -1035,27 +1034,27 @@ def test_cooking_object_rule_failure_wrong_heat_source():
     # Make sure the stove affects the baking sheet
     assert stove.states[HeatSourceOrSink].affects_obj(baking_sheet)
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
     assert len(final_bagels) == len(initial_bagels)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_cooking_object_rule_success():
+def test_cooking_object_rule_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
 
-    oven = og.sim.scene.object_registry("name", "oven")
-    baking_sheet = og.sim.scene.object_registry("name", "baking_sheet")
-    bagel_dough = og.sim.scene.object_registry("name", "bagel_dough")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    sesame_seed = get_system("sesame_seed")
+    oven = env.scene.object_registry("name", "oven")
+    baking_sheet = env.scene.object_registry("name", "baking_sheet")
+    bagel_dough = env.scene.object_registry("name", "bagel_dough")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    sesame_seed = env.scene.get_system("sesame_seed")
 
     deleted_objs = [bagel_dough, raw_egg]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    initial_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    initial_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     place_obj_on_floor_plane(oven)
     og.sim.step()
@@ -1080,12 +1079,12 @@ def test_cooking_object_rule_success():
     assert oven.states[ToggledOn].set_value(True)
     og.sim.step()
 
-    final_bagels = og.sim.scene.object_registry("category", "bagel", set()).copy()
+    final_bagels = env.scene.object_registry("category", "bagel", set()).copy()
 
     # Recipe should execute successfully: new bagels should be created, and the ingredients should be deleted
     assert len(final_bagels) > len(initial_bagels)
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Need to step again for the new bagels to be initialized, placed in the container, and cooked.
     og.sim.step()
@@ -1100,26 +1099,26 @@ def test_cooking_object_rule_success():
         assert bagel.states[Inside].get_value(oven)
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     og.sim.remove_object(new_bagels)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
+def test_single_toggleable_machine_rule_output_system_failure_wrong_container(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    food_processor = og.sim.scene.object_registry("name", "food_processor")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
+    food_processor = env.scene.object_registry("name", "food_processor")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
 
     deleted_objs = [ice_cream]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1150,26 +1149,26 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container():
     assert milk.n_particles == 0
     assert chocolate_sauce.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_failure_recipe_systems():
+def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    blender = og.sim.scene.object_registry("name", "blender")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
+    blender = env.scene.object_registry("name", "blender")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
 
     deleted_objs = [ice_cream]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1198,26 +1197,26 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems():
     assert sludge.n_particles > 0
     assert chocolate_sauce.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_failure_recipe_objects():
+def test_single_toggleable_machine_rule_output_system_failure_recipe_objects(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    blender = og.sim.scene.object_registry("name", "blender")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
+    blender = env.scene.object_registry("name", "blender")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
 
     place_obj_on_floor_plane(blender)
     og.sim.step()
@@ -1246,19 +1245,19 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_objects():
     assert chocolate_sauce.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems():
+def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    blender = og.sim.scene.object_registry("name", "blender")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
-    water = get_system("water")
+    blender = env.scene.object_registry("name", "blender")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
+    water = env.scene.get_system("water")
 
     deleted_objs = [ice_cream]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1293,23 +1292,23 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
     assert water.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects():
+def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    blender = og.sim.scene.object_registry("name", "blender")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
+    blender = env.scene.object_registry("name", "blender")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    bowl = env.scene.object_registry("name", "bowl")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
 
     deleted_objs = [ice_cream, bowl]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1343,22 +1342,22 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
     assert chocolate_sauce.n_particles == 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_system_success():
+def test_single_toggleable_machine_rule_output_system_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    blender = og.sim.scene.object_registry("name", "blender")
-    ice_cream = og.sim.scene.object_registry("name", "scoop_of_ice_cream")
-    milk = get_system("whole_milk")
-    chocolate_sauce = get_system("chocolate_sauce")
-    milkshake = get_system("milkshake")
-    sludge = get_system("sludge")
+    blender = env.scene.object_registry("name", "blender")
+    ice_cream = env.scene.object_registry("name", "scoop_of_ice_cream")
+    milk = env.scene.get_system("whole_milk")
+    chocolate_sauce = env.scene.get_system("chocolate_sauce")
+    milkshake = env.scene.get_system("milkshake")
+    sludge = env.scene.get_system("sludge")
 
     deleted_objs = [ice_cream]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1388,32 +1387,32 @@ def test_single_toggleable_machine_rule_output_system_success():
     assert milk.n_particles == 0
     assert chocolate_sauce.n_particles == 0
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_object_failure_unary_states():
+def test_single_toggleable_machine_rule_output_object_failure_unary_states(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    electric_mixer = og.sim.scene.object_registry("name", "electric_mixer")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    another_raw_egg = og.sim.scene.object_registry("name", "another_raw_egg")
-    flour = get_system("flour")
-    granulated_sugar = get_system("granulated_sugar")
-    vanilla = get_system("vanilla")
-    melted_butter = get_system("melted__butter")
-    baking_powder = get_system("baking_powder")
-    salt = get_system("salt")
-    sludge = get_system("sludge")
+    electric_mixer = env.scene.object_registry("name", "electric_mixer")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    another_raw_egg = env.scene.object_registry("name", "another_raw_egg")
+    flour = env.scene.get_system("flour")
+    granulated_sugar = env.scene.get_system("granulated_sugar")
+    vanilla = env.scene.get_system("vanilla")
+    melted_butter = env.scene.get_system("melted__butter")
+    baking_powder = env.scene.get_system("baking_powder")
+    salt = env.scene.get_system("salt")
+    sludge = env.scene.get_system("sludge")
 
-    initial_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+    initial_doughs = env.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
 
     deleted_objs = [raw_egg, another_raw_egg]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1450,12 +1449,12 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
     og.sim.step()
 
     # Recipe should fail: no dough should be created, and sludge should be created.
-    final_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+    final_doughs = env.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
 
     # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
     assert len(final_doughs) == len(initial_doughs)
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
     assert flour.n_particles == 0
     assert granulated_sugar.n_particles == 0
     assert vanilla.n_particles == 0
@@ -1465,29 +1464,29 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states():
     assert sludge.n_particles > 0
 
     # Clean up
-    remove_all_systems()
+    remove_all_systems(env.scene)
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
 
 
 @og_test
-def test_single_toggleable_machine_rule_output_object_success():
+def test_single_toggleable_machine_rule_output_object_success(env):
     assert len(REGISTERED_RULES) > 0, "No rules registered!"
-    electric_mixer = og.sim.scene.object_registry("name", "electric_mixer")
-    raw_egg = og.sim.scene.object_registry("name", "raw_egg")
-    another_raw_egg = og.sim.scene.object_registry("name", "another_raw_egg")
-    flour = get_system("flour")
-    granulated_sugar = get_system("granulated_sugar")
-    vanilla = get_system("vanilla")
-    melted_butter = get_system("melted__butter")
-    baking_powder = get_system("baking_powder")
-    salt = get_system("salt")
-    sludge = get_system("sludge")
+    electric_mixer = env.scene.object_registry("name", "electric_mixer")
+    raw_egg = env.scene.object_registry("name", "raw_egg")
+    another_raw_egg = env.scene.object_registry("name", "another_raw_egg")
+    flour = env.scene.get_system("flour")
+    granulated_sugar = env.scene.get_system("granulated_sugar")
+    vanilla = env.scene.get_system("vanilla")
+    melted_butter = env.scene.get_system("melted__butter")
+    baking_powder = env.scene.get_system("baking_powder")
+    salt = env.scene.get_system("salt")
+    sludge = env.scene.get_system("sludge")
 
-    initial_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+    initial_doughs = env.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
 
     deleted_objs = [raw_egg, another_raw_egg]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
@@ -1523,12 +1522,12 @@ def test_single_toggleable_machine_rule_output_object_success():
     og.sim.step()
 
     # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
-    final_doughs = og.sim.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
+    final_doughs = env.scene.object_registry("category", "sugar_cookie_dough", set()).copy()
 
     # Recipe should execute successfully: new dough should be created, and the ingredients should be deleted
     assert len(final_doughs) > len(initial_doughs)
     for obj in deleted_objs:
-        assert og.sim.scene.object_registry("name", obj.name) is None
+        assert env.scene.object_registry("name", obj.name) is None
     assert flour.n_particles == 0
     assert granulated_sugar.n_particles == 0
     assert vanilla.n_particles == 0
@@ -1551,5 +1550,5 @@ def test_single_toggleable_machine_rule_output_object_success():
 
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
-        og.sim.import_object(obj)
+        env.scene.add_object(obj)
     og.sim.step()
