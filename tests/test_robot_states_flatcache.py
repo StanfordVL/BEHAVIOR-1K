@@ -193,7 +193,7 @@ def test_robot_load_drive():
             goal_location = (0, 1, 0)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
-            assert np.linalg.norm(robot.get_position() - goal_location) < 0.1
+            assert np.linalg.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()

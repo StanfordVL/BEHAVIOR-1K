@@ -53,8 +53,8 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
-m.KP_LIN_VEL = 0.3
-m.KP_ANGLE_VEL = 0.2
+m.KP_LIN_VEL = 0.05
+m.KP_ANGLE_VEL = 0.05
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -74,7 +74,7 @@ m.GRASP_APPROACH_DISTANCE = 0.2
 m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.DEFAULT_DIST_THRESHOLD = 0.05
-m.DEFAULT_ANGLE_THRESHOLD = 0.05
+m.DEFAULT_ANGLE_THRESHOLD = 0.1
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
@@ -1646,10 +1646,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action = self._empty_action()
                 if self._base_controller_is_joint:
-                    direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
-                    base_action = [direction_vec[0], direction_vec[1], 0.0]
-                    action[self.robot.controller_action_idx["base"]] = base_action
+                    base_action_size = self.robot.controller_action_idx["base"].size
+                    # Joint controller
+                    if base_action_size == 3:
+                        # [x, y, theta]
+                        direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
+                        base_action = [direction_vec[0], direction_vec[1], 0.0]
+                        action[self.robot.controller_action_idx["base"]] = base_action
+                    elif base_action_size == 4:
+                        # [wheel0, wheel1, wheel2, wheel3]
+                        direction_vec = body_target_pose[0][:2]
+                        distance = np.linalg.norm(direction_vec)
+                        # Move forward
+                        linear_x = min(distance, m.KP_LIN_VEL)
+                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0)
+                        action[self.robot.controller_action_idx["base"]] = wheel_velocities
+                    else:
+                        raise ValueError("Invalid base action size")
                 else:
+                    # Diff drive controller
                     base_action = [m.KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 yield self._postprocess_action(action)
@@ -1664,6 +1679,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Rotate in place to final orientation once at location
         yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
+
+    def _calculate_wheel_velocities(self, linear_x, angular_z):
+        # Calculate individual wheel velocities based on desired motion
+        # Husky uses a differential drive system
+
+        # Calculate left and right wheel velocities
+        v_left = linear_x - (self.robot.wheel_axle_length / 2) * angular_z
+        v_right = linear_x + (self.robot.wheel_axle_length / 2) * angular_z
+
+        # Convert linear velocities to angular velocities
+        wheel_velocities = [
+            v_left / self.robot.wheel_radius,  # Front Left
+            v_right / self.robot.wheel_radius,  # Front Right
+            v_left / self.robot.wheel_radius,  # Rear Left
+            v_right / self.robot.wheel_radius,  # Rear Right
+        ]
+
+        return wheel_velocities
 
     def _rotate_in_place(self, end_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD):
         """
@@ -1691,12 +1724,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = action[self.robot.controller_action_idx["base"]]
 
             if not self._base_controller_is_joint:
-                base_action[2] = ang_vel
+                base_action[1] = ang_vel
             elif base_action.size == 4:
-                base_action[1] = ang_vel
-                base_action[3] = ang_vel
-            elif base_action.size == 2:
-                base_action[1] = ang_vel
+                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel)
+                base_action[:] = wheel_velocities
+            elif base_action.size == 3:
+                base_action[2] = ang_vel
             else:
                 raise ValueError("Invalid base action size")
 
