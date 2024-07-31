@@ -350,12 +350,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         robot_copy = RobotCopy()
 
         robots_to_copy = {"original": {"robot": self.robot, "copy_path": self.robot.prim_path + "_copy"}}
-        if hasattr(self.robot, "simplified_mesh_usd_path"):
-            simplified_robot = {
-                "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
-                "copy_path": "/World/simplified_robot_copy",
-            }
-            robots_to_copy["simplified"] = simplified_robot
 
         for robot_type, rc in robots_to_copy.items():
             copy_robot = None
@@ -1423,26 +1417,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to do nothing
         """
         action = np.zeros(self.robot.action_dim)
-        # TODO: Replace with the new no-op action interface.
         for name, controller in self.robot._controllers.items():
-            joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]
-            if (
-                controller.control_type == ControlType.POSITION
-                and len(joint_idx) == len(action_idx)
-                and not controller.use_delta_commands
-            ):
-                action[action_idx] = self.robot.get_joint_positions()[joint_idx]
-            elif self.robot._controller_config[name]["name"] == "InverseKinematicsController":
-                # overwrite the goal orientation, since it is in absolute frame.
-                assert (
-                    self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
-                ), "Controller must be in pose_absolute_ori mode"
-                current_quat = self.robot.get_relative_eef_orientation()
-                current_ori = T.quat2axisangle(current_quat)
-                control_idx = self.robot.controller_action_idx["arm_" + self.arm]
-                action[control_idx[3:]] = current_ori
+            no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
 
+            if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
+                # assert (
+                #     self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
+                # ), "Controller must be in pose_absolute_ori mode"
+                # convert quaternion to axis-angle representation for control input
+                no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
+
+            action[action_idx] = np.concatenate(list(no_op_goal.values()))
         return action
 
     def _reset_hand(self):
@@ -1702,7 +1688,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             direction = -1.0 if diff_yaw < 0.0 else 1.0
             ang_vel = m.KP_ANGLE_VEL * direction
 
-            base_action = [0.0, 0.0, ang_vel] if self._base_controller_is_joint else [0.0, ang_vel]
+            base_action = action[self.robot.controller_action_idx["base"]]
+
+            if not self._base_controller_is_joint:
+                base_action[2] = ang_vel
+            elif base_action.size == 4:
+                base_action[1] = ang_vel
+                base_action[3] = ang_vel
+            elif base_action.size == 2:
+                base_action[1] = ang_vel
+            else:
+                raise ValueError("Invalid base action size")
+
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)
 

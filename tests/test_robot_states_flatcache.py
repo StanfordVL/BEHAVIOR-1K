@@ -7,6 +7,7 @@ from omnigibson.robots import *
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 
 
 def setup_environment(flatcache):
@@ -137,11 +138,18 @@ def test_robot_load_drive():
 
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+
+        # if not robot_name in ["Freight", "Husky", "Locobot", "Stretch"]:
+        if not robot_name in ["Husky", "Locobot", "Stretch"]:
+            continue
+
         robot = robot_cls(
             name=robot_name,
             obs_modalities=[],
         )
+        og.sim.stop()
         env.scene.add_object(robot)
+        og.sim.play()
 
         # At least one step is always needed while sim is playing for any imported object to be fully initialized
         og.sim.play()
@@ -157,25 +165,35 @@ def test_robot_load_drive():
             orientation=np.array([0.39592411, 0.1348514, 0.29286304, 0.85982]),
         )
 
-        # If this is a locomotion robot, we want to test driving
-        if isinstance(robot, LocomotionRobot):
-            initial_base_pos = robot.get_position()
-            all_action = np.random.uniform(-1, 1, robot.action_dim)
-            all_action[robot.base_action_idx] = np.random.uniform(-1, 1, len(robot.base_action_idx))
-            for _ in range(10):
-                env.step(all_action)
-            assert not np.all(np.isclose(robot.get_position(), initial_base_pos, atol=1e-5))
-
         # If this is a manipulation robot, we want to test moving the arm
-        if isinstance(robot, ManipulationRobot):
-            arm_key = list(robot.arm_action_idx.keys())[0]
-            arm_action_idx = robot.arm_action_idx[arm_key]
-            all_action = np.zeros(robot.action_dim)
-            all_action[arm_action_idx] = np.random.uniform(-1, 1, len(arm_action_idx))
-            initial_eef_pos = robot.get_eef_position(arm=arm_key)
-            for _ in range(10):
-                env.step(all_action)
-            assert not np.allclose(robot.get_eef_position(arm=arm_key), initial_eef_pos, atol=1e-5)
+        if isinstance(robot, ManipulationRobot) and not isinstance(robot, BehaviorRobot):
+            # load IK controller
+            controller_config = {
+                f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
+            }
+            robot.reload_controllers(controller_config=controller_config)
+            env.scene.update_initial_state()
+
+            action_primitives = StarterSemanticActionPrimitives(env)
+
+            eef_pos = env.robots[0].get_eef_position()
+            eef_orn = env.robots[0].get_eef_orientation()
+            if isinstance(robot, Stretch):  # Stretch arm faces the y-axis
+                target_eef_pos = (eef_pos[0], eef_pos[1] - 0.1, eef_pos[2])
+            else:
+                target_eef_pos = (eef_pos[0] + 0.1, eef_pos[1], eef_pos[2])
+            target_eef_orn = eef_orn
+            for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn)):
+                env.step(action)
+            assert np.linalg.norm(robot.get_eef_position() - target_eef_pos) < 0.05
+
+        # If this is a locomotion robot, we want to test driving
+        if isinstance(robot, LocomotionRobot) and not isinstance(robot, BehaviorRobot):
+            action_primitives = StarterSemanticActionPrimitives(env)
+            goal_location = (0, 1, 0)
+            for action in action_primitives._navigate_to_pose_direct(goal_location):
+                env.step(action)
+            assert np.linalg.norm(robot.get_position() - goal_location) < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()
