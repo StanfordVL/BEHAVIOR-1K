@@ -38,11 +38,7 @@ class Temperature(TensorizedValueState):
             rate (float): Heating rate of the source / sink
         """
         # Get idxs for objs
-        idxs = np.zeros(len(objs), dtype=int)
-        for i, obj in enumerate(objs):
-            # No need to explicitly add objects to updated objects set here, since @self.global_update() automatically
-            # handles this which occurs after all heatsources are updated
-            idxs[i] = cls.OBJ_IDXS[obj]
+        idxs = [cls.OBJ_IDXS[obj] for obj in objs]
         cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_sim_step_dt()
 
     @classmethod

@@ -121,6 +121,7 @@ class DataWrapper(EnvironmentWrapper):
             self.flush_current_traj()
 
         self.current_obs, info = self.env.reset()
+
         return self.current_obs, info
 
     def observation_spec(self):
@@ -303,6 +304,23 @@ class DataCollectionWrapper(DataWrapper):
         # Set the dump filter for better performance
         self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
 
+    def reset(self):
+        # Call super first
+        init_obs, init_info = super().reset()
+
+        # Store this initial state as part of the trajectory
+        state = og.sim.dump_state(serialized=True)
+        step_data = {
+            "state": state,
+            "state_size": len(state),
+        }
+        self.current_traj_history.append(step_data)
+
+        # Update max state size
+        self.max_state_size = max(self.max_state_size, len(state))
+
+        return init_obs, init_info
+
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         # Store dumped state, reward, terminated, truncated
         step_data = dict()
@@ -369,8 +387,6 @@ class DataPlaybackWrapper(DataWrapper):
     An OmniGibson environment wrapper for playing back data and collecting observations.
 
     NOTE: This assumes a DataCollectionWrapper environment has been used to collect data!
-
-    # TODO: Add params for setting camera width / height
     """
 
     @classmethod
@@ -379,7 +395,8 @@ class DataPlaybackWrapper(DataWrapper):
         input_path,
         output_path,
         robot_obs_modalities,
-        external_obs_modalities,
+        robot_sensor_config=None,
+        external_sensors_config=None,
         n_render_iterations=5,
         only_successes=False,
     ):
@@ -393,10 +410,19 @@ class DataPlaybackWrapper(DataWrapper):
                 the replayed data
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
                 the robot_cfg (`obs_modalities` kwarg) when spawning the robot
-            external_obs_modalities (list): External sensor observation modalities to use. This list is directly passed
-                into all external sensors' `modalities` kwarg when spawning the external sensors
+            robot_sensor_config (None or dict): If specified, the sensor configuration to use for the robot. See the
+                example sensor_config in fetch_behavior.yaml env config. This can be used to specify relevant sensor
+                params, such as image_height and image_width
+            external_sensors_config (None or list): If specified, external sensor(s) to use. This will override the
+                external_sensors kwarg in the env config when the environment is loaded. Each entry should be a
+                dictionary specifying an individual external sensor's relevant parameters. See the example
+                external_sensors key in fetch_behavior.yaml env config. This can be used to specify additional sensors
+                to collect observations during playback.
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
-                recorded data
+                recorded data. This is needed because the omniverse real-time raytracing always lags behind the
+                underlying physical state by a few frames, and additionally produces transient visual artifacts when
+                the physical state changes. Increasing this number will improve the rendered quality at the expense of
+                speed.
             only_successes (bool): Whether to only save successful episodes
 
         Returns:
@@ -420,11 +446,13 @@ class DataPlaybackWrapper(DataWrapper):
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
 
-        # Set observation modalities
+        # Set observation modalities and update sensor config
         for robot_cfg in config["robots"]:
             robot_cfg["obs_modalities"] = robot_obs_modalities
-        for external_sensor_cfg in config["env"]["external_sensors"]:
-            external_sensor_cfg["modalities"] = external_obs_modalities
+            if robot_sensor_config is not None:
+                robot_cfg["sensor_config"] = robot_sensor_config
+        if external_sensors_config is not None:
+            config["env"]["external_sensors"] = external_sensors_config
 
         # Load env
         env = og.Environment(configs=config)
@@ -464,7 +492,7 @@ class DataPlaybackWrapper(DataWrapper):
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         # Store action, obs, reward, terminated, truncated, info
         step_data = dict()
-        step_data["obs"] = self.current_obs
+        step_data["obs"] = obs
         step_data["action"] = action
         step_data["reward"] = reward
         step_data["terminated"] = terminated
@@ -497,7 +525,16 @@ class DataPlaybackWrapper(DataWrapper):
         og.sim.restore(scene_files=[self.scene_file])
         self.reset()
 
-        for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state, state_size, reward, terminated, truncated)):
+        # Restore to initial state
+        og.sim.load_state(state[0, :int(state_size[0])], serialized=True)
+
+        # If record, record initial observations
+        if record:
+            init_obs, _, _, _, _ = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
+            step_data = {"obs": init_obs}
+            self.current_traj_history.append(step_data)
+
+        for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state[1:], state_size[1:], reward, terminated, truncated)):
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -519,16 +556,18 @@ class DataPlaybackWrapper(DataWrapper):
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
-            self.current_obs, _, _, _, _ = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
+            self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
             if record:
-                step_data = dict()
-                step_data["obs"] = self.current_obs
-                step_data["action"] = a
-                step_data["reward"] = r
-                step_data["terminated"] = te
-                step_data["truncated"] = tr
+                step_data = self._parse_step_data(
+                    action=a,
+                    obs=self.current_obs,
+                    reward=r,
+                    terminated=te,
+                    truncated=tr,
+                    info=info,
+                )
                 self.current_traj_history.append(step_data)
 
             self.step_count += 1

@@ -1571,8 +1571,11 @@ class EntityPrim(XFormPrim):
             state["joint_pos"] = self.get_joint_positions()
             state["joint_vel"] = self.get_joint_velocities()
             state["joint_eff"] = self.get_joint_efforts()
-            # state["joint_pos_target"] = self.get_joint_position_targets()
-            # state["joint_vel_target"] = self.get_joint_velocity_targets()
+
+            # We do NOT save joint pos / vel targets because this is only relevant for motorized joints (e.g.: robots).
+            # Such control (a) only relies on the joint state, and not joint targets, when computing control, and
+            # (b) these targets will be immediately overwritten as soon as the next physics step occurs.
+            # So because these values are not used and require additional memory / compute, we do not save targets
 
         return state
 
