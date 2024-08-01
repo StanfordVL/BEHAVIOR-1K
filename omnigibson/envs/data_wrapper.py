@@ -154,10 +154,7 @@ class DataWrapper(EnvironmentWrapper):
                 for mod, traj_mod_data in dat.items():
                     obs_grp.create_dataset(mod, data=np.stack(traj_mod_data, axis=0))
             else:
-                try:
-                    traj_grp.create_dataset(k, data=np.stack(dat, axis=0))
-                except ValueError:
-                    breakpoint()
+                traj_grp.create_dataset(k, data=np.stack(dat, axis=0))
 
         return traj_grp
 
@@ -394,9 +391,6 @@ class DataPlaybackWrapper(DataWrapper):
         config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
-
-        # for i, robot_cfg in enumerate(config["robots"]):
-        #     robot_cfg["name"] = f"robot_new{i}"
 
         # Set observation modalities
         for robot_cfg in config["robots"]:
