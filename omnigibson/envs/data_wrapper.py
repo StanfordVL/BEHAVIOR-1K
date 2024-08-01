@@ -45,7 +45,6 @@ class DataWrapper(EnvironmentWrapper):
 
         self.traj_count = 0
         self.step_count = 0
-        self.max_state_size = 0
         self.only_successes = only_successes
         self.current_obs = None
 
@@ -133,23 +132,39 @@ class DataWrapper(EnvironmentWrapper):
         """
         return self.env.observation_spec()
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, initial_data=None, obs_key="obs"):
+        """
+        Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
+
+        Args:
+            traj_data (list of dict): Trajectory data, where each entry is a keyword-mapped set of data for a single
+                sim step
+            traj_grp_name (str): Name of the trajectory group to store
+            initial_data (None or dict): If specified, keyword-mapped data to prepend to any relevant keys found
+                from @traj_data
+            obs_key (str): Name of key corresponding to observation data in @traj_data. This specific data is
+                assumed to be its own keyword-mapped dictionary of observations, and will be parsed differently from
+                the rest of the data
+
+        Returns:
+            hdf5.Group: Generated hdf5 group storing the recorded trajectory data
+        """
         data_grp = self.hdf5_file.require_group("data")
         traj_grp = data_grp.create_group(traj_grp_name)
         traj_grp.attrs["num_samples"] = len(traj_data)
 
-        data = {key: defaultdict(list) if "obs" in key else [] for key in traj_data[0]}
+        data = {key: defaultdict(list) if key == obs_key else [] for key in traj_data[0]}
 
         for step_data in traj_data:
             for k, v in step_data.items():
-                if "obs" in k:
+                if k == obs_key:
                     for mod, step_mod_data in v.items():
                         data[k][mod].append(step_mod_data)
                 else:
                     data[k].append(v)
 
         for k, dat in data.items():
-            if "obs" in k:
+            if k == obs_key:
                 obs_grp = traj_grp.create_group(k)
                 for mod, traj_mod_data in dat.items():
                     obs_grp.create_dataset(mod, data=np.stack(traj_mod_data, axis=0))
@@ -166,7 +181,7 @@ class DataWrapper(EnvironmentWrapper):
         success = self.env.task.success or not self.only_successes
         if success and self.hdf5_file is not None:
             traj_grp_name = f"demo_{self.traj_count}"
-            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name)
+            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, obs_key="obs")
             self.traj_count += 1
         else:
             # Remove this demo
@@ -232,7 +247,12 @@ class DataCollectionWrapper(DataWrapper):
             only_successes (bool): Whether to only save successful episodes
         """
         # Store additional variables needed for optimized data collection
+
+        # Denotes the maximum serialized state size for the current episode
         self.max_state_size = 0
+
+        # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
+        # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
 
         # Add callbacks on import / remove objects and systems
@@ -249,6 +269,19 @@ class DataCollectionWrapper(DataWrapper):
             name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=False)
         )
 
+        # Run super
+        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+
+        # Configure the simulator to optimize for data collection
+        self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
+
+    def _optimize_sim_for_data_collection(self, viewport_camera_path):
+        """
+        Configures the simulator to optimize for data collection
+
+        Args:
+            viewport_camera_path (str): Prim path to the camera to use for the viewer for data collection
+        """
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
         for sensor in VisionSensor.SENSORS.values():
@@ -268,12 +301,7 @@ class DataCollectionWrapper(DataWrapper):
         lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
-        env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
-
-        # TODO: load filter mismatch with actual state being loaded?
-
-        # Run super
-        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
 
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         # Store dumped state, reward, terminated, truncated
