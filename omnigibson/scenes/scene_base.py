@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import shutil
@@ -296,11 +297,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")
 
-        available_systems = dict()
-        if os.path.exists(system_dir):
-            system_names = os.listdir(system_dir)
-            for system_name in system_names:
-                available_systems[system_name] = create_system_from_metadata(system_name=system_name)
+        available_systems = {
+            system_name: create_system_from_metadata(system_name=system_name) for system_name in get_all_system_names()
+        } if os.path.exists(system_dir) else dict()
 
         # Manually add cloth system since it is a special system that doesn't have any corresponding directory in
         # the B1K database
@@ -459,10 +458,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Clears systems so they can be re-initialized.
         for system in self.active_systems.values():
-            self.remove_system(system_name=system.name)
+            self.clear_system(system_name=system.name)
 
         # Remove all of the scene's objects.
-        og.sim.remove_object(list(self.objects))
+        og.sim.batch_remove_objects(list(self.objects))
 
         # Remove the scene prim.
         self._scene_prim.remove()
@@ -596,63 +595,66 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj):
+    def add_object(self, obj, register=True, _batched_call=False):
         """
         Add an object to the scene. The scene should already be loaded.
 
         Args:
             obj (BaseObject): the object to load
-
-        Returns:
-            Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
-                (in that case, the object is stored to be loaded together with the scene)
+            register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
+                additional scene-specific logic in addition to the obj being loaded
+            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
+                a context externally. In general, this should NOT be explicitly set by the user
         """
-        # Make sure all objects in this scene are uniquely named
-        assert (
-            obj.name not in self.object_registry.object_names
-        ), f"Object with name {obj.name} already exists in scene!"
+        cxt = contextlib.nullcontext() if _batched_call else og.sim.adding_objects(objs=[obj])
+        with cxt:
+            # Make sure all objects in this scene are uniquely named
+            assert (
+                obj.name not in self.object_registry.object_names
+            ), f"Object with name {obj.name} already exists in scene!"
 
-        # Load the object.
-        prim = obj.load(self)
+            # Load the object.
+            prim = obj.load(self)
 
-        # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
-        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
-        # We do this by adding the object to our tracked collision groups
-        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
-            # TODO: Remove structure hotfix once asset collision meshes are fixed!!
-            if obj.category in STRUCTURE_CATEGORIES:
-                CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
-            else:
-                for link in obj.links.values():
-                    CollisionAPI.add_to_collision_group(
-                        col_group="fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links",
-                        prim_path=link.prim_path,
-                    )
+            if register:
+                # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
+                # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
+                # We do this by adding the object to our tracked collision groups
+                if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+                    # TODO: Remove structure hotfix once asset collision meshes are fixed!!
+                    if obj.category in STRUCTURE_CATEGORIES:
+                        CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
+                    else:
+                        for link in obj.links.values():
+                            CollisionAPI.add_to_collision_group(
+                                col_group="fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links",
+                                prim_path=link.prim_path,
+                            )
 
-        # Add this object to our registry based on its type, if we want to register it
-        self.object_registry.add(obj)
+                # Add this object to our registry based on its type, if we want to register it
+                self.object_registry.add(obj)
 
-        # Run any additional scene-specific logic with the created object
-        self._add_object(obj)
+                # Run any additional scene-specific logic with the created object
+                self._add_object(obj)
 
-        # Inform the simulator that there is a new object here.
-        og.sim.post_import_object(obj)
-        return prim
-
-    def remove_object(self, obj):
+    def remove_object(self, obj, _batched_call=False):
         """
         Method to remove an object from the simulator
 
         Args:
             obj (BaseObject): Object to remove
+            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
+                a context externally. In general, this should NOT be explicitly set by the user
         """
-        # Remove from the appropriate registry if registered.
-        # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
-        if self.object_registry.object_is_registered(obj):
-            self.object_registry.remove(obj)
+        cxt = contextlib.nullcontext() if _batched_call else og.sim.removing_objects(objs=[obj])
+        with cxt:
+            # Remove from the appropriate registry if registered.
+            # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
+            if self.object_registry.object_is_registered(obj):
+                self.object_registry.remove(obj)
 
-        # Remove from omni stage
-        obj.remove()
+            # Remove from omni stage
+            obj.remove()
 
     def reset(self):
         """
@@ -764,7 +766,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self.system_registry.add(system)
         return system
 
-    def remove_system(self, system_name):
+    def clear_system(self, system_name):
         """
         Clear the system @system_name and remove it from our set of active systems
 
@@ -773,6 +775,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         system = self.system_registry("name", system_name)
         if system is not None:
+            # Remove from system registry and clear
+            self.system_registry.remove(system)
             system.clear()
 
     @property

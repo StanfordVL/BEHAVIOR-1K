@@ -54,7 +54,7 @@ def test_save_restore_partial(env):
     og.sim.save([tmp_json_path])
 
     # Delete the breakfast table
-    og.sim.remove_object(breakfast_table)
+    env.scene.remove_object(breakfast_table)
 
     og.sim.step()
 

@@ -12,21 +12,7 @@ from omnigibson.objects import DatasetObject
 def test_data_collect_and_playback():
     cfg = {
         "env": {
-            "external_sensors": [
-                {
-                    "sensor_type": "VisionSensor",
-                    "name": "external_sensor0",
-                    "relative_prim_path": f"/robot0/root_link/external_sensor0",
-                    "modalities": [],
-                    "sensor_kwargs": {
-                        "image_height": 128,
-                        "image_width": 128,
-                        "focal_length": 12.0,
-                    },
-                    "local_position": np.array([-0.26549, -0.30288, 1.0 + 0.861]),
-                    "local_orientation": np.array([0.36165891, -0.24745751, -0.50752921, 0.74187715]),
-                },
-            ],
+            "external_sensors": [],
         },
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -86,7 +72,7 @@ def test_data_collect_and_playback():
             env.step(env.robots[0].action_space.sample())
 
         # Manually remove the added object
-        og.sim.remove_object(obj)
+        env.scene.remove_object(obj)
 
         # Take a few more steps
         for _ in range(5):
@@ -102,7 +88,7 @@ def test_data_collect_and_playback():
             env.step(env.robots[0].action_space.sample())
 
         # Clear the system
-        water.clear()
+        env.scene.clear_system("water")
 
         # Take a few more steps
         for _ in range(5):
@@ -117,12 +103,38 @@ def test_data_collect_and_playback():
         rendering_dt=0.001,
     )
 
+    # Define robot sensor config and external sensors to use during playback
+    robot_sensor_config = {
+        "VisionSensor": {
+            "sensor_kwargs": {
+                "image_height": 128,
+                "image_width": 128,
+            },
+        },
+    }
+    external_sensors_config = [
+        {
+            "sensor_type": "VisionSensor",
+            "name": "external_sensor0",
+            "relative_prim_path": f"/robot0/root_link/external_sensor0",
+            "modalities": ["rgb", "seg_semantic"],
+            "sensor_kwargs": {
+                "image_height": 128,
+                "image_width": 128,
+                "focal_length": 12.0,
+            },
+            "local_position": np.array([-0.26549, -0.30288, 1.0 + 0.861]),
+            "local_orientation": np.array([0.36165891, -0.24745751, -0.50752921, 0.74187715]),
+        },
+    ]
+
     # Create a playback env and playback the data, collecting obs along the way
     env = DataPlaybackWrapper.create_from_hdf5(
         input_path=collect_hdf5_path,
         output_path=playback_hdf5_path,
         robot_obs_modalities=["proprio", "rgb", "depth_linear"],
-        external_obs_modalities=["rgb", "seg_semantic"],
+        robot_sensor_config=robot_sensor_config,
+        external_sensors_config=external_sensors_config,
         n_render_iterations=1,
         only_successes=False,
     )

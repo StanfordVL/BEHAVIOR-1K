@@ -207,7 +207,7 @@ class BehaviorTask(BaseTask):
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
         callback_name = f"{self.activity_name}_refresh"
-        og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
+        og.sim.add_callback_on_add_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
         og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
@@ -440,7 +440,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_removed_obj(self, obj):
         """
-        Internal callback function to be called when sim.remove_object() is called to potentially update internal
+        Internal callback function to be called when sim._pre_remove_object() is called to potentially update internal
         bddl object scope
 
         Args:

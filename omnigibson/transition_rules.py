@@ -173,7 +173,7 @@ class TransitionRuleAPI:
         # Process all transition results
         if len(removed_objs) > 0:
             # First remove pre-existing objects
-            og.sim.remove_object(removed_objs)
+            og.sim.batch_remove_objects(removed_objs)
 
         # Then add new objects
         if len(added_obj_attrs) > 0:

@@ -208,9 +208,6 @@ class BaseSystem(Serializable):
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()
 
-        # Clear from scene active system registry
-        self.scene.system_registry.remove(self)
-
         self.initialized = False
         self._scene = None
 

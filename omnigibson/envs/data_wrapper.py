@@ -263,7 +263,7 @@ class DataCollectionWrapper(DataWrapper):
         og.sim.add_callback_on_system_clear(
             name="data_collection", callback=lambda system: self.add_transition_info(obj=system, add=False)
         )
-        og.sim.add_callback_on_import_obj(
+        og.sim.add_callback_on_add_obj(
             name="data_collection", callback=lambda obj: self.add_transition_info(obj=obj, add=True)
         )
         og.sim.add_callback_on_remove_obj(
@@ -542,14 +542,14 @@ class DataPlaybackWrapper(DataWrapper):
                 for add_sys_name in cur_transitions["systems"]["add"]:
                     scene.get_system(add_sys_name, force_init=True)
                 for remove_sys_name in cur_transitions["systems"]["remove"]:
-                    scene.remove_system(remove_sys_name)
+                    scene.clear_system(remove_sys_name)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(np.ones(3) * 100.0 + np.ones(3) * 5 * j)
                 for remove_obj_name in cur_transitions["objects"]["remove"]:
                     obj = scene.object_registry("name", remove_obj_name)
-                    og.sim.remove_object(obj)
+                    scene.remove_object(obj)
                 # Step physics to initialize any new objects
                 og.sim.step()
 
