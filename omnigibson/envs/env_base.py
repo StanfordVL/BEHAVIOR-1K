@@ -67,26 +67,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = self.env_config["automatic_reset"]
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
-        self.physics_frequency = self.env_config["physics_frequency"]
-        self.rendering_frequency = self.env_config["rendering_frequency"]
-        self.action_frequency = self.env_config["action_frequency"]
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
         ]  # how high to offset object placement to account for one action step of dropping
 
-        physics_dt = 1.0 / self.physics_frequency
-        rendering_dt = 1.0 / self.rendering_frequency
-        sim_step_dt = 1.0 / self.action_frequency
+        physics_dt = 1.0 / self.env_config["physics_frequency"]
+        rendering_dt = 1.0 / self.env_config["rendering_frequency"]
+        sim_step_dt = 1.0 / self.env_config["action_frequency"]
         viewer_width = self.render_config["viewer_width"]
         viewer_height = self.render_config["viewer_height"]
-
-        # Make sure action frequency is divisible by rendering frequency
-        assert self.rendering_frequency >= self.action_frequency, \
-            f"Action frequency ({self.action_frequency} Hz) cannot be greater than rendering frequency ({self.rendering_frequency} Hz)!"
-
-        assert self.rendering_frequency % self.action_frequency == 0.0, \
-            f"Rendering frequency ({self.rendering_frequency} Hz) must be divisible by action frequency ({self.action_frequency} Hz)!"
 
         # If the sim is launched, check that the parameters match
         if og.sim is not None:
@@ -207,7 +197,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * ((1.0 / self.action_frequency) ** 2)
+        drop_distance = 0.5 * 9.8 * ((1.0 / og.sim.get_sim_step_dt()) ** 2)
         assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
     def _load_task(self, task_config=None):
@@ -249,10 +239,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load the scene and robot specified in the config file.
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
-
-        assert og.sim.get_physics_dt() == 1.0 / self.physics_frequency, "Physics frequency mismatch!"
-        assert og.sim.get_rendering_dt() == 1.0 / self.rendering_frequency, "Rendering frequency mismatch!"
-        assert og.sim.get_sim_step_dt() == 1.0 / self.action_frequency, "Action / sim_step frequency mismatch!"
 
         # Create the scene from our scene config
         self._scene = create_class_from_registry_and_config(

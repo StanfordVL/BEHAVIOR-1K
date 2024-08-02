@@ -436,7 +436,7 @@ class SerializableRegistry(Registry, Serializable):
         for obj in self.objects:
             if self._load_filter(obj):
                 if obj.name not in state:
-                    log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                    log.debug(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
                     continue
                 obj.load_state(state[obj.name], serialized=False)
 

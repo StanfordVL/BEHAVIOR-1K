@@ -497,6 +497,13 @@ def _launch_simulator(*args, **kwargs):
             assert sim_step_dt >= rendering_dt, \
                 f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
 
+            # If we're headless, we also enforce that sim_step_dt == rendering_dt because it doesn't make sense
+            # to waste rendering that is not observed by the user
+            if gm.HEADLESS:
+                assert sim_step_dt == rendering_dt, \
+                    (f"Simulation step dt ({sim_step_dt}) must be equal to rendering dt ({rendering_dt}) when "
+                     f"gm.HEADLESS is set!")
+
         @property
         def viewer_visibility(self):
             """
