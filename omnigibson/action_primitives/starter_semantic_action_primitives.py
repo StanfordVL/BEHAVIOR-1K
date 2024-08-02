@@ -1641,7 +1641,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
             body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2]
-
             if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
@@ -1728,9 +1727,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         diff_yaw = T.quat2euler(body_target_pose[1])[2]
 
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
-
-            # print("Robot position: " + str(self.robot.get_position()[:2]))
-
             if abs(diff_yaw) < angle_threshold:
                 break
 
