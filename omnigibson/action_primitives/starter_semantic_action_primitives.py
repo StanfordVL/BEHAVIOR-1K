@@ -33,7 +33,7 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.robots import BaseRobot, Fetch, Tiago
+from omnigibson.robots import *
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
@@ -53,8 +53,8 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
-m.KP_LIN_VEL = 0.05
-m.KP_ANGLE_VEL = 0.05
+m.KP_LIN_VEL = {Tiago: 0.3, Fetch: 0.3, Stretch: 0.3, Turtlebot: 0.3, Husky: 0.05, Freight: 0.1, Locobot: 1.0}
+m.KP_ANGLE_VEL = {Tiago: 0.2, Fetch: 0.2, Stretch: 0.2, Turtlebot: 0.2, Husky: 0.05, Freight: 0.05, Locobot: 2.0}
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -74,7 +74,7 @@ m.GRASP_APPROACH_DISTANCE = 0.2
 m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.DEFAULT_DIST_THRESHOLD = 0.05
-m.DEFAULT_ANGLE_THRESHOLD = 0.1
+m.DEFAULT_ANGLE_THRESHOLD = 0.05
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
@@ -1641,6 +1641,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
             body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2]
+
             if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
@@ -1650,7 +1651,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     # Joint controller
                     if base_action_size == 3:
                         # [x, y, theta]
-                        direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
+                        direction_vec = (
+                            body_target_pose[0][:2]
+                            / np.linalg.norm(body_target_pose[0][:2])
+                            * m.KP_LIN_VEL[type(self.robot)]
+                        )
                         base_action = [direction_vec[0], direction_vec[1], 0.0]
                         action[self.robot.controller_action_idx["base"]] = base_action
                     elif base_action_size == 4:
@@ -1658,14 +1663,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         direction_vec = body_target_pose[0][:2]
                         distance = np.linalg.norm(direction_vec)
                         # Move forward
-                        linear_x = min(distance, m.KP_LIN_VEL)
-                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0)
+                        linear_x = min(distance, m.KP_LIN_VEL[type(self.robot)])
+                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0, 4)
+                        action[self.robot.controller_action_idx["base"]] = wheel_velocities
+                    elif base_action_size == 2:
+                        # [left, right]
+                        direction_vec = body_target_pose[0][:2]
+                        distance = np.linalg.norm(direction_vec)
+                        # Move forward
+                        linear_x = min(distance, m.KP_LIN_VEL[type(self.robot)])
+                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0, 2)
                         action[self.robot.controller_action_idx["base"]] = wheel_velocities
                     else:
                         raise ValueError("Invalid base action size")
                 else:
                     # Diff drive controller
-                    base_action = [m.KP_LIN_VEL, 0.0]
+                    base_action = [m.KP_LIN_VEL[type(self.robot)], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 yield self._postprocess_action(action)
 
@@ -1680,21 +1693,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Rotate in place to final orientation once at location
         yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
 
-    def _calculate_wheel_velocities(self, linear_x, angular_z):
+    def _calculate_wheel_velocities(self, linear_x, angular_z, wheel_count=2):
         # Calculate individual wheel velocities based on desired motion
-        # Husky uses a differential drive system
 
-        # Calculate left and right wheel velocities
+        # Calculate base velocities for left and right sides
         v_left = linear_x - (self.robot.wheel_axle_length / 2) * angular_z
         v_right = linear_x + (self.robot.wheel_axle_length / 2) * angular_z
 
         # Convert linear velocities to angular velocities
-        wheel_velocities = [
-            v_left / self.robot.wheel_radius,  # Front Left
-            v_right / self.robot.wheel_radius,  # Front Right
-            v_left / self.robot.wheel_radius,  # Rear Left
-            v_right / self.robot.wheel_radius,  # Rear Right
-        ]
+        w_left = v_left / self.robot.wheel_radius
+        w_right = v_right / self.robot.wheel_radius
+
+        if wheel_count == 2:
+            wheel_velocities = [w_left, w_right]
+        elif wheel_count == 4:
+            wheel_velocities = [w_left, w_right, w_left, w_right]
+        else:
+            raise ValueError(f"Unsupported wheel configuration: {wheel_count} wheels")
 
         return wheel_velocities
 
@@ -1713,23 +1728,33 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         diff_yaw = T.quat2euler(body_target_pose[1])[2]
 
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
+
+            # print("Robot position: " + str(self.robot.get_position()[:2]))
+
             if abs(diff_yaw) < angle_threshold:
                 break
 
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = m.KP_ANGLE_VEL * direction
+            ang_vel = m.KP_ANGLE_VEL[type(self.robot)] * direction
+
+            if isinstance(self.robot, Locobot) or isinstance(self.robot, Freight):
+                # Locobot and Freight wheel joints are reversed
+                ang_vel = -ang_vel
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
             if not self._base_controller_is_joint:
                 base_action[1] = ang_vel
             elif base_action.size == 4:
-                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel)
+                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel, 4)
                 base_action[:] = wheel_velocities
             elif base_action.size == 3:
                 base_action[2] = ang_vel
+            elif base_action.size == 2:
+                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel, 2)
+                base_action[:] = wheel_velocities
             else:
                 raise ValueError("Invalid base action size")
 

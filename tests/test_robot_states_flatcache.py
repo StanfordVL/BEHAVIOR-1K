@@ -114,8 +114,8 @@ def camera_pose_test(flatcache):
     og.clear()
 
 
-# def test_camera_pose_flatcache_on():
-#     camera_pose_test(True)
+def test_camera_pose_flatcache_on():
+    camera_pose_test(True)
 
 
 def test_robot_load_drive():
@@ -139,8 +139,11 @@ def test_robot_load_drive():
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
 
-        # if not robot_name in ["Freight", "Husky", "Locobot", "Stretch"]:
-        if not robot_name in ["Husky", "Locobot", "Stretch"]:
+        if robot_name in ["Freight", "Stretch", "Husky"]:
+            # TODO:
+            # 1. Freight doesn't seem to be moving correctly due to wheel collision mesh
+            # 2. Stretch has a joint action mapping mismatch, waiting for Josiah
+            # 3. Husky base motion is a little messed up because of the 4-wheel drive
             continue
 
         robot = robot_cls(
@@ -189,6 +192,8 @@ def test_robot_load_drive():
 
         # If this is a locomotion robot, we want to test driving
         if isinstance(robot, LocomotionRobot) and not isinstance(robot, BehaviorRobot):
+            # load diff drive controller
+            controller_config = {"base": {"name": "DifferentialDriveController"}}
             action_primitives = StarterSemanticActionPrimitives(env)
             goal_location = (0, 1, 0)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
