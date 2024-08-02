@@ -53,7 +53,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
-m.KP_LIN_VEL = {Tiago: 0.3, Fetch: 0.3, Stretch: 0.3, Turtlebot: 0.3, Husky: 0.05, Freight: 0.1, Locobot: 1.0}
+m.KP_LIN_VEL = {Tiago: 0.3, Fetch: 0.3, Stretch: 0.3, Turtlebot: 0.3, Husky: 0.05, Freight: 0.05, Locobot: 1.0}
 m.KP_ANGLE_VEL = {Tiago: 0.2, Fetch: 0.2, Stretch: 0.2, Turtlebot: 0.2, Husky: 0.05, Freight: 0.05, Locobot: 2.0}
 
 m.MAX_STEPS_FOR_SETTLING = 500

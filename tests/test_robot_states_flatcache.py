@@ -139,11 +139,10 @@ def test_robot_load_drive():
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
 
-        if robot_name in ["Freight", "Stretch", "Husky"]:
+        if robot_name in ["Stretch", "Husky"]:
             # TODO:
-            # 1. Freight doesn't seem to be moving correctly due to wheel collision mesh
-            # 2. Stretch has a joint action mapping mismatch, waiting for Josiah
-            # 3. Husky base motion is a little messed up because of the 4-wheel drive
+            # 1. Stretch has a joint action mapping mismatch, waiting for Josiah
+            # 2. Husky base motion is a little messed up because of the 4-wheel drive
             continue
 
         robot = robot_cls(
