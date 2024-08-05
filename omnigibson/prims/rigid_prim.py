@@ -329,7 +329,7 @@ class RigidPrim(XFormPrim):
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
             self.clear_kinematic_only_cache()
-            
+
         position = np.asarray(position)[None, :]
         assert np.isclose(
             np.linalg.norm(orientation), 1, atol=1e-3

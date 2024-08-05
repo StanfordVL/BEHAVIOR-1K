@@ -1193,7 +1193,7 @@ def calculate_xy_plane_angle(quaternion):
     return np.arctan2(fwd[1], fwd[0])
 
 
-def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["world", "parent", "scene"]="scene"):
+def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["world", "parent", "scene"] = "scene"):
     """
     Compute the desired position and orientation of the object relative to frame. If desired position or orientation is set to none,
     the current position and orientation of the object relative to that frame will be used. If the frame is scene,
@@ -1210,7 +1210,7 @@ def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["w
     """
 
     assert frame in ["world", "parent", "scene"], "Frame must be either 'world', 'parent', or 'scene'."
-    
+
     if frame == "scene" and prim.scene is None:
         raise ValueError("Cannot set position and orientation relative to scene without a scene")
     else:

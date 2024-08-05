@@ -778,7 +778,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_if_needed(obj, toggle_position)
 
         # Just keep the current hand orientation.
-        hand_orientation = self.robot.eef_links[self.arm].get_position_orientation()[1]  
+        hand_orientation = self.robot.eef_links[self.arm].get_position_orientation()[1]
         desired_hand_pose = (toggle_position, hand_orientation)
 
         yield from self._move_hand(desired_hand_pose)
