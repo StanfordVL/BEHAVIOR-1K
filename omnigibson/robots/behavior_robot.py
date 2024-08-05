@@ -398,7 +398,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         super().set_position_orientation(position, orientation, frame=frame)
 
-        # convert to world pose, use the world pose down
+        # For the rest of this function we want to use the world pose
         if frame != "world":
             position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
 
@@ -589,7 +589,6 @@ class BRPart(ABC):
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         if frame == "world" or frame == "scene":
-
             position, orientation = self._root_link.get_position_orientation()
 
             if frame == "scene":
@@ -605,7 +604,6 @@ class BRPart(ABC):
             return position, orientation
 
         else:
-
             return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
     def set_position_orientation(

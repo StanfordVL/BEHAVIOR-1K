@@ -333,7 +333,6 @@ class ManipulationRobot(BaseRobot):
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Now for each hand, if it was holding an AG object, teleport it.
-
         for arm in self.arm_names:
             if self._ag_obj_in_hand[arm] is not None:
                 original_eef_pose = T.pose2mat(original_poses[arm])
