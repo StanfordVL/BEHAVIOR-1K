@@ -323,21 +323,18 @@ class RigidPrim(XFormPrim):
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
-        # If we are in a scene, compute the scene-local transform before setting the pose
-        if frame == "scene":
-            # if position or orientation is None, get the current position and orientation relative to scene
-            position, orientation = T.compute_scene_transform(self, position, orientation, frame)
+        # compute the pose in the desired frame
+        position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
 
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
             self.clear_kinematic_only_cache()
-        if position is not None:
-            position = np.asarray(position)[None, :]
-        if orientation is not None:
-            assert np.isclose(
-                np.linalg.norm(orientation), 1, atol=1e-3
-            ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+            
+        position = np.asarray(position)[None, :]
+        assert np.isclose(
+            np.linalg.norm(orientation), 1, atol=1e-3
+        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
 
         if frame == "world" or frame == "scene":
             self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
@@ -398,9 +395,7 @@ class RigidPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
             if self.scene is None:
-                og.log.warning(
-                    'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                )
+                raise ValueError("Cannot transform position and orientation relative to scene without a scene")
             else:
                 position, orientation = T.relative_pose_transform(
                     position, orientation, *self.scene.prim.get_position_orientation()

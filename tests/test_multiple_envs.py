@@ -40,33 +40,64 @@ def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
     return vec_env
 
 
-def test_multi_scene_dump_and_load():
-    vec_env = setup_multi_environment(3)
-    robot_displacement = [1.0, 0.0, 0.0]
-    scene_three_robot = vec_env.envs[2].scene.robots[0]
-    robot_new_pos = scene_three_robot.get_position_orientation()[0] + robot_displacement
-    scene_three_robot.set_position_orientation(position=robot_new_pos)
-    scene_three_state = vec_env.envs[2].scene._dump_state()
-    og.clear()
+def test_multi_scene_dump_load_states():
 
     vec_env = setup_multi_environment(3)
-    initial_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
-    vec_env.envs[0].scene._load_state(scene_three_state)
-    new_robot_pos_scene_one = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
-    assert np.allclose(new_robot_pos_scene_one - initial_robot_pos_scene_one, robot_displacement, atol=1e-3)
+    robot_0 = vec_env.envs[0].scene.robots[0]
+    robot_1 = vec_env.envs[1].scene.robots[0]
+    robot_2 = vec_env.envs[2].scene.robots[0]
 
-    og.clear()
-
-
-def test_multi_scene_displacement():
-    vec_env = setup_multi_environment(3)
-    robot_0_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
-    robot_1_pos = vec_env.envs[1].scene.robots[0].get_position_orientation()[0]
-    robot_2_pos = vec_env.envs[2].scene.robots[0].get_position_orientation()[0]
+    robot_0_pos = robot_0.get_position_orientation()[0]
+    robot_1_pos = robot_1.get_position_orientation()[0]
+    robot_2_pos = robot_2.get_position_orientation()[0]
 
     dist_0_1 = robot_1_pos - robot_0_pos
     dist_1_2 = robot_2_pos - robot_1_pos
+
     assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
+
+    # Set different poses for the cube in each environment
+    poses = [([1, 1, 0], [0, 0, 0, 1]), ([0, 2, 1], [0, 0, 0.7071, 0.7071]), ([-1, -1, 0.5], [0.5, 0.5, 0.5, 0.5])]
+
+    robot_0.set_position_orientation(*poses[0], frame="scene")
+    robot_1.set_position_orientation(*poses[1], frame="scene")
+    robot_2.set_position_orientation(*poses[2], frame="scene")
+
+    # Run simulation for a bit
+    for _ in range(10):
+        og.sim.step()
+
+    initial_robot_pos_scene_1 = robot_1.get_position_orientation(frame="scene")
+    initial_robot_pos_scene_2 = robot_2.get_position_orientation(frame="scene")
+    initial_robot_pos_scene_0 = robot_0.get_position_orientation(frame="scene")
+
+    # Save states
+    robot_0_state = vec_env.envs[0].scene._dump_state()
+    robot_1_state = vec_env.envs[1].scene._dump_state()
+    robot_2_state = vec_env.envs[2].scene._dump_state()
+    og.clear()
+
+    # recreate the environments
+    vec_env = setup_multi_environment(3)
+
+    # Load the states in a different order
+    vec_env.envs[1].scene._load_state(robot_1_state)
+    vec_env.envs[2].scene._load_state(robot_2_state)
+    vec_env.envs[0].scene._load_state(robot_0_state)
+
+    post_robot_pos_scene_1 = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="scene")
+    post_robot_pos_scene_2 = vec_env.envs[2].scene.robots[0].get_position_orientation(frame="scene")
+    post_robot_pos_scene_0 = vec_env.envs[0].scene.robots[0].get_position_orientation(frame="scene")
+
+    # Check that the poses are the same
+    assert np.allclose(initial_robot_pos_scene_0[0], post_robot_pos_scene_0[0], atol=1e-3)
+    assert np.allclose(initial_robot_pos_scene_1[0], post_robot_pos_scene_1[0], atol=1e-3)
+    assert np.allclose(initial_robot_pos_scene_2[0], post_robot_pos_scene_2[0], atol=1e-3)
+
+    assert np.allclose(initial_robot_pos_scene_0[1], post_robot_pos_scene_0[1], atol=1e-3)
+    assert np.allclose(initial_robot_pos_scene_1[1], post_robot_pos_scene_1[1], atol=1e-3)
+    assert np.allclose(initial_robot_pos_scene_2[1], post_robot_pos_scene_2[1], atol=1e-3)
+
     og.clear()
 
 
@@ -74,10 +105,10 @@ def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)
 
     robot_1_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="parent")[0]
-    robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="world")[0]
+    robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation()[0]
 
     scene_prim = vec_env.envs[1].scene.prim
-    pos_scene = scene_prim.get_position_orientation(frame="world")[0]
+    pos_scene = scene_prim.get_position_orientation()[0]
 
     assert np.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
     og.clear()
@@ -91,7 +122,7 @@ def test_multi_scene_set_local_position():
     robot = vec_env.envs[1].scene.robots[0]
 
     # Get the initial global position of the robot
-    initial_global_pos = robot.get_position_orientation(frame="world")[0]
+    initial_global_pos = robot.get_position_orientation()[0]
 
     # Define a new global position
     new_global_pos = initial_global_pos + np.array([1.0, 0.5, 0.0])
@@ -100,10 +131,10 @@ def test_multi_scene_set_local_position():
     robot.set_position_orientation(position=new_global_pos)
 
     # Get the updated global position
-    updated_global_pos = robot.get_position_orientation(frame="world")[0]
+    updated_global_pos = robot.get_position_orientation()[0]
 
     # Get the scene's global position
-    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation(frame="world")[0]
+    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation()[0]
 
     # Get the updated local position
     updated_local_pos = robot.get_position_orientation(frame="parent")[0]

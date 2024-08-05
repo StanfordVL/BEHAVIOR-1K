@@ -187,11 +187,10 @@ class XFormPrim(BasePrim):
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
-        if frame == "world" or frame == "scene":
+        # get the desired position and orientation in the specified frame
+        position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
 
-            current_position, current_orientation = self.get_position_orientation()
-            position = current_position if position is None else np.array(position, dtype=float)
-            orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+        if frame == "world" or frame == "scene":
 
             assert np.isclose(
                 np.linalg.norm(orientation), 1, atol=1e-3
@@ -213,25 +212,23 @@ class XFormPrim(BasePrim):
         else:
 
             properties = self.prim.GetPropertyNames()
-            if position is not None:
-                position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
-                if "xformOp:translate" not in properties:
-                    lazy.carb.log_error(
-                        "Translate property needs to be set for {} before setting its position".format(self.name)
-                    )
-                self.set_attribute("xformOp:translate", position)
-            if orientation is not None:
-                orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
-                if "xformOp:orient" not in properties:
-                    lazy.carb.log_error(
-                        "Orient property needs to be set for {} before setting its orientation".format(self.name)
-                    )
-                xform_op = self._prim.GetAttribute("xformOp:orient")
-                if xform_op.GetTypeName() == "quatf":
-                    rotq = lazy.pxr.Gf.Quatf(*orientation)
-                else:
-                    rotq = lazy.pxr.Gf.Quatd(*orientation)
-                xform_op.Set(rotq)
+            position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
+            if "xformOp:translate" not in properties:
+                lazy.carb.log_error(
+                    "Translate property needs to be set for {} before setting its position".format(self.name)
+                )
+            self.set_attribute("xformOp:translate", position)
+            orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+            if "xformOp:orient" not in properties:
+                lazy.carb.log_error(
+                    "Orient property needs to be set for {} before setting its orientation".format(self.name)
+                )
+            xform_op = self._prim.GetAttribute("xformOp:orient")
+            if xform_op.GetTypeName() == "quatf":
+                rotq = lazy.pxr.Gf.Quatf(*orientation)
+            else:
+                rotq = lazy.pxr.Gf.Quatd(*orientation)
+            xform_op.Set(rotq)
             PoseAPI.invalidate()
             if gm.ENABLE_FLATCACHE:
                 # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
@@ -268,9 +265,7 @@ class XFormPrim(BasePrim):
             # for legacy compatibility)
             if frame == "scene":
                 if self.scene is None:
-                    og.log.warning(
-                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                    )
+                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
                 else:
                     position, orientation = T.relative_pose_transform(
                         position, orientation, *self.scene.prim.get_position_orientation()
@@ -480,14 +475,23 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        pos, ori = self.get_position_orientation(frame="scene")
+
+        if self.scene is None:
+            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
+            pos, ori = self.get_position_orientation()
+        else:
+            pos, ori = self.get_position_orientation(frame="scene")
 
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
 
         pos, orn = np.array(state["pos"]), np.array(state["ori"])
-        self.set_position_orientation(pos, orn, frame="scene")
+        if self.scene is None:
+            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
+            self.set_position_orientation()
+        else:
+            self.set_position_orientation(pos, orn, frame="scene")
 
     def serialize(self, state):
         return np.concatenate([state["pos"], state["ori"]]).astype(float)

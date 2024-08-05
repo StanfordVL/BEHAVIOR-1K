@@ -1481,9 +1481,7 @@ class ManipulationRobot(BaseRobot):
         for arm in ag_params.keys():
             if len(ag_params[arm]) > 0:
                 if self.scene is None:
-                    og.log.warning(
-                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                    )
+                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
                 else:
                     ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
                         ag_params[arm]["contact_pos"], [0, 0, 0, 1], *self.scene.prim.get_position_orientation()
@@ -1511,9 +1509,7 @@ class ManipulationRobot(BaseRobot):
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 contact_pos_global = data["contact_pos"]
                 if self.scene is None:
-                    og.log.warning(
-                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                    )
+                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
                 else:
                     contact_pos_global, _ = T.pose_transform(
                         *self.scene.prim.get_position_orientation(), contact_pos_global, [0, 0, 0, 1]

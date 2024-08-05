@@ -718,6 +718,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
 
+        # For the rest of this function we want to use the world pose
+        if frame != "world":
+            position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
+
         assert np.isclose(
             np.linalg.norm(orientation), 1, atol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
@@ -728,7 +732,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
-            joint_pos, joint_orn = self.root_link.get_position_orientation(frame=frame)
+            joint_pos, joint_orn = self.root_link.get_position_orientation()
             inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
 
             relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)

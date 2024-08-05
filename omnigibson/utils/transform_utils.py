@@ -1193,9 +1193,12 @@ def calculate_xy_plane_angle(quaternion):
     return np.arctan2(fwd[1], fwd[0])
 
 
-def compute_scene_transform(prim, position, orientation, frame="scene"):
+def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["world", "parent", "scene"]="scene"):
     """
-    Compute the position and orientation of the object. If the frame is scene, compute the position and orientation relative to the scene.
+    Compute the desired position and orientation of the object relative to frame. If desired position or orientation is set to none,
+    the current position and orientation of the object relative to that frame will be used. If the frame is scene,
+    compute the scene to world transform relative to the scene's position and orientation.
+
     Args:
         prim (object): The object whose position and orientation are to be computed
         position (array): The position of the object
@@ -1206,14 +1209,13 @@ def compute_scene_transform(prim, position, orientation, frame="scene"):
         orientation: The orientation of the object relative to the orientation
     """
 
-    assert frame == "scene", f"Invalid frame '{frame}'. Must be scene'."
+    assert frame in ["world", "parent", "scene"], "Frame must be either 'world', 'parent', or 'scene'."
+    
     if frame == "scene" and prim.scene is None:
-        og.log.warning(
-            "Cannot set position and orientation relative to scene without a scene, defaulting to world frame"
-        )
+        raise ValueError("Cannot set position and orientation relative to scene without a scene")
     else:
         # if no position or no orientation are given, get the current position and orientation of the object
-        current_position, current_orientation = prim.get_position_orientation(frame="scene")
+        current_position, current_orientation = prim.get_position_orientation(frame=frame)
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
 

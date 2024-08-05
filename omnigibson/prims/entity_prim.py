@@ -980,10 +980,6 @@ class EntityPrim(XFormPrim):
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
-        # If we are in a scene, compute the scene-local transform before setting the pose
-        if frame == "scene":
-            position, orientation = T.compute_scene_transform(self, position, orientation, frame)
-
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
@@ -995,10 +991,13 @@ class EntityPrim(XFormPrim):
             self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
         # Sim is running and articulation view exists, so use that physx API backend
         else:
-            if position is not None:
-                position = np.asarray(position)[None, :]
-            if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+
+            # compute desired pose in the specified frame
+            position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
+            
+            # convert to format expected by articulation view
+            position = np.asarray(position)[None, :]
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
 
             if frame == "world" or frame == "scene":
                 self._articulation_view.set_world_poses(position, orientation)
@@ -1041,9 +1040,7 @@ class EntityPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
             if self.scene is None:
-                og.log.warning(
-                    "Cannot transform position and orientation relative to scene without a scene, defaulting to world frame"
-                )
+                raise ValueError("Cannot transform position and orientation relative to scene without a scene")
             else:
                 position, orientation = T.relative_pose_transform(
                     position, orientation, *self.scene.prim.get_position_orientation()

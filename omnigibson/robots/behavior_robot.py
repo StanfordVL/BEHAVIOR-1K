@@ -398,9 +398,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         super().set_position_orientation(position, orientation, frame=frame)
 
+        current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else np.array(position, dtype=float)
+        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+
         # For the rest of this function we want to use the world pose
-        if frame != "world":
-            position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
+        if frame == "scene":
+            position, orientation = T.pose_transform(*self.scene.get_position_orientation(), position, orientation)
 
         # Move the joint frame for the world_base_joint
         if self._world_base_fixed_joint_prim is not None:
@@ -593,12 +597,10 @@ class BRPart(ABC):
 
             if frame == "scene":
                 if self.scene is None:
-                    og.log.warning(
-                        'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-                    )
+                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
                 else:
                     position, orientation = T.relative_pose_transform(
-                        position, orientation, *self.parent.get_position_orientation()
+                        position, orientation, *self.scene.get_position_orientation()
                     )
 
             return position, orientation
@@ -622,6 +624,18 @@ class BRPart(ABC):
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+
+        current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else np.array(position, dtype=float)
+        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+
+        # transform to world pose if necessary
+        if frame != "world":
+            if frame == "scene" and self.scene is None:
+                raise ValueError("Cannot transform position and orientation relative to scene without a scene")
+            else:
+                pos, orn = T.relative_pose_transform(*self.get_position_orientation(), pos, orn)
+
         self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
         self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
         self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
