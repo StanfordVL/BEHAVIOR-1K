@@ -174,7 +174,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.sim.step()
 
     # Always shut the simulation down cleanly at the end
-    env.close()
+    og.clear()
 
 
 def input_to_xyz_delta_command(inp, delta=0.01):

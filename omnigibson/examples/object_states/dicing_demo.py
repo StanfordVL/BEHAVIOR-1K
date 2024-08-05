@@ -92,7 +92,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     knife.keep_still()
     knife.set_position_orientation(
         position=apple.get_position() + th.tensor([-0.15, 0.0, 0.2]),
-        orientation=T.euler2quat([-math.pi / 2, 0, 0]),
+        orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0])),
     )
 
     if short_exec == False:
@@ -106,7 +106,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         input("Apple has been diced! Press [ENTER] to terminate the demo.")
 
     # Always close simulator at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

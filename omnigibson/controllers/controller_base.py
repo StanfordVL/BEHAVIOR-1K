@@ -373,7 +373,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Check if input is an Iterable, if so, we simply convert the input to th.tensor and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
         return (
-            nums.float()
+            nums
             if isinstance(nums, th.Tensor)
             else (
                 th.tensor(nums, dtype=th.float32)

@@ -91,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.ESCAPE,
-        callback_fn=lambda: env.close(),
+        callback_fn=lambda: og.clear(),
     )
 
     # Print out additional keyboard commands

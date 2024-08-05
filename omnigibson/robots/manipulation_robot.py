@@ -1553,7 +1553,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: th.tensor([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_action) -> th.tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper.

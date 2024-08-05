@@ -134,7 +134,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(th.empty(0))
 
     # Shut down at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

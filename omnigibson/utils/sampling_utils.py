@@ -452,14 +452,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     # Convert the points into the world frame
     orig_shape = start_points.shape
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = th.tensor(
-        trimesh.transformations.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape),
-        dtype=th.float32,
-    )
-    end_points = th.tensor(
-        trimesh.transformations.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape),
-        dtype=th.float32,
-    )
+    start_points = T.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape)
+    end_points = T.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape)
 
     return start_points, end_points
 
@@ -513,8 +507,8 @@ def sample_raytest_start_end_full_grid_topdown(
 
     # Convert the points into the world frame
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = th.tensor(trimesh.transformations.transform_points(start_points, to_wf_transform), dtype=th.float32)
-    end_points = th.tensor(trimesh.transformations.transform_points(end_points, to_wf_transform), dtype=th.float32)
+    start_points = T.transform_points(start_points, to_wf_transform)
+    end_points = T.transform_points(end_points, to_wf_transform)
 
     start_points = th.unsqueeze(start_points, dim=1)
     end_points = th.unsqueeze(end_points, dim=1)

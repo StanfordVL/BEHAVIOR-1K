@@ -93,7 +93,7 @@ gm.SHOW_DISCLAIMERS = False
 
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
-gm.USE_GPU_DYNAMICS = True
+gm.USE_GPU_DYNAMICS = False
 
 # Whether to use high-fidelity rendering (this includes, e.g., isosurfaces)
 gm.ENABLE_HQ_RENDERING = False

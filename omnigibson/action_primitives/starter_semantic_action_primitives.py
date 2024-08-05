@@ -78,7 +78,7 @@ m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
-m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = th.deg2rad(th.tensor([45])).item()
+m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
 
 log = create_module_logger(module_name=__name__)
 
@@ -170,7 +170,7 @@ class PlanningContext(object):
     def _set_prim_pose(self, prim, pose):
         translation = lazy.pxr.Gf.Vec3d(*(th.tensor(pose[0], dtype=th.float32).tolist()))
         prim.GetAttribute("xformOp:translate").Set(translation)
-        orientation = th.tensor(pose[1], dtype=float)[[3, 0, 1, 2]]
+        orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
         prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     def _construct_disabled_collision_pairs(self):
@@ -356,7 +356,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             reset_pose = robot_copy.reset_pose[robot_type]
             translation = lazy.pxr.Gf.Vec3d(*th.tensor(reset_pose[0], dtype=th.float32).tolist())
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
-            orientation = th.tensor(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
+            orientation = th.tensor(reset_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
             copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
             robot_to_copy = None
@@ -1062,11 +1062,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = th.tensor(joint_pos) - th.tensor(current_joint_pos)
-            if th.max(th.abs(diff_joint_pos)).values < m.JOINT_POS_DIFF_THRESHOLD:
+            if th.max(th.abs(diff_joint_pos)).item() < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).values < 0.0001:
+            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001:
                 # We're stuck!
                 break
 
@@ -1183,7 +1183,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = th.norm(target_pose[0] - start_pos)
-        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1]).values
+        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1]).item()
         pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations

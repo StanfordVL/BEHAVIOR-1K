@@ -700,7 +700,7 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
-def nums2array(nums, dim, dtype=float):
+def nums2array(nums, dim, dtype=th.float32):
     """
     Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
     corresponding dimension size @dim before converting into numpy array
@@ -728,30 +728,33 @@ def clear():
     CLASS_NAMES.clear()
 
 
-def torch_delete(tensor, indices, dim=None):
+def torch_delete(tensor: th.Tensor, indices: th.Tensor | int, dim: int | None = None) -> th.Tensor:
     """
-    Delete elements from a tensor along a specified dim.
+    Delete elements from a tensor along a specified dimension.
 
     Parameters:
     tensor (torch.Tensor): Input tensor.
-    indices (int or array-like): Indices of elements to remove.
-    dim (int, optional): The dim along which to delete the elements.
-                          If None, the tensor is flattened before deletion.
+    indices (int or torch.Tensor): Indices of elements to remove.
+    dim (int, optional): The dimension along which to delete the elements.
+                         If None, the tensor is flattened before deletion.
 
     Returns:
     torch.Tensor: Tensor with specified elements removed.
     """
+    assert tensor.dim() > 0, "Input tensor must have at least one dimension"
+
     if dim is None:
         # Flatten the tensor if no dim is specified
         tensor = tensor.flatten()
         dim = 0
 
-    # Convert indices to a tensor if they are not already
     if not isinstance(indices, th.Tensor):
-        indices = th.tensor(indices, dtype=th.long)
+        indices = th.tensor(indices, dtype=th.long, device=tensor.device)
+
+    assert th.all(indices >= 0) and th.all(indices < tensor.size(dim)), "Indices out of bounds"
 
     # Create a mask for the indices to keep
-    keep_indices = th.ones(tensor.size(dim), dtype=th.bool)
+    keep_indices = th.ones(tensor.size(dim), dtype=th.bool, device=tensor.device)
     keep_indices[indices] = False
 
-    return tensor[keep_indices] if dim == 0 else tensor.transpose(0, dim)[keep_indices].transpose(0, dim)
+    return th.index_select(tensor, dim, th.nonzero(keep_indices).squeeze(1))

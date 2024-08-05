@@ -84,7 +84,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")
 
     # Always close environment down at end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

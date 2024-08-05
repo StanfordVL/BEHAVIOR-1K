@@ -68,7 +68,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         og.sim.remove_object(obj=robot)
 
     # Always shut down the environment cleanly at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

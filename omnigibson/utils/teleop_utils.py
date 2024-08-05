@@ -75,7 +75,7 @@ class TeleopSystem(TeleopPolicy):
             robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
         return robot_obs
 
-    def get_action(self, robot_obs: TeleopObservation) -> th.tensor:
+    def get_action(self, robot_obs: TeleopObservation) -> th.Tensor:
         """
         Generate action data from VR input for robot teleoperation
         Args:
@@ -204,7 +204,7 @@ class OVXRSystem(TeleopSystem):
         orn = T.quat_multiply(orn, self.xr2og_orn_offset)
         return pos, orn
 
-    def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.tensor:
+    def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.Tensor:
         """
         Apply the orientation offset from the OmniGibson coordinate system to the Omniverse XR coordinate system
         Args:
@@ -317,7 +317,7 @@ class OVXRSystem(TeleopSystem):
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
 
-    def teleop_data_to_action(self) -> th.tensor:
+    def teleop_data_to_action(self) -> th.Tensor:
         """
         Generate action data from VR input for robot teleoperation
         Returns:

@@ -1,7 +1,6 @@
 import itertools
 
 import torch as th
-import trimesh
 from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
 
 import omnigibson as og
@@ -64,7 +63,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
         vertices_local = th.tensor(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
         vertices = th.tensor(
-            trimesh.transformations.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn))),
+            T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn))),
             dtype=th.float32,
         )
         rigid_hull = ConvexHull(vertices[:, :2])

@@ -733,7 +733,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
-    def get_linear_velocity(self) -> th.tensor:
+    def get_linear_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_linear_velocity()
 
@@ -745,7 +745,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
-    def get_angular_velocity(self) -> th.tensor:
+    def get_angular_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
 
@@ -756,7 +756,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             for arm in self.arm_names
         }
 
-    def teleop_data_to_action(self, teleop_action) -> th.tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
         action[self.base_action_idx] = teleop_action.base * 0.1
         return action

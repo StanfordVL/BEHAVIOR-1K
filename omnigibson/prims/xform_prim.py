@@ -2,7 +2,6 @@ import math
 from collections.abc import Iterable
 
 import torch as th
-import trimesh.transformations
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -349,7 +348,7 @@ class XFormPrim(BasePrim):
         return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
-        return th.tensor(trimesh.transformations.transform_points(points, self.scaled_transform), dtype=th.float32)
+        return T.transform_points(points, self.scaled_transform)
 
     @property
     def scale(self):

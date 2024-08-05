@@ -436,7 +436,7 @@ class AttachedTo(
                     log.warning(f"parent reference is not updated after attachment")
 
     def serialize(self, state):
-        return th.tensor([state["attached_obj_uuid"]], dtype=float)
+        return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)
 
     def deserialize(self, state):
         return dict(attached_obj_uuid=int(state[0])), 1

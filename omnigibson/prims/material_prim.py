@@ -893,7 +893,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied (x,y) texture_translate
         """
-        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=float)))
+        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
 
     @property
     def texture_rotate(self):
@@ -925,7 +925,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied (x,y) texture_scale
         """
-        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=float)))
+        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
 
     @property
     def detail_texture_translate(self):
@@ -941,7 +941,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied detail_texture_translate
         """
-        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=float)))
+        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
 
     @property
     def detail_texture_rotate(self):
@@ -973,7 +973,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied detail_texture_scale
         """
-        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=float)))
+        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
 
     @property
     def exclude_from_white_mode(self):

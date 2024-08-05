@@ -124,7 +124,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Shutdown sim
     if not short_exec:
         input("Completed demo. Press [ENTER] to shutdown simulation.")
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

@@ -151,7 +151,7 @@ class TwoWheelRobot(LocomotionRobot):
         classes.add("TwoWheelRobot")
         return classes
 
-    def teleop_data_to_action(self, teleop_action) -> th.tensor:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         NOTE: This implementation only supports DifferentialDriveController.

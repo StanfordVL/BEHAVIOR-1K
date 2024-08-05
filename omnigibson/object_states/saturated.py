@@ -69,7 +69,7 @@ class ModifiedParticles(RelativeObjectState):
         }
 
     def serialize(self, state):
-        state_flat = th.tensor([state["n_systems"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
             state_flat = th.cat(

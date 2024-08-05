@@ -1531,3 +1531,41 @@ def random_quaternion(num_quaternions: int = 1):
     quaternions = th.cat([qw, qx, qy, qz], dim=1)
 
     return quaternions
+
+
+@th.jit.script
+def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = True) -> th.Tensor:
+    """
+    Returns points rotated by a homogeneous
+    transformation matrix.
+    If points are (n, 2) matrix must be (3, 3)
+    If points are (n, 3) matrix must be (4, 4)
+
+    Parameters
+    ----------
+    points : (n, dim) torch.Tensor
+      Points where `dim` is 2 or 3.
+    matrix : (3, 3) or (4, 4) torch.Tensor
+      Homogeneous rotation matrix.
+    translate : bool
+      Apply translation from matrix or not.
+
+    Returns
+    ----------
+    transformed : (n, dim) torch.Tensor
+      Transformed points.
+    """
+    if len(points) == 0 or matrix is None:
+        return points.clone()
+
+    count, dim = points.shape
+    # Check if the matrix is close to an identity matrix
+    identity = th.eye(dim + 1, device=points.device)
+    if th.abs(matrix - identity[: dim + 1, : dim + 1]).max() < 1e-8:
+        return points.clone().contiguous()
+
+    if translate:
+        stack = th.cat((points, th.ones(count, 1, device=points.device)), dim=1)
+        return th.mm(matrix, stack.t()).t()[:, :dim]
+    else:
+        return th.mm(matrix[:dim, :dim], points.t()).t()

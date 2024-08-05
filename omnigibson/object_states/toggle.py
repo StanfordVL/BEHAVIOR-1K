@@ -190,7 +190,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
     def serialize(self, state):
-        return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=float)
+        return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=th.float32)
 
     def deserialize(self, state):
         return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

@@ -744,7 +744,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._current_step = state["current_step"]
 
     def serialize(self, state):
-        return th.tensor([state["current_step"]], dtype=float)
+        return th.tensor([state["current_step"]], dtype=th.float32)
 
     def deserialize(self, state):
         current_step = int(state[0])
@@ -1193,7 +1193,6 @@ class ParticleApplier(ParticleModifier):
         # If we're about to check for modification, update whether it the visualization should be active or not
         if self.visualize and self._current_step == 0:
             # Only one system in our conditions, so next(iter()) suffices
-            # is_active = bool(th.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
             is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
             self.projection_emitter.GetProperty("inputs:active").Set(is_active)
 
@@ -1291,7 +1290,7 @@ class ParticleApplier(ParticleModifier):
                     # scale differences between the two objects, so that "moving" the particle to the new object won't
                     # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
                     particles_info[group]["scales"].append(
-                        scale * modifier_avg_scale / th.pow(th.prod(hit_obj.scale).cbrt(), 1 / 3)
+                        scale * modifier_avg_scale / th.pow(th.prod(hit_obj.scale), 1 / 3)
                     )
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group

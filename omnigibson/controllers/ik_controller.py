@@ -244,8 +244,8 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
-        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"], dtype=th.float32)
+        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"], dtype=th.float32)
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -258,7 +258,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative.float() if (self._goal is None) else self._goal["target_quat"]
+                self._fixed_quat_target = quat_relative if (self._goal is None) else self._goal["target_quat"]
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation

@@ -115,7 +115,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         step += 1
 
     # Always close environment at the end
-    env.close()
+    og.clear()
 
 
 def sample_microwave_plates_apples(env):

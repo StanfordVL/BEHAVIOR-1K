@@ -102,7 +102,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         steps += 1
 
     # Always close env at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

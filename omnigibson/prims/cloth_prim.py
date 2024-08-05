@@ -121,7 +121,7 @@ class ClothPrim(GeomPrim):
             )
             overlap_vol = overlap_x * overlap_y * overlap_z
             true_vol = th.prod(true_aabb[1] - true_aabb[0])
-            if true_vol == 0.0 or overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
+            if true_vol == 0.0 or (overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD).item():
                 success = True
                 break
         assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
