@@ -13,8 +13,8 @@ if errorlevel 0 (
     set /p ISAAC_SIM_PATH=If you have already installed it in a custom location, please type in the path containing isaac-sim.bat here ^>^>^> 
 )
 :check_isaac_sim_path
-if not exist %ISAAC_SIM_PATH%\isaac-sim.bat (
-    set /p ISAAC_SIM_PATH=isaac-sim.bat not found in [4m%ISAAC_SIM_PATH%[0m! Make sure you have entered the correct path ^>^>^>
+if not exist %ISAAC_SIM_PATH%\isaac*.bat (
+    set /p ISAAC_SIM_PATH=isaac*.bat not found in [4m%ISAAC_SIM_PATH%[0m! Make sure you have entered the correct path ^>^>^>
     goto :check_isaac_sim_path
 )
 echo:
