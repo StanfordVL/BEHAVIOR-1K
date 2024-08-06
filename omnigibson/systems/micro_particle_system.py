@@ -159,7 +159,11 @@ class PhysxParticleInstancer(BasePrim):
             else orientations
         )
         self.particle_scales = th.vstack([self.particle_scales, scales]) if self.particle_scales.numel() > 0 else scales
-        self.particle_prototype_ids = th.cat([self.particle_prototype_ids, prototype_indices])
+        self.particle_prototype_ids = (
+            th.cat([self.particle_prototype_ids, prototype_indices])
+            if self.particle_prototype_ids.numel() > 0
+            else prototype_indices
+        )
 
     def remove_particles(self, idxs):
         """
@@ -350,9 +354,11 @@ class PhysxParticleInstancer(BasePrim):
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self.n_particles,
-            particle_positions=th.stack(local_positions) if len(local_positions) > 0 else th.tensor([]),
+            particle_positions=th.stack(local_positions) if len(local_positions) > 0 else th.empty(0, dtype=th.float32),
             particle_velocities=self.particle_velocities,
-            particle_orientations=th.stack(local_orientations) if len(local_orientations) > 0 else th.tensor([]),
+            particle_orientations=(
+                th.stack(local_orientations) if len(local_orientations) > 0 else th.empty(0, dtype=th.float32)
+            ),
             particle_scales=self.particle_scales,
             particle_prototype_ids=self.particle_prototype_ids,
         )

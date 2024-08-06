@@ -971,8 +971,8 @@ class SlicingRule(BaseTransitionRule):
                     name=part_obj_name,
                     category=part["category"],
                     model=part["model"],
-                    bounding_box=part["bb_size"]
-                    * scale.numpy(),  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
+                    bounding_box=th.tensor(part["bb_size"], dtype=th.float32)
+                    * scale,  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
                 sliceable_obj_state = sliceable_obj.dump_state()

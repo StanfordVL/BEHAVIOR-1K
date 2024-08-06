@@ -4,16 +4,8 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
+from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform, quaternions_close
 from omnigibson.utils.usd_utils import PoseAPI
-
-
-def quaternions_close(q1, q2, atol=1e-3):
-    """
-    Whether two quaternions represent the same rotation,
-    allowing for the possibility that one is the negative of the other.
-    """
-    return th.allclose(q1, q2, atol=atol) or th.allclose(q1, -q2, atol=atol)
 
 
 def setup_environment(flatcache):

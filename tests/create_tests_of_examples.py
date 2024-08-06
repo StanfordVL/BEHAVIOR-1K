@@ -26,13 +26,7 @@ def main():
     examples_list = []
     prefix = examples.__name__ + "."
     for package in pkgutil.walk_packages(examples.__path__, prefix):
-        if (
-            not package.ispkg
-            and package.name[len(prefix) :] != "example_selector"
-            and "web_ui" not in package.name[len(prefix) :]
-            and "vr_" not in package.name[len(prefix) :]
-            and "ray_" not in package.name[len(prefix) :]
-        ):
+        if not package.ispkg:
             examples_list.append(package.name[len(prefix) :])
 
     current_dir = os.path.dirname(os.path.abspath(__file__))

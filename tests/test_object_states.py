@@ -640,7 +640,6 @@ def test_on_fire(env):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@pytest.mark.skip(reason="TODO(parallel-hang): fix this later")
 @og_test
 def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")

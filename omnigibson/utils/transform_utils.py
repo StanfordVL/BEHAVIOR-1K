@@ -1541,19 +1541,17 @@ def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = Tru
     If points are (n, 2) matrix must be (3, 3)
     If points are (n, 3) matrix must be (4, 4)
 
-    Parameters
-    ----------
-    points : (n, dim) torch.Tensor
-      Points where `dim` is 2 or 3.
-    matrix : (3, 3) or (4, 4) torch.Tensor
-      Homogeneous rotation matrix.
-    translate : bool
-      Apply translation from matrix or not.
+    Arguments:
+        points : (n, dim) torch.Tensor
+        Points where `dim` is 2 or 3.
+        matrix : (3, 3) or (4, 4) torch.Tensor
+        Homogeneous rotation matrix.
+        translate : bool
+        Apply translation from matrix or not.
 
-    Returns
-    ----------
-    transformed : (n, dim) torch.Tensor
-      Transformed points.
+    Returns:
+        transformed : (n, dim) torch.Tensor
+        Transformed points.
     """
     if len(points) == 0 or matrix is None:
         return points.clone()
@@ -1569,3 +1567,24 @@ def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = Tru
         return th.mm(matrix, stack.t()).t()[:, :dim]
     else:
         return th.mm(matrix[:dim, :dim], points.t()).t()
+
+
+@th.jit.script
+def quaternions_close(q1: th.Tensor, q2: th.Tensor, atol: float = 1e-3) -> bool:
+    """
+    Whether two quaternions represent the same rotation,
+    allowing for the possibility that one is the negative of the other.
+
+    Arguments:
+        q1: th.Tensor
+            First quaternion
+        q2: th.Tensor
+            Second quaternion
+        atol: float
+            Absolute tolerance for comparison
+
+    Returns:
+        bool
+            Whether the quaternions are close
+    """
+    return th.allclose(q1, q2, atol=atol) or th.allclose(q1, -q2, atol=atol)
