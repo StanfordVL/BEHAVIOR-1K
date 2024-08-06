@@ -417,6 +417,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
+        # Run any additional task post-loading behavior
+        self.task.post_play_load()
+
         # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
         self.scene.reset()
 

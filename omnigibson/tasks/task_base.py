@@ -118,14 +118,19 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Run internal method
         self._load(env=env)
 
-        # Load the obs space dim
-        og.sim.play()
-        obs = self.get_obs(env=env, flatten_low_dim=True)
-        self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
-        og.sim.stop()
-
         # We're now initialized
         self._loaded = True
+
+    def post_play_load(self, env):
+        """
+        Complete any loading tasks that require the simulator to be playing
+
+        Args:
+            env (Environment): environment instance
+        """
+        # Compute the low dimensional observation dimension
+        obs = self.get_obs(env=env, flatten_low_dim=True)
+        self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
 
     @property
     def task_metadata(self):
