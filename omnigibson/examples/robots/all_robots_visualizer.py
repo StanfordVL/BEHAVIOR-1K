@@ -23,7 +23,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
         # Create and import robot
         robot = robot_cls(
-            relative_prim_path=f"/{robot_name}",
             name=robot_name,
             obs_modalities=[],  # We're just moving robots around so don't load any observation modalities
         )

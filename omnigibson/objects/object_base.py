@@ -429,6 +429,22 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
+    def dump_state(self, serialized=False):
+        """
+        Dumps the state of this object in either dictionary of flattened numerical form.
+
+        Args:
+            serialized (bool): If True, will return the state of this object as a 1D numpy array. Otherewise, will return
+                a (potentially nested) dictionary of states for this object
+
+        Returns:
+            dict or n-array: Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical np.array capturing this object's state
+        """
+        assert self._initialized, "Object must be initialized before dumping state!"
+        return super().dump_state(serialized=serialized)
+
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template

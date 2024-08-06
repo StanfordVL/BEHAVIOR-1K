@@ -105,8 +105,17 @@ def _launch_app():
         # sys.argv.append("--/log/outputStreamLevel=error")
         warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
+    # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
+    # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
+    # On the regular omniverse launcher version this should not have any impact.
+    try:
+        import isaacsim  # noqa: F401
+    except ImportError:
+        isaacsim = None
+
     # First obtain the Isaac Sim version
-    version_file_path = os.path.join(os.environ["ISAAC_PATH"], "VERSION")
+    isaac_path = os.environ["ISAAC_PATH"]
+    version_file_path = os.path.join(isaac_path, "VERSION")
     assert os.path.exists(version_file_path), f"Isaac Sim version file not found at {version_file_path}"
     with open(version_file_path, "r") as file:
         version_content = file.read().strip()
@@ -119,8 +128,10 @@ def _launch_app():
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
     assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    exp_path = os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
-    kit_file_target = Path(os.environ["EXP_PATH"]) / kit_file_name
+    kit_file_target = Path(exp_path) / kit_file_name
+
     try:
         shutil.copy(kit_file, kit_file_target)
     except Exception as e:

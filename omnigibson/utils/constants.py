@@ -11,7 +11,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_all_object_categories, get_og_avg_category_specs
+from omnigibson.utils.asset_utils import get_all_object_categories, get_all_system_categories
 
 MAX_INSTANCE_COUNT = np.iinfo(np.uint32).max
 MAX_CLASS_COUNT = np.iinfo(np.uint32).max
@@ -170,7 +170,7 @@ UNDER_OBJECTS = [
 
 
 @cache
-def semantic_class_name_to_id(scene):
+def semantic_class_name_to_id():
     """
     Get mapping from semantic class name to class id
 
@@ -179,7 +179,7 @@ def semantic_class_name_to_id(scene):
     """
     categories = get_all_object_categories()
 
-    systems = sorted(scene.available_systems.keys())
+    systems = get_all_system_categories()
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
     # Assign a unique class id to each class name with hashing
@@ -189,11 +189,11 @@ def semantic_class_name_to_id(scene):
 
 
 @cache
-def semantic_class_id_to_name(scene):
+def semantic_class_id_to_name():
     """
     Get mapping from semantic class id to class name
 
     Returns:
         dict: class id to class name
     """
-    return {v: k for k, v in semantic_class_name_to_id(scene).items()}
+    return {v: k for k, v in semantic_class_name_to_id().items()}

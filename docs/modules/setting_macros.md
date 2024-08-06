@@ -2,11 +2,11 @@
 icon: octicons/gear-24
 ---
 
-# ⚙️ **Using Macros**
+# ⚙️ **Setting Macros**
 
 Macros are a global set of hard-coded, "magic" numbers that are used as default values across **OmniGibson**. These values can have significant implications that broadly impact **OmniGibson**'s runtime (such as setting `HEADLESS` or `DEFAULT_PHYSICS_FREQ`), or can have a much more narrow scope that impacts only a specific module within **OmniGibson** (such as `FIRE_EMITTER_HEIGHT_RATIO`).
 
-All macros within **OmniGibson** can be directly accessed and set via the [`omnigibson/macros.py`](../reference/macros.html) module. There are two sets of macros:
+All macros within **OmniGibson** can be directly accessed and set via the [`omnigibson/macros.py`](../reference/macros.md) module. There are two sets of macros:
 
 1. **Global Macros**: Accessed via the `gm` module variable, these are fundamental settings that generally impact all parts of **OmniGibson** runtime, and include values such as `gm.HEADLESS`, `gm.DEFAULT_PHYSICS_FREQ`, and `gm.ENABLE_HQ_RENDERING`. Descriptions of each global macro can be seen directly in the `omnigibson/macros.py` file.
 2. **Module Macros** Accessed via the `macros` module variable, these are module-level settings used by individual modules throughout **OmniGibson**. These tend to only impact the module they are defined in, though they can be referenced by other modules as well. Examples include values such as `macros.objects.stateful_object.FIRE_EMITTER_HEIGHT_RATIO` and `macros.robots.manipulation_robot.ASSIST_GRASP_MASS_THRESHOLD`. Descriptions of each module-level macro can be seen directly at the top of the module that it is defined in.

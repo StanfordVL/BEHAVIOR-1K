@@ -557,14 +557,14 @@ These examples showcase useful functionality from **`OmniGibson`**'s monolithic 
 
 ??? question "What's the difference between `Environment` and `Simulator`?"
 
-    The [`Simulator`](../../reference/simulator) class is a lower-level object that:
+    The [`Simulator`](../reference/simulator.md) class is a lower-level object that:
       
       * handles importing scenes and objects into the actual simulation
       * directly interfaces with the underlying physics engine
 
-    The [`Environment`](../../reference/environemnts/base_env) class thinly wraps the `Simulator`'s core functionality, by:
+    The [`Environment`](../reference/envs/env_base.md) class thinly wraps the `Simulator`'s core functionality, by:
 
-      * providing convenience functions for automatically importing a predefined scene, object(s), and robot(s) (via the `cfg` argument), as well as a [`task`](../../reference/tasks/task_base)
+      * providing convenience functions for automatically importing a predefined scene, object(s), and robot(s) (via the `cfg` argument), as well as a [`task`](../reference/tasks/task_base.md)
       * providing a OpenAI Gym interface for stepping through the simulation
 
     While most of the core functionality in `Environment` (as well as more fine-grained physics control) can be replicated via direct calls to `Simulator` (`og.sim`), it requires deeper understanding of **`OmniGibson`**'s infrastructure and is not recommended for new users.
