@@ -1,5 +1,5 @@
-from collections.abc import Iterable
 import math
+from collections.abc import Iterable
 
 import cv2
 import numpy as np
