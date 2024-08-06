@@ -201,7 +201,7 @@ def segmentation_to_rgb(seg_im, N, colors=None):
     if N <= 256:
         return (255.0 * use_colors[seg_im]).to(th.uint8)
     else:
-        return (use_colors[seg_im]).float()
+        return use_colors[seg_im]
 
 
 def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):

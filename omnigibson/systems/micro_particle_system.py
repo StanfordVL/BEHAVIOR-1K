@@ -230,7 +230,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray(pos.float().tolist()))
+        self.set_attribute(attr="positions", val=lazy.pxr.Vt.Vec3fArray(pos.tolist()))
 
     @property
     def particle_orientations(self):
@@ -254,7 +254,7 @@ class PhysxParticleInstancer(BasePrim):
             quat.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self.n_particles}!"
         # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
-        quat = quat.float()
+        quat = quat
         if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat.numpy()))
@@ -280,7 +280,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             vel.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.float().tolist()))
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.tolist()))
 
     @property
     def particle_scales(self):
@@ -303,7 +303,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             scales.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray(scales.float().tolist()))
+        self.set_attribute(attr="scales", val=lazy.pxr.Vt.Vec3fArray(scales.tolist()))
 
     @property
     def particle_prototype_ids(self):
@@ -407,7 +407,7 @@ class PhysxParticleInstancer(BasePrim):
                 state["particle_scales"].reshape(-1),
                 state["particle_prototype_ids"],
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Sanity check the identification number
@@ -1305,7 +1305,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                     for name, inst_state in state["particle_states"].items()
                 ],
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Synchronize the particle instancers

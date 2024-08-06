@@ -130,7 +130,7 @@ class MovingAverageFilter(Filter):
                 th.tensor([state["current_idx"]]),
                 th.tensor([state["fully_filled"]]),
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Run super first
@@ -214,7 +214,7 @@ class ExponentialAverageFilter(Filter):
                 state["avg"],
                 [state["num_samples"]],
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Run super first

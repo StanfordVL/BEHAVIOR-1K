@@ -215,7 +215,7 @@ class OperationalSpaceController(ManipulationController):
         self.decouple_pos_ori = decouple_pos_ori
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
-        self.reset_joint_pos = reset_joint_pos[dof_idx].float()
+        self.reset_joint_pos = reset_joint_pos[dof_idx]
 
         # Other variables that will be filled in at runtime
         self._fixed_quat_target = None
@@ -266,13 +266,13 @@ class OperationalSpaceController(ManipulationController):
         """
         idx = 0
         if self.variable_kp:
-            self.kp = gains[:, idx : idx + 6].float()
+            self.kp = gains[:, idx : idx + 6]
             idx += 6
         if self.variable_damping_ratio:
-            self.damping_ratio = gains[:, idx : idx + 6].float()
+            self.damping_ratio = gains[:, idx : idx + 6]
             idx += 6
         if self.variable_kp_null:
-            self.kp_null = gains[:, idx : idx + self.control_dim].float()
+            self.kp_null = gains[:, idx : idx + self.control_dim]
             self.kd_null = 2 * math.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
@@ -309,7 +309,7 @@ class OperationalSpaceController(ManipulationController):
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
             if self._fixed_quat_target is None:
-                self._fixed_quat_target = quat_relative.float() if (self._goal is None) else self._goal["target_quat"]
+                self._fixed_quat_target = quat_relative if (self._goal is None) else self._goal["target_quat"]
             target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
@@ -332,8 +332,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Set goals and return
         return dict(
-            target_pos=target_pos.float(),
-            target_ori_mat=T.quat2mat(target_quat).float(),
+            target_pos=target_pos,
+            target_ori_mat=T.quat2mat(target_quat),
         )
 
     def compute_control(self, goal_dict, control_dict):
@@ -391,9 +391,9 @@ class OperationalSpaceController(ManipulationController):
             qd=qd,
             mm=mm,
             j_eef=j_eef,
-            ee_pos=ee_pos.float(),
-            ee_mat=T.quat2mat(ee_quat).float(),
-            ee_vel=ee_vel.float(),
+            ee_pos=ee_pos,
+            ee_mat=T.quat2mat(ee_quat),
+            ee_vel=ee_vel,
             goal_pos=goal_dict["target_pos"],
             goal_ori_mat=goal_dict["target_ori_mat"],
             kp=kp,
@@ -403,8 +403,8 @@ class OperationalSpaceController(ManipulationController):
             rest_qpos=self.reset_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
-            base_lin_vel=base_lin_vel.float(),
-            base_ang_vel=base_ang_vel.float(),
+            base_lin_vel=base_lin_vel,
+            base_ang_vel=base_ang_vel,
         ).flatten()
 
         # Apply gravity compensation from the control dict
@@ -420,8 +420,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Convert quat into eef ori mat
         return dict(
-            target_pos=target_pos.float(),
-            target_ori_mat=T.quat2mat(target_quat).float(),
+            target_pos=target_pos,
+            target_ori_mat=T.quat2mat(target_quat),
         )
 
     def _get_goal_shapes(self):
@@ -464,7 +464,7 @@ def _compute_osc_torques(
 
     # Calculate error
     pos_err = goal_pos - ee_pos
-    ori_err = orientation_error(goal_ori_mat, ee_mat).float()
+    ori_err = orientation_error(goal_ori_mat, ee_mat)
     err = th.cat((pos_err, ori_err))
 
     # Vel target is the base velocity as experienced by the end effector
@@ -504,7 +504,7 @@ def _compute_osc_torques(
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
         u_null = kd_null * -qd + kp_null * ((rest_qpos - q + math.pi) % (2 * math.pi) - math.pi)
-        u_null = mm @ th.unsqueeze(u_null, dim=-1).float()
+        u_null = mm @ th.unsqueeze(u_null, dim=-1)
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u

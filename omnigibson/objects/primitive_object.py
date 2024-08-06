@@ -391,4 +391,4 @@ class PrimitiveObject(StatefulObject):
                 state_flat,
                 th.tensor([state["radius"], state["height"], state["size"]]),
             ]
-        ).float()
+        )

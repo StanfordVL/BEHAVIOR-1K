@@ -568,7 +568,7 @@ class ClothPrim(GeomPrim):
             if not isinstance(state["particle_velocities"], th.Tensor)
             else state["particle_velocities"]
         )
-        self.set_particle_positions(positions=state["particle_positions"].float())
+        self.set_particle_positions(positions=state["particle_positions"])
 
     def serialize(self, state):
         # Run super first
@@ -581,7 +581,7 @@ class ClothPrim(GeomPrim):
                 state["particle_positions"].reshape(-1),
                 state["particle_velocities"].reshape(-1),
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Run super first

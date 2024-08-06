@@ -1013,7 +1013,7 @@ class BatchControlViewAPIImpl:
 
     def get_relative_jacobian(self, prim_path):
         jacobian = self.get_jacobian(prim_path)
-        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.float()
+        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T
         tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t

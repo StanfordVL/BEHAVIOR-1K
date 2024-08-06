@@ -233,7 +233,7 @@ class ScanSensor(BaseSensor):
             thickness=-1,
         )
 
-        return th.tensor(occupancy_grid[:, :, None]).float() / 2.0
+        return th.tensor(occupancy_grid[:, :, None]) / 2.0
 
     def _get_obs(self):
         # Run super first to grab any upstream obs

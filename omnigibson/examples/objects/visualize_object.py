@@ -124,7 +124,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for i in range(max_steps):
         z_angle = 2 * math.pi * (i % steps_per_rotate) / steps_per_rotate
         quat = T.euler2quat(th.tensor([0, 0, z_angle]))
-        pos = T.quat2mat(quat) @ center_offset.float()
+        pos = T.quat2mat(quat) @ center_offset
         if obj.n_dof > 0:
             frac = (i % steps_per_joint) / steps_per_joint
             j_frac = -1.0 + 2.0 * frac if (i // steps_per_joint) % 2 == 0 else 1.0 - 2.0 * frac

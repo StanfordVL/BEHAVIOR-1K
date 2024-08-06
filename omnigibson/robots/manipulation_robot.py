@@ -1333,7 +1333,7 @@ class ManipulationRobot(BaseRobot):
             eef_link_pos, eef_link_orn, attachment_point_pos_local, th.tensor([0, 0, 0, 1], dtype=th.float32)
         )
         joint_prim = self._ag_obj_constraints[arm]
-        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos.float()))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*attachment_point_pos))
 
     def _calculate_in_hand_object(self, arm="default"):
         if gm.AG_CLOTH:

@@ -94,7 +94,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
         if isinstance(scale, th.Tensor):
-            load_config["scale"] = scale.float()
+            load_config["scale"] = scale
         elif isinstance(scale, Iterable):
             load_config["scale"] = th.tensor(scale, dtype=th.float32)
         else:

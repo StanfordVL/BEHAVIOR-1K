@@ -231,7 +231,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 state_flat,
                 self.control_filter.serialize(state=state["control_filter"]),
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # Run super first
@@ -306,10 +306,10 @@ class InverseKinematicsController(JointController, ManipulationController):
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
         # Grab important info from control dict
-        pos_relative = control_dict[f"{self.task_name}_pos_relative"].float()
-        quat_relative = control_dict[f"{self.task_name}_quat_relative"].float()
-        target_pos = goal_dict["target_pos"].float()
-        target_quat = goal_dict["target_quat"].float()
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
+        target_pos = goal_dict["target_pos"]
+        target_quat = goal_dict["target_quat"]
 
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]

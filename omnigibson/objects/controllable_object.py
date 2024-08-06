@@ -400,7 +400,7 @@ class ControllableObject(BaseObject):
         u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
-            u_vec[idx] = ctrl["value"].float()
+            u_vec[idx] = ctrl["value"]
             u_type_vec[idx] = ctrl["type"]
 
         u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
@@ -636,7 +636,7 @@ class ControllableObject(BaseObject):
         )
 
         # Concatenate and return
-        return th.cat([state_flat, controller_states_flat]).float()
+        return th.cat([state_flat, controller_states_flat])
 
     def deserialize(self, state):
         # Run super first

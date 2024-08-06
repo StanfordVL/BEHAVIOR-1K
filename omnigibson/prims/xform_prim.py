@@ -183,10 +183,8 @@ class XFormPrim(BasePrim):
             position = current_position if position is None else position
             orientation = current_orientation if orientation is None else orientation
 
-        position = position.float() if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-        orientation = (
-            orientation.float() if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
-        )
+        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
@@ -291,7 +289,7 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = position.float().tolist() if isinstance(position, th.Tensor) else position
+            position = position.tolist() if isinstance(position, th.Tensor) else position
             position = lazy.pxr.Gf.Vec3d(*position)
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
@@ -300,7 +298,7 @@ class XFormPrim(BasePrim):
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
             orientation = (
-                orientation.float()[[3, 0, 1, 2]].tolist()
+                orientation[[3, 0, 1, 2]].tolist()
                 if isinstance(orientation, th.Tensor)
                 else [float(orientation[i]) for i in [3, 0, 1, 2]]
             )
@@ -372,7 +370,7 @@ class XFormPrim(BasePrim):
                                           Defaults to None, which means left unchanged.
         """
         if isinstance(scale, th.Tensor):
-            scale = scale.float()
+            scale = scale
         elif isinstance(scale, Iterable):
             scale = th.tensor(scale, dtype=th.float32)
         else:
@@ -439,14 +437,14 @@ class XFormPrim(BasePrim):
 
     def _load_state(self, state):
         pos, orn = state["pos"], state["ori"]
-        pos = pos.float() if isinstance(pos, th.Tensor) else th.tensor(pos, dtype=th.float32)
-        orn = orn.float() if isinstance(orn, th.Tensor) else th.tensor(orn, dtype=th.float32)
+        pos = pos if isinstance(pos, th.Tensor) else th.tensor(pos, dtype=th.float32)
+        orn = orn if isinstance(orn, th.Tensor) else th.tensor(orn, dtype=th.float32)
         if self.scene is not None:
             pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
         self.set_position_orientation(pos, orn)
 
     def serialize(self, state):
-        return th.cat([state["pos"], state["ori"]]).float()
+        return th.cat([state["pos"], state["ori"]])
 
     def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori

@@ -85,7 +85,7 @@ class ModifiedParticles(RelativeObjectState):
                         ]
                     ),
                 ]
-            ).float()
+            )
         return state_flat
 
     def deserialize(self, state):

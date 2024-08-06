@@ -429,6 +429,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             mesh.visible = False
 
         # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
-        return aabb_volume * th.mean(check_points_in_volumes(points).float())
+        return aabb_volume * th.mean(check_points_in_volumes(points))
 
     return check_points_in_volumes, calculate_volume

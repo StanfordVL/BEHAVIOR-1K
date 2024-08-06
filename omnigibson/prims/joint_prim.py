@@ -765,7 +765,7 @@ class JointPrim(BasePrim):
 
         # Standardize input
         pos = (
-            pos.float()
+            pos
             if isinstance(pos, th.Tensor)
             else (
                 th.tensor([pos], dtype=th.float32)
@@ -809,7 +809,7 @@ class JointPrim(BasePrim):
 
         # Standardize input
         vel = (
-            vel.float()
+            vel
             if isinstance(vel, th.Tensor)
             else (
                 th.tensor([vel], dtype=th.float32)
@@ -845,7 +845,7 @@ class JointPrim(BasePrim):
 
         # Standardize input
         effort = (
-            effort.float()
+            effort
             if isinstance(effort, th.Tensor)
             else (
                 th.tensor([effort], dtype=th.float32)
@@ -901,7 +901,7 @@ class JointPrim(BasePrim):
                 state["target_pos"],
                 state["target_vel"],
             ]
-        ).float()
+        )
 
     def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort
