@@ -222,7 +222,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 half_extent = (aabb_upper - aabb_lower) / 2.0
                 aabb_center = (aabb_upper + aabb_lower) / 2.0
 
-                breakpoint()
                 og.sim.psqi.overlap_box(
                     halfExtent=half_extent.tolist(),
                     pos=aabb_center.tolist(),

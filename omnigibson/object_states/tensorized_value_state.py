@@ -14,7 +14,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     individual instance update() call.
     """
 
-    # Numpy array of raw internally tracked values
+    # Tensor of raw internally tracked values
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
 
@@ -123,15 +123,15 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             tuple: Expected shape of the per-object state instance value. If empty th.Size([0]), this assumes
                 that each entry is a single (non-array) value. Default is th.Size([0])
         """
-        return th.Size([0])
+        return ()  # th.Size([0])
 
     @classproperty
     def value_type(cls):
         """
         Returns:
-            type: Type of the internal value array, e.g., bool, th.uint, float, etc. Default is float
+            type: Type of the internal value array, e.g., bool, th.uint, th.float32, etc. Default is th.float32
         """
-        return float
+        return th.float32
 
     @classproperty
     def value_name(cls):
@@ -157,7 +157,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _get_value(self):
         # Directly access value from global register
-        return self.value_type(self.VALUES[self.OBJ_IDXS[self.obj]])
+        return self.VALUES[self.OBJ_IDXS[self.obj]].to(self.value_type)
 
     def _set_value(self, new_value):
         # Directly set value in global register
@@ -168,7 +168,8 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     def state_size(self):
         # This is the flattened size of @self.value_shape
         # Returns 1 for a non-arrayed value
-        if self.value_shape == th.Size([0]):
+        # if self.value_shape == th.Size([0]):
+        if self.value_shape == ():
             return 1
         else:
             return int(th.prod(th.tensor(self.value_shape)))

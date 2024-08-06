@@ -189,7 +189,7 @@ class ClothPrim(GeomPrim):
         scale = self.scale
 
         # Don't copy to save compute, since we won't be returning a reference to the underlying object anyways
-        p_local = th.as_tensor(self.get_attribute(attr="points"))
+        p_local = th.as_tensor(self.get_attribute(attr="points"), dtype=th.float32)
         p_local = p_local[idxs] if idxs is not None else p_local
         p_world = (ori @ (p_local * scale).T).T + pos
 
@@ -577,7 +577,7 @@ class ClothPrim(GeomPrim):
         return th.cat(
             [
                 state_flat,
-                th.tensor([state["particle_group"], state["n_particles"]]),
+                th.tensor([state["particle_group"], state["n_particles"]], dtype=th.float32),
                 state["particle_positions"].reshape(-1),
                 state["particle_velocities"].reshape(-1),
             ]

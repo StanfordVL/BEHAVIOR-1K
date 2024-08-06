@@ -759,7 +759,7 @@ def quat2axisangle(quat):
     quat_shape = quat.shape[:-1]  # ignore last dim
     quat = quat.reshape(-1, 4)
     # clip quaternion
-    quat[:, 3] = th.clamp(quat[:, 3], -1.0, 1.0)
+    quat[:, 3] = th.clip(quat[:, 3], -1.0, 1.0)
     # Calculate denominator
     den = th.sqrt(1.0 - quat[:, 3] * quat[:, 3])
     # Map this into a mask
