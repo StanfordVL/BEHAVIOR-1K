@@ -3,6 +3,7 @@ import pytest
 import omnigibson as og
 from omnigibson.macros import gm
 
+
 def test_scene_graph():
 
     if og.sim is None:
@@ -39,6 +40,6 @@ def test_scene_graph():
     breakpoint()
     robot.reset()
 
+
 if __name__ == "__main__":
     test_scene_graph()
-
