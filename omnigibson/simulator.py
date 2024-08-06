@@ -323,7 +323,6 @@ def _launch_simulator(*args, **kwargs):
             # Maps callback name to callback
             self._callbacks_on_play = dict()
             self._callbacks_on_stop = dict()
-            self._callbacks_on_pre_sim_step = dict()
             self._callbacks_on_add_obj = dict()
             self._callbacks_on_remove_obj = dict()
             self._callbacks_on_system_init = dict()
@@ -1052,9 +1051,10 @@ def _launch_simulator(*args, **kwargs):
             # step() may not step physics
             if len(self._objects_to_initialize) > 0:
                 self.render()
-            # Run all callbacks
-            for callback in self._callbacks_on_pre_sim_step.values():
-                callback()
+
+            # Clear all scenes' updated objects
+            for scene in self.scenes:
+                scene.clear_updated_objects()
 
             if render:
                 super().step(render=True)
@@ -1271,18 +1271,6 @@ def _launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_stop[name] = callback
 
-        def add_callback_on_pre_sim_step(self, name, callback):
-            """
-            Adds a function @callback, referenced by @name, to be executed at the beginning of every sim.step() call
-
-            Args:
-                name (str): Name of the callback
-                callback (function): Callback function. Function signature is expected to be:
-
-                    def callback() --> None
-            """
-            self._callbacks_on_pre_sim_step[name] = callback
-
         def add_callback_on_add_obj(self, name, callback):
             """
             Adds a function @callback, referenced by @name, to be executed every time
@@ -1350,15 +1338,6 @@ def _launch_simulator(*args, **kwargs):
                 name (str): Name of the callback
             """
             self._callbacks_on_stop.pop(name, None)
-
-        def remove_callback_on_pre_sim_step(self, name):
-            """
-            Remove pre sim step callback whose reference is @name
-
-            Args:
-                name (str): Name of the callback
-            """
-            self._callbacks_on_pre_sim_step.pop(name, None)
 
         def remove_callback_on_add_obj(self, name):
             """

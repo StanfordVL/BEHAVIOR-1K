@@ -240,6 +240,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def transition_rule_api(self):
         return self._transition_rule_api
 
+    def clear_updated_objects(self):
+        self._updated_state_objects = set()
+
     def prebuild(self):
         """
         Prebuild the scene USD before loading it into the simulator. This is useful for caching the scene USD for faster
@@ -409,12 +412,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             raise ValueError("This scene is already loaded.")
 
         self._idx = idx
-
-        # Add a callback to non_physics_step for clearing updated objects
-        def clear_updated_objects():
-            self._updated_state_objects = set()
-        clear_updated_objects()
-        og.sim.add_callback_on_pre_sim_step(name=f"scene{self._idx}_clear_update_objects", callback=clear_updated_objects)
+        self.clear_updated_objects()
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()

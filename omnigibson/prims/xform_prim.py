@@ -81,9 +81,6 @@ class XFormPrim(BasePrim):
         if "scale" in self._load_config and self._load_config["scale"] is not None:
             self.scale = self._load_config["scale"]
 
-        # Grab fabric prim
-        self._fabric_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path, fabric=True)
-
     def remove(self):
         # Remove the material prim if one exists
         if self._material is not None:
