@@ -344,11 +344,8 @@ class RigidPrim(XFormPrim):
 
         pos, ori = self._rigid_prim_view.get_world_poses(clone=clone)
 
-        if gm.DEBUG:
-            # Only run this assert when debugging since this actually results in some nontrivial slowdown
-            assert np.isclose(
-                np.linalg.norm(ori), 1, atol=1e-3
-            ), f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        # Make sure we have a valid orientation
+        assert -1e-3 < (np.sum(ori * ori) - 1) < 1e-3, f"{self.prim_path} orientation {ori} is not a unit quaternion."
 
         pos = pos[0]
         ori = ori[0][[1, 2, 3, 0]]
