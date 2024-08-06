@@ -133,7 +133,7 @@ class DataWrapper(EnvironmentWrapper):
         """
         return self.env.observation_spec()
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name, initial_data=None, obs_key="obs"):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, obs_key="obs"):
         """
         Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
 
@@ -141,8 +141,6 @@ class DataWrapper(EnvironmentWrapper):
             traj_data (list of dict): Trajectory data, where each entry is a keyword-mapped set of data for a single
                 sim step
             traj_grp_name (str): Name of the trajectory group to store
-            initial_data (None or dict): If specified, keyword-mapped data to prepend to any relevant keys found
-                from @traj_data
             obs_key (str): Name of key corresponding to observation data in @traj_data. This specific data is
                 assumed to be its own keyword-mapped dictionary of observations, and will be parsed differently from
                 the rest of the data
@@ -154,7 +152,11 @@ class DataWrapper(EnvironmentWrapper):
         traj_grp = data_grp.create_group(traj_grp_name)
         traj_grp.attrs["num_samples"] = len(traj_data)
 
-        data = {key: defaultdict(list) if key == obs_key else [] for key in traj_data[0]}
+        # Create the data dictionary -- this will dynamically add keys as we iterate through our trajectory
+        # We need to do this because we're not guaranteed to have a full set of keys at every trajectory step; e.g.
+        # if the first step only has state or observations but no actions
+        data = defaultdict(list)
+        data[obs_key] = defaultdict(list)
 
         for step_data in traj_data:
             for k, v in step_data.items():
@@ -165,6 +167,11 @@ class DataWrapper(EnvironmentWrapper):
                     data[k].append(v)
 
         for k, dat in data.items():
+            # Skip over all entries that have no data
+            if not dat:
+                continue
+
+            # Create datasets for all keys with valid data
             if k == obs_key:
                 obs_grp = traj_grp.create_group(k)
                 for mod, traj_mod_data in dat.items():
@@ -338,7 +345,7 @@ class DataCollectionWrapper(DataWrapper):
 
         return step_data
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, obs_key="obs"):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
@@ -347,7 +354,7 @@ class DataCollectionWrapper(DataWrapper):
             step_data["state"] = padded_state
 
         # Call super
-        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name)
+        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name, obs_key)
 
         # Add in transition info
         self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
@@ -437,6 +444,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Minimize physics leakage during playback (we need to take an env step when loading state)
         config["env"]["action_frequency"] = 1000.0
+        config["env"]["rendering_frequency"] = 1000.0
         config["env"]["physics_frequency"] = 1000.0
 
         # Make sure obs space is flattened for recording

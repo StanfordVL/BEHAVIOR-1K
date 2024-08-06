@@ -101,6 +101,7 @@ def test_data_collect_and_playback():
     og.clear(
         physics_dt=0.001,
         rendering_dt=0.001,
+        sim_step_dt=0.001,
     )
 
     # Define robot sensor config and external sensors to use during playback
@@ -140,7 +141,3 @@ def test_data_collect_and_playback():
     )
     env.playback_dataset(record=True)
     env.save_data()
-
-
-test_data_collect_and_playback()
-og.shutdown()

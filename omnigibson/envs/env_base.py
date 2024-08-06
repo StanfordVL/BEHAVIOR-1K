@@ -197,8 +197,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * ((1.0 / og.sim.get_sim_step_dt()) ** 2)
-        assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
+        drop_distance = 0.5 * 9.8 * (og.sim.get_sim_step_dt() ** 2)
+        assert drop_distance < self._initial_pos_z_offset, \
+            f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
 
     def _load_task(self, task_config=None):
         """
@@ -418,7 +419,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
         # Run any additional task post-loading behavior
-        self.task.post_play_load()
+        self.task.post_play_load(env=self)
 
         # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
         self.scene.reset()

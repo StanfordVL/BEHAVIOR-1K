@@ -49,6 +49,7 @@ def clear(
     gravity=None,
     physics_dt=None,
     rendering_dt=None,
+    sim_step_dt=None,
     viewer_width=None,
     viewer_height=None,
     device=None,
@@ -64,6 +65,9 @@ def clear(
             current application and not only rendering a frame to the viewports/ cameras. So UI elements of
             Isaac Sim will be refreshed with this dt as well if running non-headless.
             If None, will use the current simulator value
+        sim_step_dt (None or float): dt between self.step() calls. This is the amount of simulation time that
+            passes every time step() is called. Note: This must be a multiple of @rendering_dt. If None, will
+            use the current simulator value
         viewer_width (None or int): width of the camera image, in pixels
             If None, will use the current simulator value
         viewer_height (None or int): height of the camera image, in pixels
@@ -81,6 +85,7 @@ def clear(
         gravity=sim.gravity if gravity is None else gravity,
         physics_dt=sim.get_physics_dt() if physics_dt is None else physics_dt,
         rendering_dt=sim.get_rendering_dt() if rendering_dt is None else rendering_dt,
+        sim_step_dt=sim.get_sim_step_dt() if sim_step_dt is None else sim_step_dt,
         viewer_width=sim.viewer_width if viewer_width is None else viewer_width,
         viewer_height=sim.viewer_height if viewer_height is None else viewer_height,
         device=sim.device if device is None else device,
