@@ -1179,5 +1179,6 @@ def test_covered(env):
 
         obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
+
 def test_clear_sim():
     og.clear()

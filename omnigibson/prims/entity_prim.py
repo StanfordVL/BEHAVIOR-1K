@@ -994,7 +994,7 @@ class EntityPrim(XFormPrim):
 
             # compute desired pose in the specified frame
             position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
-            
+
             # convert to format expected by articulation view
             position = np.asarray(position)[None, :]
             orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
