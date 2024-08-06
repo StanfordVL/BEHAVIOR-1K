@@ -302,6 +302,7 @@ class DataCollectionWrapper(DataWrapper):
         lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
+        # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
         self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
 
     def reset(self):
