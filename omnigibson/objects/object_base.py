@@ -382,7 +382,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             desired_frame_to_world = th.tensor(base_frame_to_world, dtype=th.float32)
 
         # Compute the world-to-base frame transform.
-        world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse
+        world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world)
 
         # Grab all the world-frame points corresponding to the object's visual or collision hulls.
         points_in_world = []

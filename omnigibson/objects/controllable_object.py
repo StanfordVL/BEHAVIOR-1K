@@ -324,7 +324,7 @@ class ControllableObject(BaseObject):
             high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(
-            shape=(self.action_dim,), low=np.array(th.cat(low)), high=np.array(th.cat(high)), dtype=np.float32
+            shape=(self.action_dim,), low=th.cat(low).cpu().numpy(), high=th.cat(high).cpu().numpy(), dtype=np.float32
         )
 
     def apply_action(self, action):

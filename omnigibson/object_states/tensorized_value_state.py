@@ -120,10 +120,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     def value_shape(cls):
         """
         Returns:
-            tuple: Expected shape of the per-object state instance value. If empty (), this assumes
-                that each entry is a single (non-array) value. Default is ()
+            tuple: Expected shape of the per-object state instance value. If empty th.Size([0]), this assumes
+                that each entry is a single (non-array) value. Default is th.Size([0])
         """
-        return ()
+        return th.Size([0])
 
     @classproperty
     def value_type(cls):
@@ -167,11 +167,11 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     @property
     def state_size(self):
         # This is the flattened size of @self.value_shape
-        # Note that th.prod(()) returns 1, which is also correct for a non-arrayed value
-        if self.value_shape == ():
+        # Returns 1 for a non-arrayed value
+        if self.value_shape == th.Size([0]):
             return 1
         else:
-            return int(th.prod(self.value_shape))
+            return int(th.prod(th.tensor(self.value_shape)))
 
     # For this state, we simply store its value.
     def _dump_state(self):

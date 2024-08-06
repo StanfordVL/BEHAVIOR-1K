@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import math
 
 import cv2
 import numpy as np
@@ -166,7 +167,7 @@ class ScanSensor(BaseSensor):
         assert self.n_vertical_rays == 1, "Occupancy grid is only valid for a 1D range sensor (n_vertical_rays = 1)!"
 
         # Calculate the number of points
-        num_points = int(self.horizontal_fov / self.horizontal_resolution)
+        num_points = math.ceil(self.horizontal_fov / self.horizontal_resolution)
 
         # Generate angles using linspace
         angles = th.linspace(

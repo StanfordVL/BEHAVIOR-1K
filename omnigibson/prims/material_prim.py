@@ -272,7 +272,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) color
         """
-        return th.tensor(self.get_input(inp="diffuse_color_constant"))
+        diffuse_color_constant = self.get_input(inp="diffuse_color_constant")
+        return th.tensor(diffuse_color_constant, dtype=th.float32) if diffuse_color_constant is not None else None
 
     @diffuse_color_constant.setter
     def diffuse_color_constant(self, color):
@@ -352,7 +353,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) diffuse_tint
         """
-        return th.tensor(self.get_input(inp="diffuse_tint"))
+        diffuse_tint = self.get_input(inp="diffuse_tint")
+        return th.tensor(diffuse_tint, dtype=th.float32) if diffuse_tint is not None else None
 
     @diffuse_tint.setter
     def diffuse_tint(self, color):
@@ -569,9 +571,7 @@ class MaterialPrim(BasePrim):
             3-array: this material's applied (R,G,B) emissive_color
         """
         color = self.get_input(inp="emissive_color")
-        if color is None:
-            return None
-        return th.tensor(color)
+        return th.tensor(color, dtype=th.float32) if color is not None else None
 
     @emissive_color.setter
     def emissive_color(self, color):
@@ -933,7 +933,8 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied detail_texture_translate
         """
-        return th.tensor(self.get_input(inp="detail_texture_translate"))
+        detail_texture_translate = self.get_input(inp="detail_texture_translate")
+        return th.tensor(detail_texture_translate, dtype=th.float32) if detail_texture_translate is not None else None
 
     @detail_texture_translate.setter
     def detail_texture_translate(self, translate):
@@ -965,7 +966,8 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied detail_texture_scale
         """
-        return th.tensor(self.get_input(inp="detail_texture_scale"))
+        detail_texture_scale = self.get_input(inp="detail_texture_scale")
+        return th.tensor(detail_texture_scale, dtype=th.float32) if detail_texture_scale is not None else None
 
     @detail_texture_scale.setter
     def detail_texture_scale(self, scale):
@@ -1045,7 +1047,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's diffuse_reflection_color in (R,G,B)
         """
-        return th.tensor(self.get_input(inp="diffuse_reflection_color"))
+        diffuse_reflection_color = self.get_input(inp="diffuse_reflection_color")
+        return th.tensor(diffuse_reflection_color, dtype=th.float32) if diffuse_reflection_color is not None else None
 
     @diffuse_reflection_color.setter
     def diffuse_reflection_color(self, color):
@@ -1061,7 +1064,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_reflection_color in (R,G,B)
         """
-        return th.tensor(self.get_input(inp="specular_reflection_color"))
+        specular_reflection_color = self.get_input(inp="specular_reflection_color")
+        return th.tensor(specular_reflection_color, dtype=th.float32) if specular_reflection_color is not None else None
 
     @specular_reflection_color.setter
     def specular_reflection_color(self, color):
@@ -1077,7 +1081,12 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_color in (R,G,B)
         """
-        return th.tensor(self.get_input(inp="specular_transmission_color"))
+        specular_transmission_color = self.get_input(inp="specular_transmission_color")
+        return (
+            th.tensor(specular_transmission_color, dtype=th.float32)
+            if specular_transmission_color is not None
+            else None
+        )
 
     @specular_transmission_color.setter
     def specular_transmission_color(self, color):
@@ -1093,7 +1102,12 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_scattering_color in (R,G,B)
         """
-        return th.tensor(self.get_input(inp="specular_transmission_scattering_color"))
+        specular_transmission_scattering_color = self.get_input(inp="specular_transmission_scattering_color")
+        return (
+            th.tensor(specular_transmission_scattering_color, dtype=th.float32)
+            if specular_transmission_scattering_color is not None
+            else None
+        )
 
     @specular_transmission_scattering_color.setter
     def specular_transmission_scattering_color(self, color):
@@ -1145,7 +1159,8 @@ class MaterialPrim(BasePrim):
             f"Tried to query glass_color shader input, "
             f"but material at {self.prim_path} is not an OmniGlass material!"
         )
-        return th.tensor(self.get_input(inp="glass_color"))
+        glass_color = self.get_input(inp="glass_color")
+        return th.tensor(glass_color, dtype=th.float32) if glass_color is not None else None
 
     @glass_color.setter
     def glass_color(self, color):

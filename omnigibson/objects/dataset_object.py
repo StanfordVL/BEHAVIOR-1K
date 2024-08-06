@@ -176,9 +176,8 @@ class DatasetObject(USDObject):
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = th.tensor(probabilities) / th.sum(probabilities)
-            chosen_orientation = th.tensor(list(self.orientations.values()))[
-                th.multinomial(th.tensor(probabilities), 1)
-            ].item()["rotation"]
+            option = th.multinomial(th.tensor(probabilities), 1).item()
+            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
 
         # Randomize yaw from -pi to pi
         rot_lo, rot_hi = -1, 1
