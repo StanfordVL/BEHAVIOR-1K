@@ -398,13 +398,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         super().set_position_orientation(position, orientation, frame=frame)
 
-        current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else np.array(position, dtype=float)
-        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-
-        # For the rest of this function we want to use the world pose
-        if frame == "scene":
-            position, orientation = T.pose_transform(*self.scene.get_position_orientation(), position, orientation)
+        position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame)
 
         # Move the joint frame for the world_base_joint
         if self._world_base_fixed_joint_prim is not None:
