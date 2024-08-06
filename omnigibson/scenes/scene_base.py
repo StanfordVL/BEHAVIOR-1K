@@ -303,9 +303,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")
 
-        available_systems = {
-            system_name: create_system_from_metadata(system_name=system_name) for system_name in get_all_system_names()
-        } if os.path.exists(system_dir) else dict()
+        available_systems = (
+            {
+                system_name: create_system_from_metadata(system_name=system_name)
+                for system_name in get_all_system_names()
+            }
+            if os.path.exists(system_dir)
+            else dict()
+        )
 
         # Manually add cloth system since it is a special system that doesn't have any corresponding directory in
         # the B1K database
@@ -628,7 +633,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     else:
                         for link in obj.links.values():
                             CollisionAPI.add_to_collision_group(
-                                col_group="fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links",
+                                col_group=(
+                                    "fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links"
+                                ),
                                 prim_path=link.prim_path,
                             )
 

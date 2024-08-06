@@ -7,12 +7,12 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import carb
 import numpy as np
-import numpy as np
 import omni
 import omni.graph.core as ogc
 import omni.timeline
 import omni.usd as ou
 import torch
+import usdrt
 import warp as wp
 from omni.isaac.core.articulations import ArticulationView as _ArticulationView
 from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
@@ -25,7 +25,6 @@ from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
 from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
-import usdrt
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
@@ -753,7 +752,6 @@ class RigidPrimView(_RigidPrimView):
             )
             return linear_velocities
 
-
     def get_angular_velocities(
         self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, clone: bool = True
     ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
@@ -814,7 +812,6 @@ class RigidPrimView(_RigidPrimView):
                 angular_velocities, dtype="float32", device=self._device, indexed=True
             )
             return angular_velocities
-
 
     def get_world_poses(
         self,
@@ -1035,4 +1032,3 @@ def get_world_pose(fabric_prim):
     result_transform.Orthonormalize()
     result_transform = np.transpose(result_transform)
     return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()
-

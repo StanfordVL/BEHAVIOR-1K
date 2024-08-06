@@ -535,7 +535,7 @@ class DataPlaybackWrapper(DataWrapper):
         self.reset()
 
         # Restore to initial state
-        og.sim.load_state(state[0, :int(state_size[0])], serialized=True)
+        og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
 
         # If record, record initial observations
         if record:
@@ -543,7 +543,9 @@ class DataPlaybackWrapper(DataWrapper):
             step_data = {"obs": init_obs}
             self.current_traj_history.append(step_data)
 
-        for i, (a, s, ss, r, te, tr) in enumerate(zip(action, state[1:], state_size[1:], reward, terminated, truncated)):
+        for i, (a, s, ss, r, te, tr) in enumerate(
+            zip(action, state[1:], state_size[1:], reward, terminated, truncated)
+        ):
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]

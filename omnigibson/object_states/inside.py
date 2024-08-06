@@ -2,10 +2,10 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.object_states.pose import Pose
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics

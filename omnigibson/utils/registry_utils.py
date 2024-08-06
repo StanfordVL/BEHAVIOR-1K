@@ -447,7 +447,13 @@ class SerializableRegistry(Registry, Serializable):
         # self("name", name) is grabs the corresponding object from this registry so that we can serialize its state
         # Each object's state in the flattened array is composed of [hash_key, serialized_state]
         n_objs = len(state)
-        state_flat = (np.concatenate([np.insert(self("name", name).serialize(state[name]), 0, getattr(self("name", name), self.hash_key)) for name in state])
+        state_flat = (
+            np.concatenate(
+                [
+                    np.insert(self("name", name).serialize(state[name]), 0, getattr(self("name", name), self.hash_key))
+                    for name in state
+                ]
+            )
             if len(state) > 0
             else np.array([])
         )

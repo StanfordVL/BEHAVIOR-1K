@@ -752,6 +752,7 @@ class PoseAPI:
 
         # Avoid premature imports
         from omnigibson.utils.deprecated_utils import get_world_pose
+
         position, orientation = get_world_pose(cls.PRIMS[prim_path])
         return np.array(position), np.array(orientation)
 
@@ -768,6 +769,7 @@ class PoseAPI:
         cls._refresh()
         # Avoid premature imports
         from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
+
         return np.array(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path])).T
 
 

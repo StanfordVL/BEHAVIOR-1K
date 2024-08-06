@@ -1616,7 +1616,7 @@ class EntityPrim(XFormPrim):
         state_dict = dict(root_link=root_link_state)
         if self.n_joints > 0:
             for jnt_state in ("pos", "vel", "eff"):
-                state_dict[f"joint_{jnt_state}"] = state[idx: idx + self.n_joints]
+                state_dict[f"joint_{jnt_state}"] = state[idx : idx + self.n_joints]
                 idx += self.n_joints
 
         return state_dict, idx

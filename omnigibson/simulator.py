@@ -498,21 +498,26 @@ def _launch_simulator(*args, **kwargs):
             """
             render_physics_ratio = rendering_dt / physics_dt
             sim_render_ratio = sim_step_dt / rendering_dt
-            assert np.isclose(render_physics_ratio, np.round(render_physics_ratio)), \
-                f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
-            assert rendering_dt >= physics_dt, \
-                f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
-            assert np.isclose(sim_render_ratio, np.round(sim_render_ratio)), \
-                f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
-            assert sim_step_dt >= rendering_dt, \
-                f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            assert np.isclose(
+                render_physics_ratio, np.round(render_physics_ratio)
+            ), f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            assert (
+                rendering_dt >= physics_dt
+            ), f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
+            assert np.isclose(
+                sim_render_ratio, np.round(sim_render_ratio)
+            ), f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            assert (
+                sim_step_dt >= rendering_dt
+            ), f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
 
             # If we're headless, we also enforce that sim_step_dt == rendering_dt because it doesn't make sense
             # to waste rendering that is not observed by the user
             if gm.HEADLESS:
-                assert sim_step_dt == rendering_dt, \
-                    (f"Simulation step dt ({sim_step_dt}) must be equal to rendering dt ({rendering_dt}) when "
-                     f"gm.HEADLESS is set!")
+                assert sim_step_dt == rendering_dt, (
+                    f"Simulation step dt ({sim_step_dt}) must be equal to rendering dt ({rendering_dt}) when "
+                    f"gm.HEADLESS is set!"
+                )
 
         @property
         def viewer_visibility(self):
@@ -1538,13 +1543,16 @@ def _launch_simulator(*args, **kwargs):
                     objs_to_add = load_obj_names - current_obj_names
 
                     # Delete any extra objects that currently exist in the scene stage
-                    objects_to_remove = [scene.object_registry("name", obj_to_remove)
-                                         for obj_to_remove in objs_to_remove]
+                    objects_to_remove = [
+                        scene.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove
+                    ]
                     og.sim.batch_remove_objects(objects_to_remove)
 
                     # Add any extra objects that do not currently exist in the scene stage
-                    objects_to_add = [create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
-                                      for obj_to_add in objs_to_add]
+                    objects_to_add = [
+                        create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
+                        for obj_to_add in objs_to_add
+                    ]
                     og.sim.batch_add_objects(objects_to_add, scenes=[scene] * len(objects_to_add))
 
             # Start the simulation and restore the dynamic state of the scene
