@@ -36,6 +36,7 @@ from omnigibson.utils.python_utils import (
     Serializable,
     classproperty,
     create_object_from_init_info,
+    get_uuid,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -256,7 +257,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             scene_file_path = self.scene_file
         else:
             # The scene file is a dict, so write it to disk directly
-            decrypted_fd, scene_file_path = tempfile.mkstemp("scene_file.json", dir=og.tempdir)
+            scene_file_str = json.dumps(self.scene_file, cls=NumpyEncoder, indent=4)
+            scene_file_hash = get_uuid(scene_file_str, deterministic=True)
+            scene_file_path = os.path.join(og.tempdir, f"scene_file_{scene_file_hash}.json")
             with open(scene_file_path, "w+") as f:
                 json.dump(self.scene_file, f, cls=NumpyEncoder, indent=4)
 
