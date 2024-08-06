@@ -36,7 +36,7 @@ class Filter(Serializable):
 
     def serialize(self, state):
         # Default is no state, so do nothing
-        return th.empty(0)
+        return th.empty(0, dtype=th.float32)
 
     def deserialize(self, state):
         # Default is no state, so do nothing

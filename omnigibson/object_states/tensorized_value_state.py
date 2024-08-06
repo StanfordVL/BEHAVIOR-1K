@@ -187,7 +187,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             state[self.value_name]
             if isinstance(state[self.value_name], th.Tensor)
             else th.tensor([state[self.value_name]])
-        )
+        ).float()
         return val.flatten()
 
     def deserialize(self, state):

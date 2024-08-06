@@ -8,8 +8,10 @@ from abc import ABCMeta
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import cache, wraps
+from hashlib import md5
 from importlib import import_module
 
+import numpy as np
 import torch as th
 
 # Global dictionary storing all unique names
@@ -277,18 +279,21 @@ def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_
     return cls(**cls_kwargs)
 
 
-def get_uuid(name, n_digits=8):
+def get_uuid(name, n_digits=8, deterministic=True):
     """
     Helper function to create a unique @n_digits uuid given a unique @name
 
     Args:
         name (str): Name of the object or class
         n_digits (int): Number of digits of the uuid, default is 8
+        deterministic (bool): Whether the outputted UUID should be deterministic or not
 
     Returns:
         int: uuid
     """
-    return abs(hash(name)) % (10**n_digits)
+    # Make sure the number is float32 compatible
+    val = int(md5(name.encode()).hexdigest(), 16) if deterministic else abs(hash(name))
+    return int(np.float32(val % (10**n_digits)))
 
 
 def meets_minimum_version(test_version, minimum_version):
