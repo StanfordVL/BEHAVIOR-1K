@@ -91,9 +91,7 @@ class GraspReward(BaseRewardFunction):
         info["rotation_penalty_factor"] = 0.0
         info["rotation_penalty"] = 0.0
         if self.prev_eef_quat is not None:
-            delta_quat = T.quat_multiply(eef_quat, T.quat_inverse(self.prev_eef_quat))
-            delta_axis_angle = T.quat2axisangle(delta_quat)
-            delta_rot = th.norm(delta_axis_angle)
+            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat, eef_quat)
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
             info["rotation_penalty_factor"] = delta_rot.item()

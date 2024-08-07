@@ -1312,7 +1312,8 @@ class BDDLSampler:
         ground_goal_state_options = get_ground_goal_state_options(
             self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions
         )
-        ground_goal_state_options = ground_goal_state_options[th.randperm(ground_goal_state_options.size(0))]
+        num_options = ground_goal_state_options.size(0)
+        ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
