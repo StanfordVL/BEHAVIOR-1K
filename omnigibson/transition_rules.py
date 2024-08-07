@@ -380,7 +380,10 @@ class TouchingAnyCondition(RuleCondition):
                 for obj in object_candidates[self._filter_1_name]
             }
             self._filter_2_idxs = {
-                obj: th.tensor([RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()])
+                obj: th.tensor(
+                    [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()],
+                    dtype=th.float32,
+                )
                 for obj in object_candidates[self._filter_2_name]
             }
         else:
@@ -950,8 +953,8 @@ class SlicingRule(BaseTransitionRule):
                 # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
                 # Get bounding box info
-                part_bb_pos = th.tensor(part["bb_pos"])
-                part_bb_orn = th.tensor(part["bb_orn"])
+                part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
+                part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
                 # Determine the relative scale to apply to the object part from the original object
                 # Note that proper (rotated) scaling can only be applied when the relative orientation of
@@ -1776,8 +1779,8 @@ class RecipeRule(BaseTransitionRule):
                 log.warning(
                     f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead."
                 )
-                pos = th.tensor(container.aabb_center) + th.tensor(
-                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0]
+                pos = th.tensor(container.aabb_center, dtype=th.float32) + th.tensor(
+                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0], dtype=th.float32
                 )
                 obj.set_bbox_center_position_orientation(position=pos)
 

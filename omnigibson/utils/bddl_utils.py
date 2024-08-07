@@ -1185,7 +1185,9 @@ class BDDLSampler:
         assert og.sim.is_stopped(), "Simulator should be stopped when importing sampleable objects"
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
-        self._agent.set_position_orientation(th.tensor([300, 300, 300]), th.tensor([0, 0, 0, 1]))
+        self._agent.set_position_orientation(
+            th.tensor([300, 300, 300], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)
+        )
 
         self._sampled_objects = set()
         num_new_obj = 0
