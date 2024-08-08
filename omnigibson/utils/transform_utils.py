@@ -48,7 +48,7 @@ _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
 @th.jit.script
 def copysign(a, b):
-    # type: (float, Tensor) -> Tensor
+    # type: (float, th.Tensor) -> th.Tensor
     a = th.tensor(a, device=b.device, dtype=th.float).repeat(b.shape[0])
     return th.abs(a) * th.sign(b)
 
@@ -105,7 +105,7 @@ def quat_mul(a, b):
 
     quat = th.stack([x, y, z, w], dim=-1).view(shape)
 
-    return quat
+    return quat / th.norm(quat, dim=-1, keepdim=True)
 
 
 @th.jit.script
@@ -186,67 +186,6 @@ def quat_apply(quat: th.Tensor, vec: th.Tensor) -> th.Tensor:
 
     # Remove any extra dimensions
     return result.squeeze()
-
-
-@th.jit.script
-def ewma_vectorized(
-    data: th.Tensor, alpha: float, offset: Optional[float] = None, dtype: Optional[str] = None, order: str = "C"
-) -> th.Tensor:
-    """
-    Calculates the exponential moving average over a vector.
-    Will fail for large inputs.
-
-    Args:
-        data (th.Tensor): Input data
-        alpha (float): scalar in range (0,1)
-            The alpha parameter for the moving average.
-        offset (Optional[float]): If specified, the offset for the moving average. None defaults to data[0].
-        dtype (Optional[str]): Data type used for calculations. If None, defaults to float64 unless
-            data.dtype is float32, then it will use float32. Valid options are 'float32' and 'float64'.
-        order (str): Order to use when flattening the data. Valid options are {'C', 'F', 'A'}.
-
-    Returns:
-        th.Tensor: Exponential moving average from @data
-    """
-    if dtype is None:
-        dtype = "float32" if data.dtype == th.float32 else "float64"
-
-    if dtype == "float32":
-        data = data.to(th.float32)
-    else:
-        data = data.to(th.float64)
-
-    if data.ndim > 1:
-        # flatten input
-        data = data.reshape(-1)
-
-    out = th.empty_like(data)
-
-    if data.size(0) < 1:
-        # empty input, return empty array
-        return out
-
-    if offset is None:
-        offset = data[0].item()
-
-    alpha = th.tensor(alpha, dtype=data.dtype)
-
-    # scaling_factors -> 0 as len(data) gets large
-    # this leads to divide-by-zeros below
-    scaling_factors = th.pow(1.0 - alpha, th.arange(data.size(0) + 1, dtype=data.dtype))
-    # create cumulative sum array
-    out = data * (alpha * scaling_factors[-2]) / scaling_factors[:-1]
-    out = th.cumsum(out, dim=0)
-
-    # cumsums / scaling
-    out = out / scaling_factors[-2::-1]
-
-    if offset != 0:
-        offset = th.tensor(offset, dtype=data.dtype)
-        # add offsets
-        out = out + offset * scaling_factors[1:]
-
-    return out
 
 
 @th.jit.script
@@ -399,21 +338,18 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
 
 @th.jit.script
-def random_axis_angle(angle_limit=None):
+def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     """
     Samples an axis-angle rotation by first sampling a random axis
     and then sampling an angle. If @angle_limit is provided, the size
     of the rotation angle is constrained.
 
     Args:
-        angle_limit (None or float): If set, determines magnitude limit of angles to generate
+        angle_limit (float): Determines magnitude limit of angles to generate
 
     Raises:
         AssertionError: [Invalid RNG]
     """
-    if angle_limit is None:
-        angle_limit = 2.0 * math.pi
-
     # sample random axis using a normalized sample from spherical Gaussian.
     # see (http://extremelearning.com.au/how-to-generate-uniformly-random-points-on-n-spheres-and-n-balls/)
     # for why it works.
@@ -421,34 +357,6 @@ def random_axis_angle(angle_limit=None):
     random_axis /= th.norm(random_axis)
     random_angle = th.rand(1) * angle_limit
     return random_axis, random_angle.item()
-
-
-@th.jit.script
-def vec(values):
-    """
-    Converts value tuple into a numpy vector.
-
-    Args:
-        values (n-array): a tuple of numbers
-
-    Returns:
-        th.tensor: vector of given values
-    """
-    return th.tensor(values, dtype=th.float32)
-
-
-@th.jit.script
-def mat4(tensor):
-    """
-    Converts an tensor to 4x4 matrix.
-
-    Args:
-        tensor (n-tensor): the tensor in form of vec, list, or tuple
-
-    Returns:
-        th.tensor: a 4x4 th tensor
-    """
-    return th.tensor(tensor, dtype=th.float32).view((4, 4))
 
 
 @th.jit.script
@@ -656,7 +564,10 @@ def euler2quat(euler: th.Tensor) -> th.Tensor:
 
 @th.jit.script
 def quat2euler(q):
-    if q.dim() == 1:
+
+    single_dim = q.dim() == 1
+
+    if single_dim:
         q = q.unsqueeze(0)
 
     qx, qy, qz, qw = 0, 1, 2, 3
@@ -674,7 +585,7 @@ def quat2euler(q):
 
     euler = th.stack([roll, pitch, yaw], dim=-1) % (2 * math.pi)
 
-    if q.shape[0] == 1:
+    if single_dim:
         euler = euler.squeeze(0)
 
     return euler
@@ -985,8 +896,8 @@ def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     pos_A_in_B = pose_A_in_B[:3, 3]
     rot_A_in_B = pose_A_in_B[:3, :3]
     skew_symm = _skew_symmetric_translation(pos_A_in_B)
-    vel_B = rot_A_in_B.dot(vel_A) + skew_symm.dot(rot_A_in_B.dot(ang_vel_A))
-    ang_vel_B = rot_A_in_B.dot(ang_vel_A)
+    vel_B = th.matmul(rot_A_in_B, vel_A) + th.matmul(skew_symm, th.matmul(rot_A_in_B, ang_vel_A))
+    ang_vel_B = th.matmul(rot_A_in_B, ang_vel_A)
     return vel_B, ang_vel_B
 
 
@@ -1009,45 +920,22 @@ def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     pos_A_in_B = pose_A_in_B[:3, 3]
     rot_A_in_B = pose_A_in_B[:3, :3]
     skew_symm = _skew_symmetric_translation(pos_A_in_B)
-    force_B = rot_A_in_B.T.dot(force_A)
-    torque_B = -rot_A_in_B.T.dot(skew_symm.dot(force_A)) + rot_A_in_B.T.dot(torque_A)
+    force_B = th.matmul(rot_A_in_B.T, force_A)
+    torque_B = -th.matmul(rot_A_in_B.T, th.matmul(skew_symm, force_A)) + th.matmul(rot_A_in_B.T, torque_A)
     return force_B, torque_B
 
 
 @th.jit.script
-def rotation_matrix(angle: float, direction: th.Tensor, point: Optional[th.Tensor] = None) -> th.Tensor:
+def rotation_matrix(angle: float, direction: th.Tensor) -> th.Tensor:
     """
-    Returns matrix to rotate about axis defined by point and direction.
-
-    E.g.:
-        >>> angle = (random.random() - 0.5) * (2*math.pi)
-        >>> direc = numpy.random.random(3) - 0.5
-        >>> point = numpy.random.random(3) - 0.5
-        >>> R0 = rotation_matrix(angle, direc, point)
-        >>> R1 = rotation_matrix(angle-2*math.pi, direc, point)
-        >>> is_same_transform(R0, R1)
-        True
-
-        >>> R0 = rotation_matrix(angle, direc, point)
-        >>> R1 = rotation_matrix(-angle, -direc, point)
-        >>> is_same_transform(R0, R1)
-        True
-
-        >>> I = numpy.identity(4, numpy.float32)
-        >>> numpy.allclose(I, rotation_matrix(math.pi*2, direc))
-        True
-
-        >>> numpy.allclose(2., numpy.trace(rotation_matrix(math.pi/2,
-        ...                                                direc, point)))
-        True
+    Returns a 3x3 rotation matrix to rotate about the given axis.
 
     Args:
-        angle (float): Magnitude of rotation
-        direction (th.tensor): (ax,ay,az) axis about which to rotate
-        point (None or th.tensor): If specified, is the (x,y,z) point about which the rotation will occur
+        angle (float): Magnitude of rotation in radians
+        direction (th.Tensor): (ax,ay,az) axis about which to rotate
 
     Returns:
-        th.tensor: 4x4 homogeneous matrix that includes the desired rotation
+        th.Tensor: 3x3 rotation matrix
     """
     sina = th.sin(th.tensor(angle, dtype=th.float32))
     cosa = th.cos(th.tensor(angle, dtype=th.float32))
@@ -1070,6 +958,24 @@ def rotation_matrix(angle: float, direction: th.Tensor, point: Optional[th.Tenso
     skew_matrix[2, 1] = direction[0]
 
     R += skew_matrix
+
+    return R
+
+
+@th.jit.script
+def transformation_matrix(angle: float, direction: th.Tensor, point: Optional[th.Tensor] = None) -> th.Tensor:
+    """
+    Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
+
+    Args:
+        angle (float): Magnitude of rotation in radians
+        direction (th.Tensor): (ax,ay,az) axis about which to rotate
+        point (Optional[th.Tensor]): If specified, is the (x,y,z) point about which the rotation will occur
+
+    Returns:
+        th.Tensor: 4x4 homogeneous transformation matrix
+    """
+    R = rotation_matrix(angle, direction)
 
     M = th.eye(4, dtype=th.float32, device=direction.device)
     M[:3, :3] = R
@@ -1322,70 +1228,35 @@ def align_vector_sets(vec_set1: th.Tensor, vec_set2: th.Tensor) -> th.Tensor:
     Returns:
         th.Tensor: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute average directions
-    avg_dir1 = th.sum(vec_set1, dim=0)
-    avg_dir2 = th.sum(vec_set2, dim=0)
+    # Compute the cross-covariance matrix
+    H = vec_set2.T @ vec_set1
 
-    # Normalize average directions
-    avg_dir1 = avg_dir1 / th.norm(avg_dir1)
-    avg_dir2 = avg_dir2 / th.norm(avg_dir2)
+    # Compute the elements for the quaternion
+    trace = H.trace()
+    w = trace + 1
+    x = H[1, 2] - H[2, 1]
+    y = H[2, 0] - H[0, 2]
+    z = H[0, 1] - H[1, 0]
 
-    # Compute quaternion using vecs2quat
-    rotation = vecs2quat(avg_dir1.unsqueeze(0), avg_dir2.unsqueeze(0), normalized=True)
+    # Construct the quaternion
+    quat = th.stack([x, y, z, w])
 
-    return rotation.squeeze(0)
+    # Handle the case where w is close to zero
+    if quat[3] < 1e-4:
+        quat[3] = 0
+        max_idx = th.argmax(quat[:3].abs()) + 1
+        quat[max_idx] = 1
+
+    # Normalize the quaternion
+    quat = quat / (th.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
+
+    return quat
 
 
 @th.jit.script
 def l2_distance(v1: th.Tensor, v2: th.Tensor) -> th.Tensor:
     """Returns the L2 distance between vector v1 and v2."""
     return th.norm(v1 - v2)
-
-
-@th.jit.script
-def frustum(left: float, right: float, bottom: float, top: float, znear: float, zfar: float) -> th.Tensor:
-    """Create view frustum matrix."""
-    assert right != left, "right must not equal left"
-    assert bottom != top, "bottom must not equal top"
-    assert znear != zfar, "znear must not equal zfar"
-
-    M = th.zeros((4, 4), dtype=th.float32)
-    M[0, 0] = 2.0 * znear / (right - left)
-    M[2, 0] = (right + left) / (right - left)
-    M[1, 1] = 2.0 * znear / (top - bottom)
-    M[2, 1] = (top + bottom) / (top - bottom)
-    M[2, 2] = -(zfar + znear) / (zfar - znear)
-    M[3, 2] = -2.0 * znear * zfar / (zfar - znear)
-    M[2, 3] = -1.0
-    return M
-
-
-@th.jit.script
-def ortho(left, right, bottom, top, znear, zfar):
-    """Create orthonormal projection matrix."""
-    assert right != left
-    assert bottom != top
-    assert znear != zfar
-
-    M = th.zeros((4, 4), dtype=th.float32)
-    M[0, 0] = 2.0 / (right - left)
-    M[1, 1] = 2.0 / (top - bottom)
-    M[2, 2] = -2.0 / (zfar - znear)
-    M[3, 0] = -(right + left) / (right - left)
-    M[3, 1] = -(top + bottom) / (top - bottom)
-    M[3, 2] = -(zfar + znear) / (zfar - znear)
-    M[3, 3] = 1.0
-    return M
-
-
-@th.jit.script
-def perspective(fovy, aspect, znear, zfar):
-    """Create perspective projection matrix."""
-    # fovy is in degree
-    assert znear != zfar
-    h = th.tan(fovy / 360.0 * math.pi) * znear
-    w = h * aspect
-    return frustum(-w, w, -h, h, znear, zfar)
 
 
 @th.jit.script
@@ -1462,15 +1333,15 @@ def z_rotation_from_quat(quat):
 
 
 @th.jit.script
-def integer_spiral_coordinates(n):
+def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
     # Sources:
     # https://www.reddit.com/r/askmath/comments/18vqorf/find_the_nth_coordinate_of_a_square_spiral/
     # https://oeis.org/A174344
-    m = th.floor(th.sqrt(n))
-    x = ((-1) ** m) * ((n - m * (m + 1)) * (th.floor(2 * th.sqrt(n)) % 2) - math.ceil(m / 2))
-    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (th.floor(2 * th.sqrt(n) + 1) % 2) + math.ceil(m / 2))
+    m = math.floor(math.sqrt(n))
+    x = ((-1) ** m) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n)) % 2) - math.ceil(m / 2))
+    y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n) + 1) % 2) + math.ceil(m / 2))
     return int(x), int(y)
 
 
@@ -1501,36 +1372,28 @@ def calculate_xy_plane_angle(quaternion: th.Tensor) -> th.Tensor:
 
 
 @th.jit.script
-def random_quaternion(num_quaternions: int = 1):
+def random_quaternion(num_quaternions: int = 1) -> th.Tensor:
     """
     Generate random rotation quaternions, uniformly distributed over SO(3).
 
     Arguments:
-        num_quaternions: int, number of quaternions to generate
+        num_quaternions: int, number of quaternions to generate (default: 1)
 
     Returns:
-        th.Tensor of shape (num_quaternions, 4) containing random unit quaternions
+        th.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
     """
-    # Generate three random numbers
-    x0 = th.rand(num_quaternions, 1)
-    x1 = th.rand(num_quaternions, 1)
-    x2 = th.rand(num_quaternions, 1)
+    # Generate four random numbers between 0 and 1
+    rand = th.rand(num_quaternions, 4)
 
-    # Calculate random rotation
-    theta1 = 2 * th.pi * x0
-    theta2 = 2 * th.pi * x1
-    r1 = th.sqrt(1 - x2)
-    r2 = th.sqrt(x2)
+    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
+    r1 = th.sqrt(1.0 - rand[:, 0])
+    r2 = th.sqrt(rand[:, 0])
+    t1 = 2 * th.pi * rand[:, 1]
+    t2 = 2 * th.pi * rand[:, 2]
 
-    qw = r2 * th.cos(theta2)
-    qx = r1 * th.sin(theta1)
-    qy = r1 * th.cos(theta1)
-    qz = r2 * th.sin(theta2)
+    quaternions = th.stack([r1 * th.sin(t1), r1 * th.cos(t1), r2 * th.sin(t2), r2 * th.cos(t2)], dim=1)
 
-    # Combine into quaternions
-    quaternions = th.cat([qw, qx, qy, qz], dim=1)
-
-    return quaternions
+    return quaternions.squeeze()
 
 
 @th.jit.script
