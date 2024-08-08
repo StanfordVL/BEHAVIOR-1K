@@ -329,7 +329,7 @@ class RigidContactAPIImpl:
         if scene_idx not in self._CONTACT_MATRIX:
             self._CONTACT_MATRIX[scene_idx] = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
 
-        return th.tensor(self._CONTACT_MATRIX[scene_idx], dtype=th.float32)
+        return self._CONTACT_MATRIX[scene_idx]
 
     def get_impulses(self, prim_paths_a, prim_paths_b):
         """
@@ -847,7 +847,7 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_position_targets" not in self._read_cache:
-            self._read_cache["dof_position_targets"] = th.tensor(self._view.get_dof_position_targets())
+            self._read_cache["dof_position_targets"] = self._view.get_dof_position_targets()
 
         # Update the target
         self._read_cache["dof_position_targets"][idx][indices] = positions
@@ -861,7 +861,7 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_velocity_targets" not in self._read_cache:
-            self._read_cache["dof_velocity_targets"] = th.tensor(self._view.get_dof_velocity_targets())
+            self._read_cache["dof_velocity_targets"] = self._view.get_dof_velocity_targets()
 
         # Update the target
         self._read_cache["dof_velocity_targets"][idx][indices] = velocities
@@ -875,7 +875,7 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_actuation_forces" not in self._read_cache:
-            self._read_cache["dof_actuation_forces"] = th.tensor(self._view.get_dof_actuation_forces())
+            self._read_cache["dof_actuation_forces"] = self._view.get_dof_actuation_forces()
 
         # Update the target
         self._read_cache["dof_actuation_forces"][idx][indices] = efforts
@@ -885,7 +885,7 @@ class BatchControlViewAPIImpl:
 
     def get_position_orientation(self, prim_path):
         if "root_transforms" not in self._read_cache:
-            self._read_cache["root_transforms"] = th.tensor(self._view.get_root_transforms())
+            self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
         idx = self._idx[prim_path]
         pose = self._read_cache["root_transforms"][idx]
@@ -893,14 +893,14 @@ class BatchControlViewAPIImpl:
 
     def get_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = th.tensor(self._view.get_root_velocities())
+            self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
         idx = self._idx[prim_path]
         return self._read_cache["root_velocities"][idx][:3]
 
     def get_angular_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = th.tensor(self._view.get_root_velocities())
+            self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
         idx = self._idx[prim_path]
         return self._read_cache["root_velocities"][idx][3:]
@@ -917,51 +917,49 @@ class BatchControlViewAPIImpl:
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
-            self._read_cache["dof_positions"] = th.tensor(self._view.get_dof_positions())
+            self._read_cache["dof_positions"] = self._view.get_dof_positions()
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_positions"][idx]
 
     def get_joint_velocities(self, prim_path):
         if "dof_velocities" not in self._read_cache:
-            self._read_cache["dof_velocities"] = th.tensor(self._view.get_dof_velocities())
+            self._read_cache["dof_velocities"] = self._view.get_dof_velocities()
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_velocities"][idx]
 
     def get_joint_efforts(self, prim_path):
         if "dof_projected_joint_forces" not in self._read_cache:
-            self._read_cache["dof_projected_joint_forces"] = th.tensor(self._view.get_dof_projected_joint_forces())
+            self._read_cache["dof_projected_joint_forces"] = self._view.get_dof_projected_joint_forces()
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_projected_joint_forces"][idx]
 
     def get_mass_matrix(self, prim_path):
         if "mass_matrices" not in self._read_cache:
-            self._read_cache["mass_matrices"] = th.tensor(self._view.get_mass_matrices())
+            self._read_cache["mass_matrices"] = self._view.get_mass_matrices()
 
         idx = self._idx[prim_path]
         return self._read_cache["mass_matrices"][idx]
 
     def get_generalized_gravity_forces(self, prim_path):
         if "generalized_gravity_forces" not in self._read_cache:
-            self._read_cache["generalized_gravity_forces"] = th.tensor(self._view.get_generalized_gravity_forces())
+            self._read_cache["generalized_gravity_forces"] = self._view.get_generalized_gravity_forces()
 
         idx = self._idx[prim_path]
         return self._read_cache["generalized_gravity_forces"][idx]
 
     def get_coriolis_and_centrifugal_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
-            self._read_cache["coriolis_and_centrifugal_forces"] = th.tensor(
-                self._view.get_coriolis_and_centrifugal_forces()
-            )
+            self._read_cache["coriolis_and_centrifugal_forces"] = self._view.get_coriolis_and_centrifugal_forces()
 
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
     def get_link_relative_position_orientation(self, prim_path, link_name):
         if "link_transforms" not in self._read_cache:
-            self._read_cache["link_transforms"] = th.tensor(self._view.get_link_transforms())
+            self._read_cache["link_transforms"] = self._view.get_link_transforms()
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
@@ -976,7 +974,7 @@ class BatchControlViewAPIImpl:
 
     def get_link_relative_linear_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = th.tensor(self._view.get_link_velocities())
+            self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
@@ -991,7 +989,7 @@ class BatchControlViewAPIImpl:
 
     def get_link_relative_angular_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = th.tensor(self._view.get_link_velocities())
+            self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
@@ -1006,7 +1004,7 @@ class BatchControlViewAPIImpl:
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
-            self._read_cache["jacobians"] = th.tensor(self._view.get_jacobians())
+            self._read_cache["jacobians"] = self._view.get_jacobians()
 
         idx = self._idx[prim_path]
         return self._read_cache["jacobians"][idx]

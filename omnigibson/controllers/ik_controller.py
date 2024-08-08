@@ -244,8 +244,8 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
-        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"], dtype=th.float32)
-        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"], dtype=th.float32)
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":

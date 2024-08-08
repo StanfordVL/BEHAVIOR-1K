@@ -329,8 +329,6 @@ class RigidPrim(XFormPrim):
             return self._kinematic_world_pose_cache
 
         pos, ori = self._rigid_prim_view.get_world_poses()
-        pos = th.tensor(pos)
-        ori = th.tensor(ori)
 
         assert math.isclose(
             th.norm(ori), 1, abs_tol=1e-3

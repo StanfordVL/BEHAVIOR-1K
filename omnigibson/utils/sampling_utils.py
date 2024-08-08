@@ -220,7 +220,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
         bimodal_sample = truncnorm.rvs(bottom, top, loc=bimodal_mean_fraction, scale=bimodal_stdev_fraction)
 
         # Pick which axis the bimodal normal sample should go to.
-        bimodal_axis = th.multinomial(th.tensor(axis_probabilities), 1).item()
+        bimodal_axis = th.multinomial(th.tensor(axis_probabilities, dtype=th.float32), 1).item()
 
         # Choose which side of the axis to sample from. We only sample from the top for the Z axis.
         if bimodal_axis == 2:
