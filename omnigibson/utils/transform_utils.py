@@ -1393,7 +1393,7 @@ def random_quaternion(num_quaternions: int = 1) -> th.Tensor:
 
     quaternions = th.stack([r1 * th.sin(t1), r1 * th.cos(t1), r2 * th.sin(t2), r2 * th.cos(t2)], dim=1)
 
-    return quaternions.squeeze()
+    return quaternions
 
 
 @th.jit.script

@@ -1080,7 +1080,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             is_cloth = self._is_cloth_obj(obj=obj)
             group_obj_link2id = {link_name: i for i, link_name in enumerate(obj.links.keys())}
             state_group_flat += [
-                th.tensor([group_dict["particle_attached_obj_uuid"]], dtype=th.float64),
+                th.tensor([group_dict["particle_attached_obj_uuid"]], dtype=th.float32),
                 th.tensor([group_dict["n_particles"]], dtype=th.float32),
                 th.tensor(group_dict["particle_idns"], dtype=th.float32),
                 th.tensor(group_dict["particle_indices"], dtype=th.float32),

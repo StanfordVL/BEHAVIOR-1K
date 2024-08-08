@@ -334,7 +334,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_vel = th.tensor(self._articulation_view.get_max_velocities(joint_indices=self.dof_indices)[0][0])
+        raw_vel = self._articulation_view.get_max_velocities(joint_indices=self.dof_indices)[0][0]
         default_max_vel = (
             m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == JointType.JOINT_REVOLUTE else m.DEFAULT_MAX_PRISMATIC_VEL
         )
@@ -363,7 +363,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_effort = th.tensor(self._articulation_view.get_max_efforts(joint_indices=self.dof_indices)[0][0])
+        raw_effort = self._articulation_view.get_max_efforts(joint_indices=self.dof_indices)[0][0]
         return m.DEFAULT_MAX_EFFORT if raw_effort is None or th.abs(raw_effort) > m.INF_EFFORT_THRESHOLD else raw_effort
 
     @max_effort.setter
@@ -469,8 +469,6 @@ class JointPrim(BasePrim):
         raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(
             joint_indices=self.dof_indices
         ).flatten()
-        raw_pos_lower = th.tensor(raw_pos_lower)
-        raw_pos_upper = th.tensor(raw_pos_upper)
         return (
             -m.DEFAULT_MAX_POS
             if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or th.abs(raw_pos_lower) > m.INF_POS_THRESHOLD
@@ -505,8 +503,6 @@ class JointPrim(BasePrim):
         raw_pos_lower, raw_pos_upper = self._articulation_view.get_joint_limits(
             joint_indices=self.dof_indices
         ).flatten()
-        raw_pos_lower = th.tensor(raw_pos_lower)
-        raw_pos_upper = th.tensor(raw_pos_upper)
         return (
             m.DEFAULT_MAX_POS
             if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or th.abs(raw_pos_upper) > m.INF_POS_THRESHOLD
@@ -536,8 +532,7 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         return th.all(
-            th.abs(th.tensor(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)))
-            < m.INF_POS_THRESHOLD
+            th.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD
         )
 
     @property
@@ -624,9 +619,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only get state for articulated joints!"
 
         # Grab raw states
-        pos = th.tensor(self._articulation_view.get_joint_positions(joint_indices=self.dof_indices)[0])
-        vel = th.tensor(self._articulation_view.get_joint_velocities(joint_indices=self.dof_indices)[0])
-        effort = th.tensor(self._articulation_view.get_measured_joint_efforts(joint_indices=self.dof_indices)[0])
+        pos = self._articulation_view.get_joint_positions(joint_indices=self.dof_indices)[0]
+        vel = self._articulation_view.get_joint_velocities(joint_indices=self.dof_indices)[0]
+        effort = self._articulation_view.get_measured_joint_efforts(joint_indices=self.dof_indices)[0]
 
         # Potentially normalize if requested
         if normalized:
@@ -651,8 +646,8 @@ class JointPrim(BasePrim):
 
         # Grab raw states
         targets = self._articulation_view.get_applied_actions()
-        pos = th.tensor(targets.joint_positions[0][self.dof_indices])
-        vel = th.tensor(targets.joint_velocities[0][self.dof_indices])
+        pos = targets.joint_positions[0][self.dof_indices]
+        vel = targets.joint_velocities[0][self.dof_indices]
 
         # Potentially normalize if requested
         if normalized:

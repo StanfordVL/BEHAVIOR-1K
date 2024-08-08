@@ -405,7 +405,9 @@ class TouchingAnyCondition(RuleCondition):
                         if obj2.scene == obj.scene
                     ]
                 )
-                if th.any(RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                if th.any(
+                    RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
+                ):
                     objs.append(obj)
         else:
             # Manually check contact

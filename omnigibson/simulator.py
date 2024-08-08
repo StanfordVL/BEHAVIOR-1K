@@ -266,6 +266,7 @@ def _launch_simulator(*args, **kwargs):
             rendering_dt=None,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
+            backend="torch",
             device=None,
         ):
             assert (
@@ -292,6 +293,7 @@ def _launch_simulator(*args, **kwargs):
             super().__init__(
                 physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt,
                 rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt,
+                backend=backend,
                 device=device,
             )
 

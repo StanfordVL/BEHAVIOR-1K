@@ -135,7 +135,7 @@ class IKSolver:
         # Compute target joint positions
         ik_results = lazy.lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
         if ik_results.success:
-            return th.tensor(ik_results.cspace_position)
+            return th.tensor(ik_results.cspace_position, dtype=th.float32)
         else:
             return None
 
