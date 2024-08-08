@@ -1233,6 +1233,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         )
 
         particle_offset, particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        particle_offset = th.tensor(particle_offset, dtype=th.float32)
+        particle_radius = th.tensor(particle_radius, dtype=th.float32)
 
         if particle_radius < m.MIN_PARTICLE_RADIUS:
             ratio = m.MIN_PARTICLE_RADIUS / particle_radius

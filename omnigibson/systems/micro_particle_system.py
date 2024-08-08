@@ -1603,6 +1603,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         # Threshold the lower-bound to avoid super small particles
         vertices = th.tensor(prototype.get_attribute("points")) * prototype.scale
         _, particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+        particle_contact_offset = th.tensor(particle_contact_offset, dtype=th.float32).item()
         if particle_contact_offset < m.MIN_PARTICLE_CONTACT_OFFSET:
             prototype.scale *= m.MIN_PARTICLE_CONTACT_OFFSET / particle_contact_offset
             particle_contact_offset = m.MIN_PARTICLE_CONTACT_OFFSET
@@ -1667,7 +1668,9 @@ class Cloth(MicroParticleSystem):
             tm = mesh_prim_to_trimesh_mesh(
                 mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
             )
-            texcoord = th.tensor(mesh_prim.GetAttribute("primvars:st").Get()) if has_uv_mapping else None
+            texcoord = (
+                th.tensor(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32) if has_uv_mapping else None
+            )
         else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
             # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
