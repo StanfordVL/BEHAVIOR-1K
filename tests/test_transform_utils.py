@@ -1,12 +1,14 @@
+import math
+
+import numpy as np
 import pytest
 import torch as th
-import math
-from torch.testing import assert_close
-from omnigibson.utils.transform_utils import *
+import trimesh
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
-import numpy as np
-import trimesh
+from torch.testing import assert_close
+
+from omnigibson.utils.transform_utils import *
 
 # Set the seed for PyTorch
 th.manual_seed(0)
