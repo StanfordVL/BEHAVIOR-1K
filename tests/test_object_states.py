@@ -247,7 +247,9 @@ def test_aabb(env):
     particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
     assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
     assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
-    assert th.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
+    assert th.all(
+        (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
+    ).item()
 
     with pytest.raises(NotImplementedError):
         breakfast_table.states[AABB].set_value(None)
