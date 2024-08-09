@@ -144,7 +144,7 @@ def main():
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(
             position=apples[n].get_position() + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
-            orientation=T.euler2quat([-math.pi / 2, 0, 0]),
+            orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
         )
         knife.keep_still()
     if args.fluids:
