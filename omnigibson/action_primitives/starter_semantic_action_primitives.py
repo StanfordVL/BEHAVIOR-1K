@@ -53,8 +53,26 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
-m.KP_LIN_VEL = {Tiago: 0.3, Fetch: 0.3, Stretch: 0.5, Turtlebot: 0.3, Husky: 0.05, Freight: 0.05, Locobot: 1.0}
-m.KP_ANGLE_VEL = {Tiago: 0.2, Fetch: 0.2, Stretch: 1.0, Turtlebot: 0.2, Husky: 0.05, Freight: 0.05, Locobot: 2.0}
+m.KP_LIN_VEL = {
+    Tiago: 0.3,
+    Fetch: 0.3,
+    Stretch: 0.5,
+    Turtlebot: 0.3,
+    Husky: 0.05,
+    Freight: 0.05,
+    Locobot: 0.8,
+    BehaviorRobot: 0.3,
+}
+m.KP_ANGLE_VEL = {
+    Tiago: 0.2,
+    Fetch: 0.2,
+    Stretch: 0.8,
+    Turtlebot: 0.2,
+    Husky: 0.05,
+    Freight: 0.05,
+    Locobot: 2.0,
+    BehaviorRobot: 0.2,
+}
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -1647,34 +1665,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action = self._empty_action()
                 if self._base_controller_is_joint:
                     base_action_size = self.robot.controller_action_idx["base"].size
-                    # Joint controller
-                    if base_action_size == 3:
-                        # [x, y, theta]
-                        direction_vec = (
-                            body_target_pose[0][:2]
-                            / np.linalg.norm(body_target_pose[0][:2])
-                            * m.KP_LIN_VEL[type(self.robot)]
-                        )
-                        base_action = [direction_vec[0], direction_vec[1], 0.0]
-                        action[self.robot.controller_action_idx["base"]] = base_action
-                    elif base_action_size == 4:
-                        # [wheel0, wheel1, wheel2, wheel3]
-                        direction_vec = body_target_pose[0][:2]
-                        distance = np.linalg.norm(direction_vec)
-                        # Move forward
-                        linear_x = min(distance, m.KP_LIN_VEL[type(self.robot)])
-                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0, 4)
-                        action[self.robot.controller_action_idx["base"]] = wheel_velocities
-                    elif base_action_size == 2:
-                        # [left, right]
-                        direction_vec = body_target_pose[0][:2]
-                        distance = np.linalg.norm(direction_vec)
-                        # Move forward
-                        linear_x = min(distance, m.KP_LIN_VEL[type(self.robot)])
-                        wheel_velocities = self._calculate_wheel_velocities(linear_x, 0.0, 2)
-                        action[self.robot.controller_action_idx["base"]] = wheel_velocities
-                    else:
-                        raise ValueError("Invalid base action size")
+                    assert (
+                        base_action_size == 3
+                    ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                    direction_vec = (
+                        body_target_pose[0][:2]
+                        / np.linalg.norm(body_target_pose[0][:2])
+                        * m.KP_LIN_VEL[type(self.robot)]
+                    )
+                    base_action = [direction_vec[0], direction_vec[1], 0.0]
+                    action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     # Diff drive controller
                     base_action = [m.KP_LIN_VEL[type(self.robot)], 0.0]
@@ -1691,26 +1691,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Rotate in place to final orientation once at location
         yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
-
-    def _calculate_wheel_velocities(self, linear_x, angular_z, wheel_count=2):
-        # Calculate individual wheel velocities based on desired motion
-
-        # Calculate base velocities for left and right sides
-        v_left = linear_x - (self.robot.wheel_axle_length / 2) * angular_z
-        v_right = linear_x + (self.robot.wheel_axle_length / 2) * angular_z
-
-        # Convert linear velocities to angular velocities
-        w_left = v_left / self.robot.wheel_radius
-        w_right = v_right / self.robot.wheel_radius
-
-        if wheel_count == 2:
-            wheel_velocities = [w_left, w_right]
-        elif wheel_count == 4:
-            wheel_velocities = [w_left, w_right, w_left, w_right]
-        else:
-            raise ValueError(f"Unsupported wheel configuration: {wheel_count} wheels")
-
-        return wheel_velocities
 
     def _rotate_in_place(self, end_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD):
         """
@@ -1743,16 +1723,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             if not self._base_controller_is_joint:
                 base_action[1] = ang_vel
-            elif base_action.size == 4:
-                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel, 4)
-                base_action[:] = wheel_velocities
-            elif base_action.size == 3:
-                base_action[2] = ang_vel
-            elif base_action.size == 2:
-                wheel_velocities = self._calculate_wheel_velocities(0.0, ang_vel, 2)
-                base_action[:] = wheel_velocities
             else:
-                raise ValueError("Invalid base action size")
+                assert (
+                    base_action.size == 3
+                ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                base_action[2] = ang_vel
 
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)

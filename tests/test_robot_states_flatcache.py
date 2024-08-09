@@ -135,6 +135,7 @@ def test_robot_load_drive():
     }
 
     env = og.Environment(configs=config)
+    og.sim.stop()
 
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
@@ -142,9 +143,7 @@ def test_robot_load_drive():
             name=robot_name,
             obs_modalities=[],
         )
-        og.sim.stop()
         env.scene.add_object(robot)
-        og.sim.play()
 
         # At least one step is always needed while sim is playing for any imported object to be fully initialized
         og.sim.play()
