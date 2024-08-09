@@ -11,7 +11,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, PoseAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -695,7 +695,17 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        return self.base_footprint_link.get_position_orientation(frame=frame)
+
+        if frame == "world" or frame == "scene":
+            return self.base_footprint_link.get_position_orientation(frame=frame)
+        else:
+            # Get the position and orientation of the root_link in the world frame
+            position, orientation = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
+            # Get the position and orientation of the base_footprint_link with respect to robot root__link
+            parent_position, parent_orientation = PoseAPI.get_position_orientation(self.base_footprint_link.prim_path, frame="parent")
+            # Find the relative transformation from the root_link to the base_footprint_link
+            relative_pos, relative_orn = T.pose_transform(position, orientation, parent_position, parent_orientation)
+            return relative_pos, relative_orn
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "scene", "parent"] = "world"
@@ -718,10 +728,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
 
-        # For the rest of this function we want to use the world pose
-        if frame != "world":
-            position, orientation = T.relative_pose_transform(position, orientation, *self.get_position_orientation())
-
         assert np.isclose(
             np.linalg.norm(orientation), 1, atol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
@@ -732,7 +738,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
-            joint_pos, joint_orn = self.root_link.get_position_orientation()
+            if frame == "world" or frame == "scene":
+                # get the pose of the root link in the world/parent frame, invert to get the pose from root_link to world/scene frame
+                joint_pos, joint_orn = self.root_link.get_position_orientation(frame=frame)
+            else:
+                # getting root link pose in the parent frame is tricky, use PoseAPI to get the parent of the robot directly
+                joint_pos, joint_orn = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
             inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
 
             relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
@@ -750,10 +761,19 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             super().set_position_orientation(position, orientation, frame=frame)
 
             # convert the position and orientation to world frame
-            if frame == "parent" or frame == "scene":
-                position, orientation = T.relative_pose_transform(
-                    position, orientation, *self.get_position_orientation()
-                )
+            if frame == "scene":
+                if self.scene is None:
+                    raise ValueError("Cannot set pose relative to scene without a scene.")
+                else:
+                    position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+            elif frame == "parent":
+               
+                # get the parent prim path
+                parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
+                parent_position, parent_orientation = PoseAPI.get_position_orientation(parent_prim_path)
+
+                # combine them to get the pose from root link to the world frame
+                position, orientation = T.pose_transform(parent_position, parent_orientation, position, orientation)
 
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:

@@ -273,7 +273,7 @@ class XFormPrim(BasePrim):
 
             return position, orientation
         else:
-            return PoseAPI.get_position_orientation(self.prim_path, frame)
+            return PoseAPI.get_position_orientation(self.prim_path, frame="parent")
 
     # ------------------- Deprecated methods -------------------
 
