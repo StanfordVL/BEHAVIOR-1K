@@ -495,9 +495,9 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to add to the Replicator backend
         """
         if self._annotators.get(modality, None) is None:
-            self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                self._RAW_SENSOR_TYPES[modality]
-            )
+            from omnigibson.utils.deprecated_utils import AnnotatorRegistry
+
+            self._annotators[modality] = AnnotatorRegistry.get_annotator(self._RAW_SENSOR_TYPES[modality])
             self._annotators[modality].attach([self._render_product])
 
     def _remove_modality_from_backend(self, modality):
