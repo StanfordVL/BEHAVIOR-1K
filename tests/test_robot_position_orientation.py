@@ -4,7 +4,6 @@ import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 
-
 def setup_multi_environment(num_of_envs, robot="Tiago", additional_objects_cfg=[]):
     cfg = {
         "scene": {
