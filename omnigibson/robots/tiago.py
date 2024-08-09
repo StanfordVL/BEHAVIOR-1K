@@ -702,7 +702,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Get the position and orientation of the root_link in the world frame
             position, orientation = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
             # Get the position and orientation of the base_footprint_link with respect to robot root__link
-            parent_position, parent_orientation = PoseAPI.get_position_orientation(self.base_footprint_link.prim_path, frame="parent")
+            parent_position, parent_orientation = PoseAPI.get_position_orientation(
+                self.base_footprint_link.prim_path, frame="parent"
+            )
             # Find the relative transformation from the root_link to the base_footprint_link
             relative_pos, relative_orn = T.pose_transform(position, orientation, parent_position, parent_orientation)
             return relative_pos, relative_orn
@@ -765,9 +767,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 if self.scene is None:
                     raise ValueError("Cannot set pose relative to scene without a scene.")
                 else:
-                    position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+                    position, orientation = T.pose_transform(
+                        *self.scene.prim.get_position_orientation(), position, orientation
+                    )
             elif frame == "parent":
-               
+
                 # get the parent prim path
                 parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
                 parent_position, parent_orientation = PoseAPI.get_position_orientation(parent_prim_path)
