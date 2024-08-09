@@ -157,7 +157,10 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     def _get_value(self):
         # Directly access value from global register
-        return self.VALUES[self.OBJ_IDXS[self.obj]].to(self.value_type)
+        val = self.VALUES[self.OBJ_IDXS[self.obj]].to(self.value_type)
+        if isinstance(val, th.Tensor) and val.numel() == 1:
+            val = val.item()
+        return val
 
     def _set_value(self, new_value):
         # Directly set value in global register

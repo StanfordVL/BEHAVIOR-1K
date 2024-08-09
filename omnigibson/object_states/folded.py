@@ -62,7 +62,7 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
 
         # projection onto the z-axis
         proj = th.abs(th.matmul(normals, th.tensor([0.0, 0.0, 1.0])))
-        percentage = th.mean((proj > math.cos(m.NORMAL_Z_ANGLE_DIFF)))
+        percentage = th.mean((proj > math.cos(m.NORMAL_Z_ANGLE_DIFF)).float()).item()
         return percentage
 
     def calculate_projection_area_and_diagonal_maximum(self):

@@ -647,7 +647,9 @@ def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")
     robot = env.scene.object_registry("name", "robot0")
 
-    stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -math.pi / 2.0]))
+    stove.set_position_orientation(
+        [1.48, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, -math.pi / 2.0], dtype=th.float32))
+    )
     robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
