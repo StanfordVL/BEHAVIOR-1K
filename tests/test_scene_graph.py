@@ -1,5 +1,5 @@
-import numpy as np
-import pytest
+import math
+import torch as th
 from utils import place_obj_on_floor_plane
 
 import omnigibson as og
@@ -69,22 +69,22 @@ def test_scene_graph():
 
     env = og.Environment(configs=config)
 
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
-    bowl = og.sim.scene.object_registry("name", "bowl")
-    robot = og.sim.scene.robots[0]
+    breakfast_table = og.sim.scenes[0].object_registry("name", "breakfast_table")
+    bowl = og.sim.scenes[0].object_registry("name", "bowl")
+    robot = og.sim.scenes[0].robots[0]
     place_obj_on_floor_plane(breakfast_table)
     bowl.set_position_orientation([0.0, -0.8, 0.1], [0, 0, 0, 1])
-    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
+    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)))
     robot.reset()
 
     scene_graph_builder = SceneGraphBuilder(
         robot_name=None, egocentric=False, full_obs=True, only_true=True, merge_parallel_edges=True
     )
-    scene_graph_builder.start(og.sim.scene)
+    scene_graph_builder.start(og.sim.scenes[0])
     for _ in range(3):
         og.sim.step()
-        scene_graph_builder.step(og.sim.scene)
+        scene_graph_builder.step(og.sim.scenes[0])
 
-    assert visualize_scene_graph(
-        og.sim.scene, scene_graph_builder.get_scene_graph(), show_window=False, cartesian_positioning=True
+    visualize_scene_graph(
+        og.sim.scenes[0], scene_graph_builder.get_scene_graph(), show_window=False, cartesian_positioning=True
     )

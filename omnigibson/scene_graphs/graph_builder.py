@@ -1,10 +1,10 @@
 import itertools
-import os
 
 import networkx as nx
 import torch as th
 from matplotlib import pyplot as plt
 from PIL import Image
+from torchvision.transforms import ToPILImage, ToTensor
 
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
@@ -14,7 +14,7 @@ from omnigibson.utils import transform_utils as T
 
 
 def _formatted_aabb(obj):
-    return T.pose2mat((obj.aabb_center, [0, 0, 0, 1])), obj.aabb_extent
+    return T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32))), obj.aabb_extent
 
 
 class SceneGraphBuilder(object):
@@ -151,8 +151,8 @@ class SceneGraphBuilder(object):
         # Update the position of everything that's already in the scene by using our relative position to last frame.
         old_desired_to_new_desired = world_to_desired_frame @ self._last_desired_frame_to_world
         nodes = list(self._G.nodes)
-        poses = th.tensor([self._G.nodes[obj]["pose"] for obj in nodes])
-        bbox_poses = th.tensor([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
+        poses = th.stack([self._G.nodes[obj]["pose"] for obj in nodes])
+        bbox_poses = th.stack([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
         updated_poses = old_desired_to_new_desired @ poses
         updated_bbox_poses = old_desired_to_new_desired @ bbox_poses
         for i, obj in enumerate(nodes):
@@ -271,9 +271,14 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
 
+    pil_transform = ToPILImage()
+    torch_transform = ToTensor()
+
     # check imgheight and imgwidth; if they are too small, we need to upsample the image to 1280x1280
     if imgheight < 640 or imgwidth < 640:
-        robot_view = np.array(Image.fromarray(robot_view).resize((640, 640), Image.BILINEAR))
+        robot_view = torch_transform(
+            pil_transform((robot_view.permute(2, 0, 1).cpu())).resize((640, 640), Image.BILINEAR)
+        ).permute(1, 2, 0)
         imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
@@ -301,5 +306,3 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
         cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imshow("SceneGraph", cv_img)
         cv2.waitKey(0)
-
-    return Image.fromarray(img)
