@@ -55,7 +55,7 @@ def recursively_generate_compatible_dict(dic):
             out[k] = recursively_generate_compatible_dict(dic=v)
         elif isinstance(v, np.ndarray) and len(v.dtype) > 0:
             # Map to list of tuples
-            out[k] = list(map(tuple, v))
+            out[k] = tuple(map(tuple, v))
         else:
             # Preserve the key-value pair
             out[k] = v

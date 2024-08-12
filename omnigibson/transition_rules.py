@@ -1,5 +1,6 @@
 import itertools
 import json
+import math
 import operator
 import os
 from abc import ABCMeta, abstractmethod
@@ -1816,7 +1817,7 @@ class RecipeRule(BaseTransitionRule):
                 # When ignore_nonrecipe_objects is True, we don't necessarily remove all objects in the container.
                 # Therefore, we need to check for contact when generating output systems.
                 check_contact=self.ignore_nonrecipe_objects,
-                max_samples=int(volume / (np.pi * (out_system.particle_radius**3) * 4 / 3)),
+                max_samples=math.ceil(volume / (np.pi * (out_system.particle_radius**3) * 4 / 3)),
             )
 
         # Return transition results
