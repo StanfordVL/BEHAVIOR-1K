@@ -4,7 +4,6 @@ from copy import deepcopy
 from functools import cached_property
 
 import gymnasium as gym
-import numpy as np
 import torch as th
 
 import omnigibson as og
@@ -12,6 +11,7 @@ from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -324,7 +324,10 @@ class ControllableObject(BaseObject):
             high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
         return gym.spaces.Box(
-            shape=(self.action_dim,), low=th.cat(low).cpu().numpy(), high=th.cat(high).cpu().numpy(), dtype=np.float32
+            shape=(self.action_dim,),
+            low=th.cat(low).cpu().numpy(),
+            high=th.cat(high).cpu().numpy(),
+            dtype=NumpyTypes.FLOAT32,
         )
 
     def apply_action(self, action):

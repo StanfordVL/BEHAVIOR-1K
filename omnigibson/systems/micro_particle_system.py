@@ -4,7 +4,6 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import numpy as np
 import torch as th
 import trimesh
 
@@ -16,6 +15,7 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
+from omnigibson.utils.numpy_utils import NumpyTypes, to_numpy
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
@@ -239,7 +239,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        return th.from_numpy(np.array(self.get_attribute(attr="orientations"), dtype=np.float32))
+        return th.from_numpy(to_numpy(self.get_attribute(attr="orientations"), dtype=NumpyTypes.FLOAT32))
 
     @particle_orientations.setter
     def particle_orientations(self, quat):

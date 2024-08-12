@@ -2,7 +2,6 @@ from abc import abstractmethod
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch as th
 
 import omnigibson.utils.transform_utils as T
@@ -19,6 +18,7 @@ from omnigibson.sensors import (
 )
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
@@ -387,7 +387,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
             obs_space["proprio"] = self._build_obs_box_space(
-                shape=(self.proprioception_dim,), low=-float("inf"), high=float("inf"), dtype=np.float64
+                shape=(self.proprioception_dim,), low=-float("inf"), high=float("inf"), dtype=NumpyTypes.FLOAT32
             )
 
         return obs_space

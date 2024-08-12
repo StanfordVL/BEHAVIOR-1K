@@ -2,13 +2,13 @@ import math
 from collections.abc import Iterable
 
 import cv2
-import numpy as np
 import torch as th
-from transforms3d.quaternions import quat2mat
 
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import OccupancyGridState
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import classproperty
 
 
@@ -146,8 +146,13 @@ class ScanSensor(BaseSensor):
         # Set the remaining modalities' values
         # (obs modality, shape, low, high)
         obs_space_mapping = dict(
-            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
-            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
+            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, NumpyTypes.FLOAT32),
+            occupancy_grid=(
+                (self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1),
+                0.0,
+                1.0,
+                NumpyTypes.FLOAT32,
+            ),
         )
 
         return obs_space_mapping
@@ -185,11 +190,11 @@ class ScanSensor(BaseSensor):
 
         # Convert scans from laser frame to world frame
         pos, ori = self.get_position_orientation()
-        scan_world = th.matmul(th.tensor(quat2mat(ori)), scan_laser.T).T + pos
+        scan_world = th.matmul(T.quat2mat(ori), scan_laser.T).T + pos
 
         # Convert scans from world frame to local base frame
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
-        scan_local = th.matmul(th.tensor(quat2mat(base_ori)).T, (scan_world - base_pos).T).T
+        scan_local = th.matmul(T.quat2mat(base_ori).T, (scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
         scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
 
