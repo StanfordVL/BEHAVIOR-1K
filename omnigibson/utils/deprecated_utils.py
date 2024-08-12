@@ -3,7 +3,7 @@ A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
 
 import math
-from typing import Callable, List, Optional, Tuple, Union, Any
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import carb
 import numpy as np
@@ -21,14 +21,14 @@ from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
-from omni.replicator.core.scripts.annotators import (
-    AnnotatorError,
-    AnnotatorRegistryError,
-    annotator_utils,
-    _register_fabric_reader_anno,
-)
 from omni.replicator.core.scripts.annotators import Annotator as _Annotator
+from omni.replicator.core.scripts.annotators import AnnotatorError
 from omni.replicator.core.scripts.annotators import AnnotatorRegistry as _AnnotatorRegistry
+from omni.replicator.core.scripts.annotators import (
+    AnnotatorRegistryError,
+    _register_fabric_reader_anno,
+    annotator_utils,
+)
 from omni.syntheticdata import SyntheticData
 from PIL import Image, ImageDraw
 from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
