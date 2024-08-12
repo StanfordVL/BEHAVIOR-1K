@@ -121,6 +121,7 @@ nav:
   - Tutorials:
     - Demo Collection: tutorials/demo_collection.md
     - Running on a Compute Cluster: tutorials/running_on_a_compute_cluster.md
+    - Remote Streaming: tutorials/remote_streaming.md    
     - Saving and Loading Simulation State: tutorials/save_load.md
     - Customizing Robots: tutorials/customizing_robots.md
     - Custom Robot Import: tutorials/custom_robot_import.md
