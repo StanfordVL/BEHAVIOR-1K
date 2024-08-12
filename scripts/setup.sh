@@ -14,8 +14,8 @@ else
   read -p "If you have already installed it in a custom location, please type in the path containing isaac-sim.sh here >>> " ISAAC_SIM_PATH
 fi
 
-while [[ ! -f "${ISAAC_SIM_PATH}/isaac-sim.sh" ]]; do
-  read -p "isaac-sim.sh not found in [4m$ISAAC_SIM_PATH[0m! Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
+while [[ ! -f "${ISAAC_SIM_PATH}/isaac*.sh" ]]; do
+  read -p "isaac*.sh not found in [4m$ISAAC_SIM_PATH[0m! Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
 done
 echo -e "\nUsing Isaac Sim at [4m$ISAAC_SIM_PATH[0m\n"
 
