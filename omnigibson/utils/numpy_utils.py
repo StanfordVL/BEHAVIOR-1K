@@ -3,7 +3,7 @@ from enum import Enum
 import numpy as np
 
 
-class NumpyTypes(Enum):
+class NumpyTypes:
     FLOAT32 = np.float32
     INT32 = np.int32
     UINT8 = np.uint8

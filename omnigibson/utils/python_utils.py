@@ -762,3 +762,13 @@ def torch_delete(tensor: th.Tensor, indices: th.Tensor | int, dim: int | None = 
     keep_indices[indices] = False
 
     return th.index_select(tensor, dim, th.nonzero(keep_indices).squeeze(1))
+
+
+def recursively_convert_to_torch(state):
+    # For all the lists in state dict, convert to torch tensor
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_to_torch(value)
+        elif isinstance(value, list):
+            state[key] = th.tensor(value, dtype=th.float32)
+    return state

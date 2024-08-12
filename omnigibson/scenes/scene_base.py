@@ -33,6 +33,7 @@ from omnigibson.utils.python_utils import (
     Serializable,
     classproperty,
     create_object_from_init_info,
+    recursively_convert_to_torch,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -446,6 +447,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             with open(self.scene_file, "r") as f:
                 scene_info = json.load(f)
             init_state = scene_info["state"]
+            init_state = recursively_convert_to_torch(init_state)
             self.load_state(init_state, serialized=False)
         self._initial_state = init_state
 
