@@ -62,7 +62,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
         inbound_idxs = ((lower < positions) & (positions < upper)).all(dim=-1).nonzero()
         dist = system.particle_contact_radius + m.CONTACT_TOLERANCE
         for idx in inbound_idxs:
-            og.sim.psqi.overlap_sphere(dist, positions[idx.item()].numpy(), report_hit, False)
+            og.sim.psqi.overlap_sphere(dist, positions[idx.item()].cpu().numpy(), report_hit, False)
 
         # Return contacts
         return contacts

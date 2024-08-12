@@ -257,7 +257,7 @@ class PhysxParticleInstancer(BasePrim):
         quat = quat
         if self.n_particles > 0:
             quat = quat[:, [3, 0, 1, 2]]
-        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat.numpy()))
+        self.set_attribute(attr="orientations", val=lazy.pxr.Vt.QuathArray.FromNumpy(quat.cpu().numpy()))
 
     @property
     def particle_velocities(self):
@@ -326,7 +326,7 @@ class PhysxParticleInstancer(BasePrim):
         assert (
             prototype_ids.shape[0] == self.n_particles
         ), f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self.n_particles}!"
-        self.set_attribute(attr="protoIndices", val=prototype_ids.int().numpy())
+        self.set_attribute(attr="protoIndices", val=prototype_ids.int().cpu().numpy())
 
     @property
     def state_size(self):

@@ -94,7 +94,7 @@ class TraversableMap(BaseMap):
                 map_size = int(self.trav_map_original_size * self.map_default_resolution / self.map_resolution)
 
             # We resize the traversability map to the new size computed before
-            trav_map = th.tensor(cv2.resize(trav_map.numpy(), (map_size, map_size)))
+            trav_map = th.tensor(cv2.resize(trav_map.cpu().numpy(), (map_size, map_size)))
 
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
@@ -119,7 +119,7 @@ class TraversableMap(BaseMap):
         else:
             radius = self.default_erosion_radius
         radius_pixel = int(math.ceil(radius / self.map_resolution))
-        trav_map = th.tensor(cv2.erode(trav_map.numpy(), np.ones((radius_pixel, radius_pixel))))
+        trav_map = th.tensor(cv2.erode(trav_map.cpu().numpy(), np.ones((radius_pixel, radius_pixel))))
         return trav_map
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
@@ -151,7 +151,7 @@ class TraversableMap(BaseMap):
 
         if reference_point is not None:
             # Find connected component
-            _, component_labels = cv2.connectedComponents(trav_map.numpy(), connectivity=4)
+            _, component_labels = cv2.connectedComponents(trav_map.cpu().numpy(), connectivity=4)
             component_labels = th.tensor(component_labels)
 
             # If previous point is given, sample a point in the same connected component

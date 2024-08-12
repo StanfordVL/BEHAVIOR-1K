@@ -210,8 +210,8 @@ class ScanSensor(BaseSensor):
         )
         scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).int()
 
-        occupancy_grid = occupancy_grid.numpy()
-        scan_local_in_map = scan_local_in_map.numpy()
+        occupancy_grid = occupancy_grid.cpu().numpy()
+        scan_local_in_map = scan_local_in_map.cpu().numpy()
 
         # For each scan hit,
         for i in range(scan_local_in_map.shape[1]):

@@ -42,15 +42,15 @@ class TestQuaternionOperations:
         ],
     )
     def test_quat2mat_special_cases(self, q):
-        q_np = q.numpy()
+        q_np = q.cpu().numpy()
         scipy_mat = R.from_quat(q_np).as_matrix()
         our_mat = quat2mat(q)
         assert_close(our_mat, th.from_numpy(scipy_mat.astype(np.float32)))
 
     def test_quat_mul(self):
         q1, q2 = random_quaternion().squeeze(), random_quaternion().squeeze()
-        q1_scipy = q1.numpy()
-        q2_scipy = q2.numpy()
+        q1_scipy = q1.cpu().numpy()
+        q2_scipy = q2.cpu().numpy()
         scipy_result = R.from_quat(q1_scipy) * R.from_quat(q2_scipy)
         scipy_quat = scipy_result.as_quat()
         our_quat = quat_mul(q1, q2)
@@ -58,14 +58,14 @@ class TestQuaternionOperations:
 
     def test_quat_conjugate(self):
         q = random_quaternion().squeeze()
-        q_scipy = q.numpy()
+        q_scipy = q.cpu().numpy()
         scipy_conj = R.from_quat(q_scipy).inv().as_quat()
         our_conj = quat_conjugate(q)
         assert quaternions_close(our_conj, th.from_numpy(scipy_conj.astype(np.float32)))
 
     def test_quat_inverse(self):
         q = random_quaternion().squeeze()
-        scipy_inv = R.from_quat(q.numpy()).inv().as_quat().astype(np.float32)
+        scipy_inv = R.from_quat(q.cpu().numpy()).inv().as_quat().astype(np.float32)
         our_inv = quat_inverse(q)
         assert quaternions_close(our_inv, th.from_numpy(scipy_inv))
         q_identity = quat_mul(q, our_inv)
@@ -73,8 +73,8 @@ class TestQuaternionOperations:
 
     # def test_quat_distance(self):
     #     q1, q2 = random_quaternion().squeeze(), random_quaternion().squeeze()
-    #     r1 = R.from_quat(q1.numpy())
-    #     r2 = R.from_quat(q2.numpy())
+    #     r1 = R.from_quat(q1.cpu().numpy())
+    #     r2 = R.from_quat(q2.cpu().numpy())
     #     r_diff = r1.inv() * r2
     #     scipy_dist = r_diff.as_quat().astype(np.float32)
     #     our_dist = quat_distance(q1, q2)
@@ -103,7 +103,7 @@ class TestMatrixOperations:
     def test_rotation_matrix_properties(self):
         rand_quat = random_quaternion().squeeze()
         R_mat = quat2mat(rand_quat)
-        scipy_R = R.from_quat(rand_quat.numpy()).as_matrix().astype(np.float32)
+        scipy_R = R.from_quat(rand_quat.cpu().numpy()).as_matrix().astype(np.float32)
         assert_close(R_mat, th.from_numpy(scipy_R))
         assert_close(th.matmul(R_mat, R_mat.t()), th.eye(3))
         assert_close(th.det(R_mat), th.tensor(1.0))
@@ -112,7 +112,7 @@ class TestMatrixOperations:
     def test_rotation_matrix(self, angle):
         direction = normalize(random_vector())
         R_mat = rotation_matrix(angle, direction)
-        scipy_R = R.from_rotvec(angle * direction.numpy()).as_matrix().astype(np.float32)
+        scipy_R = R.from_rotvec(angle * direction.cpu().numpy()).as_matrix().astype(np.float32)
         assert_close(R_mat, th.from_numpy(scipy_R))
 
         identity = th.eye(3, dtype=R_mat.dtype, device=R_mat.device)
@@ -139,11 +139,11 @@ class TestMatrixOperations:
         point = th.randn(3, dtype=th.float32)
         T = transformation_matrix(angle, direction, point)
 
-        direction_np = direction.numpy()
+        direction_np = direction.cpu().numpy()
         scipy_R = R.from_rotvec(angle * direction_np).as_matrix().astype(np.float32)
         scipy_T = np.eye(4, dtype=np.float32)
         scipy_T[:3, :3] = scipy_R
-        scipy_T[:3, 3] = point.numpy() - np.dot(scipy_R, point.numpy())
+        scipy_T[:3, 3] = point.cpu().numpy() - np.dot(scipy_R, point.cpu().numpy())
         assert_close(T, th.from_numpy(scipy_T))
 
         rot = T[:3, :3]
@@ -158,7 +158,7 @@ class TestMatrixOperations:
         angle = np.pi / 4
         T = transformation_matrix(angle, direction)
 
-        scipy_R = R.from_rotvec(angle * direction.numpy()).as_matrix().astype(np.float32)
+        scipy_R = R.from_rotvec(angle * direction.cpu().numpy()).as_matrix().astype(np.float32)
         scipy_T = np.eye(4, dtype=np.float32)
         scipy_T[:3, :3] = scipy_R
         assert_close(T, th.from_numpy(scipy_T))
@@ -170,7 +170,7 @@ class TestMatrixOperations:
     def test_matrix_inverse(self):
         M = random_matrix()
         M_inv = matrix_inverse(M)
-        scipy_M_inv = np.linalg.inv(M.numpy()).astype(np.float32)
+        scipy_M_inv = np.linalg.inv(M.cpu().numpy()).astype(np.float32)
         assert_close(M_inv, th.from_numpy(scipy_M_inv), atol=1e-3, rtol=1e-3)
         assert_close(th.matmul(M, M_inv), th.eye(3))
 
@@ -189,10 +189,10 @@ class TestPoseTransformations:
         pos, orn = random_vector(), random_quaternion().squeeze()
         T = pose2mat((pos, orn))
 
-        scipy_R = R.from_quat(orn.numpy())
+        scipy_R = R.from_quat(orn.cpu().numpy())
         scipy_T = np.eye(4, dtype=np.float32)
         scipy_T[:3, :3] = scipy_R.as_matrix()
-        scipy_T[:3, 3] = pos.numpy()
+        scipy_T[:3, 3] = pos.cpu().numpy()
 
         assert_close(T, th.from_numpy(scipy_T))
 
@@ -205,10 +205,10 @@ class TestPoseTransformations:
         T = pose2mat((pos, orn))
         T_inv = pose_inv(T)
 
-        scipy_R = R.from_quat(orn.numpy())
+        scipy_R = R.from_quat(orn.cpu().numpy())
         scipy_T = np.eye(4, dtype=np.float32)
         scipy_T[:3, :3] = scipy_R.as_matrix()
-        scipy_T[:3, 3] = pos.numpy()
+        scipy_T[:3, 3] = pos.cpu().numpy()
         scipy_T_inv = np.linalg.inv(scipy_T)
 
         assert_close(T_inv, th.from_numpy(scipy_T_inv))
@@ -219,10 +219,10 @@ class TestPoseTransformations:
         pos1, orn1 = random_vector(), random_quaternion().squeeze()
         rel_pos, rel_orn = relative_pose_transform(pos1, orn1, pos0, orn0)
 
-        scipy_R0 = R.from_quat(orn0.numpy())
-        scipy_R1 = R.from_quat(orn1.numpy())
+        scipy_R0 = R.from_quat(orn0.cpu().numpy())
+        scipy_R1 = R.from_quat(orn1.cpu().numpy())
         scipy_rel_R = scipy_R0.inv() * scipy_R1
-        scipy_rel_pos = scipy_R0.inv().apply(pos1.numpy() - pos0.numpy())
+        scipy_rel_pos = scipy_R0.inv().apply(pos1.cpu().numpy() - pos0.cpu().numpy())
 
         assert_close(rel_pos, th.from_numpy(scipy_rel_pos.astype(np.float32)))
         assert quaternions_close(rel_orn, th.from_numpy(scipy_rel_R.as_quat().astype(np.float32)))
@@ -235,7 +235,7 @@ class TestAxisAngleConversions:
         axisangle = axis * angle
         quat = axisangle2quat(axisangle)
 
-        scipy_R = R.from_rotvec(axisangle.numpy())
+        scipy_R = R.from_rotvec(axisangle.cpu().numpy())
         scipy_quat = scipy_R.as_quat().astype(np.float32)
 
         assert quaternions_close(quat, th.from_numpy(scipy_quat))
@@ -252,7 +252,7 @@ class TestAxisAngleConversions:
         vec2 = th.tensor([0.0, 1.0, 0.0])
         axisangle = vecs2axisangle(vec1, vec2)
 
-        scipy_R = R.align_vectors(vec2.unsqueeze(0).numpy(), vec1.unsqueeze(0).numpy())[0]
+        scipy_R = R.align_vectors(vec2.unsqueeze(0).cpu().numpy(), vec1.unsqueeze(0).cpu().numpy())[0]
         scipy_axisangle = scipy_R.as_rotvec().astype(np.float32)
 
         assert_close(axisangle, th.from_numpy(scipy_axisangle))
@@ -262,7 +262,7 @@ class TestAxisAngleConversions:
         vec2 = th.tensor([0.0, 1.0, 0.0])
         quat = vecs2quat(vec1, vec2)
 
-        scipy_R = R.align_vectors(vec2.unsqueeze(0).numpy(), vec1.unsqueeze(0).numpy())[0]
+        scipy_R = R.align_vectors(vec2.unsqueeze(0).cpu().numpy(), vec1.unsqueeze(0).cpu().numpy())[0]
         scipy_quat = scipy_R.as_quat().astype(np.float32)
 
         assert quaternions_close(quat, th.from_numpy(scipy_quat))
@@ -278,7 +278,7 @@ class TestEulerAngleConversions:
     )
     def test_euler2quat_and_quat2euler(self, euler):
         quat = euler2quat(euler)
-        scipy_R = R.from_euler("xyz", euler.numpy())
+        scipy_R = R.from_euler("xyz", euler.cpu().numpy())
         scipy_quat = scipy_R.as_quat().astype(np.float32)
         assert quaternions_close(quat, th.from_numpy(scipy_quat))
 
@@ -295,7 +295,7 @@ class TestEulerAngleConversions:
     )
     def test_euler2mat_and_mat2euler(self, euler):
         mat = euler2mat(euler)
-        scipy_R = R.from_euler("xyz", euler.numpy())
+        scipy_R = R.from_euler("xyz", euler.cpu().numpy())
         scipy_mat = scipy_R.as_matrix().astype(np.float32)
         assert_close(mat, th.from_numpy(scipy_mat))
 
@@ -310,8 +310,8 @@ class TestQuaternionApplications:
         vec = random_vector()
         rotated_vec = quat_apply(quat, vec)
 
-        scipy_R = R.from_quat(quat.numpy())
-        scipy_rotated_vec = scipy_R.apply(vec.numpy()).astype(np.float32)
+        scipy_R = R.from_quat(quat.cpu().numpy())
+        scipy_rotated_vec = scipy_R.apply(vec.cpu().numpy()).astype(np.float32)
 
         assert rotated_vec.shape == (3,)
         assert_close(rotated_vec, th.from_numpy(scipy_rotated_vec))
@@ -322,7 +322,7 @@ class TestQuaternionApplications:
         t = th.rand(1)
         q_slerp = quat_slerp(q1, q2, t)
 
-        key_rots = R.from_quat(np.stack([q1.numpy(), q2.numpy()]))
+        key_rots = R.from_quat(np.stack([q1.cpu().numpy(), q2.cpu().numpy()]))
         key_times = [0, 1]
         slerp = Slerp(key_times, key_rots)
         scipy_q_slerp = slerp([t]).as_quat()[0].astype(np.float32)
