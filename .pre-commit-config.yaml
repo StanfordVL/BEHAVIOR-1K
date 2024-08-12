@@ -14,7 +14,7 @@ repos:
     hooks:
       - id: no-commit-to-branch
         name: Check for numpy imports
-        entry: grep -R "import numpy" .
+        entry: git grep -l "import numpy"
         language: system
         types: [python]
         exclude: |
