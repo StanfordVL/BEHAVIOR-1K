@@ -1,3 +1,4 @@
+import string
 from abc import ABC, abstractmethod
 
 import omnigibson as og
@@ -36,6 +37,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         load_config=None,
     ):
         self._relative_prim_path = relative_prim_path
+        assert relative_prim_path.startswith("/"), f"Relative prim path {relative_prim_path} must start with a '/'!"
+        assert all(
+            component[0] in string.ascii_letters for component in relative_prim_path[1:].split("/")
+        ), f"Each component of relative prim path {relative_prim_path} must start with a letter!"
+
         self._name = name
         self._load_config = dict() if load_config is None else load_config
 
@@ -73,10 +79,11 @@ class BasePrim(Serializable, Recreatable, ABC):
         ), f"Prim {self.name} at prim_path {self.prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
-        # Cache state size
-        self._state_size = len(self.dump_state(serialized=True))
-
         self._initialized = True
+
+        # Cache state size (note that we are doing this after initialized is set to True because
+        # dump_state asserts that the prim is initialized for some prims).
+        self._state_size = len(self.dump_state(serialized=True))
 
     def load(self, scene):
         """

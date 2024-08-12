@@ -6,7 +6,7 @@ icon: material/repeat
 
 ## Description
 
-**`OmniGibson`**'s [Simulator](../reference/simulator.html) class is the global singleton that serves as the interface with omniverse's low-level physx (physics) backend. It provides utility functions for modulating the ongoing simulation as well as the low-level interface for importing scenes and objects. For standard use-cases, interfacing with the simulation exclusively through a created [environment](./environments.md) or [vector environment](./vector_environments.md) should be sufficient, though for more advanced or prototyping use-cases it may be common to interface via this simulator class.
+**`OmniGibson`**'s [Simulator](../reference/simulator.md) class is the global singleton that serves as the interface with omniverse's low-level physx (physics) backend. It provides utility functions for modulating the ongoing simulation as well as the low-level interface for importing scenes and objects. For standard use-cases, interfacing with the simulation exclusively through a created [environment](./environments.md) or [vector environment](./vector_environments.md) should be sufficient, though for more advanced or prototyping use-cases it may be common to interface via this simulator class.
 
 ## Usage
 

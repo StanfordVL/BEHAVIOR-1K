@@ -22,8 +22,8 @@ def test_camera_semantic_segmentation():
     all_observation, all_info = vision_sensor.get_obs()
     seg_semantic = all_observation["seg_semantic"]
     seg_semantic_info = all_info["seg_semantic"]
-    agent_label = semantic_class_name_to_id(env.scene)["agent"]
-    background_label = semantic_class_name_to_id(env.scene)["background"]
+    agent_label = semantic_class_name_to_id()["agent"]
+    background_label = semantic_class_name_to_id()["background"]
     assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
     assert set(seg_semantic_info.keys()) == {agent_label, background_label}
     og.clear()

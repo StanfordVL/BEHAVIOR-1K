@@ -6,7 +6,7 @@ icon: material/magic-staff
 
 ## Description
 
-Transition rules are **`OmniGibson`**'s method for simulating complex physical phenomena not directly supported by the underlying omniverse physics engine, such as slicing, blending, and cooking. A given [`TransitionRule`](../reference/transition_rules.html#transition_rules.BaseTransitionRule) dynamically checks for its internal sets of conditions, and, if validated, executes its corresponding `transition`.
+Transition rules are **`OmniGibson`**'s method for simulating complex physical phenomena not directly supported by the underlying omniverse physics engine, such as slicing, blending, and cooking. A given [`TransitionRule`](../reference/transition_rules.md#transition_rules.BaseTransitionRule) dynamically checks for its internal sets of conditions, and, if validated, executes its corresponding `transition`.
 
 !!! info annotate "Transition Rules must be enabled before usage!"
 
@@ -17,10 +17,10 @@ Transition rules are **`OmniGibson`**'s method for simulating complex physical p
 ## Usage
 
 ### Creating
-Because `TransitionRule`s are monolithic classes, these should be defined _before_ **`OmniGibson`** is launched. A rule can be easily extended by subclassing the `BaseTransitionRule` class and implementing the necessary functions. For a simple example, please see the [`SlicingRule`](../reference/transition_rules.html#transition_rules.SlicingRule) class.
+Because `TransitionRule`s are monolithic classes, these should be defined _before_ **`OmniGibson`** is launched. A rule can be easily extended by subclassing the `BaseTransitionRule` class and implementing the necessary functions. For a simple example, please see the [`SlicingRule`](../reference/transition_rules.md#transition_rules.SlicingRule) class.
 
 ### Runtime
-At runtime, each scene owns a [`TransitionRuleAPI`](../reference/transition_rules.html#transition_rules.TransitionRuleAPI) instance, which automatically handles the stepping and processing of all defined transition rule classes. For efficiency reasons, rules are dynamically loaded and checked based on the object / system set currently active in the scene. A rule will only be checked if there is at least one valid candidate combination amongst the current object / system set. For example, if there is no sliceable object present in this scene, then `SlicingRule` will not be active. Every time an object / system is added / removed from the scene, all rules are refreshed so that the current active transition rule set is always accurate.
+At runtime, each scene owns a [`TransitionRuleAPI`](../reference/transition_rules.md#transition_rules.TransitionRuleAPI) instance, which automatically handles the stepping and processing of all defined transition rule classes. For efficiency reasons, rules are dynamically loaded and checked based on the object / system set currently active in the scene. A rule will only be checked if there is at least one valid candidate combination amongst the current object / system set. For example, if there is no sliceable object present in this scene, then `SlicingRule` will not be active. Every time an object / system is added / removed from the scene, all rules are refreshed so that the current active transition rule set is always accurate.
 
 In general, you should not need to interface with the `TransitionRuleAPI` class at all -- if your rule implementation is correct, then the API will automatically handle the transition when the appropriate conditions are met!
 
@@ -31,7 +31,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
 <table markdown="span">
     <tr>
         <td valign="top" width="60%">
-            [**`SlicingRule`**](../reference/transition_rules.html#transition_rules.SlicingRule)<br><br>  
+            [**`SlicingRule`**](../reference/transition_rules.md#transition_rules.SlicingRule)<br><br>  
             Encapsulates slicing an object into halves (e.g.: slicing an apple).<br><br>**Required Candidates**
             <ul>
                 <li>1+ sliceable objects</li>
@@ -53,7 +53,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`DicingRule`**](../reference/transition_rules.html#transition_rules.DicingRule)<br><br>  
+            [**`DicingRule`**](../reference/transition_rules.md#transition_rules.DicingRule)<br><br>  
             Encapsulates dicing a diceable into small chunks (e.g.: dicing an apple).<br><br>**Required Candidates**
             <ul>
                 <li>1+ diceable objects</li>
@@ -75,7 +75,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`MeltingRule`**](../reference/transition_rules.html#transition_rules.MeltingRule)<br><br>  
+            [**`MeltingRule`**](../reference/transition_rules.md#transition_rules.MeltingRule)<br><br>  
             Encapsulates melting an object into liquid (e.g.: melting chocolate).<br><br>**Required Candidates**
             <ul>
                 <li>1+ meltable objects</li>
@@ -95,7 +95,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`CookingPhysicalParticleRule`**](../reference/transition_rules.html#transition_rules.CookingPhysicalParticleRule)<br><br>  
+            [**`CookingPhysicalParticleRule`**](../reference/transition_rules.md#transition_rules.CookingPhysicalParticleRule)<br><br>  
             Encapsulates cooking physical particles (e.g.: boiling water).<br><br>**Required Candidates**
             <ul>
                 <li>1+ fillable and heatable objects</li>
@@ -115,7 +115,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`ToggleableMachineRule`**](../reference/transition_rules.html#transition_rules.ToggleableMachineRule)<br><br>  
+            [**`ToggleableMachineRule`**](../reference/transition_rules.md#transition_rules.ToggleableMachineRule)<br><br>  
             Encapsulates transformative changes when a button is pressed (e.g.: blending a smoothie). Valid transitions are defined by a pre-defined set of "recipes" (input / output combinations).<br><br>**Required Candidates**
             <ul>
                 <li>1+ fillable and toggleable objects</li>
@@ -135,7 +135,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`MixingToolRule`**](../reference/transition_rules.html#transition_rules.MixingToolRule)<br><br>  
+            [**`MixingToolRule`**](../reference/transition_rules.md#transition_rules.MixingToolRule)<br><br>  
             Encapsulates transformative changes during tool-driven mixing (e.g.: mixing a drink with a stirrer). Valid transitions are defined by a pre-defined set of "recipes" (input / output combinations).<br><br>**Required Candidates**
             <ul>
                 <li>1+ fillable objects</li>
@@ -157,7 +157,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`CookingRule`**](../reference/transition_rules.html#transition_rules.CookingRule)<br><br>  
+            [**`CookingRule`**](../reference/transition_rules.md#transition_rules.CookingRule)<br><br>  
             Encapsulates transformative changes during cooking (e.g.: baking a cake). Valid transitions are defined by a pre-defined set of "recipes" (input / output combinations).<br><br>**Required Candidates**
             <ul>
                 <li>1+ fillable objects</li>
@@ -179,7 +179,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`WasherRule`**](../reference/transition_rules.html#transition_rules.WasherRule)<br><br>  
+            [**`WasherRule`**](../reference/transition_rules.md#transition_rules.WasherRule)<br><br>  
             Encapsulates washing mechanism (e.g.: cleaning clothes in the washing machine with detergent). Washing behavior (i.e.: what types of particles are removed from clothes during washing) is predefined.<br><br>**Required Candidates**
             <ul>
                 <li>1+ washer objects</li>
@@ -200,7 +200,7 @@ In general, you should not need to interface with the `TransitionRuleAPI` class 
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`DryerRule`**](../reference/transition_rules.html#transition_rules.DryerRule)<br><br>  
+            [**`DryerRule`**](../reference/transition_rules.md#transition_rules.DryerRule)<br><br>  
             Encapsulates drying mechanism (e.g.: drying clothes in the drying machine).<br><br>**Required Candidates**
             <ul>
                 <li>1+ clothes_dryer objects</li>
