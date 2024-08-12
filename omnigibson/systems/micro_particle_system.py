@@ -1744,7 +1744,7 @@ class Cloth(MicroParticleSystem):
             tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
 
         # Update the mesh prim
-        face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
         mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
         mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
         mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())

@@ -106,7 +106,7 @@ def test_bbox_modalities(env):
     robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
     dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
-    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -np.pi / 2]))
+    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat([0, 0, -math.pi / 2]))
     robot.reset()
 
     modalities_required = ["bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
