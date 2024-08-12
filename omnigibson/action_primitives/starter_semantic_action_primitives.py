@@ -1440,9 +1440,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
 
             if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
-                # assert (
-                #     self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
-                # ), "Controller must be in pose_absolute_ori mode"
+                assert (
+                    self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
+                ), "Controller must be in pose_absolute_ori mode"
                 # convert quaternion to axis-angle representation for control input
                 no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
 
