@@ -1,18 +1,14 @@
 import itertools
 import math
 import random
-import time
 from collections import Counter, defaultdict
 
-import numpy as np
 import torch as th
-import trimesh
 from scipy.stats import truncnorm
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.utils.ui_utils import create_module_logger, draw_line
 
 # Create module logger

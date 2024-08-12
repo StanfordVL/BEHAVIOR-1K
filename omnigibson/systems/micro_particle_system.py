@@ -1,9 +1,7 @@
-import datetime
 import math
 import os
 import tempfile
 import uuid
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -18,11 +16,9 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.python_utils import assert_valid_key, torch_delete
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.ui_utils import create_module_logger, disclaimer
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     PoseAPI,
     absolute_prim_path_to_scene_relative,
@@ -243,7 +239,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 4) numpy array, where each of the N particles' orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
-        return th.from_numpy(np.array(self.get_attribute(attr="orientations")))
+        return th.from_numpy(np.array(self.get_attribute(attr="orientations"), dtype=np.float32))
 
     @particle_orientations.setter
     def particle_orientations(self, quat):

@@ -11,7 +11,6 @@ from functools import cache, wraps
 from hashlib import md5
 from importlib import import_module
 
-import numpy as np
 import torch as th
 
 # Global dictionary storing all unique names
@@ -293,7 +292,7 @@ def get_uuid(name, n_digits=8, deterministic=True):
     """
     # Make sure the number is float32 compatible
     val = int(md5(name.encode()).hexdigest(), 16) if deterministic else abs(hash(name))
-    return int(np.float32(val % (10**n_digits)))
+    return int(th.tensor(val % (10**n_digits), dtype=th.float32).item())
 
 
 def meets_minimum_version(test_version, minimum_version):

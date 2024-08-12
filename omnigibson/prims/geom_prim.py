@@ -1,8 +1,6 @@
 from functools import cached_property
 
-import numpy as np
 import torch as th
-import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -92,7 +90,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:
-            self.set_attribute("primvars:displayColor", np.array(rgb))
+            self.set_attribute("primvars:displayColor", rgb.cpu().numpy())
 
     @property
     def opacity(self):
