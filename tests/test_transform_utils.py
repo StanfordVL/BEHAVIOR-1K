@@ -427,18 +427,7 @@ class TestMiscellaneousFunctions:
         angle = z_angle_from_quat(quat)
         assert_close(angle, th.tensor(math.pi / 4))
 
-    def test_z_rotation_from_quat(self):
-        quat = euler2quat(th.tensor([0.1, 0.2, 0.3]))
-        z_quat = z_rotation_from_quat(quat)
-        z_angle = z_angle_from_quat(z_quat)
-        assert_close(z_angle, quat2euler(quat)[2])
-
     def test_integer_spiral_coordinates(self):
         coords = [integer_spiral_coordinates(i) for i in range(5)]
         expected = [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 1)]
         assert coords == expected
-
-    def test_calculate_xy_plane_angle(self):
-        quat = euler2quat(th.tensor([0.0, 0.0, math.pi / 3]))
-        angle = calculate_xy_plane_angle(quat)
-        assert_close(angle, th.tensor(math.pi / 3))

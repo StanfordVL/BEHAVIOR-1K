@@ -357,7 +357,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         ori = T.quat2euler(quat)
 
-        ori_2d = T.calculate_xy_plane_angle(quat)
+        ori_2d = T.z_angle_from_quat(quat)
 
         # Pack everything together
         return dict(

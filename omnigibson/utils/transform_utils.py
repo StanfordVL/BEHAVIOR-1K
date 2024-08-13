@@ -1303,36 +1303,6 @@ def z_angle_from_quat(quat):
 
 
 @th.jit.script
-def z_rotation_from_quat(quat):
-    """
-    Get the quaternion for the rotation around the Z axis produced by the quaternion.
-
-    Args:
-        quat (th.tensor): (x,y,z,w) float quaternion
-
-    Returns:
-        th.tensor: (x,y,z,w) float quaternion representing rotation around Z axis
-    """
-    # Ensure quat is 2D tensor
-    if quat.dim() == 1:
-        quat = quat.unsqueeze(0)
-
-    # Get the yaw angle from the quaternion
-    yaw = quat2euler(quat)[:, 2]
-
-    # Create a new quaternion representing rotation around Z axis
-    z_quat = th.zeros_like(quat)
-    z_quat[:, 2] = th.sin(yaw / 2)  # z component
-    z_quat[:, 3] = th.cos(yaw / 2)  # w component
-
-    # If input was 1D, return 1D
-    if quat.shape[0] == 1:
-        z_quat = z_quat.squeeze(0)
-
-    return z_quat
-
-
-@th.jit.script
 def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
@@ -1343,32 +1313,6 @@ def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     x = ((-1) ** m) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n)) % 2) - math.ceil(m / 2))
     y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n) + 1) % 2) + math.ceil(m / 2))
     return int(x), int(y)
-
-
-@th.jit.script
-def calculate_xy_plane_angle(quaternion: th.Tensor) -> th.Tensor:
-    """
-    Compute the 2D orientation angle from a quaternion assuming the initial forward vector is along the x-axis.
-
-    Parameters:
-    quaternion : th.Tensor
-        The quaternion (w, x, y, z) representing the rotation.
-
-    Returns:
-    th.Tensor
-        The angle (in radians) of the projection of the forward vector onto the XY plane.
-        Returns 0.0 if the projected vector's magnitude is negligibly small.
-    """
-    fwd = quat_apply(quaternion, th.tensor([1.0, 0.0, 0.0], dtype=quaternion.dtype, device=quaternion.device))
-    fwd_xy = fwd.clone()
-    fwd_xy[..., 2] = 0.0
-
-    norm = th.norm(fwd_xy, dim=-1, keepdim=True)
-
-    # Use where to handle both cases
-    angle = th.where(norm < 1e-4, th.zeros_like(norm), th.arctan2(fwd_xy[..., 1], fwd_xy[..., 0]))
-
-    return angle.squeeze(-1)
 
 
 @th.jit.script

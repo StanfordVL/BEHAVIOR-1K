@@ -1,6 +1,5 @@
 import os
 
-import torch as th
 import yaml
 
 import omnigibson as og

@@ -18,6 +18,7 @@ from omnigibson.utils.gym_utils import (
     recursively_generate_compatible_dict,
     recursively_generate_flat_dict,
 )
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import (
     Recreatable,
     assert_valid_key,
@@ -395,7 +396,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 ), "Can only flatten action space where all individual spaces are 1D instances!"
                 lows.append(space.low)
                 highs.append(space.high)
-            action_space = gym.spaces.Box(th.cat(lows), th.cat(highs), dtype=th.float32)
+            action_space = gym.spaces.Box(
+                th.tensor(lows, dtype=th.float32).cpu().numpy(),
+                th.tensor(highs, dtype=th.float32).cpu().numpy(),
+                dtype=NumpyTypes.FLOAT32,
+            )
 
         # Store action space
         self.action_space = action_space

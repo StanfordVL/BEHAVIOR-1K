@@ -1,5 +1,3 @@
-import torch as th
-
 from omnigibson.object_states.object_state_base import BaseObjectRequirement
 
 

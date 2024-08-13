@@ -71,7 +71,7 @@ class SceneGraphBuilder(object):
         robot_to_world = self._robot.get_position_orientation()
 
         # Get rid of any rotation outside xy plane
-        robot_to_world = T.pose2mat((robot_to_world[0], T.z_rotation_from_quat(robot_to_world[1])))
+        robot_to_world = T.pose2mat((robot_to_world[0], T.z_angle_from_quat(robot_to_world[1])))
 
         return robot_to_world
 

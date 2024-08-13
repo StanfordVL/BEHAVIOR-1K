@@ -1,5 +1,3 @@
-import torch as th
-
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.utils.python_utils import classproperty

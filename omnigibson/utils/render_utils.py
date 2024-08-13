@@ -2,11 +2,7 @@
 Set of rendering utility functions when working with Omni
 """
 
-import torch as th
-
-import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
 from omnigibson.utils.physx_utils import bind_material
 
