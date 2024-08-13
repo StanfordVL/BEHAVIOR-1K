@@ -86,6 +86,9 @@ def test_scene_graph():
         og.sim.step()
         scene_graph_builder.step(og.sim.scenes[0])
 
-    visualize_scene_graph(
-        og.sim.scenes[0], scene_graph_builder.get_scene_graph(), show_window=False, cartesian_positioning=True
+    assert isinstance(
+        visualize_scene_graph(
+            og.sim.scenes[0], scene_graph_builder.get_scene_graph(), show_window=False, cartesian_positioning=True
+        ),
+        th.Tensor,
     )

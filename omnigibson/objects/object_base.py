@@ -93,12 +93,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        if isinstance(scale, th.Tensor):
-            load_config["scale"] = scale
-        elif isinstance(scale, Iterable):
-            load_config["scale"] = th.tensor(scale, dtype=th.float32)
-        else:
-            load_config["scale"] = scale
+        load_config["scale"] = (
+            scale
+            if isinstance(scale, th.Tensor)
+            else th.tensor(scale, dtype=th.float32) if isinstance(scale, Iterable) else scale
+        )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["kinematic_only"] = kinematic_only

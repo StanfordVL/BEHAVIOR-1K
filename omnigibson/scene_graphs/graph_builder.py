@@ -71,7 +71,8 @@ class SceneGraphBuilder(object):
         robot_to_world = self._robot.get_position_orientation()
 
         # Get rid of any rotation outside xy plane
-        robot_to_world = T.pose2mat((robot_to_world[0], T.z_angle_from_quat(robot_to_world[1])))
+        z_angle = T.z_angle_from_quat(robot_to_world[1])
+        robot_to_world = T.pose2mat((robot_to_world[0], T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32))))
 
         return robot_to_world
 
@@ -306,3 +307,5 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
         cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imshow("SceneGraph", cv_img)
         cv2.waitKey(0)
+
+    return img
