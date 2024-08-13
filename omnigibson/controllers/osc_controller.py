@@ -133,7 +133,7 @@ class OperationalSpaceController(ManipulationController):
         self.kp = nums2array(nums=kp, dim=6, dtype=th.float32) if kp is not None else None
         self.damping_ratio = damping_ratio
         self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=th.float32) if kp_null is not None else None
-        self.kd_null = 2 * math.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
+        self.kd_null = 2 * th.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
         self.kp_limits = th.tensor(kp_limits, dtype=th.float32)
         self.damping_ratio_limits = th.tensor(damping_ratio_limits, dtype=th.float32)
         self.kp_null_limits = th.tensor(kp_null_limits, dtype=th.float32)
@@ -369,7 +369,7 @@ class OperationalSpaceController(ManipulationController):
         # For now, always use internal values
         kp = self.kp
         damping_ratio = self.damping_ratio
-        kd = 2 * math.sqrt(kp) * damping_ratio
+        kd = 2 * th.sqrt(kp) * damping_ratio
 
         # Extract relevant values from the control dict
         dof_idxs_mat = tuple(th.meshgrid(self.dof_idx, self.dof_idx))
@@ -439,25 +439,26 @@ class OperationalSpaceController(ManipulationController):
         return self._command_dim
 
 
+@th.jit.script
 def _compute_osc_torques(
-    q,
-    qd,
-    mm,
-    j_eef,
-    ee_pos,
-    ee_mat,
-    ee_vel,
-    goal_pos,
-    goal_ori_mat,
-    kp,
-    kd,
-    kp_null,
-    kd_null,
-    rest_qpos,
-    control_dim,
-    decouple_pos_ori,
-    base_lin_vel,
-    base_ang_vel,
+    q: th.Tensor,
+    qd: th.Tensor,
+    mm: th.Tensor,
+    j_eef: th.Tensor,
+    ee_pos: th.Tensor,
+    ee_mat: th.Tensor,
+    ee_vel: th.Tensor,
+    goal_pos: th.Tensor,
+    goal_ori_mat: th.Tensor,
+    kp: th.Tensor,
+    kd: th.Tensor,
+    kp_null: th.Tensor,
+    kd_null: th.Tensor,
+    rest_qpos: th.Tensor,
+    control_dim: int,
+    decouple_pos_ori: bool,
+    base_lin_vel: th.Tensor,
+    base_ang_vel: th.Tensor,
 ):
     # Compute the inverse
     mm_inv = th.linalg.inv(mm)

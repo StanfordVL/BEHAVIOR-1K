@@ -3,7 +3,6 @@ Set of utilities for helping to execute robot control
 """
 
 import torch as th
-from numba import jit
 
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
@@ -140,7 +139,7 @@ class IKSolver:
             return None
 
 
-@jit(nopython=True)
+@th.jit.script
 def orientation_error(desired, current):
     """
     This function calculates a 3-dimensional orientation error vector for use in the
@@ -156,22 +155,15 @@ def orientation_error(desired, current):
     Returns:
         tensor: (..., 3) where final dim is (ax, ay, az) axis-angle representing orientation error
     """
-    # convert input shapes
-    input_shape = desired.shape[:-2]
-    desired = desired.reshape(-1, 3, 3)
-    current = current.reshape(-1, 3, 3)
+    # Compute batch size
+    batch_size = desired.numel() // 9  # Each 3x3 matrix has 9 elements
 
-    # grab relevant info
-    rc1 = current[:, :, 0]
-    rc2 = current[:, :, 1]
-    rc3 = current[:, :, 2]
-    rd1 = desired[:, :, 0]
-    rd2 = desired[:, :, 1]
-    rd3 = desired[:, :, 2]
+    desired_flat = desired.reshape(batch_size, 3, 3)
+    current_flat = current.reshape(batch_size, 3, 3)
+
+    rc1, rc2, rc3 = current_flat[:, :, 0], current_flat[:, :, 1], current_flat[:, :, 2]
+    rd1, rd2, rd3 = desired_flat[:, :, 0], desired_flat[:, :, 1], desired_flat[:, :, 2]
 
     error = 0.5 * (th.linalg.cross(rc1, rd1) + th.linalg.cross(rc2, rd2) + th.linalg.cross(rc3, rd3))
 
-    # Reshape
-    error = error.reshape(*input_shape, 3)
-
-    return error
+    return error.reshape(desired.shape[:-2] + (3,))
