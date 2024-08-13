@@ -48,14 +48,11 @@ jobs:
         working-directory: omnigibson-src
         run: python tests/create_tests_of_examples.py
 
-      - name: Debug step
-        id: my-debug
-        run: ls tests/
-
       - name: Get list of generated tests
         id: get-test-list
+        working-directory: omnigibson-src
         run: |
-          echo "example_tests=$(cat example_tests.json)" >> $GITHUB_OUTPUT
+          echo "example_tests=$(cat tests/example_tests.json)" >> $GITHUB_OUTPUT
 
     outputs:
       example_tests: ${{ steps.get-test-list.outputs.example_tests }}
