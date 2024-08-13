@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import pkgutil
 import shutil
@@ -36,6 +37,8 @@ def main():
 
     examples_list = [example for example in examples_list if example not in EXAMPLES_TO_SKIP]
 
+    test_file_names = []
+
     for example in examples_list:
         template_file_name = os.path.join(omnigibson.__path__[0], "..", "tests", "test_of_example_template.txt")
         with open(template_file_name, "r") as f:
@@ -45,9 +48,17 @@ def main():
             substitutes["name"] = name
             src = Template(f.read())
             dst = src.substitute(substitutes)
-            test_file = open(os.path.join(tests_of_examples_dir, name + "_test.py"), "w")
-            n = test_file.write(dst)
-            test_file.close()
+            test_file_name = name + "_test.py"
+            test_file_path = os.path.join(tests_of_examples_dir, test_file_name)
+            with open(test_file_path, "w") as test_file:
+                test_file.write(dst)
+            # Add the test file name (without .py extension) to the list
+            test_file_names.append(name + "_test")
+
+    # Write the list of test file names to a JSON file
+    json_file_path = os.path.join(current_dir, "example_tests.json")
+    with open(json_file_path, "w") as json_file:
+        json.dump(test_file_names, json_file)
 
 
 if __name__ == "__main__":

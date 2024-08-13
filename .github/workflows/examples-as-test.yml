@@ -1,12 +1,19 @@
 name: Examples as Tests
 
-on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # Format: minute hour day-of-month month day-of-week(starts on sunday)
-    # Scheduled for 2 am, every sunday, tuesday, friday
-    - cron: '0 10 * * *'
-  workflow_dispatch:
+# TODO: revert this after testing
+# on:
+#   schedule:
+#     # * is a special character in YAML so you have to quote this string
+#     # Format: minute hour day-of-month month day-of-week(starts on sunday)
+#     # Scheduled for 2 am, everyday
+#     - cron: '0 10 * * *'
+#   workflow_dispatch:
+on: 
+  pull_request: 
+  push: 
+    branches: 
+      - og-develop
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
@@ -44,7 +51,7 @@ jobs:
       - name: Get list of generated tests
         id: get-test-list
         run: |
-          echo "example_tests=$(ls omnigibson-src/tests/tests_of_examples/*_test.py | xargs -n 1 basename | sed 's/.py$//' | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+          echo "example_tests=$(cat tests/example_tests.json)" >> $GITHUB_OUTPUT
 
     outputs:
       example_tests: ${{ steps.get-test-list.outputs.example_tests }}
@@ -57,13 +64,20 @@ jobs:
     strategy:
       matrix:
         test_file:
-          - ${{ needs.generate_example_tests.outputs.example_tests != '' && fromJson(needs.generate_example_tests.outputs.example_tests) || '[]' }}
+          - ${{ needs.generate_example_tests.outputs.example_tests != '' && fromJson(needs.generate_example_tests.outputs.example_tests) }}
+      fail-fast: true
 
     defaults:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
 
     steps:
+      - name: Check for generated tests
+        if: ${{ needs.generate_example_tests.outputs.example_tests == '' }}
+        run: |
+          echo "No tests were generated. Failing the job."
+          exit 1
+
       - name: Fix home
         run: echo "HOME=/root" >> $GITHUB_ENV
 

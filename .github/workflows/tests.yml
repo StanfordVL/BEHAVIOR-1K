@@ -59,13 +59,7 @@ jobs:
 
       - name: Run tests
         working-directory: omnigibson-src
-        run: |
-          if [[ "${{ matrix.test_file }}" == *"_test" ]]; then
-            pytest -s tests/tests_of_examples/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
-          else
-            pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
-          fi
-          cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
+        run: pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
 
       - name: Deploy artifact
         uses: actions/upload-artifact@v3
