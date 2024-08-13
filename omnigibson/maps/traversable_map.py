@@ -3,14 +3,9 @@ import os
 
 import cv2
 import torch as th
-from PIL import Image
-
-# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
-Image.MAX_IMAGE_PIXELS = None
 
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.motion_planning_utils import astar
-from omnigibson.utils.numpy_utils import to_numpy
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -78,11 +73,9 @@ class TraversableMap(BaseMap):
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
-                trav_map = th.tensor(to_numpy(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor)))))
+                trav_map = th.tensor(cv2.imread(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
             else:
-                trav_map = th.tensor(
-                    to_numpy(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
-                )
+                trav_map = th.tensor(cv2.imread(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the

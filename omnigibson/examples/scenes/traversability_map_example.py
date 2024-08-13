@@ -7,7 +7,6 @@ from PIL import Image
 
 import omnigibson as og
 from omnigibson.utils.asset_utils import get_available_og_scenes, get_og_scene_path
-from omnigibson.utils.numpy_utils import to_numpy
 from omnigibson.utils.ui_utils import choose_from_options
 
 
@@ -26,9 +25,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     trav_map_size = 200
     trav_map_erosion = 2
 
-    trav_map = Image.open(os.path.join(get_og_scene_path(scene_model), "layout", "floor_trav_0.png"))
-    trav_map = trav_map.resize((trav_map_size, trav_map_size))
-    trav_map = cv2.erode(to_numpy(trav_map), th.ones((trav_map_erosion, trav_map_erosion)).cpu().numpy())
+    trav_map = cv2.imread(os.path.join(get_og_scene_path(scene_model), "layout", "floor_trav_0.png"))
+    trav_map = cv2.resize(trav_map, (trav_map_size, trav_map_size))
+    trav_map = cv2.erode(trav_map, th.ones((trav_map_erosion, trav_map_erosion)).cpu().numpy())
 
     if not headless:
         plt.figure(figsize=(12, 12))

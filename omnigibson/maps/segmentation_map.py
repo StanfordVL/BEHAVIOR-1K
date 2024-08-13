@@ -1,15 +1,11 @@
 import os
 
+import cv2
 import torch as th
-from PIL import Image
-
-# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
-Image.MAX_IMAGE_PIXELS = None
 
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
-from omnigibson.utils.numpy_utils import to_numpy
 from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -57,15 +53,15 @@ class SegmentationMap(BaseMap):
     def _load_map(self):
         layout_dir = os.path.join(self.scene_dir, "layout")
         room_seg_imgs = os.path.join(layout_dir, "floor_insseg_0.png")
-        img_ins = Image.open(room_seg_imgs)
+        img_ins = cv2.imread(room_seg_imgs)
         room_seg_imgs = os.path.join(layout_dir, "floor_semseg_0.png")
-        img_sem = Image.open(room_seg_imgs)
+        img_sem = cv2.imread(room_seg_imgs)
         height, width = img_ins.size
         assert height == width, "room seg map is not a square"
         assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
         map_size = int(height * self.map_default_resolution / self.map_resolution)
-        img_ins = th.tensor(to_numpy(img_ins.resize((map_size, map_size), Image.NEAREST)))
-        img_sem = th.tensor(to_numpy(img_sem.resize((map_size, map_size), Image.NEAREST)))
+        img_ins = th.tensor(cv2.resize(img_ins, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
+        img_sem = th.tensor(cv2.resize(img_sem, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
 
         room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
