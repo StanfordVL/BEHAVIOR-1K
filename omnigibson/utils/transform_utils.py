@@ -5,15 +5,12 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import torch as th
 
 PI = math.pi
 EPS = th.finfo(th.float32).eps * 4.0
-
-# axis sequences for Euler angles
-_NEXT_AXIS = [1, 2, 0, 1]
 
 # map axes strings to/from tuples of inner axis, parity, repetition, frame
 _AXES2TUPLE = {
@@ -42,8 +39,6 @@ _AXES2TUPLE = {
     "rxyz": (2, 1, 0, 1),
     "rzyz": (2, 1, 1, 1),
 }
-
-_TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
 
 @th.jit.script
