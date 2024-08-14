@@ -288,31 +288,51 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-            raw_obs = self._annotators[modality].get_data(device="cuda")
+            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
-            # All segmentation modalities return uint32 warp arrays, but PyTorch doesn't support it
-            if modality in ["seg_semantic", "seg_instance", "seg_instance_id"]:
-                obs[modality] = obs[modality].view(lazy.warp.int32)
-            if not modality in ["bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]:
-                obs[modality] = lazy.warp.to_torch(obs[modality])
-            if modality == "seg_semantic":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
-            elif modality == "seg_instance":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_instance_segmentation(
-                    obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=False
-                )
-            elif modality == "seg_instance_id":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_instance_segmentation(
-                    obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=True
-                )
-            elif "bbox" in modality:
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_bounding_box_semantic_ids(obs[modality], id_to_labels)
+
+            if og.sim.device == "cpu":
+                obs[modality] = self._preprocess_cpu_obs(obs[modality], modality)
+            elif "cuda" in og.sim.device:
+                obs[modality] = self._preprocess_gpu_obs(obs[modality], modality)
+            else:
+                raise ValueError(f"Unsupported device {og.sim.device}")
+
+            if "seg_" in modality or "bbox_" in modality:
+                self._remap_modality(modality, obs, info, raw_obs)
         return obs, info
+
+    def _preprocess_cpu_obs(self, obs, modality):
+        # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
+        if "seg_" in modality:
+            obs = obs.astype(NumpyTypes.INT32)
+        return th.from_numpy(obs) if not "bbox_" in modality else obs
+
+    def _preprocess_gpu_obs(self, obs, modality):
+        # All segmentation modalities return uint32 warp arrays on gpu, but PyTorch doesn't support it
+        if "seg_" in modality:
+            obs = obs.view(lazy.warp.int32)
+        return lazy.warp.to_torch(obs) if not "bbox_" in modality else obs
+
+    def _remap_modality(self, modality, obs, info, raw_obs):
+        id_to_labels = raw_obs["info"]["idToLabels"]
+
+        if modality == "seg_semantic":
+            obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
+        elif modality in ["seg_instance", "seg_instance_id"]:
+            obs[modality], info[modality] = self._remap_instance_segmentation(
+                obs[modality],
+                id_to_labels,
+                obs["seg_semantic"],
+                info["seg_semantic"],
+                id=(modality == "seg_instance_id"),
+            )
+        elif "bbox" in modality:
+            obs[modality], info[modality] = self._remap_bounding_box_semantic_ids(obs[modality], id_to_labels)
+        else:
+            raise ValueError(f"Unsupported modality {modality}")
 
     def _preprocess_semantic_labels(self, id_to_labels):
         """
