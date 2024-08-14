@@ -40,8 +40,8 @@ jobs:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
 
     steps:
-      - name: Fix home
-        run: echo "HOME=/root" >> $GITHUB_ENV
+      # - name: Fix home
+      #   run: echo "HOME=/root" >> $GITHUB_ENV
 
       - name: Checkout source
         uses: actions/checkout@v2
