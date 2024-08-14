@@ -61,7 +61,7 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         normals = cloth.compute_face_normals(face_ids=cloth.keyface_idx)
 
         # projection onto the z-axis
-        proj = th.abs(th.matmul(normals, th.tensor([0.0, 0.0, 1.0])))
+        proj = th.abs(normals @ th.tensor([0.0, 0.0, 1.0], dtype=th.float32))
         percentage = th.mean((proj > math.cos(m.NORMAL_Z_ANGLE_DIFF)).float()).item()
         return percentage
 

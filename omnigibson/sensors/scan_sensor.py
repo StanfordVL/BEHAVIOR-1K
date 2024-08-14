@@ -190,11 +190,11 @@ class ScanSensor(BaseSensor):
 
         # Convert scans from laser frame to world frame
         pos, ori = self.get_position_orientation()
-        scan_world = th.matmul(T.quat2mat(ori), scan_laser.T).T + pos
+        scan_world = (T.quat2mat(ori) @ scan_laser.T).T + pos
 
         # Convert scans from world frame to local base frame
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
-        scan_local = th.matmul(T.quat2mat(base_ori).T, (scan_world - base_pos).T).T
+        scan_local = (T.quat2mat(base_ori).T @ (scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
         scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
 

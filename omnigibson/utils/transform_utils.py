@@ -891,8 +891,8 @@ def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     pos_A_in_B = pose_A_in_B[:3, 3]
     rot_A_in_B = pose_A_in_B[:3, :3]
     skew_symm = _skew_symmetric_translation(pos_A_in_B)
-    vel_B = th.matmul(rot_A_in_B, vel_A) + th.matmul(skew_symm, th.matmul(rot_A_in_B, ang_vel_A))
-    ang_vel_B = th.matmul(rot_A_in_B, ang_vel_A)
+    vel_B = rot_A_in_B @ vel_A + skew_symm @ (rot_A_in_B @ ang_vel_A)
+    ang_vel_B = rot_A_in_B @ ang_vel_A
     return vel_B, ang_vel_B
 
 
@@ -915,8 +915,8 @@ def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     pos_A_in_B = pose_A_in_B[:3, 3]
     rot_A_in_B = pose_A_in_B[:3, :3]
     skew_symm = _skew_symmetric_translation(pos_A_in_B)
-    force_B = th.matmul(rot_A_in_B.T, force_A)
-    torque_B = -th.matmul(rot_A_in_B.T, th.matmul(skew_symm, force_A)) + th.matmul(rot_A_in_B.T, torque_A)
+    force_B = rot_A_in_B.T @ force_A
+    torque_B = -(rot_A_in_B.T @ (skew_symm @ force_A)) + rot_A_in_B.T @ torque_A
     return force_B, torque_B
 
 
@@ -978,8 +978,7 @@ def transformation_matrix(angle: float, direction: th.Tensor, point: Optional[th
     if point is not None:
         # Rotation not about origin
         point = point.to(dtype=th.float32)
-        M[:3, 3] = point - th.matmul(R, point)
-
+        M[:3, 3] = point - R @ point
     return M
 
 

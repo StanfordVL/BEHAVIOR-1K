@@ -204,7 +204,7 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
         # Project corners to image space (assumes pinhole camera model)
         proj_mat = camera_params["cameraProjection"].reshape(4, 4)
         view_mat = camera_params["cameraViewTransform"].reshape(4, 4)
-        view_proj_mat = th.matmul(view_mat, proj_mat)
+        view_proj_mat = view_mat @ proj_mat
         world_points_homo = th.nn.functional.pad(world_points, (0, 1, 0, 0), value=1.0)
         tf_points = th.dot(world_points_homo, view_proj_mat)
         tf_points = tf_points / (tf_points[..., -1:])

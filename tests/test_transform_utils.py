@@ -26,8 +26,8 @@ def random_matrix():
 
 def are_rotations_close(R1, R2, atol=1e-3):
     return (
-        th.allclose(th.matmul(R1, R1.t()), th.eye(3), atol=atol)
-        and th.allclose(th.matmul(R2, R2.t()), th.eye(3), atol=atol)
+        th.allclose(R1 @ R1.t(), th.eye(3), atol=atol)
+        and th.allclose(R2 @ R2.t(), th.eye(3), atol=atol)
         and th.allclose(R1, R2, atol=atol)
     )
 
@@ -100,7 +100,7 @@ class TestMatrixOperations:
         R_mat = quat2mat(rand_quat)
         scipy_R = R.from_quat(rand_quat.cpu().numpy()).as_matrix().astype(NumpyTypes.FLOAT32)
         assert_close(R_mat, th.from_numpy(scipy_R))
-        assert_close(th.matmul(R_mat, R_mat.t()), th.eye(3))
+        assert_close(R_mat @ R_mat.t(), th.eye(3))
         assert_close(th.det(R_mat), th.tensor(1.0))
 
     @pytest.mark.parametrize("angle", [0, math.pi / 4, math.pi / 2, math.pi])
@@ -167,7 +167,7 @@ class TestMatrixOperations:
         M_inv = matrix_inverse(M)
         scipy_M_inv = np.linalg.inv(M.cpu().numpy()).astype(NumpyTypes.FLOAT32)
         assert_close(M_inv, th.from_numpy(scipy_M_inv), atol=1e-3, rtol=1e-3)
-        assert_close(th.matmul(M, M_inv), th.eye(3))
+        assert_close(M @ M_inv, th.eye(3))
 
 
 class TestCoordinateTransformations:
@@ -207,7 +207,7 @@ class TestPoseTransformations:
         scipy_T_inv = np.linalg.inv(scipy_T)
 
         assert_close(T_inv, th.from_numpy(scipy_T_inv))
-        assert_close(th.matmul(T, T_inv), th.eye(4))
+        assert_close(T @ T_inv, th.eye(4))
 
     def test_relative_pose_transform(self):
         pos0, orn0 = random_vector(), random_quaternion().squeeze()

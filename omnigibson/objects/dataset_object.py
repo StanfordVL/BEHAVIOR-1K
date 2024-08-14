@@ -453,7 +453,7 @@ class DatasetObject(USDObject):
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = th.abs(th.matmul(jnt_frame_rot.T, th.tensor(scale_in_parent_lf)))
+                        scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
                         scales[child_name] = scale_in_child_lf
 
         return scales
