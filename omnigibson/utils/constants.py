@@ -178,7 +178,7 @@ def semantic_class_name_to_id():
         dict: class name to class id
     """
     categories = get_all_object_categories()
-    systems = get_all_system_categories()
+    systems = get_all_system_categories(include_cloth=True)
 
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 

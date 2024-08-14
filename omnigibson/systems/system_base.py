@@ -971,7 +971,7 @@ def create_system_from_metadata(system_name):
 
     # Search for the appropriate system, if not found, fallback
     # TODO: Once dataset is fully constructed, DON'T fallback, and assert False instead
-    all_systems = set(get_all_system_categories())
+    all_systems = set(get_all_system_categories(include_cloth=True))
     if system_name not in all_systems:
         # Use default config -- assume @system_name is a fluid that uses the same params as water
         return systems.FluidSystem(

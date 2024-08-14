@@ -152,9 +152,12 @@ def get_og_model_path(category_name, model_name):
     return os.path.join(og_category_path, model_name)
 
 
-def get_all_system_categories():
+def get_all_system_categories(include_cloth=False):
     """
     Get OmniGibson all system categories
+
+    Args:
+        include_cloth (bool): whether to include cloth category; default to only include non-cloth particle systems
 
     Returns:
         list: all system categories
@@ -163,7 +166,8 @@ def get_all_system_categories():
     og_categories_path = os.path.join(og_dataset_path, "systems")
 
     categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
-    categories.append("cloth")
+    if include_cloth:
+        categories.append("cloth")
     return sorted(categories)
 
 
