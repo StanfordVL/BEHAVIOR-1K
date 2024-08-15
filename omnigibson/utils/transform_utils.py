@@ -357,49 +357,40 @@ def random_axis_angle(angle_limit: float = 2.0 * math.pi):
 @th.jit.script
 def quat2mat(quaternion):
     """
-    Converts given quaternion to matrix.
+    Convert quaternions into rotation matrices.
+
     Args:
-        quaternion (tensor): (..., 4) tensor where the final dim is (x,y,z,w) quaternion
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
+
     Returns:
-        tensor: (..., 3, 3) tensor whose final two dimensions are 3x3 rotation matrices
+        torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
     """
-    # convert quat convention
-    inds = th.tensor([3, 0, 1, 2], dtype=th.long)
-    input_shape = quaternion.shape[:-1]
-    q = quaternion.reshape(-1, 4)[:, inds]
-    # Conduct dot product
-    n = th.bmm(q.unsqueeze(1), q.unsqueeze(-1)).squeeze(-1).squeeze(-1)  # shape (-1)
-    idx = th.nonzero(n).reshape(-1)
-    q_ = q.clone()  # Copy so we don't have inplace operations that fail to backprop
-    q_[idx, :] = q[idx, :] * th.sqrt(2.0 / n[idx].unsqueeze(-1))
-    # Conduct outer product
-    q2 = th.bmm(q_.unsqueeze(-1), q_.unsqueeze(1)).squeeze(-1).squeeze(-1)  # shape (-1, 4 ,4)
-    # Create return array
-    ret = (
-        th.eye(3, dtype=quaternion.dtype, device=q.device)
-        .reshape(1, 3, 3)
-        .repeat(int(th.prod(th.tensor(input_shape, dtype=th.long))), 1, 1)
-    )
-    ret[idx, :, :] = th.stack(
-        [
-            th.stack(
-                [1.0 - q2[idx, 2, 2] - q2[idx, 3, 3], q2[idx, 1, 2] - q2[idx, 3, 0], q2[idx, 1, 3] + q2[idx, 2, 0]],
-                dim=-1,
-            ),
-            th.stack(
-                [q2[idx, 1, 2] + q2[idx, 3, 0], 1.0 - q2[idx, 1, 1] - q2[idx, 3, 3], q2[idx, 2, 3] - q2[idx, 1, 0]],
-                dim=-1,
-            ),
-            th.stack(
-                [q2[idx, 1, 3] - q2[idx, 2, 0], q2[idx, 2, 3] + q2[idx, 1, 0], 1.0 - q2[idx, 1, 1] - q2[idx, 2, 2]],
-                dim=-1,
-            ),
-        ],
-        dim=1,
-    ).to(dtype=quaternion.dtype)
-    # Reshape and return output
-    ret = ret.reshape(list(input_shape) + [3, 3])
-    return ret
+    quaternion = quaternion / th.norm(quaternion, dim=-1, keepdim=True)
+
+    x = quaternion[..., 0]
+    y = quaternion[..., 1]
+    z = quaternion[..., 2]
+    w = quaternion[..., 3]
+
+    xx, yy, zz = x * x, y * y, z * z
+    xy, xz, yz = x * y, x * z, y * z
+    xw, yw, zw = x * w, y * w, z * w
+
+    rotation_matrix = th.empty(quaternion.shape[:-1] + (3, 3), dtype=quaternion.dtype, device=quaternion.device)
+
+    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
+    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
+    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
+
+    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
+    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
+    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
+
+    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
+    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
+    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
+
+    return rotation_matrix
 
 
 @th.jit.script
