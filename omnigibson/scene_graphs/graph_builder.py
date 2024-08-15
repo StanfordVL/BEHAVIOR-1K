@@ -9,6 +9,7 @@ from PIL import Image
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
+from omnigibson.robots import BaseRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils import transform_utils as T
 
@@ -20,7 +21,7 @@ def _formatted_aabb(obj):
 class SceneGraphBuilder(object):
     def __init__(
         self,
-        robot_name=None,
+        robot_names=None,
         egocentric=False,
         full_obs=False,
         only_true=True,
@@ -35,7 +36,7 @@ class SceneGraphBuilder(object):
         alongside additional metadata.
 
         Args:
-            robot_name (str): Name of the robot whose POV the scene graph will be from. If None, we assert that there
+            robot_names (list of str): Names of the robots whose POV the scene graph will be from. If None, we assert that there
                 is exactly one robot in the scene and use that robot.
             egocentric (bool): Whether the objects should have poses in the world frame or robot frame.
             full_obs (bool): Whether all objects should be updated or only those in FOV of the robot.
@@ -46,8 +47,10 @@ class SceneGraphBuilder(object):
             exclude_states (Iterable): Object state classes that should be ignored when building the graph.
         """
         self._G = None
-        self._robot = None
-        self._robot_name = robot_name
+        self._robots = None
+        if robot_names is not None and len(robot_names) > 1:
+            assert not egocentric, "Cannot have multiple robots in egocentric mode."
+        self._robot_names = robot_names
         self._egocentric = egocentric
         self._full_obs = full_obs
         self._only_true = only_true
@@ -62,13 +65,13 @@ class SceneGraphBuilder(object):
         desired_frame_to_world = np.eye(4)
         world_to_desired_frame = np.eye(4)
         if self._egocentric:
-            desired_frame_to_world = self._get_robot_to_world_transform()
+            desired_frame_to_world = self._get_robot_to_world_transform(self._robots[0])
             world_to_desired_frame = T.pose_inv(desired_frame_to_world)
 
         return desired_frame_to_world, world_to_desired_frame
 
-    def _get_robot_to_world_transform(self):
-        robot_to_world = self._robot.get_position_orientation()
+    def _get_robot_to_world_transform(self, robot):
+        robot_to_world = robot.get_position_orientation()
 
         # Get rid of any rotation outside xy plane
         robot_to_world = T.pose2mat((robot_to_world[0], T.z_rotation_from_quat(robot_to_world[1])))
@@ -120,23 +123,26 @@ class SceneGraphBuilder(object):
     def start(self, scene):
         assert self._G is None, "Cannot start graph builder multiple times."
 
-        if self._robot_name is None:
+        if self._robot_names is None:
             assert (
                 len(scene.robots) == 1
             ), "Cannot build scene graph without specifying robot name if there are multiple robots."
-            self._robot = scene.robots[0]
+            self._robots = [scene.robots[0]]
         else:
-            self._robot = scene.object_registry("name", self._robot_name)
-            assert self._robot, f"Robot with name {self._robot_name} not found in scene."
+            self._robots = [scene.object_registry("name", name) for name in self._robot_names]
+            assert len(self._robots) > 0, f"Robots with names {self._robot_names} not found in scene."
         self._G = nx.DiGraph() if self._merge_parallel_edges else nx.MultiDiGraph()
 
         desired_frame_to_world, world_to_desired_frame = self._get_desired_frame()
-        robot_pose = world_to_desired_frame @ self._get_robot_to_world_transform()
-        robot_bbox_pose, robot_bbox_extent = _formatted_aabb(self._robot)
-        robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
-        self._G.add_node(
-            self._robot, pose=robot_pose, bbox_pose=robot_bbox_pose, bbox_extent=robot_bbox_extent, states={}
-        )
+
+        for robot in self._robots:
+            robot_pose = world_to_desired_frame @ self._get_robot_to_world_transform(robot)
+            robot_bbox_pose, robot_bbox_extent = _formatted_aabb(robot)
+            robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
+            self._G.add_node(
+                robot, pose=robot_pose, bbox_pose=robot_bbox_pose, bbox_extent=robot_bbox_extent, states={}
+            )
+
         self._last_desired_frame_to_world = desired_frame_to_world
 
         # Let's also take the first step.
@@ -159,19 +165,25 @@ class SceneGraphBuilder(object):
             self._G.nodes[obj]["pose"] = updated_poses[i]
             self._G.nodes[obj]["bbox_pose"] = updated_bbox_poses[i]
 
-        # Update the robot's pose. We don't want to accumulate errors because of the repeated transforms.
-        self._G.nodes[self._robot]["pose"] = world_to_desired_frame @ self._get_robot_to_world_transform()
-        robot_bbox_pose, robot_bbox_extent = _formatted_aabb(self._robot)
-        robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
-        self._G.nodes[self._robot]["bbox_pose"] = robot_bbox_pose
-        self._G.nodes[self._robot]["bbox_extent"] = robot_bbox_extent
+        # Update the robots' poses. We don't want to accumulate errors because of the repeated transforms.
+        for robot in self._robots:
+            self._G.nodes[robot]["pose"] = world_to_desired_frame @ self._get_robot_to_world_transform(robot)
+            robot_bbox_pose, robot_bbox_extent = _formatted_aabb(robot)
+            robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
+            self._G.nodes[robot]["bbox_pose"] = robot_bbox_pose
+            self._G.nodes[robot]["bbox_extent"] = robot_bbox_extent
 
         # Go through the objects in FOV of the robot.
         objs_to_add = set(scene.objects)
         if not self._full_obs:
-            # If we're not in full observability mode, only pick the objects in FOV of robot.
-            objs_in_fov = self._robot.states[object_states.ObjectsInFOVOfRobot].get_value()
-            objs_to_add &= set(objs_in_fov)
+            # If we're not in full observability mode, only pick the objects in FOV of robots.
+            for robot in self._robots:
+                objs_in_fov = robot.states[object_states.ObjectsInFOVOfRobot].get_value()
+                objs_to_add &= set(objs_in_fov)
+
+        # Remove all BaseRobot objects from the set of objects to add.
+        base_robots = [obj for obj in objs_to_add if isinstance(obj, BaseRobot)]
+        objs_to_add -= set(base_robots)
 
         for obj in objs_to_add:
             # Add the object if not already in the graph
@@ -224,11 +236,16 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
             or placed using a graphviz layout (neato) that makes it easier to read edges & find clusters.
     """
 
+    nodes = list(G.nodes)
+    all_robots = [robot for robot in nodes if isinstance(robot, BaseRobot)]
+
     def _draw_graph():
-        nodes = list(G.nodes)
         node_labels = {obj: obj.category for obj in nodes}
-        # get all objects in fov of robot
-        objects_in_fov = scene.robots[0].states[object_states.ObjectsInFOVOfRobot].get_value()
+
+        # get all objects in fov of robots
+        objects_in_fov = []
+        for robot in all_robots:
+            objects_in_fov += robot.states[object_states.ObjectsInFOVOfRobot].get_value()
         colors = [
             ("yellow" if obj.category == "agent" else ("green" if obj in objects_in_fov else "red")) for obj in nodes
         ]
@@ -264,7 +281,7 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
         nx.drawing.draw_networkx_edge_labels(G, pos=positions, edge_labels=edge_labels, font_size=4)
 
     # Prepare pyplot figure that's sized to match the robot video.
-    robot = scene.robots[0]
+    robot = all_robots[0]  # If there are multiple robots, we only include the first one
     (robot_camera_sensor,) = [
         s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities
     ]
@@ -296,10 +313,9 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
 
     # # Convert to BGR for cv2-based viewing.
     if show_window:
-        import cv2
-
-        cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        cv2.imshow("SceneGraph", cv_img)
-        cv2.waitKey(0)
+        plt.imshow(img)
+        plt.title("SceneGraph")
+        plt.axis("off")
+        plt.show()
 
     return Image.fromarray(img)
