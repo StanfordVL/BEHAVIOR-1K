@@ -417,7 +417,7 @@ class ManipulationRobot(BaseRobot):
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
-        start_idx = 6 if self.fixed_base else 0
+        start_idx = 0 if self.fixed_base else 6
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
             self.articulation_root_path
