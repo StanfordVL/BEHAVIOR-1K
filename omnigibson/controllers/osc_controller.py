@@ -273,7 +273,7 @@ class OperationalSpaceController(ManipulationController):
             idx += 6
         if self.variable_kp_null:
             self.kp_null = gains[:, idx : idx + self.control_dim]
-            self.kd_null = 2 * math.sqrt(self.kp_null)  # critically damped
+            self.kd_null = 2 * th.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
     def _update_goal(self, command, control_dict):
