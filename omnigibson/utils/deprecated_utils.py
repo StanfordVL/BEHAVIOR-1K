@@ -3,7 +3,7 @@ A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
 
 import math
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import carb
 import numpy as np
@@ -21,15 +21,6 @@ from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
-from omni.replicator.core.scripts.annotators import Annotator as _Annotator
-from omni.replicator.core.scripts.annotators import AnnotatorError
-from omni.replicator.core.scripts.annotators import AnnotatorRegistry as _AnnotatorRegistry
-from omni.replicator.core.scripts.annotators import (
-    AnnotatorRegistryError,
-    _register_fabric_reader_anno,
-    annotator_utils,
-)
-from omni.syntheticdata import SyntheticData
 from PIL import Image, ImageDraw
 from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
 
@@ -670,132 +661,6 @@ class RigidPrimView(_RigidPrimView):
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(True)
             return
-
-
-class Annotator(_Annotator):
-    """Replicator Annotator without warp.synchronize for performance."""
-
-    def get_data(
-        self,
-        device: str = None,
-        do_array_copy: bool = False,
-        use_legacy_structure: bool = True,
-    ) -> Any:
-        """Return annotator data.
-
-        Note that if calling `get_data()` immediately after initialization, the annotator output will not yet
-        be available. Please allow for at least one update.
-
-        Args:
-            device: Device to hold data in. Select from ``['cpu', 'cuda', 'cuda:<device_index>']``. If ``cpu`` is specified,
-                the output data is returned in the form of a numpy array. If ``cuda`` is selected, a Warp array is returned.
-                Note that only valid datatypes will be moved to the GPU. Defaults to the device specified on annotator
-                initialization.
-            do_array_copy: If ``True``, return a copy of the data. This is necessary if the data is expected to persist, such as
-                when used in conjunction with asynchronous backends.
-            use_legacy_structure: Specifies the output structure to return. If ``True``, the legacy structure is returned.
-                The legacy structure changes depending on the data being returned:
-                    - only array data: <array>
-                    - only non-array data: {<anno_attribute_0>: <anno_output_0>, <anno_attribute_n>: <aanno_output_n>}
-                    - array data and non-array data: {"data": <array>, "info": {<anno_attribute_0>: <anno_output_0>, <anno_attribute_n>: <aanno_output_n>}}
-
-                If ``False``, a more consistent data structure is returned:
-                    - all cases: {"data": <array>, <anno_attribute_0>: <anno_output_0>, <anno_attribute_n>: <aanno_output_n>}
-                Defaults to ``True``
-
-        Example:
-            >>> import omni.replicator.core as rep
-            >>> async def capture(ldr_annotator):
-            ...     await rep.orchestrator.step_async()
-            ...     data_warp = ldr_annotator.get_data(device="cuda")
-            ...     data_np = data_warp.numpy()
-            ...     data_np2 = ldr_annotator.get_data(deviec="cpu")
-        """
-        if not self.is_attached:
-            raise AnnotatorError("Unable to get data, annotator is not attached to any render products.")
-        if device is None:
-            device = self._device
-        annotator_params = AnnotatorRegistry._annotators.get(self.name)
-        annotator_data = annotator_utils.get_annotator_data(
-            self.get_node(),
-            annotator_params,
-            device=device.lower(),
-            annotator_id=str(self.get_node().get_prim_path()),
-            do_copy=do_array_copy,
-            use_legacy_structure=use_legacy_structure,
-        )
-
-        # TODO: avoid synchronize call when not needed
-        # wp.synchronize()
-        return annotator_data
-
-
-class AnnotatorRegistry(_AnnotatorRegistry):
-
-    @classmethod
-    def get_annotator(
-        cls,
-        name: str,
-        init_params: dict = None,
-        render_product_idxs: List[int] = None,
-        device: str = None,
-        do_array_copy: bool = True,
-    ) -> Annotator:
-        """Create a new annotator instance of given annotator name
-
-        Args:
-            name: Name of annotator to be retrieved from registry
-            init_params: Annotator initialization parameters
-            render_product_idxs: Index of render products to utilize
-            device: If set, make annotator data available to specified device if possible. Select from
-                `['cpu', 'cuda', 'cuda:<device_index>']`. Defaults to ``cpu``
-            do_array_copy: If ``True``, retrieve a copy of the data array. This is recommended for workflows using asynchronous
-                backends to manage the data lifetime. Can be set to ``False`` to gain performance if the data is expected
-                to be used immediately within the writer. Defaults to ``True``
-        """
-        if not isinstance(name, str):
-            raise AnnotatorRegistryError(f"Invalid name `{name}` or type `{type(name)}`")
-        if render_product_idxs and (
-            not hasattr(render_product_idxs, "__iter__")
-            or not all([isinstance(rpi, int) for rpi in render_product_idxs])
-        ):
-            raise AnnotatorRegistryError(
-                f"Invalid render product indexes, must be list of integers, got `{render_product_idxs}`"
-            )
-
-        # Register Fabric Reader attribute
-        # TODO: Better way to resolve different instances for same type of annotator
-        if name == "Attribute":
-            if cls._fabric_reader_anno_idx > 0:
-                suffix = f"{cls._fabric_reader_anno_idx:02d}"
-                name = f"{name}_{cls._fabric_reader_anno_idx:02d}"
-                _register_fabric_reader_anno(suffix)
-            cls._fabric_reader_anno_idx += 1
-
-        if not AnnotatorRegistry._annotators.get(name):
-            if name in SyntheticData._ogn_templates_registry:
-                return Annotator(
-                    name,
-                    init_params,
-                    render_product_idxs,
-                    template_name=name,
-                    device=device,
-                    do_array_copy=do_array_copy,
-                )
-            else:
-                raise AnnotatorRegistryError(
-                    f"No annotator of name {name} registered. Available annotators: {cls.get_registered_annotators()}"
-                )
-        else:
-            template_name = AnnotatorRegistry._annotators.get(name).template
-            return Annotator(
-                name,
-                init_params,
-                render_product_idxs,
-                template_name=template_name,
-                device=device,
-                do_array_copy=do_array_copy,
-            )
 
 
 def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
