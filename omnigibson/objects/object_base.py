@@ -192,6 +192,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
             self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
 
+        if og.sim.is_playing:
+            log.warning("Cannot set articulation root API while simulation is playing!")
+
         # Potentially add articulation root APIs and also set self collisions
         root_prim = (
             None
