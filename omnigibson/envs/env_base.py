@@ -67,25 +67,25 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = self.env_config["automatic_reset"]
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
-        self.physics_frequency = self.env_config["physics_frequency"]
-        self.action_frequency = self.env_config["action_frequency"]
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"
         ]  # how high to offset object placement to account for one action step of dropping
 
-        physics_frequency = 1.0 / self.physics_frequency
-        rendering_frequency = 1.0 / self.action_frequency
+        physics_dt = 1.0 / self.env_config["physics_frequency"]
+        rendering_dt = 1.0 / self.env_config["rendering_frequency"]
+        sim_step_dt = 1.0 / self.env_config["action_frequency"]
         viewer_width = self.render_config["viewer_width"]
         viewer_height = self.render_config["viewer_height"]
+
         # If the sim is launched, check that the parameters match
         if og.sim is not None:
             assert (
-                og.sim.initial_physics_dt == physics_frequency
-            ), f"Physics frequency mismatch! Expected {physics_frequency}, got {og.sim.initial_physics_dt}"
+                og.sim.initial_physics_dt == physics_dt
+            ), f"Physics frequency mismatch! Expected {physics_dt}, got {og.sim.initial_physics_dt}"
             assert (
-                og.sim.initial_rendering_dt == rendering_frequency
-            ), f"Rendering frequency mismatch! Expected {rendering_frequency}, got {og.sim.initial_rendering_dt}"
+                og.sim.initial_rendering_dt == rendering_dt
+            ), f"Rendering frequency mismatch! Expected {rendering_dt}, got {og.sim.initial_rendering_dt}"
             assert og.sim.device == self.device, f"Device mismatch! Expected {self.device}, got {og.sim.device}"
             assert (
                 og.sim.viewer_width == viewer_width
@@ -96,8 +96,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Otherwise, launch a simulator instance
         else:
             og.launch(
-                physics_dt=physics_frequency,
-                rendering_dt=rendering_frequency,
+                physics_dt=physics_dt,
+                rendering_dt=rendering_dt,
+                sim_step_dt=sim_step_dt,
                 device=self.device,
                 viewer_width=viewer_width,
                 viewer_height=viewer_height,
@@ -196,8 +197,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
-        drop_distance = 0.5 * 9.8 * ((1.0 / self.action_frequency) ** 2)
-        assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
+        drop_distance = 0.5 * 9.8 * (og.sim.get_sim_step_dt() ** 2)
+        assert (
+            drop_distance < self._initial_pos_z_offset
+        ), f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
 
     def _load_task(self, task_config=None):
         """
@@ -238,9 +241,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load the scene and robot specified in the config file.
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
-
-        assert og.sim.get_physics_dt() == 1.0 / self.physics_frequency, "Physics frequency mismatch!"
-        assert og.sim.get_rendering_dt() == 1.0 / self.action_frequency, "Rendering frequency mismatch!"
 
         # Create the scene from our scene config
         self._scene = create_class_from_registry_and_config(
@@ -419,6 +419,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
+        # Run any additional task post-loading behavior
+        self.task.post_play_load(env=self)
+
         # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
         self.scene.reset()
 
@@ -583,7 +586,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._current_step += 1
         return obs, reward, terminated, truncated, info
 
-    def step(self, action):
+    def step(self, action, n_render_iterations=1):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
@@ -592,6 +595,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             action (gym.spaces.Dict or dict or np.array): robot actions. If a dict is specified, each entry should
                 map robot name to corresponding action. If a np.array, it should be the flattened, concatenated set
                 of actions
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             5-tuple:
@@ -601,8 +605,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - bool: truncated, i.e. whether this episode ended due to a time limit etc.
                 - dict: info, i.e. dictionary with any useful information
         """
+        # Pre-processing before stepping simulation
         self._pre_step(action)
+
+        # Step simulation
         og.sim.step()
+
+        # Render any additional times requested
+        for _ in range(n_render_iterations - 1):
+            og.sim.render()
+
+        # Run final post-processing
         return self._post_step(action)
 
     def render(self):
@@ -806,6 +819,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Environment kwargs
             "env": {
                 "action_frequency": gm.DEFAULT_RENDERING_FREQ,
+                "rendering_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
                 "device": None,
                 "automatic_reset": False,

@@ -33,7 +33,6 @@ class LightObject(StatefulObject):
         light_type,
         relative_prim_path=None,
         category="light",
-        uuid=None,
         scale=None,
         fixed_base=False,
         load_config=None,
@@ -49,8 +48,6 @@ class LightObject(StatefulObject):
             light_type (str): Type of light to create. Valid options are LIGHT_TYPES
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -84,7 +81,6 @@ class LightObject(StatefulObject):
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=True,
             fixed_base=fixed_base,

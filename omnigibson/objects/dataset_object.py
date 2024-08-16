@@ -36,7 +36,6 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -62,8 +61,6 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -130,7 +127,6 @@ class DatasetObject(USDObject):
             encrypted=True,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,

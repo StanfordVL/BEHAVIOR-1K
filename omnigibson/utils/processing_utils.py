@@ -138,7 +138,7 @@ class MovingAverageFilter(Filter):
 
         # Deserialize state for this filter
         samples_len = self.filter_width * self.obs_dim
-        state_dict["past_samples"] = state[idx : idx + samples_len]
+        state_dict["past_samples"] = state[idx : idx + samples_len].reshape(self.filter_width, self.obs_dim)
         state_dict["current_idx"] = int(state[idx + samples_len])
         state_dict["fully_filled"] = bool(state[idx + samples_len + 1])
 

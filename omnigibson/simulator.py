@@ -255,6 +255,9 @@ def _launch_simulator(*args, **kwargs):
                 current application and not only rendering a frame to the viewports/ cameras. So UI elements of
                 Isaac Sim will be refreshed with this dt as well if running non-headless. If None, will use default
                 value 1 / gm.DEFAULT_RENDERING_FREQ
+            sim_step_dt (None or float): dt between self.step() calls. This is the amount of simulation time that
+                passes every time step() is called. Note: This must be a multiple of @rendering_dt. If None, will
+                use default value 1 / gm.DEFAULT_SIM_STEP_FREQ
             viewer_width (int): width of the camera image, in pixels
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
@@ -265,6 +268,7 @@ def _launch_simulator(*args, **kwargs):
             gravity=9.81,
             physics_dt=None,
             rendering_dt=None,
+            sim_step_dt=None,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
@@ -279,8 +283,16 @@ def _launch_simulator(*args, **kwargs):
             assert og.sim is None, "Only one Simulator instance can be created at a time!"
             og.sim = self
 
+            # Sanity check physics vs. rendering vs. sim step dt
+            physics_dt = 1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt
+            rendering_dt = 1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt
+            sim_step_dt = 1.0 / gm.DEFAULT_SIM_STEP_FREQ if sim_step_dt is None else sim_step_dt
+            self._validate_dts(physics_dt, rendering_dt, sim_step_dt)
+
             # Store vars needed for initialization
             self.gravity = gravity
+            self._sim_step_dt = sim_step_dt
+            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
@@ -288,11 +300,12 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane = None
             self._skybox = None
             self._last_scene_edge = None
+            self._stage_id = None
 
             # Run super init
             super().__init__(
-                physics_dt=1.0 / gm.DEFAULT_PHYSICS_FREQ if physics_dt is None else physics_dt,
-                rendering_dt=1.0 / gm.DEFAULT_RENDERING_FREQ if rendering_dt is None else rendering_dt,
+                physics_dt=physics_dt,
+                rendering_dt=rendering_dt,
                 device=device,
             )
 
@@ -322,7 +335,7 @@ def _launch_simulator(*args, **kwargs):
             # Maps callback name to callback
             self._callbacks_on_play = dict()
             self._callbacks_on_stop = dict()
-            self._callbacks_on_import_obj = dict()
+            self._callbacks_on_add_obj = dict()
             self._callbacks_on_remove_obj = dict()
             self._callbacks_on_system_init = dict()
             self._callbacks_on_system_clear = dict()
@@ -371,6 +384,9 @@ def _launch_simulator(*args, **kwargs):
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
 
+            # Store stage ID
+            self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
                 self._set_viewer_camera()
@@ -380,11 +396,6 @@ def _launch_simulator(*args, **kwargs):
                 )
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
-
-            # Toggle simulator state once so that downstream omni features can be used without bugs
-            # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
-            self.play()
-            self.stop()
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -468,11 +479,46 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/outputVelocitiesLocalSpace", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateTransformations", True)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateVelocities", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateForceSensors", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateResiduals", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/fabricUseGPUInterop", True)
+
+        def _validate_dts(self, physics_dt, rendering_dt, sim_step_dt):
+            """
+            Validates that @physics_dt, @rendering_dt, and @sim_step_dt are all valid with respect to each other
+
+            Args:
+                physics_dt (float): Physics timestep
+                rendering_dt (float): Rendering timestep
+                sim_step_dt (float): Simulation step timestep
+            """
+            render_physics_ratio = rendering_dt / physics_dt
+            sim_render_ratio = sim_step_dt / rendering_dt
+            assert np.isclose(
+                render_physics_ratio, np.round(render_physics_ratio)
+            ), f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            assert (
+                rendering_dt >= physics_dt
+            ), f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
+            assert np.isclose(
+                sim_render_ratio, np.round(sim_render_ratio)
+            ), f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            assert (
+                sim_step_dt >= rendering_dt
+            ), f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+
+            # If we're headless, we also enforce that sim_step_dt == rendering_dt because it doesn't make sense
+            # to waste rendering that is not observed by the user
+            if gm.HEADLESS:
+                assert sim_step_dt == rendering_dt, (
+                    f"Simulation step dt ({sim_step_dt}) must be equal to rendering dt ({rendering_dt}) when "
+                    f"gm.HEADLESS is set!"
+                )
 
         @property
         def viewer_visibility(self):
@@ -581,6 +627,38 @@ def _launch_simulator(*args, **kwargs):
             self._skybox.color = (1.07, 0.85, 0.61)
             self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
+        def get_sim_step_dt(self):
+            """
+            Gets the internal simulation step timestep size
+
+            Returns:
+                float: Simulation timestep size
+            """
+            return self._sim_step_dt
+
+        def set_sim_step_dt(self, sim_step_dt):
+            """
+            Sets the internal simulation step timestep size
+
+            Args:
+                sim_step_dt (float): Timestep size to apply
+            """
+            # Sanity check this new dt with respect to the rendering dt
+            rendering_dt = self.get_rendering_dt()
+            self._validate_dts(self.get_physics_dt(), rendering_dt, sim_step_dt)
+
+            self._sim_step_dt = sim_step_dt
+            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
+
+        def set_simulation_dt(self, physics_dt=None, rendering_dt=None):
+            # Call super first
+            super().set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+
+            # Sanity check all new dts
+            rendering_dt = self.get_rendering_dt()
+            physics_dt = self.get_physics_dt()
+            self._validate_dts(physics_dt, rendering_dt, self._sim_step_dt)
+
         def set_lighting_mode(self, mode):
             """
             Sets the active lighting mode in the current simulator. Valid options are one of LightingMode
@@ -635,18 +713,34 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
             log.info(f"Imported scene {scene.idx}.")
 
-        def post_import_object(self, obj):
+        @contextlib.contextmanager
+        def adding_objects(self, objs):
+            """
+            Adds a set of objects from the simulator. This is a context manager that handles low-level simulator state
+            and should be called externally. Note that this method does not explicitly add the object from
+            the simulator; it is assumed that this is handled externally
+
+            Args:
+                objs (Iterable[BaseObject]): list of objects to add
+            """
+            # Immediately yield
+            yield
+
+            # Run all post-processing on all newly added objects
+            for obj in objs:
+                self._post_import_object(obj=obj)
+
+        def _post_import_object(self, obj):
             """
             Post import an object into the simulator, handling any additional setup that needs to be done.
 
             Args:
                 obj (BaseObject): an object to load
-                register (bool): whether to register this object internally in the scene registry
             """
-            assert isinstance(obj, BaseObject), "post_import_object can only be called with BaseObject"
+            assert isinstance(obj, BaseObject), "_post_import_object can only be called with BaseObject"
 
             # Run any callbacks
-            for callback in self._callbacks_on_import_obj.values():
+            for callback in self._callbacks_on_add_obj.values():
                 callback(obj)
 
             # Cache the mapping from link IDs to object
@@ -656,16 +750,30 @@ def _launch_simulator(*args, **kwargs):
             # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
             self._objects_to_initialize.append(obj)
 
-        def remove_object(self, obj):
+        def batch_add_objects(self, objs, scenes):
             """
-            Remove one or a list of non-robot object from the simulator.
+            Add a set of objects from the simulator.
 
             Args:
-                obj (BaseObject or Iterable[BaseObject]): one or a list of non-robot objects to remove
+                objs (Iterable[BaseObject]): list of objects to add
+                scenes (Iterable[BaseScene]): list of scenes corresponding to each object to load
             """
-            objs = [obj] if isinstance(obj, BaseObject) else obj
+            with self.adding_objects(objs=objs):
+                for obj, scene in zip(objs, scenes):
+                    scene.add_object(obj, _batched_call=True)
 
-            if self.is_playing():
+        @contextlib.contextmanager
+        def removing_objects(self, objs):
+            """
+            Remove a set of objects from the simulator. This is a context manager that handles low-level simulator state
+            and should be called externally. Note that this method does not explicitly remove the object from
+            the simulator; it is assumed that this is handled externally
+
+            Args:
+                objs (Iterable[BaseObject]): list of objects to remove
+            """
+            playing = self.is_playing()
+            if playing:
                 state = self.dump_state()
 
                 # Omniverse has a strange bug where if GPU dynamics is on and the object to remove is in contact with
@@ -679,12 +787,20 @@ def _launch_simulator(*args, **kwargs):
                 # One physics timestep will elapse
                 self.step_physics()
 
+            # Run all pre-processing for all objects and record which scenes have been modified
             scenes_modified = set()
-            for ob in objs:
-                scenes_modified.add(ob.scene)
-                self._remove_object(ob)
+            for obj in objs:
+                scenes_modified.add(obj.scene)
+                self._pre_remove_object(obj)
+                # Prune from the state if recorded
+                if playing:
+                    state[obj.scene.idx]["object_registry"].pop(obj.name)
 
-            if self.is_playing():
+            # Run the main method
+            yield
+
+            # Run post-processing required if we were playing
+            if playing:
                 # Update all handles that are now broken because objects have changed
                 self.update_handles()
 
@@ -696,7 +812,7 @@ def _launch_simulator(*args, **kwargs):
                 # Load the state back
                 self.load_state(state)
 
-        def _remove_object(self, obj):
+        def _pre_remove_object(self, obj):
             """
             Remove a non-robot object from the simulator. Should not be called directly by the user.
 
@@ -716,7 +832,17 @@ def _launch_simulator(*args, **kwargs):
                 if obj.name == initialize_obj.name:
                     self._objects_to_initialize.pop(i)
                     break
-            obj.scene.remove_object(obj)
+
+        def batch_remove_objects(self, objs):
+            """
+            Remove a set of objects from the simulator.
+
+            Args:
+                objs (Iterable[BaseObject]): list of objects to remove
+            """
+            with self.removing_objects(objs=objs):
+                for obj in objs:
+                    obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """
@@ -932,10 +1058,7 @@ def _launch_simulator(*args, **kwargs):
 
         def step(self):
             """
-            Step the simulation at self.render_timestep
-
-            Args:
-                render (bool): Whether rendering should occur or not
+            Step the simulation at self.get_sim_step_dt() rate
             """
             render = self._render_on_step
             if self.stage is None:
@@ -945,6 +1068,10 @@ def _launch_simulator(*args, **kwargs):
             # step() may not step physics
             if len(self._objects_to_initialize) > 0:
                 self.render()
+
+            # Clear all scenes' updated objects
+            for scene in self.scenes:
+                scene.clear_updated_objects()
 
             if render:
                 super().step(render=True)
@@ -1161,9 +1288,10 @@ def _launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_stop[name] = callback
 
-        def add_callback_on_import_obj(self, name, callback):
+        def add_callback_on_add_obj(self, name, callback):
             """
-            Adds a function @callback, referenced by @name, to be executed every time sim.post_import_object() is called
+            Adds a function @callback, referenced by @name, to be executed every time
+            sim._post_import_object() is called
 
             Args:
                 name (str): Name of the callback
@@ -1171,11 +1299,12 @@ def _launch_simulator(*args, **kwargs):
 
                     def callback(obj: BaseObject) --> None
             """
-            self._callbacks_on_import_obj[name] = callback
+            self._callbacks_on_add_obj[name] = callback
 
         def add_callback_on_remove_obj(self, name, callback):
             """
-            Adds a function @callback, referenced by @name, to be executed every time sim.remove_object() is called
+            Adds a function @callback, referenced by @name, to be executed every time
+            sim._pre_remove_object() is called
 
             Args:
                 name (str): Name of the callback
@@ -1197,6 +1326,18 @@ def _launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_system_init[name] = callback
 
+        def add_callback_on_system_clear(self, name, callback):
+            """
+            Adds a function @callback, referenced by @name, to be executed every time a system is cleared
+
+            Args:
+                name (str): Name of the callback
+                callback (function): Callback function. Function signature is expected to be:
+
+                    def callback(system: System) --> None
+            """
+            self._callbacks_on_system_clear[name] = callback
+
         def remove_callback_on_play(self, name):
             """
             Remove play callback whose reference is @name
@@ -1215,35 +1356,41 @@ def _launch_simulator(*args, **kwargs):
             """
             self._callbacks_on_stop.pop(name, None)
 
-        def remove_callback_on_import_obj(self, name):
+        def remove_callback_on_add_obj(self, name):
             """
-            Remove stop callback whose reference is @name
+            Remove add obj callback whose reference is @name
 
             Args:
                 name (str): Name of the callback
             """
-            self._callbacks_on_import_obj.pop(name, None)
+            self._callbacks_on_add_obj.pop(name, None)
 
         def remove_callback_on_remove_obj(self, name):
             """
-            Remove stop callback whose reference is @name
+            Remove remove obj callback whose reference is @name
 
             Args:
                 name (str): Name of the callback
             """
             self._callbacks_on_remove_obj.pop(name, None)
 
-        def add_callback_on_system_clear(self, name, callback):
+        def remove_callback_on_system_init(self, name):
             """
-            Adds a function @callback, referenced by @name, to be executed every time a system is cleared
+            Remove system init callback whose reference is @name
 
             Args:
                 name (str): Name of the callback
-                callback (function): Callback function. Function signature is expected to be:
-
-                    def callback(system: System) --> None
             """
-            self._callbacks_on_system_clear[name] = callback
+            self._callbacks_on_system_init.pop(name, None)
+
+        def remove_callback_on_system_clear(self, name):
+            """
+            Remove system clear callback whose reference is @name
+
+            Args:
+                name (str): Name of the callback
+            """
+            self._callbacks_on_system_clear.pop(name, None)
 
         @property
         def pi(self):
@@ -1334,43 +1481,85 @@ def _launch_simulator(*args, **kwargs):
             """
             return self.world_prim.GetCustomDataByKey(key)
 
-        def restore(self, json_paths):
+        def restore(self, scene_files):
             """
             Restore simulation environments from @json_paths.
 
             Args:
-                json_paths (List[str]): Full paths of JSON file to load, which contains information
-                    to recreate a scene.
+                scene_files (List[str] or List[dict]): Full paths of either JSON files or loaded scene files to load,
+                    which contains information to recreate a scene.
             """
-            if len(self.scenes) > 0:
-                log.error("There are already scenes loaded. Please call og.clear() to relaunch the simulator first.")
+            # Note whether we're loading from scratch or not
+            load_from_scratch = len(self.scenes) == 0
+
+            # We don't support smart diff'ing if there's a mismatch in number of scenes
+            if not load_from_scratch and len(self.scenes) != len(scene_files):
+                log.error(
+                    "There is a mismatch between the number of active scenes and number of json_paths to be "
+                    "loaded. Please call og.clear() to relaunch the simulator first."
+                )
                 return
 
-            for json_path in json_paths:
-                if not json_path.endswith(".json"):
-                    log.error(f"You have to define the full json_path to load from. Got: {json_path}")
-                    return
+            # Parse each json path individually
+            states = []
+            og.sim.stop()
+            for i, scene_file in enumerate(scene_files):
+                if isinstance(scene_file, str):
+                    if not scene_file.endswith(".json"):
+                        log.error(f"You have to define the full json_path to load from. Got: {json_path}")
+                        return
 
-                # Load the info from the json
-                with open(json_path, "r") as f:
-                    scene_info = json.load(f)
+                    # Load the info from the json
+                    with open(scene_file, "r") as f:
+                        scene_info = json.load(f)
+                else:
+                    scene_info = scene_file
                 init_info = scene_info["init_info"]
                 state = scene_info["state"]
+                states.append(state)
 
-                # Override the init info with our json path
-                init_info["args"]["scene_file"] = json_path
+                if load_from_scratch:
+                    # Override the init info with our json path
+                    init_info["args"]["scene_file"] = scene_file
 
-                # Also make sure we have any additional modifications necessary from the specific scene
-                og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
+                    # Also make sure we have any additional modifications necessary from the specific scene
+                    og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-                # Recreate and import the saved scene
-                og.sim.stop()
-                recreated_scene = create_object_from_init_info(init_info)
-                self.import_scene(scene=recreated_scene)
+                    # Recreate and import the saved scene
+                    recreated_scene = create_object_from_init_info(init_info)
+                    self.import_scene(scene=recreated_scene)
 
-                # Start the simulation and restore the dynamic state of the scene and then pause again
-                self.play()
-                recreated_scene.load_state(state, serialized=False)
+                else:
+                    scene = self.scenes[i]
+                    # Make sure the class type is the same
+                    if scene.__class__.__name__ != init_info["class_name"]:
+                        log.error(
+                            f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}"
+                        )
+
+                    current_obj_names = set(scene.object_registry.get_dict("name").keys())
+                    load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
+
+                    objs_to_remove = current_obj_names - load_obj_names
+                    objs_to_add = load_obj_names - current_obj_names
+
+                    # Delete any extra objects that currently exist in the scene stage
+                    objects_to_remove = [
+                        scene.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove
+                    ]
+                    og.sim.batch_remove_objects(objects_to_remove)
+
+                    # Add any extra objects that do not currently exist in the scene stage
+                    objects_to_add = [
+                        create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
+                        for obj_to_add in objs_to_add
+                    ]
+                    og.sim.batch_add_objects(objects_to_add, scenes=[scene] * len(objects_to_add))
+
+            # Start the simulation and restore the dynamic state of the scene
+            self.play()
+            for i, state in enumerate(states):
+                self.scenes[i].load_state(state, serialized=False)
 
             log.info("The saved simulation environment loaded.")
 
@@ -1379,12 +1568,12 @@ def _launch_simulator(*args, **kwargs):
             Saves the current simulation environment to @json_path.
 
             Args:
-                json_paths (None or List[str]): Full path of JSON files to save (should end with .json), which contains information
-                    to recreate the current scenes, if specified. List should have one element per currently loaded scene.
-                    If None, will return a list of JSON strings instead.
+                json_paths (None or List[str]): Full path of JSON files to save (should end with .json), each of which
+                    contain information to recreate the current scenes, if specified. List should have one element per
+                    currently loaded scene. If None, will return a list of JSON strings instead.
 
             Returns:
-                None or str: If @json_paths is None, returns list of dumped json strings. Else, None
+                None or list of str: If @json_paths is None, returns list of dumped json strings. Else, None
             """
             # Make sure the sim is not stopped, since we need to grab joint states
             assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
@@ -1397,9 +1586,15 @@ def _launch_simulator(*args, **kwargs):
             if not self.scenes:
                 log.warning("Scene has not been loaded. Nothing to save.")
                 return
-            if not all([json_path.endswith(".json") for json_path in json_paths]):
-                log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
-                return
+            if json_paths is not None:
+                if isinstance(json_paths, str):
+                    log.error(
+                        f"You must define a list of .json paths, one for each scene. Number of scenes: {len(self.scenes)}"
+                    )
+                    return
+                if not all([json_path.endswith(".json") for json_path in json_paths]):
+                    log.error(f"You have to define the full json_path to save the scene to. Got: {json_paths}")
+                    return
 
             if not json_paths:
                 json_paths = [None] * len(self.scenes)
@@ -1468,6 +1663,9 @@ def _launch_simulator(*args, **kwargs):
             # Clear all materials
             MaterialPrim.clear()
 
+            # Clear pose API cache
+            PoseAPI.clear()
+
             # Clear uniquely named items and other internal states
             clear_python_utils()
             clear_usd_utils()
@@ -1484,7 +1682,7 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 int: ID of the current active stage
             """
-            return lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+            return self._stage_id
 
         @property
         def device(self):

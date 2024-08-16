@@ -15,10 +15,10 @@ log = create_module_logger(module_name=__name__)
 # Set some macros
 m = create_module_macros(module_path=__file__)
 m.IK_POS_TOLERANCE = 0.002
-m.IK_POS_WEIGHT = 20.0
+m.IK_POS_WEIGHT = 1.0
 m.IK_ORN_TOLERANCE = 0.01
 m.IK_ORN_WEIGHT = 0.05
-m.IK_MAX_ITERATIONS = 100
+m.IK_MAX_ITERATIONS = 10
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {

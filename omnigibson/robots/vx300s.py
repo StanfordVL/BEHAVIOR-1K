@@ -18,7 +18,6 @@ class VX300S(ManipulationRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -46,8 +45,6 @@ class VX300S(ManipulationRobot):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -91,7 +88,6 @@ class VX300S(ManipulationRobot):
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,

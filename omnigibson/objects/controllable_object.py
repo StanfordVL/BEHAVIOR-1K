@@ -30,7 +30,6 @@ class ControllableObject(BaseObject):
         name,
         relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -50,8 +49,6 @@ class ControllableObject(BaseObject):
             name (str): Name for the object. Names need to be unique per scene
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -116,7 +113,6 @@ class ControllableObject(BaseObject):
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -178,7 +174,7 @@ class ControllableObject(BaseObject):
         prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
-        expected_control_freq = 1.0 / og.sim.get_rendering_dt()
+        expected_control_freq = 1.0 / og.sim.get_sim_step_dt()
         if self._control_freq is None:
             log.info(
                 "Control frequency is None - being set to default of render_frequency: %.4f", expected_control_freq
@@ -338,6 +334,9 @@ class ControllableObject(BaseObject):
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
             action = np.array(self.discrete_action_list[action])
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
 
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(

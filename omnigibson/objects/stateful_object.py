@@ -69,7 +69,6 @@ class StatefulObject(BaseObject):
         name,
         relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -87,8 +86,6 @@ class StatefulObject(BaseObject):
             name (str): Name for the object. Names need to be unique per scene
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -130,7 +127,6 @@ class StatefulObject(BaseObject):
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -200,6 +196,22 @@ class StatefulObject(BaseObject):
             dict: Dictionary mapping ability name to ability arguments for this object
         """
         return self._abilities
+
+    @property
+    def is_active(self):
+        """
+        Returns:
+            bool: True if this object is currently considered active -- e.g.: if this object is currently awake
+        """
+        return super().is_active or self in self.scene.updated_state_objects
+
+    def state_updated(self):
+        """
+        Adds this object to this object's scene's updated_state_objects set -- generally called externally
+        by owned object state instances when its state is updated. This is useful for tracking when this object
+        has had its state updated within the last simulation step
+        """
+        self.scene.updated_state_objects.add(self)
 
     def prepare_object_states(self):
         """

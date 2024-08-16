@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Stop the simulator and remove the robot
         og.sim.stop()
-        og.sim.remove_object(obj=robot)
+        env.scene.remove_object(obj=robot)
 
     # Always shut down the environment cleanly at the end
     env.close()

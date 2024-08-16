@@ -65,8 +65,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = self._create_particle_template()
-        particle_template.load(scene)
-        og.sim.post_import_object(particle_template)
+        scene.add_object(particle_template, register=False)
 
         # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via self.min/max_scale
         assert np.all(particle_template.scale == 1.0)
@@ -129,7 +128,7 @@ class MacroParticleSystem(BaseSystem):
 
     def _clear(self):
         # Clear all internal state
-        og.sim.remove_object(self._particle_template)
+        self.scene.remove_object(self._particle_template)
 
         super()._clear()
 
