@@ -304,22 +304,19 @@ class VisionSensor(BaseSensor):
                     obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=True
                 )
             elif "bbox" in modality:
-                obs[modality] = self._remap_bounding_box_semantic_ids(obs[modality])
+                id_to_labels = raw_obs["info"]["idToLabels"]
+                obs[modality], info[modality] = self._remap_bounding_box_semantic_ids(obs[modality], id_to_labels)
         return obs, info
 
-    def _remap_semantic_segmentation(self, img, id_to_labels):
+    def _preprocess_semantic_labels(self, id_to_labels):
         """
-        Remap the semantic segmentation image to the class IDs defined in semantic_class_name_to_id().
-        Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
+        Preprocess the semantic labels to feed into the remapper.
 
         Args:
-            img (np.ndarray): Semantic segmentation image to remap
             id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
-            np.ndarray: Remapped semantic segmentation image
-            dict: Corrected id_to_labels dictionary
+            dict: Preprocessed dictionary of semantic IDs to class labels
         """
-        # Preprocess id_to_labels to feed into the remapper
         replicator_mapping = {}
         for key, val in id_to_labels.items():
             key = int(key)
@@ -338,6 +335,21 @@ class VisionSensor(BaseSensor):
             assert (
                 replicator_mapping[key] in semantic_class_id_to_name().values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
+        return replicator_mapping
+
+    def _remap_semantic_segmentation(self, img, id_to_labels):
+        """
+        Remap the semantic segmentation image to the class IDs defined in semantic_class_name_to_id().
+        Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
+
+        Args:
+            img (np.ndarray): Semantic segmentation image to remap
+            id_to_labels (dict): Dictionary of semantic IDs to class labels
+        Returns:
+            np.ndarray: Remapped semantic segmentation image
+            dict: Corrected id_to_labels dictionary
+        """
+        replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
 
         image_keys = np.unique(img)
         assert set(image_keys).issubset(
@@ -447,18 +459,22 @@ class VisionSensor(BaseSensor):
         if instance_name not in registry.values():
             registry[len(registry)] = instance_name
 
-    def _remap_bounding_box_semantic_ids(self, bboxes):
+    def _remap_bounding_box_semantic_ids(self, bboxes, id_to_labels):
         """
         Remap the semantic IDs of the bounding boxes to our own semantic IDs.
 
         Args:
             bboxes (list of dict): List of bounding boxes to remap
+            id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
             list of dict: Remapped list of bounding boxes
+            dict: Remapped id_to_labels dictionary
         """
+        replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
-            bbox["semanticId"] = VisionSensor.SEMANTIC_REMAPPER.remap_bbox(bbox["semanticId"], self._scene)
-        return bboxes
+            bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
+        return bboxes, info
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)

@@ -33,7 +33,9 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.robots import BaseRobot, Fetch, Tiago
+from omnigibson.robots import *
+from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.control_utils import FKSolver, IKSolver
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
@@ -51,8 +53,26 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
-m.KP_LIN_VEL = 0.3
-m.KP_ANGLE_VEL = 0.2
+m.KP_LIN_VEL = {
+    Tiago: 0.3,
+    Fetch: 0.3,
+    Stretch: 0.5,
+    Turtlebot: 0.3,
+    Husky: 0.05,
+    Freight: 0.05,
+    Locobot: 0.8,
+    BehaviorRobot: 0.3,
+}
+m.KP_ANGLE_VEL = {
+    Tiago: 0.2,
+    Fetch: 0.2,
+    Stretch: 0.8,
+    Turtlebot: 0.2,
+    Husky: 0.05,
+    Freight: 0.05,
+    Locobot: 2.0,
+    BehaviorRobot: 0.2,
+}
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -113,6 +133,9 @@ class PlanningContext(object):
         self.robot_copy = robot_copy
         self.robot_copy_type = robot_copy_type if robot_copy_type in robot_copy.prims.keys() else "original"
         self.disabled_collision_pairs_dict = {}
+
+        # For now, the planning context only works with Fetch and Tiago
+        assert isinstance(self.robot, (Fetch, Tiago)), "PlanningContext only works with Fetch and Tiago."
 
     def __enter__(self):
         self._assemble_robot_copy()
@@ -285,23 +308,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
         # Validate the robot
-        assert isinstance(
-            self.robot, (Fetch, Tiago)
-        ), "StarterSemanticActionPrimitives only works with Fetch and Tiago."
-        assert isinstance(
-            self.robot.controllers["base"], (JointController, DifferentialDriveController)
-        ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
-        self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
-        if self._base_controller_is_joint:
-            assert not self.robot.controllers[
-                "base"
-            ].use_delta_commands, (
-                "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
-            )
+        if isinstance(self.robot, LocomotionRobot):
+            assert isinstance(
+                self.robot.controllers["base"], (JointController, DifferentialDriveController)
+            ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
+            if self._base_controller_is_joint:
+                assert not self.robot.controllers[
+                    "base"
+                ].use_delta_commands, (
+                    "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
+                )
 
-        self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
-        self.robot_base_mass = self.robot._links["base_link"].mass
         self.add_context = add_context
 
         self._task_relevant_objects_only = task_relevant_objects_only
@@ -311,6 +329,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._tracking_object = None
 
         self.robot_copy = self._load_robot_copy()
+
+    @property
+    def arm(self):
+        if not isinstance(self.robot, ManipulationRobot):
+            raise ValueError("Cannot use arm for non-manipulation robot")
+        return self.robot.default_arm
+
+    @property
+    def _base_controller_is_joint(self):
+        return isinstance(self.robot.controllers["base"], JointController)
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking and adding context if necessary."""
@@ -340,12 +368,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         robot_copy = RobotCopy()
 
         robots_to_copy = {"original": {"robot": self.robot, "copy_path": self.robot.prim_path + "_copy"}}
-        if hasattr(self.robot, "simplified_mesh_usd_path"):
-            simplified_robot = {
-                "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
-                "copy_path": "/World/simplified_robot_copy",
-            }
-            robots_to_copy["simplified"] = simplified_robot
 
         for robot_type, rc in robots_to_copy.items():
             copy_robot = None
@@ -1414,24 +1436,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         action = np.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
-            joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]
-            if (
-                controller.control_type == ControlType.POSITION
-                and len(joint_idx) == len(action_idx)
-                and not controller.use_delta_commands
-            ):
-                action[action_idx] = self.robot.get_joint_positions()[joint_idx]
-            elif self.robot._controller_config[name]["name"] == "InverseKinematicsController":
-                # overwrite the goal orientation, since it is in absolute frame.
+            no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
+
+            if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
                 assert (
                     self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
                 ), "Controller must be in pose_absolute_ori mode"
-                current_quat = self.robot.get_relative_eef_orientation()
-                current_ori = T.quat2axisangle(current_quat)
-                control_idx = self.robot.controller_action_idx["arm_" + self.arm]
-                action[control_idx[3:]] = current_ori
+                # convert quaternion to axis-angle representation for control input
+                no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
 
+            action[action_idx] = np.concatenate(list(no_op_goal.values()))
         return action
 
     def _reset_hand(self):
@@ -1465,10 +1480,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return np.array([0.28493954, 0.37450749, 1.1512334]), np.array(
                 [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
             )
-        else:
+        elif self.robot_model == "Fetch":
             return np.array([0.48688125, -0.12507881, 0.97888719]), np.array(
                 [0.61324748, 0.61305553, -0.35266518, 0.35173529]
             )
+        else:
+            raise ValueError(f"Unsupported robot model: {self.robot_model}")
 
     def _get_reset_joint_pos(self):
         reset_pose_fetch = np.array(
@@ -1521,7 +1538,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 4.50000000e-02,
             ]
         )
-        return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
+        if self.robot_model == "Fetch":
+            return reset_pose_fetch
+        elif self.robot_model == "Tiago":
+            return reset_pose_tiago
+        else:
+            raise ValueError(f"Unsupported robot model: {self.robot_model}")
 
     def _navigate_to_pose(self, pose_2d):
         """
@@ -1642,11 +1664,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action = self._empty_action()
                 if self._base_controller_is_joint:
-                    direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL
+                    base_action_size = self.robot.controller_action_idx["base"].size
+                    assert (
+                        base_action_size == 3
+                    ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                    direction_vec = (
+                        body_target_pose[0][:2]
+                        / np.linalg.norm(body_target_pose[0][:2])
+                        * m.KP_LIN_VEL[type(self.robot)]
+                    )
                     base_action = [direction_vec[0], direction_vec[1], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
-                    base_action = [m.KP_LIN_VEL, 0.0]
+                    # Diff drive controller
+                    base_action = [m.KP_LIN_VEL[type(self.robot)], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 yield self._postprocess_action(action)
 
@@ -1682,9 +1713,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = m.KP_ANGLE_VEL * direction
+            ang_vel = m.KP_ANGLE_VEL[type(self.robot)] * direction
 
-            base_action = [0.0, 0.0, ang_vel] if self._base_controller_is_joint else [0.0, ang_vel]
+            if isinstance(self.robot, Locobot) or isinstance(self.robot, Freight):
+                # Locobot and Freight wheel joints are reversed
+                ang_vel = -ang_vel
+
+            base_action = action[self.robot.controller_action_idx["base"]]
+
+            if not self._base_controller_is_joint:
+                base_action[1] = ang_vel
+            else:
+                assert (
+                    base_action.size == 3
+                ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                base_action[2] = ang_vel
+
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)
 
