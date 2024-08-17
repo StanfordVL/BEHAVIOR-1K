@@ -23,17 +23,20 @@ m = create_module_macros(module_path=__file__)
 m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # Offset between the body and parts
-m.HEAD_TO_BODY_OFFSET = th.tensor([0, 0, -0.4])
-m.HAND_TO_BODY_OFFSET = {"left": th.tensor([0, -0.15, -0.4]), "right": th.tensor([0, 0.15, -0.4])}
+m.HEAD_TO_BODY_OFFSET = th.tensor([0, 0, -0.4], dtype=th.float32)
+m.HAND_TO_BODY_OFFSET = {
+    "left": th.tensor([0, -0.15, -0.4], dtype=th.float32),
+    "right": th.tensor([0, 0.15, -0.4], dtype=th.float32),
+}
 m.BODY_HEIGHT_OFFSET = 0.45
 
 # Hand parameters
 m.HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
-m.THUMB_2_POS = th.tensor([0, -0.02, -0.05])
-m.THUMB_1_POS = th.tensor([0, -0.015, -0.02])
-m.PALM_CENTER_POS = th.tensor([0, -0.04, 0.01])
-m.PALM_BASE_POS = th.tensor([0, 0, 0.015])
-m.FINGER_TIP_POS = th.tensor([0, -0.025, -0.055])
+m.THUMB_2_POS = th.tensor([0, -0.02, -0.05], dtype=th.float32)
+m.THUMB_1_POS = th.tensor([0, -0.015, -0.02], dtype=th.float32)
+m.PALM_CENTER_POS = th.tensor([0, -0.04, 0.01], dtype=th.float32)
+m.PALM_BASE_POS = th.tensor([0, 0, 0.015], dtype=th.float32)
+m.FINGER_TIP_POS = th.tensor([0, -0.025, -0.055], dtype=th.float32)
 
 # Hand link index constants
 m.PALM_LINK_NAME = "palm"

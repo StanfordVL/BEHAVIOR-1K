@@ -73,9 +73,13 @@ class TraversableMap(BaseMap):
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
-                trav_map = th.tensor(cv2.imread(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
+                trav_map = th.tensor(
+                    cv2.imread(os.path.join(maps_path, "floor_trav_{}.png".format(floor)), cv2.IMREAD_GRAYSCALE)
+                )
             else:
-                trav_map = th.tensor(cv2.imread(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+                trav_map = th.tensor(
+                    cv2.imread(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor)), cv2.IMREAD_GRAYSCALE)
+                )
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the

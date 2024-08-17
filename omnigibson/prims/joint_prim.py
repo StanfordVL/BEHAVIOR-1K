@@ -376,7 +376,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_max_efforts(th.tensor([[effort]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_max_efforts(th.tensor([[effort]], dtype=th.float32), joint_indices=self.dof_indices)
 
     @property
     def stiffness(self):

@@ -53,12 +53,13 @@ class SegmentationMap(BaseMap):
     def _load_map(self):
         layout_dir = os.path.join(self.scene_dir, "layout")
         room_seg_imgs = os.path.join(layout_dir, "floor_insseg_0.png")
-        img_ins = cv2.imread(room_seg_imgs)
+        img_ins = cv2.imread(room_seg_imgs, cv2.IMREAD_GRAYSCALE)
         room_seg_imgs = os.path.join(layout_dir, "floor_semseg_0.png")
-        img_sem = cv2.imread(room_seg_imgs)
-        height, width = img_ins.size
+        img_sem = cv2.imread(room_seg_imgs, cv2.IMREAD_GRAYSCALE)
+        height = img_ins.shape[0]
+        width = img_ins.shape[1]
         assert height == width, "room seg map is not a square"
-        assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
+        assert img_ins.shape == img_sem.shape, "semantic and instance seg maps have different sizes"
         map_size = int(height * self.map_default_resolution / self.map_resolution)
         img_ins = th.tensor(cv2.resize(img_ins, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
         img_sem = th.tensor(cv2.resize(img_sem, (map_size, map_size), interpolation=cv2.INTER_NEAREST))

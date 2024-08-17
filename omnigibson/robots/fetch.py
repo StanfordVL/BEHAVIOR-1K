@@ -227,7 +227,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Also apply a convex decomposition to the torso lift link
         torso_lift_link = self.links["torso_lift_link"]
-        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "torso link should only have 1 collision!"
         torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
 
     @property

@@ -570,6 +570,7 @@ def quat2euler(q):
     yaw = th.atan2(siny_cosp, cosy_cosp)
 
     euler = th.stack([roll, pitch, yaw], dim=-1) % (2 * math.pi)
+    euler[euler > math.pi] -= 2 * math.pi
 
     if single_dim:
         euler = euler.squeeze(0)

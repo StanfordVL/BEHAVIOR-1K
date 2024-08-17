@@ -309,8 +309,18 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
 
         # Rotate the linear and angular velocity to the desired frame
-        lin_vel_global, _ = T.pose_transform([0, 0, 0], cur_orn, u_vec[self.base_idx[:3]], [0, 0, 0, 1])
-        ang_vel_global, _ = T.pose_transform([0, 0, 0], cur_orn, u_vec[self.base_idx[3:]], [0, 0, 0, 1])
+        lin_vel_global, _ = T.pose_transform(
+            th.tensor([0, 0, 0], dtype=th.float32),
+            cur_orn,
+            u_vec[self.base_idx[:3]],
+            th.tensor([0, 0, 0, 1], dtype=th.float32),
+        )
+        ang_vel_global, _ = T.pose_transform(
+            th.tensor([0, 0, 0], dtype=th.float32),
+            cur_orn,
+            u_vec[self.base_idx[3:]],
+            th.tensor([0, 0, 0, 1], dtype=th.float32),
+        )
 
         u_vec[self.base_control_idx] = th.tensor([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
         return u_vec, u_type_vec

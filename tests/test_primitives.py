@@ -42,7 +42,10 @@ def setup_environment(load_object_categories):
                     "arm_0": {
                         "name": "InverseKinematicsController",
                         "command_input_limits": "default",
-                        "command_output_limits": [[-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]],
+                        "command_output_limits": [
+                            th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], dtype=th.float32),
+                            th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], dtype=th.float32),
+                        ],
                         "mode": "pose_absolute_ori",
                         "kp": 300.0,
                     },

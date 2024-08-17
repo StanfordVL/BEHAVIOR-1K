@@ -54,7 +54,10 @@ class InverseKinematicsController(JointController, ManipulationController):
         control_limits,
         dof_idx,
         command_input_limits="default",
-        command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
+        command_output_limits=(
+            th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], dtype=th.float32),
+            th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], dtype=th.float32),
+        ),
         kp=None,
         damping_ratio=None,
         use_impedances=True,
@@ -157,21 +160,29 @@ class InverseKinematicsController(JointController, ManipulationController):
             if command_input_limits is not None:
                 if type(command_input_limits) == str and command_input_limits == "default":
                     command_input_limits = [
-                        [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
-                        [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
+                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
+                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
                     ]
                 else:
-                    command_input_limits[0][3:] = [-math.pi] * len(command_input_limits[0][3:])
-                    command_input_limits[1][3:] = [math.pi] * len(command_input_limits[1][3:])
+                    command_input_limits[0][3:] = th.tensor(
+                        [-math.pi] * len(command_input_limits[0][3:]), dtype=th.float32
+                    )
+                    command_input_limits[1][3:] = th.tensor(
+                        [math.pi] * len(command_input_limits[1][3:]), dtype=th.float32
+                    )
             if command_output_limits is not None:
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
-                        [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
-                        [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
+                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
+                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
                     ]
                 else:
-                    command_output_limits[0][3:] = [-math.pi] * len(command_output_limits[0][3:])
-                    command_output_limits[1][3:] = [math.pi] * len(command_output_limits[1][3:])
+                    command_output_limits[0][3:] = th.tensor(
+                        [-math.pi] * len(command_output_limits[0][3:]), dtype=th.float32
+                    )
+                    command_output_limits[1][3:] = th.tensor(
+                        [math.pi] * len(command_output_limits[1][3:]), dtype=th.float32
+                    )
 
         # Run super init
         super().__init__(

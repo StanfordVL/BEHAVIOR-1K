@@ -7,6 +7,9 @@ from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.utils.ui_utils import create_module_logger
+
+log = create_module_logger(module_name=__name__)
 
 
 class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
@@ -14,6 +17,19 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     Strech Robot from Hello Robotics
     Reference: https://hello-robot.com/stretch-3-product
     """
+
+    def _post_load(self):
+        super()._post_load()
+
+        # Set the wheels back to using sphere approximations
+        for wheel_name in ["link_left_wheel", "link_right_wheel"]:
+            log.warning(
+                "Stretch wheel links are post-processed to use sphere approximation collision meshes. "
+                "Please ignore any previous errors about these collision meshes."
+            )
+            wheel_link = self.links[wheel_name]
+            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
 
     @property
     def discrete_action_list(self):
