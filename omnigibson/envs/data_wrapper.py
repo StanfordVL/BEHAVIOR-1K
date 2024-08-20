@@ -14,7 +14,7 @@ from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.python_utils import create_object_from_init_info
+from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -175,9 +175,10 @@ class DataWrapper(EnvironmentWrapper):
             if k == obs_key:
                 obs_grp = traj_grp.create_group(k)
                 for mod, traj_mod_data in dat.items():
-                    obs_grp.create_dataset(mod, data=th.stack(traj_mod_data, dim=0))
+                    obs_grp.create_dataset(mod, data=th.stack(traj_mod_data, dim=0).cpu())
             else:
-                traj_grp.create_dataset(k, data=th.stack(dat, dim=0))
+                traj_data = th.stack(dat, dim=0) if isinstance(dat[0], th.Tensor) else th.tensor(dat)
+                traj_grp.create_dataset(k, data=traj_data)
 
         return traj_grp
 
@@ -523,6 +524,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Grab episode data
         transitions = json.loads(traj_grp.attrs["transitions"])
+        traj_grp = h5py_group_to_torch(traj_grp)
         action = traj_grp["action"]
         state = traj_grp["state"]
         state_size = traj_grp["state_size"]

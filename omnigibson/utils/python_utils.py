@@ -11,6 +11,7 @@ from functools import cache, wraps
 from hashlib import md5
 from importlib import import_module
 
+import h5py
 import torch as th
 
 # Global dictionary storing all unique names
@@ -771,4 +772,14 @@ def recursively_convert_to_torch(state):
             state[key] = recursively_convert_to_torch(value)
         elif isinstance(value, list):
             state[key] = th.tensor(value, dtype=th.float32)
+    return state
+
+
+def h5py_group_to_torch(group):
+    state = {}
+    for key, value in group.items():
+        if isinstance(value, h5py.Group):
+            state[key] = h5py_group_to_torch(value)
+        else:
+            state[key] = th.tensor(value[()], dtype=th.float32)
     return state
