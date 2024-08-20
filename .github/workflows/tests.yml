@@ -66,11 +66,9 @@ jobs:
 
       - name: Check for failures or errors
         run: |
-          if grep -Eq "<failure|error" test_primitives.xml; then
-            echo "Found failure or error in test_primitives.xml"
+          if grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' ${{ matrix.test_file }}.xml; then
             exit 1
           else
-            echo "No failures or errors found in test_primitives.xml"
             exit 0
           fi
 
