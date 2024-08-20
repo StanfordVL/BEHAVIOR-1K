@@ -59,7 +59,7 @@ class GraspTask(BaseTask):
 
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj_pos, obj_orn = T.pose_transform(*env.scene.get_position_orientation(), obj_pos, obj_orn)
             obj.set_position_orientation(obj_pos, obj_orn)
 
     def _create_termination_conditions(self):
@@ -91,7 +91,7 @@ class GraspTask(BaseTask):
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
             # Move it to the appropriate scene. TODO: The scene should provide a function for this.
-            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            robot_pos, robot_orn = T.pose_transform(*robot.scene.get_position_orientation(), robot_pos, robot_orn)
             robot.set_position_orientation(robot_pos, robot_orn)
 
         # Otherwise, reset using the primitive controller.
@@ -166,7 +166,7 @@ class GraspTask(BaseTask):
             # Set object pose
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj_pos, obj_orn = T.pose_transform(*env.scene.prim.get_position_orientation(), obj_pos, obj_orn)
+            obj_pos, obj_orn = T.pose_transform(*env.scene.get_position_orientation(), obj_pos, obj_orn)
             obj.set_position_orientation(obj_pos, obj_orn)
 
     # Overwrite reset by only removeing reset scene

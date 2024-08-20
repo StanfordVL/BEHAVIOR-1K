@@ -1472,7 +1472,7 @@ class ManipulationRobot(BaseRobot):
                 ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
                     ag_params[arm]["contact_pos"],
                     th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    *self.scene.prim.get_position_orientation(),
+                    *self.scene.get_position_orientation(),
                 )
         state["ag_obj_constraint_params"] = ag_params
         return state
@@ -1498,7 +1498,7 @@ class ManipulationRobot(BaseRobot):
                 contact_pos_global = data["contact_pos"]
                 if self.scene is not None:
                     contact_pos_global, _ = T.pose_transform(
-                        *self.scene.prim.get_position_orientation(),
+                        *self.scene.get_position_orientation(),
                         contact_pos_global,
                         th.tensor([0, 0, 0, 1], dtype=th.float32),
                     )

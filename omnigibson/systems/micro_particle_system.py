@@ -348,7 +348,7 @@ class PhysxParticleInstancer(BasePrim):
             local_orientations = []
             for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations):
                 local_pos, local_ori = T.relative_pose_transform(
-                    global_pos, global_ori, *self.scene.prim.get_position_orientation()
+                    global_pos, global_ori, *self.scene.get_position_orientation()
                 )
                 local_positions.append(local_pos)
                 local_orientations.append(local_ori)
@@ -385,7 +385,7 @@ class PhysxParticleInstancer(BasePrim):
         else:
             global_positions, global_orientations = zip(
                 *[
-                    T.pose_transform(*self.scene.prim.get_position_orientation(), local_pos, local_ori)
+                    T.pose_transform(*self.scene.get_position_orientation(), local_pos, local_ori)
                     for local_pos, local_ori in zip(local_positions, local_orientations)
                 ]
             )

@@ -74,7 +74,7 @@ def test_multi_scene_scene_prim():
     scene_state = vec_env.envs[0].scene._dump_state()
     scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
     original_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position()
-    vec_env.envs[0].scene._scene_prim.set_position(original_scene_prim_pos + scene_prim_displacement)
+    vec_env.envs[0].scene.set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
     vec_env.envs[0].scene._load_state(scene_state)
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position()
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position()

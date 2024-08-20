@@ -678,14 +678,29 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self.load_state(self._initial_state)
         og.sim.step_physics()
 
-    @property
-    def prim(self):
+    def get_position_orientation(self):
         """
+        Get the position and orientation of the scene
+
         Returns:
-            XFormPrim: the prim of the scene
+            2-tuple:
+                - th.Tensor: (3,) position of the scene
+                - th.Tensor: (4,) orientation of the scene
         """
-        assert self._scene_prim is not None, "Scene prim is not loaded yet!"
-        return self._scene_prim
+        return self._scene_prim.get_position_orientation()
+
+    def set_position_orientation(self, position=None, orientation=None):
+        """
+        Set the position and orientation of the scene
+
+        Args:
+            position (th.Tensor): (3,) position of the scene
+            orientation (th.Tensor): (4,) orientation of the scene
+        """
+        self._scene_prim.set_position_orientation(position, orientation)
+        # Update the cached pose and inverse pose
+        self._pose = T.pose2mat(self.get_position_orientation())
+        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
     @property
     def prim_path(self):
@@ -694,7 +709,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             str: the prim path of the scene
         """
         assert self._scene_prim is not None, "Scene prim is not loaded yet!"
-        return self.prim.prim_path
+        return self._scene_prim.prim_path
 
     @property
     def n_floors(self):
