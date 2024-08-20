@@ -188,7 +188,8 @@ def test_slicing_rule(env):
         assert half_apple.states[Cooked].get_value()
 
     # Clean up
-    env.scene.remove_object(new_half_apples)
+    for apple in new_half_apples:
+        env.scene.remove_object(apple)
     og.sim.step()
 
     objs = [DatasetObject(**obj_cfg) for obj_cfg in deleted_objs_cfg]
@@ -1117,7 +1118,8 @@ def test_cooking_object_rule_success(env):
     # Clean up
     remove_all_systems(env.scene)
 
-    env.scene.remove_object(new_bagels)
+    for bagel in new_bagels:
+        env.scene.remove_object(bagel)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:
@@ -1561,7 +1563,8 @@ def test_single_toggleable_machine_rule_output_object_success(env):
         assert dough.states[OnTop].get_value(electric_mixer)
 
     # Clean up
-    og.sim.batch_remove_objects(new_doughs)
+    for dough in new_doughs:
+        env.scene.remove_object(dough)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:

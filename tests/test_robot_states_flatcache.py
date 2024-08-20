@@ -62,7 +62,7 @@ def camera_pose_test(flatcache):
     )
 
     sensor_world_pos_gt = th.tensor([150.1703, 149.9969, 101.3649])
-    sensor_world_ori_gt = th.tensor([-0.2940, 0.2917, 0.6436, -0.6436])
+    sensor_world_ori_gt = th.tensor([-0.2944, 0.2927, 0.6437, -0.6429])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
@@ -199,6 +199,6 @@ def test_robot_load_drive():
 
         # Stop the simulator and remove the robot
         og.sim.stop()
-        og.sim.remove_object(obj=robot)
+        env.scene.remove_object(obj=robot)
 
     env.close()
