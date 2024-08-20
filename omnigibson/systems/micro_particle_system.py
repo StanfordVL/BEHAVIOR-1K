@@ -1552,7 +1552,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         return False
 
     def _clear(self):
-        og.sim.remove_object(self._particle_template)
+        self.scene.remove_object(self._particle_template)
 
         super()._clear()
 
@@ -1570,8 +1570,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def _create_particle_prototypes(self):
         # Load the particle template
         particle_template = self._create_particle_template()
-        particle_template.load(self._scene)
-        og.sim.post_import_object(particle_template)
+        self._scene.add_object(particle_template, register=False)
         self._particle_template = particle_template
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"

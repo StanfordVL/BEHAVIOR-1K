@@ -40,7 +40,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super().global_initialize()
 
         # Initialize other global variables
-        cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
+        cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_sim_step_dt())))
         cls.DELAY_COUNTER = th.empty(0, dtype=int)
         cls.PREVIOUSLY_TOUCHING = th.empty(0, dtype=bool)
         cls.SLICER_LINK_PATHS = []
@@ -80,6 +80,9 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         # Are we currently touching any sliceables?
         currently_touching_sliceables = cls._currently_touching_sliceables()
 
+        # Track changed variables between currently and previously touched sliceables
+        changed_idxs = set((cls.PREVIOUSLY_TOUCHING ^ currently_touching_sliceables).nonzero().flatten().tolist())
+
         # If any of our values are False, we need to consider reverting back.
         if not th.all(values):
             not_active_not_touching = ~values & ~currently_touching_sliceables
@@ -95,11 +98,18 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             # If we are touching a sliceable object, reset the counter
             cls.DELAY_COUNTER[not_active_is_touching_idxs] = 0
 
+            # Update changed idxs to include not active not touching / is touching
+            changed_idxs = set.union(changed_idxs, not_active_not_touching_idxs, not_active_is_touching_idxs)
+
             # If the delay counter is greater than steps to wait, set to True
             values = th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
 
         # Record if we were touching anything previously
         cls.PREVIOUSLY_TOUCHING = currently_touching_sliceables
+
+        # Add all changed objects to the current state update set in their respective scenes
+        for idx in changed_idxs:
+            cls.IDX_OBJS[idx].state_updated()
 
         return values
 

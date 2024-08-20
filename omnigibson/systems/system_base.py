@@ -131,7 +131,7 @@ class BaseSystem(Serializable):
             scene.transition_rule_api.refresh_all_rules()
 
         # Run any callbacks
-        for callback in og.sim.get_callbacks_on_system_init():
+        for callback in og.sim.get_callbacks_on_system_init().values():
             callback(self)
 
     @property
@@ -199,7 +199,7 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
-        for callback in og.sim.get_callbacks_on_system_clear():
+        for callback in og.sim.get_callbacks_on_system_clear().values():
             callback(self)
 
         self.reset()
@@ -955,6 +955,19 @@ class PhysicalParticleSystem(BaseSystem):
             )
 
         return success
+
+
+def get_all_system_names():
+    """
+    Gets all available systems from the OmniGibson dataset
+
+    Returns:
+        set: Set of all available system names that can be created in OmniGibson
+    """
+    system_dir = os.path.join(gm.DATASET_PATH, "systems")
+
+    assert os.path.exists(system_dir), f"Path for OmniGibson systems not found! Attempted path: {system_dir}"
+    return set(os.listdir(system_dir))
 
 
 def create_system_from_metadata(system_name):

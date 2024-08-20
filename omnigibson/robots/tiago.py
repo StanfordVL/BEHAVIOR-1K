@@ -49,7 +49,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -84,8 +83,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -154,7 +151,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=True,
@@ -689,9 +685,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "right": [th.deg2rad(th.tensor([-75])).item(), th.deg2rad(th.tensor([-15])).item()],
         }
 
-    def get_position_orientation(self):
+    def get_position_orientation(self, clone=True):
         # TODO: Investigate the need for this custom behavior.
-        return self.base_footprint_link.get_position_orientation()
+        return self.base_footprint_link.get_position_orientation(clone=clone)
 
     def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()

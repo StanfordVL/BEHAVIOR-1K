@@ -918,7 +918,43 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
-    def set_linear_velocity(self, velocity: th.tensor):
+    def get_joint_position_targets(self, normalized=False):
+        """
+        Grabs this entity's joint position targets
+
+        Args:
+            normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
+
+        Returns:
+            n-array: n-DOF length array of position targets
+        """
+        # Run sanity checks -- make sure we are articulated
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+
+        joint_positions = self._articulation_view.get_joint_position_targets().view(self.n_dof)
+
+        # Possibly normalize values when returning
+        return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
+
+    def get_joint_velocity_targets(self, normalized=False):
+        """
+        Grabs this entity's joint velocity targets
+
+        Args:
+            normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
+
+        Returns:
+            n-array: n-DOF length array of velocity targets
+        """
+        # Run sanity checks -- make sure we are articulated
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
+
+        joint_velocities = self._articulation_view.get_joint_velocity_targets().view(self.n_dof)
+
+        # Possibly normalize values when returning
+        return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
+
+    def set_linear_velocity(self, velocity: th.Tensor):
         """
         Sets the linear velocity of the root prim in stage.
 
@@ -996,16 +1032,16 @@ class EntityPrim(XFormPrim):
             self._articulation_view.set_world_poses(position, orientation)
             PoseAPI.invalidate()
 
-    def get_position_orientation(self):
+    def get_position_orientation(self, clone=True):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
-            return XFormPrim.get_position_orientation(self)
+            return XFormPrim.get_position_orientation(self, clone=clone)
         # Delegate to RigidPrim if we are not articulated
         elif self._articulation_view is None:
-            return self.root_link.get_position_orientation()
+            return self.root_link.get_position_orientation(clone=clone)
         # Sim is running and articulation view exists, so use that physx API backend
         else:
-            positions, orientations = self._articulation_view.get_world_poses()
+            positions, orientations = self._articulation_view.get_world_poses(clone=clone)
             return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
@@ -1544,18 +1580,31 @@ class EntityPrim(XFormPrim):
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
         state = dict(root_link=self.root_link._dump_state())
-        joint_state = dict()
-        for prim_name, prim in self._joints.items():
-            joint_state[prim_name] = prim._dump_state()
-        state["joints"] = joint_state
+        if self.n_joints > 0:
+            state["joint_pos"] = self.get_joint_positions()
+            state["joint_vel"] = self.get_joint_velocities()
+            state["joint_eff"] = self.get_joint_efforts()
+
+            # We do NOT save joint pos / vel targets because this is only relevant for motorized joints (e.g.: robots).
+            # Such control (a) only relies on the joint state, and not joint targets, when computing control, and
+            # (b) these targets will be immediately overwritten as soon as the next physics step occurs.
+            # So because these values are not used and require additional memory / compute, we do not save targets
 
         return state
 
     def _load_state(self, state):
         # Load base link state and joint states
         self.root_link._load_state(state=state["root_link"])
-        for joint_name, joint_state in state["joints"].items():
-            self._joints[joint_name]._load_state(state=joint_state)
+
+        # TODO: Remove this backwards-compatible part once we re-sample scenes
+        if "joints" in state:
+            for joint_name, joint_state in state["joints"].items():
+                self._joints[joint_name]._load_state(state=joint_state)
+
+        elif self.n_joints > 0:
+            self.set_joint_positions(state["joint_pos"])
+            self.set_joint_velocities(state["joint_vel"])
+            self.set_joint_efforts(state["joint_eff"])
 
         # Make sure this object is awake
         self.wake()
@@ -1565,9 +1614,11 @@ class EntityPrim(XFormPrim):
         # adding them to the a flattened array
         state_flat = [self.root_link.serialize(state=state["root_link"])]
         if self.n_joints > 0:
-            state_flat.append(
-                th.cat([prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()])
-            )
+            state_flat += [
+                state["joint_pos"],
+                state["joint_vel"],
+                state["joint_eff"],
+            ]
 
         return th.cat(state_flat)
 
@@ -1576,11 +1627,10 @@ class EntityPrim(XFormPrim):
         # sequentially grabbing from the flattened state array, incrementing along the way
         root_link_state, idx = self.root_link.deserialize(state=state)
         state_dict = dict(root_link=root_link_state)
-        joint_state_dict = dict()
-        for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name], deserialized_items = prim.deserialize(state=state[idx:])
-            idx += deserialized_items
-        state_dict["joints"] = joint_state_dict
+        if self.n_joints > 0:
+            for jnt_state in ("pos", "vel", "eff"):
+                state_dict[f"joint_{jnt_state}"] = state[idx : idx + self.n_joints]
+                idx += self.n_joints
 
         return state_dict, idx
 

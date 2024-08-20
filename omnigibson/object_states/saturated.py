@@ -149,6 +149,9 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         """
         self._limits[system.name] = limit
 
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
+
     def _get_value(self, system):
         limit = self.get_limit(system=system)
 

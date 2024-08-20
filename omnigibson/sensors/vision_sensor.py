@@ -351,7 +351,7 @@ class VisionSensor(BaseSensor):
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
                 categories = [
-                    cat for cat in replicator_mapping[key].split(",") if cat in self.scene.system_registry.object_names
+                    cat for cat in replicator_mapping[key].split(",") if cat in self.scene.available_systems.keys()
                 ]
                 assert (
                     len(categories) == 1
@@ -369,10 +369,10 @@ class VisionSensor(BaseSensor):
         Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
 
         Args:
-            img (np.ndarray): Semantic segmentation image to remap
+            img (th.Tensor): Semantic segmentation image to remap
             id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
-            np.ndarray: Remapped semantic segmentation image
+            th.Tensor: Remapped semantic segmentation image
             dict: Corrected id_to_labels dictionary
         """
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
@@ -418,7 +418,7 @@ class VisionSensor(BaseSensor):
                 if "Particle" in prim_name:
                     category_name = prim_name.split("Particle")[0]
                     assert (
-                        category_name in self.scene.system_registry.object_names
+                        category_name in self.scene.available_systems.keys()
                     ), f"System name {category_name} is not in the registered systems!"
                     value = category_name
                 else:
@@ -451,7 +451,7 @@ class VisionSensor(BaseSensor):
                     semantic_label in semantic_labels
                 ), f"Semantic map value {semantic_label} is not in the semantic labels!"
                 category_name = semantic_labels[semantic_label]
-                if category_name in self.scene.system_registry.object_names:
+                if category_name in self.scene.available_systems.keys():
                     value = category_name
                     self._register_instance(value, id=id)
                 # If the category name is not in the registered systems,
@@ -557,6 +557,14 @@ class VisionSensor(BaseSensor):
 
         # Run super
         super().remove()
+
+    @property
+    def render_product(self):
+        """
+        Returns:
+            HydraTexture: Render product associated with this viewport and camera
+        """
+        return self._render_product
 
     @property
     def camera_parameters(self):
@@ -744,6 +752,27 @@ class VisionSensor(BaseSensor):
             length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
+
+    @property
+    def active_camera_path(self):
+        """
+        Returns:
+            str: prim path of the active camera attached to this vision sensor
+        """
+        return self._viewport.viewport_api.get_active_camera().pathString
+
+    @active_camera_path.setter
+    def active_camera_path(self, path):
+        """
+        Sets the active camera prim path @path for this vision sensor. Note: Must be a valid Camera prim path
+
+        Args:
+            path (str): Prim path to the camera that will be attached to this vision sensor
+        """
+        self._viewport.viewport_api.set_active_camera(path)
+        # Requires 6 updates to propagate changes
+        for i in range(6):
+            render()
 
     @property
     def intrinsic_matrix(self):

@@ -23,8 +23,7 @@ def test_dump_load(env):
     og.sim.load_state(state)
 
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = env.scene.get_system(system_name)
-        system.clear()
+        env.scene.clear_system(system_name)
 
 
 @og_test
@@ -43,5 +42,38 @@ def test_dump_load_serialized(env):
     og.sim.load_state(state, serialized=True)
 
     for system_name, system_class in SYSTEM_EXAMPLES.items():
-        system = env.scene.get_system(system_name)
-        system.clear()
+        env.scene.clear_system(system_name)
+
+
+@og_test
+def test_save_restore_partial(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+
+    decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
+    og.sim.save([tmp_json_path])
+
+    # Delete the breakfast table
+    env.scene.remove_object(breakfast_table)
+
+    og.sim.step()
+
+    # Restore the saved environment
+    og.sim.restore([tmp_json_path])
+
+    # Make sure we still have an object that existed beforehand
+    assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
+
+
+@og_test
+def test_save_restore_full(env):
+    decrypted_fd, tmp_json_path = tempfile.mkstemp("test_save_restore.json", dir=og.tempdir)
+    og.sim.save([tmp_json_path])
+
+    # Clear the simulator
+    og.clear()
+
+    # Restore the saved environment
+    og.sim.restore([tmp_json_path])
+
+    # Make sure we still have an object that existed beforehand
+    assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None

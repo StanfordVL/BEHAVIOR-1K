@@ -286,12 +286,15 @@ class RigidPrim(XFormPrim):
         """
         self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
-    def get_linear_velocity(self):
+    def get_linear_velocity(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_linear_velocities()[0]
+        return self._rigid_prim_view.get_linear_velocities(clone=clone)[0]
 
     def set_angular_velocity(self, velocity):
         """
@@ -302,12 +305,15 @@ class RigidPrim(XFormPrim):
         """
         self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
-    def get_angular_velocity(self):
+    def get_angular_velocity(self, clone=True):
         """
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_angular_velocities()[0]
+        return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
 
     def set_position_orientation(self, position=None, orientation=None):
         # Invalidate kinematic-only object pose caches when new pose is set
@@ -323,16 +329,26 @@ class RigidPrim(XFormPrim):
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
         PoseAPI.invalidate()
 
-    def get_position_orientation(self):
+    def get_position_orientation(self, clone=True):
+        """
+        Gets prim's pose with respect to the world's frame.
+
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the world frame
+                - 4-array: (x,y,z,w) quaternion orientation in the world frame
+        """
         # Return cached pose if we're kinematic-only
         if self.kinematic_only and self._kinematic_world_pose_cache is not None:
             return self._kinematic_world_pose_cache
 
-        pos, ori = self._rigid_prim_view.get_world_poses()
+        pos, ori = self._rigid_prim_view.get_world_poses(clone=clone)
 
-        assert math.isclose(
-            th.norm(ori), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        # Make sure we have a valid orientation
+        assert -1e-3 < (th.sum(ori * ori) - 1) < 1e-3, f"{self.prim_path} orientation {ori} is not a unit quaternion."
 
         pos = pos[0]
         ori = ori[0][[1, 2, 3, 0]]
@@ -799,8 +815,8 @@ class RigidPrim(XFormPrim):
     def _dump_state(self):
         # Grab pose from super class
         state = super()._dump_state()
-        state["lin_vel"] = self.get_linear_velocity()
-        state["ang_vel"] = self.get_angular_velocity()
+        state["lin_vel"] = self.get_linear_velocity(clone=False)
+        state["ang_vel"] = self.get_angular_velocity(clone=False)
 
         return state
 

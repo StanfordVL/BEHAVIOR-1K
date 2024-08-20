@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import shutil
@@ -24,8 +25,10 @@ from omnigibson.systems.system_base import (
     PhysicalParticleSystem,
     VisualParticleSystem,
     create_system_from_metadata,
+    get_all_system_names,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -33,6 +36,7 @@ from omnigibson.utils.python_utils import (
     Serializable,
     classproperty,
     create_object_from_init_info,
+    get_uuid,
     recursively_convert_to_torch,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
@@ -65,7 +69,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     ):
         """
         Args:
-            scene_file (None or str): If specified, full path of JSON file to load (with .json).
+            scene_file (None or str or dict): If specified, full path of JSON file to load (with .json) or the
+                pre-loaded scene state from that json.
                 None results in no additional objects being loaded into the scene
             use_floor_plane (bool): whether to load a flat floor plane into the simulator
             floor_plane_visible (bool): whether to render the additionally added floor plane
@@ -87,6 +92,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane_color = floor_plane_color
         self._use_skybox = use_skybox
         self._transition_rule_api = None
+        self._available_systems = None
+        self._pose = None
+        self._pose_inv = None
+        self._updated_state_objects = None
 
         # Call super init
         super().__init__()
@@ -99,8 +108,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # If we have any scene file specified, use it to create the objects within it
         if self.scene_file is not None:
             # Grab objects info from the scene file
-            with open(self.scene_file, "r") as f:
-                scene_info = json.load(f)
+            if isinstance(self.scene_file, str):
+                with open(self.scene_file, "r") as f:
+                    scene_info = json.load(f)
+            else:
+                scene_info = self.scene_file
             init_info = scene_info["objects_info"]["init_info"]
             self._init_state = scene_info["state"]["object_registry"]
             self._init_systems = list(scene_info["state"]["system_registry"].keys())
@@ -152,6 +164,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self.object_registry.objects
 
     @property
+    def updated_state_objects(self):
+        """
+        Returns:
+            set of StatefulObject: set of stateful objects in the scene that have had at least a single object state
+                updated since the last simulator's non_physics_step()
+        """
+        return self._updated_state_objects
+
+    @property
     def robots(self):
         """
         Robots in the scene
@@ -164,12 +185,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def systems(self):
         """
-        Systems in the scene
+        Active systems in the scene
 
         Returns:
-            list of BaseSystem: System(s) that are available to use in this scene
+            list of BaseSystem: Active system(s) in this scene
         """
         return self.system_registry.objects
+
+    @property
+    def available_systems(self):
+        """
+        Available systems in the scene
+
+        Returns:
+            dict: Maps all system names to corresponding systems that are available to use in this scene
+        """
+        return self._available_systems
 
     @property
     def object_registry_unique_keys(self):
@@ -211,6 +242,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def transition_rule_api(self):
         return self._transition_rule_api
 
+    def clear_updated_objects(self):
+        self._updated_state_objects = set()
+
     def prebuild(self):
         """
         Prebuild the scene USD before loading it into the simulator. This is useful for caching the scene USD for faster
@@ -220,12 +254,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             str: Path to the prebuilt USD file
         """
         # Prebuild and cache the scene USD using the objects
-        if self.scene_file not in PREBUILT_USDS:
+        if isinstance(self.scene_file, str):
+            scene_file_path = self.scene_file
+        else:
+            # The scene file is a dict, so write it to disk directly
+            scene_file_str = json.dumps(self.scene_file, cls=TorchEncoder, indent=4)
+            scene_file_hash = get_uuid(scene_file_str, deterministic=True)
+            scene_file_path = os.path.join(og.tempdir, f"scene_file_{scene_file_hash}.json")
+            with open(scene_file_path, "w+") as f:
+                json.dump(self.scene_file, f, cls=TorchEncoder, indent=4)
+
+        if scene_file_path not in PREBUILT_USDS:
             # Prebuild the scene USD
-            log.info(f"Prebuilding scene file {self.scene_file}...")
+            log.info(f"Prebuilding scene file {scene_file_path}...")
 
             # Create a new stage inside the tempdir, named after this scene's file.
-            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
             os.close(decrypted_fd)
             stage = lazy.pxr.Usd.Stage.CreateNew(usd_path)
 
@@ -240,12 +284,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             stage.Save()
             del stage
 
-            PREBUILT_USDS[self.scene_file] = usd_path
+            PREBUILT_USDS[scene_file_path] = usd_path
 
         # Copy the prebuilt USD to a new path
-        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(self.scene_file) + ".usd", dir=og.tempdir)
+        decrypted_fd, instance_usd_path = tempfile.mkstemp(os.path.basename(scene_file_path) + ".usd", dir=og.tempdir)
         os.close(decrypted_fd)
-        shutil.copyfile(PREBUILT_USDS[self.scene_file], instance_usd_path)
+        shutil.copyfile(PREBUILT_USDS[scene_file_path], instance_usd_path)
         return instance_usd_path
 
     def _load(self):
@@ -260,13 +304,20 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")
 
-        if os.path.exists(system_dir):
-            system_names = os.listdir(system_dir)
-            for system_name in system_names:
-                self.system_registry.add(create_system_from_metadata(system_name=system_name))
+        available_systems = (
+            {
+                system_name: create_system_from_metadata(system_name=system_name)
+                for system_name in get_all_system_names()
+            }
+            if os.path.exists(system_dir)
+            else dict()
+        )
 
+        # Manually add cloth system since it is a special system that doesn't have any corresponding directory in
+        # the B1K database
         cloth_system = Cloth(name="cloth")
-        self.system_registry.add(cloth_system)
+        available_systems["cloth"] = cloth_system
+        self._available_systems = available_systems
 
     def _load_scene_prim_with_objects(self, last_scene_edge, initial_scene_prim_z_offset, scene_margin):
         """
@@ -331,8 +382,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Loads metadata from self.scene_file and stores it within the world prim's CustomData
         """
-        with open(self.scene_file, "r") as f:
-            scene_info = json.load(f)
+        if isinstance(self.scene_file, str):
+            with open(self.scene_file, "r") as f:
+                scene_info = json.load(f)
+        else:
+            scene_info = self.scene_file
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
@@ -367,6 +421,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             raise ValueError("This scene is already loaded.")
 
         self._idx = idx
+        self.clear_updated_objects()
 
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
@@ -391,6 +446,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.scene_file is not None:
             self._load_metadata_from_scene_file()
 
+        # Cache this scene's pose
+        self._pose = T.pose2mat(self._scene_prim.get_position_orientation())
+        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
+
         if gm.ENABLE_TRANSITION_RULES:
             self._transition_rule_api = TransitionRuleAPI(scene=self)
 
@@ -406,10 +465,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         # Clears systems so they can be re-initialized.
         for system in self.active_systems.values():
-            system.clear()
+            self.clear_system(system_name=system.name)
 
         # Remove all of the scene's objects.
-        og.sim.remove_object(list(self.objects))
+        og.sim.batch_remove_objects(list(self.objects))
 
         # Remove the scene prim.
         self._scene_prim.remove()
@@ -444,8 +503,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.scene_file is None:
             init_state = self.dump_state(serialized=False)
         else:
-            with open(self.scene_file, "r") as f:
-                scene_info = json.load(f)
+            if isinstance(self.scene_file, str):
+                with open(self.scene_file, "r") as f:
+                    scene_info = json.load(f)
+            else:
+                scene_info = self.scene_file
             init_state = scene_info["state"]
             init_state = recursively_convert_to_torch(init_state)
             self.load_state(init_state, serialized=False)
@@ -471,6 +533,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name="system_registry",
                 class_types=BaseSystem,
                 default_key="name",
+                hash_key="uuid",
                 unique_keys=["name", "prim_path", "uuid"],
             )
         )
@@ -481,6 +544,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name=f"object_registry",
                 class_types=BaseObject,
                 default_key="name",
+                hash_key="uuid",
                 unique_keys=self.object_registry_unique_keys,
                 group_keys=self.object_registry_group_keys,
             )
@@ -539,63 +603,68 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj):
+    def add_object(self, obj, register=True, _batched_call=False):
         """
         Add an object to the scene. The scene should already be loaded.
 
         Args:
             obj (BaseObject): the object to load
-
-        Returns:
-            Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
-                (in that case, the object is stored to be loaded together with the scene)
+            register (bool): Whether to register @obj internally in the scene object registry or not, as well as run
+                additional scene-specific logic in addition to the obj being loaded
+            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
+                a context externally. In general, this should NOT be explicitly set by the user
         """
-        # Make sure all objects in this scene are uniquely named
-        assert (
-            obj.name not in self.object_registry.object_names
-        ), f"Object with name {obj.name} already exists in scene!"
+        cxt = contextlib.nullcontext() if _batched_call else og.sim.adding_objects(objs=[obj])
+        with cxt:
+            # Make sure all objects in this scene are uniquely named
+            assert (
+                obj.name not in self.object_registry.object_names
+            ), f"Object with name {obj.name} already exists in scene!"
 
-        # Load the object.
-        prim = obj.load(self)
+            # Load the object.
+            prim = obj.load(self)
 
-        # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
-        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
-        # We do this by adding the object to our tracked collision groups
-        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
-            # TODO: Remove structure hotfix once asset collision meshes are fixed!!
-            if obj.category in STRUCTURE_CATEGORIES:
-                CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
-            else:
-                for link in obj.links.values():
-                    CollisionAPI.add_to_collision_group(
-                        col_group="fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links",
-                        prim_path=link.prim_path,
-                    )
+            if register:
+                # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
+                # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
+                # We do this by adding the object to our tracked collision groups
+                if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
+                    # TODO: Remove structure hotfix once asset collision meshes are fixed!!
+                    if obj.category in STRUCTURE_CATEGORIES:
+                        CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
+                    else:
+                        for link in obj.links.values():
+                            CollisionAPI.add_to_collision_group(
+                                col_group=(
+                                    "fixed_base_root_links" if link == obj.root_link else "fixed_base_nonroot_links"
+                                ),
+                                prim_path=link.prim_path,
+                            )
 
-        # Add this object to our registry based on its type, if we want to register it
-        self.object_registry.add(obj)
+                # Add this object to our registry based on its type, if we want to register it
+                self.object_registry.add(obj)
 
-        # Run any additional scene-specific logic with the created object
-        self._add_object(obj)
+                # Run any additional scene-specific logic with the created object
+                self._add_object(obj)
 
-        # Inform the simulator that there is a new object here.
-        og.sim.post_import_object(obj)
-        return prim
-
-    def remove_object(self, obj):
+    def remove_object(self, obj, _batched_call=False):
         """
         Method to remove an object from the simulator
 
         Args:
             obj (BaseObject): Object to remove
+            _batched_call (bool): Whether this is from a batched call or not. If True, will avoid running
+                a context externally. In general, this should NOT be explicitly set by the user
         """
-        # Remove from the appropriate registry if registered.
-        # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
-        if self.object_registry.object_is_registered(obj):
-            self.object_registry.remove(obj)
+        cxt = contextlib.nullcontext() if _batched_call else og.sim.removing_objects(objs=[obj])
+        with cxt:
+            # Remove from the appropriate registry if registered.
+            # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
+            if self.object_registry.object_is_registered(obj):
+                self.object_registry.remove(obj)
 
-        # Remove from omni stage
-        obj.remove()
+            # Remove from omni stage
+            obj.remove()
 
     def reset(self):
         """
@@ -657,6 +726,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             if obj.category != robot_macros.ROBOT_CATEGORY
         }
 
+    @property
+    def pose(self):
+        """
+        Returns:
+            th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global pose
+        """
+        return self._pose
+
+    @property
+    def pose_inv(self):
+        """
+        Returns:
+            th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
+        """
+        return self._pose_inv
+
     def is_system_active(self, system_name):
         return self.get_system(system_name, force_init=False).initialized
 
@@ -670,18 +755,43 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return isinstance(self.get_system(system_name, force_init=False), FluidSystem)
 
     def get_system(self, system_name, force_init=True):
+        """
+        Grab the system @system_name, and optionally initialize it if @force_init is set
+
+        Args:
+            system_name (str): Name of the system to grab
+            force_init (bool): Whether to force the system to be initialized and added to set of active_systems
+                if not already
+
+        Returns:
+            BaseSystem: Requested system
+        """
         # Make sure scene exists
         assert self.loaded, "Cannot get systems until scene is imported!"
-        # If system_name is not in REGISTERED_SYSTEMS, create from metadata
-        system = self.system_registry("name", system_name)
-        assert system is not None, f"System {system_name} not in system registry."
+        assert system_name in self._available_systems, f"System {system_name} is not a valid system name"
+        # If system is not initialized, initialize and add it to our registry
+        system = self._available_systems[system_name]
         if not system.initialized and force_init:
             system.initialize(scene=self)
+            self.system_registry.add(system)
         return system
+
+    def clear_system(self, system_name):
+        """
+        Clear the system @system_name and remove it from our set of active systems
+
+        Args:
+            system_name (str): Name of the system to remove
+        """
+        system = self.system_registry("name", system_name)
+        if system is not None:
+            # Remove from system registry and clear
+            self.system_registry.remove(system)
+            system.clear()
 
     @property
     def active_systems(self):
-        return {system.name: system for system in self.systems if system.initialized and not isinstance(system, Cloth)}
+        return {system.name: system for system in self.systems if not isinstance(system, Cloth)}
 
     def get_random_floor(self):
         """

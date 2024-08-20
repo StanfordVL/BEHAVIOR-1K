@@ -37,7 +37,7 @@ class Temperature(TensorizedValueState):
         """
         # Get idxs for objs
         idxs = [cls.OBJ_IDXS[obj] for obj in objs]
-        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_rendering_dt()
+        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_sim_step_dt()
 
     @classmethod
     def get_dependencies(cls):

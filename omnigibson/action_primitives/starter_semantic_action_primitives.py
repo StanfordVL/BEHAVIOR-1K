@@ -417,7 +417,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
 
             if robot_type == "simplified":
-                og.sim.remove_object(robot_to_copy)
+                self.env.scene.remove_object(robot_to_copy)
 
             robot_copy.prims[robot_type] = copy_robot
             robot_copy.meshes[robot_type] = copy_robot_meshes

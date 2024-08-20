@@ -18,11 +18,15 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
     # Shape is (N, ...), where the ith entry in the first dimension corresponds to the ith object state instance's value
     VALUES = None
 
-    # Dictionary mapping object to index in VALUES
+    # Dictionary mapping object to index in VALUES, as well as the reverse (a simple list)
     OBJ_IDXS = None
+    IDX_OBJS = None
 
     # Dict of callbacks that can be added to when an object is removed
     CALLBACKS_ON_REMOVE = None
+
+    # Int representing per-object state size
+    STATE_SIZE = None
 
     @classmethod
     def global_initialize(cls):
@@ -32,7 +36,12 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # Initialize the global variables
         cls.VALUES = th.empty(0, dtype=cls.value_type).reshape(0, *cls.value_shape)
         cls.OBJ_IDXS = dict()
+        cls.IDX_OBJS = []
         cls.CALLBACKS_ON_REMOVE = dict()
+
+        # Compute and cache state size
+        # This is the flattened size of @self.value_shape
+        cls.STATE_SIZE = 1 if cls.value_shape == () else int(th.prod(th.tensor(cls.value_shape)))
 
     @classmethod
     def global_update(cls):
@@ -41,10 +50,18 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
         # This should be globally update all values. If there are no values, we skip by default since there is nothing
         # being tracked currently
-        if len(cls.VALUES) == 0:
+        n_values = len(cls.VALUES)
+        if n_values == 0:
             return
 
-        cls.VALUES = cls._update_values(values=cls.VALUES)
+        new_values = cls._update_values(values=cls.VALUES)
+
+        # Compare with previous values, and add any changed objects to the scene-tracked set
+        changed_idxs = th.where(th.any(new_values != cls.VALUES, dim=-1))[0]
+        for idx in changed_idxs:
+            cls.IDX_OBJS[idx].state_updated()
+
+        cls.VALUES = new_values
 
     @classmethod
     def _update_values(cls, values):
@@ -73,6 +90,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
         # Add this object to the tracked global state
         cls.OBJ_IDXS[obj] = len(cls.VALUES)
+        cls.IDX_OBJS.append(obj)
         cls.VALUES = th.cat([cls.VALUES, th.zeros((1, *cls.value_shape), dtype=cls.value_type)], dim=0)
 
     @classmethod
@@ -93,6 +111,7 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         # Re-standardize the indices
         for i, o in enumerate(cls.OBJ_IDXS.keys()):
             cls.OBJ_IDXS[o] = i
+        cls.IDX_OBJS.pop(deleted_idx)
         cls.VALUES = torch_delete(cls.VALUES, [deleted_idx])
 
     @classmethod
@@ -169,13 +188,8 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
 
     @property
     def state_size(self):
-        # This is the flattened size of @self.value_shape
-        # Returns 1 for a non-arrayed value
-        # if self.value_shape == th.Size([0]):
-        if self.value_shape == ():
-            return 1
-        else:
-            return int(th.prod(th.tensor(self.value_shape)))
+        # This is merely the class state size
+        return self.STATE_SIZE
 
     # For this state, we simply store its value.
     def _dump_state(self):

@@ -162,18 +162,12 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    def write_task_metadata(self):
+    @property
+    def task_metadata(self):
         # Store mapping from entity name to its corresponding BDDL instance name
-        metadata = dict(
+        return dict(
             inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
         )
-
-        # Write to sim
-        og.sim.write_metadata(key="task", data=metadata)
-
-    def load_task_metadata(self):
-        # Load from sim
-        return og.sim.get_metadata(key="task")
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
@@ -213,7 +207,7 @@ class BehaviorTask(BaseTask):
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
         callback_name = f"{self.activity_name}_refresh"
-        og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
+        og.sim.add_callback_on_add_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
         og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
@@ -370,7 +364,7 @@ class BehaviorTask(BaseTask):
                     f"from loaded scene, but could not be found!"
                 )
                 name = inst_to_name[obj_inst]
-                is_system = name in env.scene.system_registry.object_names
+                is_system = name in env.scene.available_systems.keys()
                 entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
@@ -447,7 +441,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_removed_obj(self, obj):
         """
-        Internal callback function to be called when sim.remove_object() is called to potentially update internal
+        Internal callback function to be called when sim._pre_remove_object() is called to potentially update internal
         bddl object scope
 
         Args:

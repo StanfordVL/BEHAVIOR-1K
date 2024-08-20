@@ -368,7 +368,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
     land_success = False
-    max_simulator_step = int(1.0 / og.sim.get_rendering_dt())
+    max_simulator_step = int(1.0 / og.sim.get_sim_step_dt())
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
         og.sim.step()

@@ -84,7 +84,8 @@ class IKSolver:
         tolerance_quat=0.01,
         weight_pos=1.0,
         weight_quat=0.05,
-        max_iterations=150,
+        bfgs_orientation_weight=100.0,
+        max_iterations=10,
         initial_joint_pos=None,
     ):
         """
@@ -99,6 +100,8 @@ class IKSolver:
             tolerance_quat (float): Maximum orientation error (per-axis L2-norm) for a successful IK solution
             weight_pos (float): Weight for the relative importance of position error during CCD
             weight_quat (float): Weight for the relative importance of position error during CCD
+            bfgs_orientation_weight (float): Weight when applying BFGS algorithm during optimization. Only used if
+                target_quat is specified
             max_iterations (int): Number of iterations used for each cyclic coordinate descent.
             initial_joint_pos (None or n-array): If specified, will set the initial cspace seed when solving for joint
                 positions. Otherwise, will use self.reset_joint_pos
@@ -129,6 +132,7 @@ class IKSolver:
 
         self.config.ccd_position_weight = weight_pos
         self.config.ccd_orientation_weight = 0.0 if target_quat is None else weight_quat
+        self.config.bfgs_orientation_weight = 0.0 if target_quat is None else bfgs_orientation_weight
         self.config.max_num_descents = max_iterations
 
         # Compute target joint positions

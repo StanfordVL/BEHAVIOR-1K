@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import Registerable, classproperty
@@ -118,12 +119,45 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Run internal method
         self._load(env=env)
 
-        # Load the obs space dim
+        # We're now initialized
+        self._loaded = True
+
+    def post_play_load(self, env):
+        """
+        Complete any loading tasks that require the simulator to be playing
+
+        Args:
+            env (Environment): environment instance
+        """
+        # Compute the low dimensional observation dimension
         obs = self.get_obs(env=env, flatten_low_dim=True)
         self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
 
-        # We're now initialized
-        self._loaded = True
+    @property
+    def task_metadata(self):
+        """
+        Returns:
+            dict: Relevant metadata for the current task
+        """
+        # Default is empty dictionary
+        return dict()
+
+    def write_task_metadata(self):
+        """
+        Store any relevant task metadata that should be written when the simulation state is saved
+        """
+        # Write to sim
+        og.sim.write_metadata(key="task", data=self.task_metadata)
+
+    def load_task_metadata(self):
+        """
+        Load relevant task metadata stored in the simulator
+
+        Returns:
+            dict: Relevant metadata for the ucrrent task
+        """
+        # Load from sim
+        return og.sim.get_metadata(key="task")
 
     @abstractmethod
     def _create_termination_conditions(self):

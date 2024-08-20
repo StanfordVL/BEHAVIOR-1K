@@ -11,7 +11,7 @@ icon: material/water-outline
 ## Usage
 
 ### Creating
-For efficiency reasons, systems are created dynamically on an as-needed basis.  A system can be dynamically created (or referenced, if it already exists) via `scene.get_system(name)`, where `name` defines the name of the system. If you do not wish to initialize a system when refrencing it, e.g. for performance reasons, use the `force_init` flag: `scene.get_system(name, force_init=False)`. For a list of all possible system names, see `scene.system_registry.objects`. 
+For efficiency reasons, systems are created dynamically on an as-needed basis.  A system can be dynamically created (or referenced, if it already exists) via `scene.get_system(name)`, where `name` defines the name of the system. If you do not wish to initialize a system when refrencing it, e.g. for performance reasons, use the `force_init` flag: `scene.get_system(name, force_init=False)`. For a list of all possible system names, see `scene.available_systems.keys()`. 
 
 ### Runtime
 A given system can be accessed at any time via `scene.get_system(...)`. Systems can generate particles via `system.generate_particles(...)`, track their states via `system.get_particles_position_orientation()`, and remove them via `system.remove_particles(...)`. Please refer to the [`System`'s API Reference](../reference/systems/system_base.md) for specific information regarding arguments. Moreover, specific subclasses may implement more complex generation behavior, such as `VisualParticleSystem`s `generate_group_particles(...)` which spawn visual (non-collidable) particles that are attached to a specific object.

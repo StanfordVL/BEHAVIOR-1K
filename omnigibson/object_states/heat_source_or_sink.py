@@ -211,7 +211,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 nonlocal affected_objects
                 # global affected_objects
                 obj = self.obj.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
-                if obj is not None:
+                if obj is not None and obj != self.obj and obj in Temperature.OBJ_IDXS:
                     affected_objects.add(obj)
                 # Always continue traversal
                 return True
@@ -242,9 +242,11 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                             dim=-1,
                         )
                     )[0]:
-                        affected_objects.add(cloth_objs[idx])
+                        # Only add if object has temperature
+                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
+                            affected_objects.add(cloth_objs[idx])
 
-                # Additionally prune objects based on Inside requirement -- cast to avoid in-place operations
+                # Additionally prune objects based on Temperature / Inside requirement -- cast to avoid in-place operations
                 for obj in tuple(affected_objects):
                     if not obj.states[Inside].get_value(self.obj):
                         affected_objects.remove(obj)
@@ -270,14 +272,14 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     for idx in th.where(
                         th.norm(heat_source_pos.reshape(1, 3) - cloth_positions, dim=-1) <= self.distance_threshold
                     )[0]:
-                        affected_objects.add(cloth_objs[idx])
+                        # Only add if object has temperature
+                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
+                            affected_objects.add(cloth_objs[idx])
 
         # Remove self (we cannot affect ourselves) and update the internal set of objects, and remove self
         if self.obj in affected_objects:
             affected_objects.remove(self.obj)
-        self._affected_objects = {
-            obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states
-        }
+        self._affected_objects = affected_objects
 
         # Propagate the affected objects' temperatures
         if len(self._affected_objects) > 0:

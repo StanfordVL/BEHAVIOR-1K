@@ -202,9 +202,12 @@ class XFormPrim(BasePrim):
         ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
-    def get_position_orientation(self):
+    def get_position_orientation(self, clone=True):
         """
         Gets prim's pose with respect to the world's frame.
+
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:
             2-tuple:
@@ -431,17 +434,17 @@ class XFormPrim(BasePrim):
         # If we are in a scene, compute the scene-local transform (and save this as the world transform
         # for legacy compatibility)
         if self.scene is not None:
-            pos, ori = T.relative_pose_transform(pos, ori, *self.scene.prim.get_position_orientation())
+            pos, ori = T.mat2pose(self.scene.pose_inv @ T.pose2mat((pos, ori)))
 
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        pos, orn = state["pos"], state["ori"]
+        pos, ori = state["pos"], state["ori"]
         pos = pos if isinstance(pos, th.Tensor) else th.tensor(pos, dtype=th.float32)
-        orn = orn if isinstance(orn, th.Tensor) else th.tensor(orn, dtype=th.float32)
+        ori = ori if isinstance(ori, th.Tensor) else th.tensor(ori, dtype=th.float32)
         if self.scene is not None:
-            pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
-        self.set_position_orientation(pos, orn)
+            pos, ori = T.mat2pose(self.scene.pose @ T.pose2mat((pos, ori)))
+        self.set_position_orientation(pos, ori)
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"]])

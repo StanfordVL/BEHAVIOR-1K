@@ -162,7 +162,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     modifier._loaded = True
     modifier._post_load()
     env.scene.object_registry.add(modifier)
-    og.sim.post_import_object(modifier)
+    og.sim._post_import_object(modifier)
     modifier.set_position(th.tensor([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle
