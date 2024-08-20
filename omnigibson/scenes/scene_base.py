@@ -673,9 +673,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Make sure the simulator is playing
         assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
 
-        for system_name in self.active_systems.keys():
-            self.clear_system(system_name)
-
         # Reset the states of all objects (including robots), including (non-)kinematic states and internal variables.
         assert self._initial_state is not None
         self.load_state(self._initial_state)

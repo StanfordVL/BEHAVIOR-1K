@@ -1195,8 +1195,8 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env
     og.sim.step()
 
     # This fails the recipe because it requires the milk to be in the blender
-    milk.generate_particles(positions=th.tensor([[0.02, 0, 1.57]]))
-    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 1.57]], dtype=th.float32))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]], dtype=th.float32))
     ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
     og.sim.step()
 
