@@ -142,8 +142,8 @@ def test_robot_load_drive():
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
 
-        if robot_name == "FrankaMounted":
-            # TODO: skipping FrankaMounted for now because CI doesn't have the required assets
+        if robot_name in ["FrankaMounted", "Stretch"]:
+            # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
             continue
 
         robot = robot_cls(
