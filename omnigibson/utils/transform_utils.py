@@ -477,6 +477,7 @@ def mat2pose(hmat):
             - (th.tensor) (x,y,z) position array in cartesian coordinates
             - (th.tensor) (x,y,z,w) orientation array in quaternion form
     """
+    assert th.allclose(hmat[:3, :3].det(), th.tensor(1.0)), "Rotation matrix must not be scaled"
     pos = hmat[:3, 3]
     orn = mat2quat(hmat[:3, :3])
     return pos, orn
