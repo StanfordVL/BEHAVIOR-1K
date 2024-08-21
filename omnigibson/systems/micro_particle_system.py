@@ -1718,14 +1718,14 @@ class Cloth(MicroParticleSystem):
                     )
                 else:
                     # Terminate anyways, but don't fail
-                    log.warn("The generated cloth may not have evenly distributed particles.")
+                    log.warning("The generated cloth may not have evenly distributed particles.")
 
                 # Check if we have too many vertices
                 cm = ms.current_mesh()
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
                     particle_distance *= math.sqrt(2)  # halve the number of vertices
-                    log.warn(
+                    log.warning(
                         f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
                     )
                 else:
