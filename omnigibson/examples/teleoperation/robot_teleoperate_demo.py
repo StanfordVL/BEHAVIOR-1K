@@ -133,7 +133,7 @@ def main():
 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

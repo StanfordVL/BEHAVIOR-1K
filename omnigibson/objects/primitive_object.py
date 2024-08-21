@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -82,7 +82,7 @@ class PrimitiveObject(StatefulObject):
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
-        load_config["color"] = np.array(rgba[:3])
+        load_config["color"] = th.tensor(rgba[:3])
         load_config["opacity"] = rgba[3]
         load_config["radius"] = radius
         load_config["height"] = height
@@ -91,7 +91,7 @@ class PrimitiveObject(StatefulObject):
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
-        self._extents = np.ones(3)  # (x,y,z extents)
+        self._extents = th.ones(3)  # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
@@ -180,7 +180,11 @@ class PrimitiveObject(StatefulObject):
             raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
 
         visual_geom_prim.color = self._load_config["color"]
-        visual_geom_prim.opacity = self._load_config["opacity"]
+        visual_geom_prim.opacity = (
+            self._load_config["opacity"].item()
+            if isinstance(self._load_config["opacity"], th.Tensor)
+            else self._load_config["opacity"]
+        )
 
     @property
     def radius(self):
@@ -207,21 +211,24 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = th.tensor(self._extents)
         self._extents = (
-            np.ones(3) * radius * 2.0
+            th.ones(3) * radius * 2.0
             if self._primitive_type == "Sphere"
-            else np.array([radius * 2.0, radius * 2.0, self._extents[2]])
+            else th.tensor([radius * 2.0, radius * 2.0, self._extents[2]])
         )
         attr_pairs = []
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.tensor(attr.Get()).double()
                     attr_pairs.append([attr, vals])
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -235,7 +242,7 @@ class PrimitiveObject(StatefulObject):
             else:
                 vals[:, :2] = vals[:, :2] * scaling_factor
             # Set the value
-            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
 
     @property
     def height(self):
@@ -262,7 +269,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = th.tensor(self._extents)
         self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -270,13 +277,16 @@ class PrimitiveObject(StatefulObject):
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.tensor(attr.Get()).double()
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals.tolist()]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -306,8 +316,8 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
         # Update the extents variable
-        original_extent = np.array(self._extents)
-        self._extents = np.ones(3) * size
+        original_extent = th.tensor(self._extents)
+        self._extents = th.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = size / original_extent[0]
@@ -315,11 +325,14 @@ class PrimitiveObject(StatefulObject):
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
-                    vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                    vals = th.tensor(attr.Get()).double() * scaling_factor
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -349,7 +362,7 @@ class PrimitiveObject(StatefulObject):
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        # self._extents = np.array(state["extents"])
+        # self._extents = th.tensor(state["extents"])
         if self._primitive_type in VALID_RADIUS_OBJECTS:
             self.radius = state["radius"]
         if self._primitive_type in VALID_HEIGHT_OBJECTS:
@@ -369,9 +382,9 @@ class PrimitiveObject(StatefulObject):
         # Run super first
         state_flat = super().serialize(state=state)
 
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
-                np.array([state["radius"], state["height"], state["size"]]),
+                th.tensor([state["radius"], state["height"], state["size"]]),
             ]
-        ).astype(float)
+        )

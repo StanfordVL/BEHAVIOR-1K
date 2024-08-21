@@ -5,7 +5,7 @@ A set of utility functions for registering and tracking objects
 from collections.abc import Iterable
 from inspect import isclass
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, get_uuid
@@ -444,20 +444,29 @@ class SerializableRegistry(Registry, Serializable):
         # Iterate over the entire dict and flatten
         # We keep track of how many objects are being saved, as well as the unique identifier for each object so that
         # the saved flattened array is agnostic to object ordering
-        # self("name", name) is grabs the corresponding object from this registry so that we can serialize its state
+        # self("name", name) grabs the corresponding object from this registry so that we can serialize its state
         # Each object's state in the flattened array is composed of [hash_key, serialized_state]
         n_objs = len(state)
-        state_flat = (
-            np.concatenate(
-                [
-                    np.insert(self("name", name).serialize(state[name]), 0, getattr(self("name", name), self.hash_key))
-                    for name in state
-                ]
-            )
-            if len(state) > 0
-            else np.array([])
-        )
-        return np.insert(state_flat, 0, n_objs)
+
+        if len(state) > 0:
+            state_flat = []
+            for name in state:
+                obj = self("name", name)
+                serialized = obj.serialize(state[name])
+
+                # Handle the case where serialize returns an empty tensor
+                if serialized.numel() == 0:
+                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=th.float32)
+                    state_flat.append(hash_key_tensor)
+                else:
+                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=serialized.dtype)
+                    state_flat.append(th.cat([hash_key_tensor, serialized.flatten()]))
+
+            state_flat = th.cat(state_flat)
+        else:
+            state_flat = th.tensor([])
+
+        return th.cat([th.tensor([n_objs], dtype=th.float32), state_flat])
 
     def deserialize(self, state):
         state_dict = dict()

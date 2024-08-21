@@ -1,7 +1,7 @@
 import sys
 from collections import defaultdict
 
-import numpy as np
+import torch as th
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
@@ -398,7 +398,7 @@ class StatefulObject(BaseObject):
             else:
                 bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
                 # Radius is the average x-y half-extent of the object
-                radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
+                radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
             emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
             smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
@@ -413,10 +413,10 @@ class StatefulObject(BaseObject):
             colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
             emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
             )
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-                bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+                bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
             )
 
     def set_emitter_enabled(self, emitter_type, value):
@@ -501,20 +501,20 @@ class StatefulObject(BaseObject):
         if object_state is None:
             # This restore the albedo map to its original value
             albedo_add = 0.0
-            diffuse_tint = (1.0, 1.0, 1.0)
+            diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         else:
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
         if material.is_glass:
-            if not np.allclose(material.glass_color, diffuse_tint):
+            if not th.allclose(material.glass_color, diffuse_tint):
                 material.glass_color = diffuse_tint
 
         else:
             if material.albedo_add != albedo_add:
                 material.albedo_add = albedo_add
 
-            if not np.allclose(material.diffuse_tint, diffuse_tint):
+            if not th.allclose(material.diffuse_tint, diffuse_tint):
                 material.diffuse_tint = diffuse_tint
 
     def remove(self):
@@ -565,18 +565,18 @@ class StatefulObject(BaseObject):
 
         # Iterate over all states and serialize them individually
         non_kin_state_flat = (
-            np.concatenate(
+            th.cat(
                 [
                     self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
                     for state_name, state_dict in state["non_kin"].items()
                 ]
             )
             if len(state["non_kin"]) > 0
-            else np.array([])
+            else th.empty(0)
         )
 
         # Combine these two arrays
-        return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
+        return th.cat([state_flat, non_kin_state_flat])
 
     def deserialize(self, state):
         # Call super method first

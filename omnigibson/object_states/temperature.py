@@ -1,5 +1,3 @@
-import numpy as np
-
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB

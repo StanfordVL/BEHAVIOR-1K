@@ -3,13 +3,14 @@ import json
 import math
 import operator
 import os
+import random
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from copy import copy
 
 import bddl
 import networkx as nx
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -21,7 +22,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
+from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory, torch_delete
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
 from omnigibson.utils.usd_utils import RigidContactAPI
@@ -362,12 +363,14 @@ class TouchingAnyCondition(RuleCondition):
     def refresh(self, object_candidates):
         # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
         # in our collision set are kinematic only
-        self._optimized = not np.any(
-            [
-                obj.kinematic_only or obj.prim_type == PrimType.CLOTH
-                for f in (self._filter_1_name, self._filter_2_name)
-                for obj in object_candidates[f]
-            ]
+        self._optimized = not th.any(
+            th.tensor(
+                [
+                    obj.kinematic_only or obj.prim_type == PrimType.CLOTH
+                    for f in (self._filter_1_name, self._filter_2_name)
+                    for obj in object_candidates[f]
+                ]
+            )
         )
 
         if self._optimized:
@@ -377,7 +380,10 @@ class TouchingAnyCondition(RuleCondition):
                 for obj in object_candidates[self._filter_1_name]
             }
             self._filter_2_idxs = {
-                obj: [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()]
+                obj: th.tensor(
+                    [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()],
+                    dtype=th.float32,
+                )
                 for obj in object_candidates[self._filter_2_name]
             }
         else:
@@ -392,14 +398,16 @@ class TouchingAnyCondition(RuleCondition):
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
                 # Get all impulses between @obj and any object in @filter_2_name that are in the same scene
-                idxs_to_check = np.concatenate(
+                idxs_to_check = th.cat(
                     [
                         self._filter_2_idxs[obj2]
                         for obj2 in object_candidates[self._filter_2_name]
                         if obj2.scene == obj.scene
                     ]
                 )
-                if np.any(RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                if th.any(
+                    RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
+                ):
                     objs.append(obj)
         else:
             # Manually check contact
@@ -776,7 +784,7 @@ class WasherDryerRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all obj
-        obj_positions = np.array([obj.aabb_center for obj in self.scene.objects])
+        obj_positions = th.stack([obj.aabb_center for obj in self.scene.objects])
         return dict(obj_positions=obj_positions)
 
     def _compute_container_info(self, object_candidates, container, global_info):
@@ -798,7 +806,7 @@ class WasherDryerRule(BaseTransitionRule):
         obj_positions = global_info["obj_positions"]
         in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
-        in_volume_objs = list(np.array(self.scene.objects)[in_volume])
+        in_volume_objs = [obj for obj, is_in_volume in zip(self.scene.objects, in_volume) if is_in_volume]
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
@@ -947,8 +955,8 @@ class SlicingRule(BaseTransitionRule):
                 # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
                 # Get bounding box info
-                part_bb_pos = np.array(part["bb_pos"])
-                part_bb_orn = np.array(part["bb_orn"])
+                part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
+                part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
                 # Determine the relative scale to apply to the object part from the original object
                 # Note that proper (rotated) scaling can only be applied when the relative orientation of
@@ -958,7 +966,7 @@ class SlicingRule(BaseTransitionRule):
                 ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
-                scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
+                scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
                 # Calculate global part bounding box pose.
                 part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
@@ -968,7 +976,7 @@ class SlicingRule(BaseTransitionRule):
                     name=part_obj_name,
                     category=part["category"],
                     model=part["model"],
-                    bounding_box=part["bb_size"]
+                    bounding_box=th.tensor(part["bb_size"], dtype=th.float32)
                     * scale,  # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
                 )
 
@@ -1242,7 +1250,7 @@ class RecipeRule(BaseTransitionRule):
 
     def _filter_input_objects_by_unary_and_binary_system_states(self, recipe):
         # Filter input objects based on a subset of input states (unary states and binary system states)
-        # Map object categories (str) to valid indices (np.ndarray)
+        # Map object categories (str) to valid indices (th.tensor)
         category_to_valid_indices = dict()
         for obj_category in recipe["input_objects"]:
             if obj_category not in recipe["input_states"]:
@@ -1274,13 +1282,15 @@ class RecipeRule(BaseTransitionRule):
                     category_to_valid_indices[obj_category].append(idx)
 
                 # Convert to numpy array for faster indexing
-                category_to_valid_indices[obj_category] = np.array(category_to_valid_indices[obj_category], dtype=int)
+                category_to_valid_indices[obj_category] = th.tensor(
+                    category_to_valid_indices[obj_category], dtype=th.int32
+                )
         return category_to_valid_indices
 
     def _validate_recipe_objects_non_multi_instance(self, recipe, category_to_valid_indices, in_volume):
         # Check if sufficiently number of objects are contained
         for obj_category, obj_quantity in recipe["input_objects"].items():
-            if np.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
+            if th.sum(in_volume[category_to_valid_indices[obj_category]]) < obj_quantity:
                 return False
         return True
 
@@ -1328,7 +1338,7 @@ class RecipeRule(BaseTransitionRule):
                 ), "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
                 state_class, _, state_value = input_states[child_cat]["binary_object"][0]
                 num_valid_children = 0
-                children_objs = self._objects[category_to_valid_indices[child_cat]]
+                children_objs = [self._objects[i] for i in category_to_valid_indices[child_cat]]
                 for child_obj in children_objs:
                     # If the child doesn't satisfy the binary object state, skip
                     if child_obj.states[state_class].get_value(obj) != state_value:
@@ -1352,12 +1362,12 @@ class RecipeRule(BaseTransitionRule):
 
         # If multi-instance is True but doesn't require kinematic states between objects
         if input_object_tree is None:
-            num_instances = np.inf
+            num_instances = float("inf")
             # Compute how many instances of this recipe can be produced.
             # Example: if a recipe requires 1 apple and 2 bananas, and there are 3 apples and 4 bananas in the
             # container, then 2 instance of the recipe can be produced.
             for obj_category, obj_quantity in recipe["input_objects"].items():
-                quantity_in_volume = np.sum(in_volume[category_to_valid_indices[obj_category]])
+                quantity_in_volume = th.sum(in_volume[category_to_valid_indices[obj_category]])
                 num_inst = quantity_in_volume // obj_quantity
                 if num_inst < 1:
                     return False
@@ -1374,7 +1384,7 @@ class RecipeRule(BaseTransitionRule):
                 0
             ]
             # A list of objects belonging to the root node category
-            root_nodes = self._objects[category_to_valid_indices[root_node_category]]
+            root_nodes = [self._objects[i] for i in category_to_valid_indices[root_node_category]]
             input_states = recipe["input_states"]
 
             for root_node in root_nodes:
@@ -1401,7 +1411,7 @@ class RecipeRule(BaseTransitionRule):
                 system = self.scene.get_system(system_name)
                 for obj in objs:
                     if state_class in [Filled, Contains]:
-                        contained_particle_idx = obj.states[ContainedParticles].get_value(system).in_volume.nonzero()[0]
+                        contained_particle_idx = obj.states[ContainedParticles].get_value(system).in_volume.nonzero()
                         relevant_systems[system_name] |= contained_particle_idx
                     elif state_class in [Covered]:
                         covered_particle_idx = obj.states[ContactParticles].get_value(system)
@@ -1433,12 +1443,12 @@ class RecipeRule(BaseTransitionRule):
         nonrecipe_objects_in_volume = (
             in_volume
             if len(recipe["input_objects"]) == 0
-            else np.delete(
+            else torch_delete(
                 in_volume,
-                np.concatenate([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
+                th.cat([category_to_valid_indices[obj_category] for obj_category in category_to_valid_indices]),
             )
         )
-        return not np.any(nonrecipe_objects_in_volume)
+        return not th.any(nonrecipe_objects_in_volume)
 
     def _validate_recipe_systems_exist(self, recipe):
         """
@@ -1572,7 +1582,7 @@ class RecipeRule(BaseTransitionRule):
             dict: Keyword-mapped global rule information
         """
         # Compute all relevant object AABB positions
-        obj_positions = np.array([obj.aabb_center for obj in self._objects])
+        obj_positions = th.stack([obj.aabb_center for obj in self._objects])
         return dict(obj_positions=obj_positions)
 
     def _compute_container_info(self, object_candidates, container, global_info):
@@ -1595,7 +1605,7 @@ class RecipeRule(BaseTransitionRule):
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | np.array(
+        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | th.tensor(
             [obj.states[OnTop].get_value(container) for obj in self._objects]
         )
 
@@ -1628,14 +1638,11 @@ class RecipeRule(BaseTransitionRule):
         # Finally, compute relevant objects and category mapping based on relevant categories
         i = 0
         for category, objects in objects_by_category.items():
-            self._category_idxs[category] = i + np.arange(len(objects))
+            self._category_idxs[category] = i + th.arange(len(objects))
             self._objects += list(objects)
             for obj in objects:
                 self._objects_to_idx[obj] = i
                 i += 1
-
-        # Wrap relevant objects as numpy array so we can index into it efficiently
-        self._objects = np.array(self._objects)
 
     @classproperty
     def candidate_filters(cls):
@@ -1734,7 +1741,7 @@ class RecipeRule(BaseTransitionRule):
                         if self.scene.is_physical_particle_system(system_name):
                             volume += (
                                 contained_particles_state.get_value(system).n_in_volume
-                                * np.pi
+                                * math.pi
                                 * (system.particle_radius**3)
                                 * 4
                                 / 3
@@ -1744,18 +1751,19 @@ class RecipeRule(BaseTransitionRule):
             # Remove the particles that are involved in this execution
             for system_name, particle_idxs in execution_info["relevant_systems"].items():
                 system = self.scene.get_system(system_name)
-                volume += len(particle_idxs) * np.pi * (system.particle_radius**3) * 4 / 3
-                system.remove_particles(idxs=np.array(list(particle_idxs)))
+                volume += len(particle_idxs) * math.pi * (system.particle_radius**3) * 4 / 3
+                system.remove_particles(idxs=th.tensor(list(particle_idxs)))
 
         if not self.is_multi_instance:
             # Remove either all objects or only the ones specified in the input objects of the recipe
-            object_mask = in_volume.copy()
+            object_mask = th.clone(in_volume)
             if self.ignore_nonrecipe_objects:
-                object_category_mask = np.zeros_like(object_mask, dtype=bool)
+                object_category_mask = th.zeros_like(object_mask, dtype=bool)
                 for obj_category in recipe["input_objects"].keys():
                     object_category_mask[self._category_idxs[obj_category]] = True
                 object_mask &= object_category_mask
-            objs_to_remove.extend(self._objects[object_mask])
+            mask_indices = object_mask.nonzero().flatten().tolist()
+            objs_to_remove.extend([self._objects[i] for i in mask_indices])
         else:
             # Remove the objects that are involved in this execution
             for obj_category, objs in execution_info["relevant_objects"].items():
@@ -1773,8 +1781,8 @@ class RecipeRule(BaseTransitionRule):
                 log.warning(
                     f"Failed to spawn object {obj.name} in container {container.name}! Directly placing on top instead."
                 )
-                pos = np.array(container.aabb_center) + np.array(
-                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0]
+                pos = th.tensor(container.aabb_center, dtype=th.float32) + th.tensor(
+                    [0, 0, container.aabb_extent[2] / 2.0 + obj.aabb_extent[2] / 2.0], dtype=th.float32
                 )
                 obj.set_bbox_center_position_orientation(position=pos)
 
@@ -1796,13 +1804,13 @@ class RecipeRule(BaseTransitionRule):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
                     category=category,
-                    model=np.random.choice(models),
+                    model=random.choice(models),
                 )
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,
                     callback=_spawn_object_in_container,
                     states=output_states,
-                    pos=np.ones(3) * (100.0 + i),
+                    pos=th.ones(3) * (100.0 + i),
                 )
                 objs_to_add.append(new_obj_attrs)
 
@@ -1817,7 +1825,7 @@ class RecipeRule(BaseTransitionRule):
                 # When ignore_nonrecipe_objects is True, we don't necessarily remove all objects in the container.
                 # Therefore, we need to check for contact when generating output systems.
                 check_contact=self.ignore_nonrecipe_objects,
-                max_samples=math.ceil(volume / (np.pi * (out_system.particle_radius**3) * 4 / 3)),
+                max_samples=math.ceil(volume / (math.pi * (out_system.particle_radius**3) * 4 / 3)),
             )
 
         # Return transition results
@@ -1958,7 +1966,7 @@ class CookingPhysicalParticleRule(RecipeRule):
     def _execute_recipe(self, container, recipe, container_info):
         system = self.scene.get_system(recipe["input_systems"][0])
         contained_particles_state = container.states[ContainedParticles].get_value(system)
-        in_volume_idx = np.where(contained_particles_state.in_volume)[0]
+        in_volume_idx = th.where(contained_particles_state.in_volume)[0]
         assert len(in_volume_idx) > 0, "No particles found in the container when executing recipe!"
 
         # Remove uncooked particles

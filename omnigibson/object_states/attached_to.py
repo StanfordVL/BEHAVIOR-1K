@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -26,7 +26,7 @@ m = create_module_macros(module_path=__file__)
 m.ATTACHMENT_LINK_PREFIX = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
-m.DEFAULT_ORIENTATION_THRESHOLD = np.deg2rad(5.0)  # 5 degrees
+m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([5.0])).item()  # 5 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 1000  # Newton
 m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
@@ -224,7 +224,7 @@ class AttachedTo(
                 if other.states[AttachedTo].children[parent_link_name] is None:
                     if bypass_alignment_checking:
                         return child_link, parent_link
-                    pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
+                    pos_diff = th.norm(child_link.get_position() - parent_link.get_position())
                     orn_diff = T.get_orientation_diff_in_radian(
                         child_link.get_orientation(), parent_link.get_orientation()
                     )
@@ -307,7 +307,7 @@ class AttachedTo(
 
         if joint_type == JointType.JOINT_FIXED:
             # FixedJoint: the parent link, the child link and the joint frame all align.
-            parent_local_quat = np.array([0.0, 0.0, 0.0, 1.0])
+            parent_local_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
         else:
             # SphericalJoint: the same except that the rotation of the parent link doesn't align with the joint frame.
             # The child link and the joint frame still align.
@@ -335,10 +335,10 @@ class AttachedTo(
             joint_type=joint_type,
             body0=f"{parent_link.prim_path}",
             body1=f"{child_link.prim_path}",
-            joint_frame_in_parent_frame_pos=np.zeros(3),
+            joint_frame_in_parent_frame_pos=th.zeros(3),
             joint_frame_in_parent_frame_quat=parent_local_quat,
-            joint_frame_in_child_frame_pos=np.zeros(3),
-            joint_frame_in_child_frame_quat=np.array([0.0, 0.0, 0.0, 1.0]),
+            joint_frame_in_child_frame_pos=th.zeros(3),
+            joint_frame_in_child_frame_quat=th.tensor([0.0, 0.0, 0.0, 1.0]),
             **kwargs,
         )
 
@@ -436,7 +436,7 @@ class AttachedTo(
                     log.warning(f"parent reference is not updated after attachment")
 
     def serialize(self, state):
-        return np.array([state["attached_obj_uuid"]], dtype=float)
+        return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)
 
     def deserialize(self, state):
         return dict(attached_obj_uuid=int(state[0])), 1

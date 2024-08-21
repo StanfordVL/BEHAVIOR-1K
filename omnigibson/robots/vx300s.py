@@ -1,6 +1,7 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
@@ -129,7 +130,7 @@ class VX300S(ManipulationRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.array([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+        return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
 
     @property
     def finger_lengths(self):
@@ -202,7 +203,7 @@ class VX300S(ManipulationRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-np.pi, 0, 0])}
+        return {self.default_arm: euler2quat([-math.pi, 0, 0])}
 
     @property
     def assisted_grasp_start_points(self):

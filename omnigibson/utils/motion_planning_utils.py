@@ -1,7 +1,7 @@
 import heapq
-from math import ceil
+import math
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -27,7 +27,7 @@ def _wrap_angle(theta):
     Returns:
         float: angle in radians in range [-pi, pi)
     """
-    return (theta + np.pi) % (2 * np.pi) - np.pi
+    return (theta + math.pi) % (2 * math.pi) - math.pi
 
 
 def plan_base_motion(
@@ -62,8 +62,8 @@ def plan_base_motion(
             if not self.si.isValid(s2):
                 return False
 
-            start = np.array([s1.getX(), s1.getY(), s1.getYaw()])
-            goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
+            start = th.tensor([s1.getX(), s1.getY(), s1.getYaw()])
+            goal = th.tensor([s2.getX(), s2.getY(), s2.getYaw()])
             segment_theta = self.get_angle_between_poses(start, goal)
 
             # Start rotation
@@ -71,10 +71,10 @@ def plan_base_motion(
                 return False
 
             # Navigation
-            dist = np.linalg.norm(goal[:2] - start[:2])
-            num_points = ceil(dist / m.DIST_DIFF) + 1
-            nav_x = np.linspace(start[0], goal[0], num_points).tolist()
-            nav_y = np.linspace(start[1], goal[1], num_points).tolist()
+            dist = th.norm(goal[:2] - start[:2])
+            num_points = math.ceil(dist / m.DIST_DIFF) + 1
+            nav_x = th.linspace(start[0], goal[0], num_points).tolist()
+            nav_y = th.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
                 state = create_state(self.si, nav_x[i], nav_y[i], segment_theta)
                 if not self.si.isValid(state()):
@@ -89,10 +89,10 @@ def plan_base_motion(
         @staticmethod
         def is_valid_rotation(si, start_conf, final_orientation):
             diff = _wrap_angle(final_orientation - start_conf[2])
-            direction = np.sign(diff)
+            direction = th.sign(diff)
             diff = abs(diff)
-            num_points = ceil(diff / m.ANGLE_DIFF) + 1
-            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            num_points = math.ceil(diff / m.ANGLE_DIFF) + 1
+            nav_angle = th.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start_conf[2]
             for i in range(num_points):
                 state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])
@@ -106,7 +106,7 @@ def plan_base_motion(
             segment = []
             segment.append(p2[0] - p1[0])
             segment.append(p2[1] - p1[1])
-            return np.arctan2(segment[1], segment[0])
+            return th.arctan2(segment[1], segment[0])
 
     def create_state(space, x, y, yaw):
         x = float(x)
@@ -238,18 +238,18 @@ def plan_arm_motion(
     if torso_fixed:
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
-        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-        control_idx_in_joint_pos = np.arange(dim)
+        initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+        control_idx_in_joint_pos = th.arange(dim)
     else:
-        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         dim = len(joint_control_idx)
         if "combined" in robot.robot_arm_descriptor_yamls:
-            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+            joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
-            initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-            control_idx_in_joint_pos = np.arange(dim)
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+            control_idx_in_joint_pos = th.arange(dim)
 
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
@@ -261,7 +261,7 @@ def plan_arm_motion(
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(dim)
-    joints = np.array([joint for joint in robot.joints.values()])
+    joints = th.tensor([joint for joint in robot.joints.values()])
     arm_joints = joints[joint_control_idx]
     for i, joint in enumerate(arm_joints):
         if end_conf[i] > joint.upper_limit:
@@ -337,19 +337,19 @@ def plan_arm_motion_ik(
     if torso_fixed:
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
-        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-        control_idx_in_joint_pos = np.arange(dim)
+        initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+        control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls["left_fixed"]
     else:
-        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         dim = len(joint_control_idx)
         if "combined" in robot.robot_arm_descriptor_yamls:
-            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+            joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
         else:
-            initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-            control_idx_in_joint_pos = np.arange(dim)
+            initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+            control_idx_in_joint_pos = th.arange(dim)
         robot_description_path = robot.robot_arm_descriptor_yamls[robot.default_arm]
 
     ik_solver = IKSolver(
@@ -391,8 +391,8 @@ def plan_arm_motion_ik(
 
     # # set lower and upper bounds for eef orientation (axis angle bounds)
     for i in range(3, 6):
-        bounds.setLow(i, -np.pi)
-        bounds.setHigh(i, np.pi)
+        bounds.setLow(i, -math.pi)
+        bounds.setHigh(i, math.pi)
     space.setBounds(bounds)
 
     # create a simple setup object
@@ -403,7 +403,7 @@ def plan_arm_motion_ik(
     planner = ompl_geo.BITstar(si)
     ss.setPlanner(planner)
 
-    start_conf = np.append(robot.get_relative_eef_position(), T.quat2axisangle(robot.get_relative_eef_orientation()))
+    start_conf = th.cat((robot.get_relative_eef_position(), T.quat2axisangle(robot.get_relative_eef_orientation())))
     # do fk
     start = ob.State(space)
     for i in range(DOF):
@@ -448,11 +448,11 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(*np.array(pose[0], dtype=float))
+    translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=th.float32).tolist())
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+    orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)
 
@@ -480,10 +480,10 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lazy.pxr.Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
+                translation = lazy.pxr.Gf.Vec3d(*th.tensor(mesh_pose[0], dtype=th.float32).tolist())
                 mesh.GetAttribute("xformOp:translate").Set(translation)
-                orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+                orientation = th.tensor(mesh_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+                mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)
 
@@ -579,7 +579,7 @@ def astar(search_map, start, goal, eight_connected=True):
 
     def heuristic(node):
         # Calculate the Euclidean distance from node to goal
-        return np.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
+        return math.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2)
 
     def get_neighbors(cell):
         if eight_connected:
@@ -608,12 +608,13 @@ def astar(search_map, start, goal, eight_connected=True):
         if cell1[0] == cell2[0] or cell1[1] == cell2[1]:
             return 1
         else:
-            return np.sqrt(2)
+            return math.sqrt(2)
 
     open_set = [(0, start)]
     came_from = {}
     visited = set()
-    g_score = {cell: float("inf") for cell in np.ndindex(search_map.shape)}
+    rows, cols = search_map.shape
+    g_score = {(i.item(), j.item()): float("inf") for i, j in th.cartesian_prod(th.arange(rows), th.arange(cols))}
     g_score[start] = 0
 
     while open_set:
@@ -628,7 +629,7 @@ def astar(search_map, start, goal, eight_connected=True):
                 path.insert(0, current)
                 current = came_from[current]
             path.insert(0, start)
-            return np.array(path)
+            return th.tensor(path)
 
         for neighbor in get_neighbors(current):
             # Skip neighbors that are not valid or have already been visited

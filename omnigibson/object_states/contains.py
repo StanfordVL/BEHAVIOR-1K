@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-import numpy as np
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -19,8 +19,8 @@ m.VISUAL_PARTICLE_OFFSET = 0.01  # Offset to visual particles' poses when checki
 """
 ContainedParticlesData contains the following fields:
     n_in_volume (int): number of particles in the container volume
-    positions (np.array): (N, 3) array representing the raw global particle positions
-    in_volume (np.array): (N,) boolean array representing whether each particle is inside the container volume or not
+    positions (th.tensor): (N, 3) array representing the raw global particle positions
+    in_volume (th.tensor): (N,) boolean array representing whether each particle is inside the container volume or not
 """
 ContainedParticlesData = namedtuple("ContainedParticlesData", ("n_in_volume", "positions", "in_volume"))
 
@@ -49,16 +49,16 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         Returns:
             ContainedParticlesData: namedtuple with the following keys:
                 - n_in_volume (int): Number of @system's particles inside this object's container volume
-                - positions (np.array): (N, 3) Particle positions of all @system's particles
-                - in_volume (np.array): (N,) boolean array, True if the corresponding particle is inside this
+                - positions (th.tensor): (N, 3) Particle positions of all @system's particles
+                - in_volume (th.tensor): (N,) boolean array, True if the corresponding particle is inside this
                     object's container volume, else False
         """
         # Value is false by default
         n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = (
             0,
-            np.array([]),
-            np.array([]),
-            np.array([]),
+            th.empty(0),
+            th.empty(0),
+            th.empty(0),
         )
 
         # Only run additional computations if there are any particles
@@ -68,7 +68,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
             if self.obj.scene.is_visual_particle_system(system_name=system.name):
                 # Grab global particle poses and offset them in the direction of their orientation
                 raw_positions, quats = system.get_particles_position_orientation()
-                unit_z = np.zeros((len(raw_positions), 3, 1))
+                unit_z = th.zeros((len(raw_positions), 3, 1))
                 unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
                 checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
             elif self.obj.scene.is_physical_particle_system(system_name=system.name):
@@ -119,7 +119,7 @@ class Contains(RelativeObjectState, BooleanStateMixin):
             raise NotImplementedError(f"{self.__class__.__name__} does not support set_value(system, True)")
         else:
             # Remove all particles from inside the volume
-            system.remove_particles(idxs=self.obj.states[ContainedParticles].get_value(system).in_volume.nonzero()[0])
+            system.remove_particles(idxs=self.obj.states[ContainedParticles].get_value(system).in_volume.nonzero())
 
         return True
 

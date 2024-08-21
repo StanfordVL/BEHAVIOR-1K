@@ -1,7 +1,8 @@
+import math
 from collections.abc import Iterable
 from enum import IntEnum
 
-import numpy as np
+import torch as th
 
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
@@ -106,16 +107,16 @@ class BaseController(Serializable, Registerable, Recreatable):
                 continue
 
             self._control_limits[ControlType.get_type(motor_type)] = [
-                np.array(control_limits[motor_type][0]),
-                np.array(control_limits[motor_type][1]),
+                control_limits[motor_type][0],
+                control_limits[motor_type][1],
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = np.array(dof_idx, dtype=int)
+        self._dof_idx = dof_idx.int()
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(np.sum([np.prod(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(sum(th.prod(th.tensor(shape)) for shape in self._goal_shapes.values()))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -132,8 +133,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         )
         command_output_limits = (
             (
-                np.array(self._control_limits[self.control_type][0])[self.dof_idx],
-                np.array(self._control_limits[self.control_type][1])[self.dof_idx],
+                th.tensor(self._control_limits[self.control_type][0])[self.dof_idx],
+                th.tensor(self._control_limits[self.control_type][1])[self.dof_idx],
             )
             if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
@@ -167,8 +168,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: Processed command vector
         """
-        # Make sure command is a np.array
-        command = np.array([command]) if type(command) in {int, float} else np.array(command)
+        # Make sure command is a th.tensor
+        command = th.tensor([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -208,7 +209,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
         # Preprocess and run internal command
-        self._goal = self._update_goal(command=self._preprocess_command(np.array(command)), control_dict=control_dict)
+        self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
 
     def _update_goal(self, command, control_dict):
         """
@@ -314,26 +315,17 @@ class BaseController(Serializable, Registerable, Recreatable):
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = (
-            None
-            if state["goal"] is None
-            else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
-        )
+        self._goal = None if state["goal"] is None else {name: goal_state for name, goal_state in state["goal"].items()}
 
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])
+            th.cat([goal_state.flatten() for goal_state in self._goal.values()])
             if (state)["goal_is_valid"]
-            else np.zeros(self.goal_dim)
+            else th.zeros(self.goal_dim)
         )
 
-        return np.concatenate(
-            [
-                [state["goal_is_valid"]],
-                goal_state_flattened,
-            ]
-        )
+        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])
@@ -342,7 +334,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             idx = 1
             goal = dict()
             for key, shape in self._goal_shapes.items():
-                length = np.prod(shape)
+                length = math.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:
@@ -372,15 +364,23 @@ class BaseController(Serializable, Registerable, Recreatable):
             dim (int): Size of array to broadcast input to
 
         Returns:
-            np.array: Array filled with values specified in @nums
+            th.tensor: Array filled with values specified in @nums
         """
         # First run sanity check to make sure no strings are being inputted
         if isinstance(nums, str):
             raise TypeError("Error: Only numeric inputs are supported for this function, nums2array!")
 
-        # Check if input is an Iterable, if so, we simply convert the input to np.array and return
+        # Check if input is an Iterable, if so, we simply convert the input to th.tensor and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
-        return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
+        return (
+            nums
+            if isinstance(nums, th.Tensor)
+            else (
+                th.tensor(nums, dtype=th.float32)
+                if isinstance(nums, Iterable)
+                else th.ones(dim, dtype=th.float32) * nums
+            )
+        )
 
     @property
     def state_size(self):
@@ -468,7 +468,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return np.array(self._dof_idx)
+        return self._dof_idx
 
     @classproperty
     def _do_not_register_classes(cls):

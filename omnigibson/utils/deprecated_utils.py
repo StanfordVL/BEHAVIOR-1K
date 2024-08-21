@@ -981,10 +981,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
 # This is a faster version than the native implementation, as it avoids pre-processing initially
 def _get_world_pose_transform_w_scale(fabric_prim):
     # This will return a transformation matrix with translation as the last row and scale included
-    try:
-        xformable_prim = usdrt.Rt.Xformable(fabric_prim)
-    except TypeError as e:
-        breakpoint()
+    xformable_prim = usdrt.Rt.Xformable(fabric_prim)
     if xformable_prim.HasWorldXform():
         world_pos_attr = xformable_prim.GetWorldPositionAttr()
         if not world_pos_attr.IsValid():

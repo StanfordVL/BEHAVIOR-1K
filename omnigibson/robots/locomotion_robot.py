@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-import numpy as np
+import torch as th
 
 from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
@@ -44,8 +44,8 @@ class LocomotionRobot(BaseRobot):
 
         # Add base info
         dic["base_qpos"] = joint_positions[self.base_control_idx]
-        dic["base_qpos_sin"] = np.sin(joint_positions[self.base_control_idx])
-        dic["base_qpos_cos"] = np.cos(joint_positions[self.base_control_idx])
+        dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
+        dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
         dic["base_qvel"] = joint_velocities[self.base_control_idx]
 
         return dic
@@ -99,7 +99,7 @@ class LocomotionRobot(BaseRobot):
             "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.base_control_idx,
-            "default_command": np.zeros(len(self.base_control_idx)),
+            "default_command": th.zeros(len(self.base_control_idx)),
             "use_impedances": False,
         }
 
@@ -123,7 +123,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float):float], (x,y,z) cartesian delta base position
         """
-        new_pos = np.array(delta) + self.get_position()
+        new_pos = th.tensor(delta) + self.get_position()
         self.set_position(position=new_pos)
 
     def move_forward(self, delta=0.05):
@@ -133,7 +133,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position forward
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(np.array([delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([delta, 0, 0])))
 
     def move_backward(self, delta=0.05):
         """
@@ -142,7 +142,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position backward
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(np.array([-delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([-delta, 0, 0])))
 
     def move_left(self, delta=0.05):
         """
@@ -151,7 +151,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position left
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, -delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([0, -delta, 0])))
 
     def move_right(self, delta=0.05):
         """
@@ -160,7 +160,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta base position right
         """
-        self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(th.tensor([0, delta, 0])))
 
     def turn_left(self, delta=0.03):
         """
@@ -188,7 +188,7 @@ class LocomotionRobot(BaseRobot):
     def base_action_idx(self):
         controller_idx = self.controller_order.index("base")
         action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
-        return np.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
+        return th.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
 
     @property
     @abstractmethod
@@ -208,7 +208,7 @@ class LocomotionRobot(BaseRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to base joints.
         """
-        return np.array([list(self.joints.keys()).index(name) for name in self.base_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.base_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):

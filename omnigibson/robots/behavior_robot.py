@@ -1,11 +1,11 @@
 import itertools
+import math
 import os
 from abc import ABC
 from collections import OrderedDict
 from typing import Iterable, List, Tuple
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -18,20 +18,25 @@ from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobo
 from omnigibson.utils.python_utils import classproperty
 
 m = create_module_macros(module_path=__file__)
+
 # component suffixes for the 6-DOF arm joint names
 m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # Offset between the body and parts
-m.HEAD_TO_BODY_OFFSET = [0, 0, -0.4]
-m.HAND_TO_BODY_OFFSET = {"left": [0, -0.15, -0.4], "right": [0, 0.15, -0.4]}
+m.HEAD_TO_BODY_OFFSET = th.tensor([0, 0, -0.4], dtype=th.float32)
+m.HAND_TO_BODY_OFFSET = {
+    "left": th.tensor([0, -0.15, -0.4], dtype=th.float32),
+    "right": th.tensor([0, 0.15, -0.4], dtype=th.float32),
+}
 m.BODY_HEIGHT_OFFSET = 0.45
+
 # Hand parameters
 m.HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
-m.THUMB_2_POS = [0, -0.02, -0.05]
-m.THUMB_1_POS = [0, -0.015, -0.02]
-m.PALM_CENTER_POS = [0, -0.04, 0.01]
-m.PALM_BASE_POS = [0, 0, 0.015]
-m.FINGER_TIP_POS = [0, -0.025, -0.055]
+m.THUMB_2_POS = th.tensor([0, -0.02, -0.05], dtype=th.float32)
+m.THUMB_1_POS = th.tensor([0, -0.015, -0.02], dtype=th.float32)
+m.PALM_CENTER_POS = th.tensor([0, -0.04, 0.01], dtype=th.float32)
+m.PALM_BASE_POS = th.tensor([0, 0, 0.015], dtype=th.float32)
+m.FINGER_TIP_POS = th.tensor([0, -0.025, -0.055], dtype=th.float32)
 
 # Hand link index constants
 m.PALM_LINK_NAME = "palm"
@@ -46,7 +51,7 @@ m.ARM_JOINT_STIFFNESS = 1e6
 m.ARM_JOINT_MAX_EFFORT = 300
 m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
-m.FINGER_JOINT_MAX_VELOCITY = np.pi * 4
+m.FINGER_JOINT_MAX_VELOCITY = math.pi * 4
 
 
 class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -201,7 +206,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def controller_order(self):
@@ -372,12 +377,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
             if orientation is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                    lazy.pxr.Gf.Quatf(*np.float_(orientation)[[3, 0, 1, 2]])
+                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                 )
 
     @property
     def assisted_grasp_start_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_BASE_POS),
@@ -392,7 +397,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def assisted_grasp_end_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{finger}", position=m.FINGER_TIP_POS * side_coefficients[arm])
@@ -408,11 +413,11 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         self._part_is_in_contact["body"] = len(self.links["body"].contact_list()) > 0
         for hand_name in self.arm_names:
-            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or np.any(
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or th.any(
                 [len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]]
             )
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 
@@ -428,17 +433,17 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Total size: 44
         """
         # Actions are stored as 1D numpy array
-        action = np.zeros(self.action_dim)
+        action = th.zeros(self.action_dim)
         # Update body action space
         if teleop_action.is_valid["head"]:
             head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])
-            des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
-            des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
+            des_body_pos = head_pos - th.tensor([0, 0, m.BODY_HEIGHT_OFFSET])
+            des_body_rpy = th.tensor([0, 0, T.quat2euler(head_orn)[2][0]])
             des_body_orn = T.euler2quat(des_body_rpy)
         else:
             des_body_pos, des_body_orn = self.get_position_orientation()
-            des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
-        action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
+            des_body_rpy = th.stack(T.quat2euler(des_body_orn)).squeeze(1)
+        action[self.controller_action_idx["base"]] = th.cat((des_body_pos, des_body_rpy))
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
@@ -471,9 +476,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             des_local_part_pos, des_local_part_orn = T.pose_transform(
                 eef_part.offset_to_body, [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
             )
-            des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
+            des_part_rpy = th.stack(T.quat2euler(des_local_part_orn)).squeeze(1)
             controller_name = "camera" if part_name == "head" else "arm_" + part_name
-            action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
+            action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose
             if part_name in self.arm_names and teleop_action.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
@@ -567,7 +572,7 @@ class BRPart(ABC):
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears
-        dist_to_real_controller = np.linalg.norm(pos - self.get_position_orientation()[0])
+        dist_to_real_controller = th.norm(pos - self.get_position_orientation()[0])
         should_visible = dist_to_real_controller > m.HAND_GHOST_HAND_APPEAR_THRESHOLD
 
         # Only toggle visibility if we are transition from hidden to unhidden, or the other way around

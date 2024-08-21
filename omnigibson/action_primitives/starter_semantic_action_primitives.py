@@ -8,16 +8,15 @@ runnable examples.
 
 import inspect
 import logging
+import math
 import random
 from functools import cached_property
-from math import ceil
 
 import cv2
 import gymnasium as gym
-import numpy as np
+import torch as th
 from aenum import IntEnum, auto
 from matplotlib import pyplot as plt
-from scipy.spatial.transform import Rotation, Slerp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -55,22 +54,22 @@ m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
 m.KP_LIN_VEL = {
     Tiago: 0.3,
-    Fetch: 0.3,
+    Fetch: 0.2,
     Stretch: 0.5,
     Turtlebot: 0.3,
     Husky: 0.05,
     Freight: 0.05,
-    Locobot: 0.8,
+    Locobot: 1.5,
     BehaviorRobot: 0.3,
 }
 m.KP_ANGLE_VEL = {
     Tiago: 0.2,
-    Fetch: 0.2,
-    Stretch: 0.8,
+    Fetch: 0.1,
+    Stretch: 0.7,
     Turtlebot: 0.2,
     Husky: 0.05,
     Freight: 0.05,
-    Locobot: 2.0,
+    Locobot: 1.5,
     BehaviorRobot: 0.2,
 }
 
@@ -99,7 +98,7 @@ m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
-m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
+m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
 
 log = create_module_logger(module_name=__name__)
 
@@ -165,12 +164,10 @@ class PlanningContext(object):
         if m.TIAGO_TORSO_FIXED:
             assert self.arm == "left", "Fixed torso mode only supports left arm!"
             joint_control_idx = self.robot.arm_control_idx["left"]
-            joint_pos = np.array(self.robot.get_joint_positions()[joint_control_idx])
+            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_control_idx])
         else:
-            joint_combined_idx = np.concatenate(
-                [self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]]
-            )
-            joint_pos = np.array(self.robot.get_joint_positions()[joint_combined_idx])
+            joint_combined_idx = th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
+            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_combined_idx])
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
@@ -194,10 +191,10 @@ class PlanningContext(object):
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
     def _set_prim_pose(self, prim, pose):
-        translation = lazy.pxr.Gf.Vec3d(*np.array(pose[0], dtype=float))
+        translation = lazy.pxr.Gf.Vec3d(*(th.tensor(pose[0], dtype=th.float32).tolist()))
         prim.GetAttribute("xformOp:translate").Set(translation)
-        orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
-        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+        orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+        prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     def _construct_disabled_collision_pairs(self):
         robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
@@ -379,10 +376,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             lazy.omni.usd.commands.CreatePrimCommand("Xform", rc["copy_path"]).do()
             copy_robot = lazy.omni.isaac.core.utils.prims.get_prim_at_path(rc["copy_path"])
             reset_pose = robot_copy.reset_pose[robot_type]
-            translation = lazy.pxr.Gf.Vec3d(*np.array(reset_pose[0], dtype=float))
+            translation = lazy.pxr.Gf.Vec3d(*th.tensor(reset_pose[0], dtype=th.float32).tolist())
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
-            orientation = np.array(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
-            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation))
+            orientation = th.tensor(reset_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+            copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
             robot_to_copy = None
             if robot_type == "simplified":
@@ -407,7 +404,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     relative_pose = T.relative_pose_transform(
                         *mesh.get_position_orientation(), *link.get_position_orientation()
                     )
-                    relative_pose = (relative_pose[0], np.array([0, 0, 0, 1]))
+                    relative_pose = (relative_pose[0], th.tensor([0, 0, 0, 1]))
                     if link_name not in copy_robot_meshes.keys():
                         copy_robot_meshes[link_name] = {mesh_name: copy_mesh}
                         copy_robot_meshes_relative_poses[link_name] = {mesh_name: relative_pose}
@@ -484,7 +481,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             attempts (int): Number of attempts to make before raising an error
 
         Yields:
-            np.array or None: Action array for one step for the robot to execute the primitve or None if primitive completed
+            th.tensor or None: Action array for one step for the robot to execute the primitve or None if primitive completed
 
         Raises:
             ActionPrimitiveError: If primitive fails to execute
@@ -639,7 +636,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             speed (float): base speed
 
         Returns:
-            np.array or None: Action array for one step for the robot to move base or None if its at the target pose
+            th.tensor or None: Action array for one step for the robot to move base or None if its at the target pose
         """
         for _ in range(steps):
             action = self._empty_action()
@@ -656,7 +653,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             speed (float): eef speed
 
         Returns:
-            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+            th.tensor or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         for _ in range(steps):
             action = self._empty_action()
@@ -673,7 +670,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             speed (float): eef speed
 
         Returns:
-            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+            th.tensor or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         # TODO: Combine these movement functions.
         for _ in range(steps):
@@ -690,7 +687,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StatefulObject: Object for robot to grasp
 
         Returns:
-            np.array or None: Action array for one step for the robot to grasp or None if grasp completed
+            th.tensor or None: Action array for one step for the robot to grasp or None if grasp completed
         """
         # Update the tracking to track the object.
         self._tracking_object = obj
@@ -768,7 +765,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             obj (StatefulObject): Object for robot to place the object in its hand on
 
         Returns:
-            np.array or None: Action array for one step for the robot to place or None if place completed
+            th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
         yield from self._place_with_predicate(obj, object_states.OnTop)
 
@@ -780,7 +777,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             obj (StatefulObject): Object for robot to place the object in its hand on
 
         Returns:
-            np.array or None: Action array for one step for the robot to place or None if place completed
+            th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
         yield from self._place_with_predicate(obj, object_states.Inside)
 
@@ -823,7 +820,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             predicate (object_states.OnTop or object_states.Inside): Determines whether to place on top or inside
 
         Returns:
-            np.array or None: Action array for one step for the robot to place or None if place completed
+            th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
         # Update the tracking to track the object.
         self._tracking_object = obj
@@ -868,8 +865,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Returns:
             2-tuple
-                - np.array or None: Joint positions to reach target pose or None if impossible to reach target pose
-                - np.array: Indices for joints in the robot
+                - th.tensor or None: Joint positions to reach target pose or None if impossible to reach target pose
+                - th.tensor: Indices for joints in the robot
         """
         relative_target_pose = self._get_pose_in_robot_frame(target_pose)
         joint_pos = self._ik_solver_cartesian_to_joint_space(relative_target_pose)
@@ -913,9 +910,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 assert self.arm == "left", "Fixed torso mode only supports left arm!"
                 return self.robot.arm_control_idx["left"]
             else:
-                return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+                return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
         elif isinstance(self.robot, Fetch):
-            return np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+            return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
@@ -939,8 +936,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Returns:
             2-tuple
-                - np.array or None: Joint positions to reach target pose or None if impossible to reach the target pose
-                - np.array: Indices for joints in the robot
+                - th.tensor or None: Joint positions to reach target pose or None if impossible to reach the target pose
+                - th.tensor: Indices for joints in the robot
         """
         ik_solver = IKSolver(
             robot_description_path=self._manipulation_descriptor_path,
@@ -965,7 +962,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+            th.tensor or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         yield from self._settle_robot()
         controller_config = self.robot._controller_config["arm_" + self.arm]
@@ -981,10 +978,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to move arm to reach the specified joint positions using the planner
 
         Args:
-            joint_pos (np.array): Joint positions for the arm
+            joint_pos (th.tensor): Joint positions for the arm
 
         Returns:
-            np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
+            th.tensor or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
         with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion(
@@ -1012,14 +1009,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to move arm to reach the specified eef positions using the planner
 
         Args:
-            eef_pose (np.array): End Effector pose for the arm
+            eef_pose (th.tensor): End Effector pose for the arm
 
         Returns:
-            np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
+            th.tensor or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
         eef_pos = eef_pose[0]
         eef_ori = T.quat2axisangle(eef_pose[1])
-        end_conf = np.append(eef_pos, eef_ori)
+        end_conf = th.cat((eef_pos, eef_ori))
 
         with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion_ik(
@@ -1057,12 +1054,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             Array of arrays: Planned path with additional waypoints
         """
-        plan = np.array(plan)
+        plan = th.tensor(plan)
         interpolated_plan = []
         for i in range(len(plan) - 1):
             max_diff = max(plan[i + 1] - plan[i])
-            num_intervals = ceil(max_diff / max_inter_dist)
-            interpolated_plan += np.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
+            num_intervals = math.ceil(max_diff / max_inter_dist)
+            interpolated_plan += th.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
 
@@ -1071,27 +1068,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to move its arm to reach the specified joint positions by directly actuating with no planner
 
         Args:
-            joint_pos (np.array): Array of joint positions for the arm
+            joint_pos (th.tensor): Array of joint positions for the arm
             stop_on_contact (boolean): Determines whether to stop move once an object is hit
             ignore_failure (boolean): Determines whether to throw error for not reaching final joint positions
 
         Returns:
-            np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
+            th.tensor or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
         controller_name = f"arm_{self.arm}"
         use_delta = self.robot._controllers[controller_name].use_delta_commands
 
         # Store the previous eef pose for checking if we got stuck
-        prev_eef_pos = np.zeros(3)
+        prev_eef_pos = th.zeros(3)
 
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
-            diff_joint_pos = np.array(joint_pos) - np.array(current_joint_pos)
-            if np.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
+            diff_joint_pos = th.tensor(joint_pos) - th.tensor(current_joint_pos)
+            if th.max(th.abs(diff_joint_pos)).item() < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if np.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
+            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001:
                 # We're stuck!
                 break
 
@@ -1161,8 +1158,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             current_orn = current_pose[1]
 
             delta_pos = target_pos - current_pos
-            target_pos_diff = np.linalg.norm(delta_pos)
-            target_orn_diff = (Rotation.from_quat(target_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
+            target_pos_diff = th.norm(delta_pos)
+            target_orn_diff = T.get_orientation_diff_in_radian(current_orn, target_orn)
             reached_goal = target_pos_diff < pos_thresh and target_orn_diff < ori_thresh
             if reached_goal:
                 return
@@ -1172,17 +1169,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # if i > 0 and stop_if_stuck and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
             if i > 0 and stop_if_stuck:
-                pos_diff = np.linalg.norm(prev_pos - current_pos)
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
-                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
+                pos_diff = th.norm(prev_pos - current_pos)
+                orn_diff = T.get_orientation_diff_in_radian(current_orn, prev_orn)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
                     raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand is stuck")
 
             prev_pos = current_pos
             prev_orn = current_orn
 
-            action[control_idx] = np.concatenate([delta_pos, target_orn_axisangle])
+            action[control_idx] = th.cat([delta_pos, target_orn_axisangle])
             yield self._postprocess_action(action)
 
         if not ignore_failure:
@@ -1204,20 +1199,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ignore_failure (boolean): Determines whether to throw error for not reaching final joint positions
 
         Returns:
-            np.array or None: Action array for one step for the robot to move arm or None if its at the target pose
+            th.tensor or None: Action array for one step for the robot to move arm or None if its at the target pose
         """
         # To make sure that this happens in a roughly linear fashion, we will divide the trajectory
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
-        travel_distance = np.linalg.norm(target_pose[0] - start_pos)
-        num_poses = np.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1])
-        pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)
+        travel_distance = th.norm(target_pose[0] - start_pos)
+        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1]).item()
+        pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
-        combined_rotation = Rotation.from_quat(np.array([start_orn, target_pose[1]]))
-        slerp = Slerp([0, 1], combined_rotation)
-        orn_waypoints = slerp(np.linspace(0, 1, num_poses))
-        quat_waypoints = [x.as_quat() for x in orn_waypoints]
+        t_values = th.linspace(0, 1, num_poses)
+        quat_waypoints = [T.quat_slerp(start_orn, target_pose[1], t) for t in t_values]
 
         controller_config = self.robot._controller_config["arm_" + self.arm]
         if controller_config["name"] == "InverseKinematicsController":
@@ -1243,9 +1236,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = np.linalg.norm(np.array(current_pos) - np.array(target_pose[0]))
-                orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
-                if pos_diff < 0.005 and orn_diff < np.deg2rad(0.1):
+                pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
+                orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn).item()
+                if pos_diff < 0.005 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
@@ -1271,7 +1264,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 for joint_idx, target_joint_pos, current_joint_pos in zip(
                     self._manipulation_control_idx, joint_pos, current_joint_positions
                 ):
-                    if np.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
+                    if th.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
                         failed_joints.append(joints[joint_idx].joint_name)
 
                 if failed_joints:
@@ -1288,9 +1281,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = np.linalg.norm(np.array(current_pos) - np.array(target_pose[0]))
-                orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
-                if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
+                pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
+                orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn)
+                if pos_diff < 0.001 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
@@ -1307,13 +1300,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to grasp
 
         Returns:
-            np.array or None: Action array for one step for the robot to grasp or None if its done grasping
+            th.tensor or None: Action array for one step for the robot to grasp or None if its done grasping
         """
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_lower_limit = self.robot.joint_lower_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_lower_limit, atol=0.01):
+            if th.allclose(joint_position, joint_lower_limit, atol=0.01):
                 break
 
             action = self._empty_action()
@@ -1326,13 +1319,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to release its grasp
 
         Returns:
-            np.array or None: Action array for one step for the robot to release or None if its done releasing
+            th.tensor or None: Action array for one step for the robot to release or None if its done releasing
         """
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
             joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
             joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[self.arm]]
 
-            if np.allclose(joint_position, joint_upper_limit, atol=0.01):
+            if th.allclose(joint_position, joint_upper_limit, atol=0.01):
                 break
 
             action = self._empty_action()
@@ -1405,7 +1398,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         obj_in_base = T.relative_pose_transform(*target_obj_pose, *robot_pose)
 
         # compute angle between base and object in xy plane (parallel to floor)
-        theta = np.arctan2(obj_in_base[0][1], obj_in_base[0][0])
+        theta = th.arctan2(obj_in_base[0][1], obj_in_base[0][0])
 
         # if it is possible to get object in view, compute both head joint positions
         if head1_joint_limits[0] < theta < head1_joint_limits[1]:
@@ -1415,7 +1408,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             head2_pose = self.robot.links["head_2_link"].get_position_orientation()
             head2_in_base = T.relative_pose_transform(*head2_pose, *robot_pose)
 
-            phi = np.arctan2(obj_in_base[0][2] - head2_in_base[0][2], obj_in_base[0][0])
+            phi = th.arctan2(obj_in_base[0][2] - head2_in_base[0][2], obj_in_base[0][0])
             if head2_joint_limits[0] < phi < head2_joint_limits[1]:
                 head2_joint_goal = phi
 
@@ -1432,9 +1425,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Get a no-op action that allows us to run simulation without changing robot configuration.
 
         Returns:
-            np.array or None: Action array for one step for the robot to do nothing
+            th.tensor or None: Action array for one step for the robot to do nothing
         """
-        action = np.zeros(self.robot.action_dim)
+        action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             action_idx = self.robot.controller_action_idx[name]
             no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
@@ -1446,7 +1439,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # convert quaternion to axis-angle representation for control input
                 no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
 
-            action[action_idx] = np.concatenate(list(no_op_goal.values()))
+            action[action_idx] = th.cat(list(no_op_goal.values()))
         return action
 
     def _reset_hand(self):
@@ -1454,7 +1447,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action to move the hand to the position optimal for executing subsequent action primitives
 
         Returns:
-            np.array or None: Action array for one step for the robot to reset its hand or None if it is done resetting
+            th.tensor or None: Action array for one step for the robot to reset its hand or None if it is done resetting
         """
         controller_config = self.robot._controller_config["arm_" + self.arm]
         if controller_config["name"] == "InverseKinematicsController":
@@ -1477,18 +1470,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def _get_reset_eef_pose(self):
         # TODO: Add support for Fetch
         if self.robot_model == "Tiago":
-            return np.array([0.28493954, 0.37450749, 1.1512334]), np.array(
+            return th.tensor([0.28493954, 0.37450749, 1.1512334]), th.tensor(
                 [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
             )
         elif self.robot_model == "Fetch":
-            return np.array([0.48688125, -0.12507881, 0.97888719]), np.array(
+            return th.tensor([0.48688125, -0.12507881, 0.97888719]), th.tensor(
                 [0.61324748, 0.61305553, -0.35266518, 0.35173529]
             )
         else:
             raise ValueError(f"Unsupported robot model: {self.robot_model}")
 
     def _get_reset_joint_pos(self):
-        reset_pose_fetch = np.array(
+        reset_pose_fetch = th.tensor(
             [
                 0.0,
                 0.0,  # wheels
@@ -1507,7 +1500,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ]
         )
 
-        reset_pose_tiago = np.array(
+        reset_pose_tiago = th.tensor(
             [
                 -1.78029833e-04,
                 3.20231302e-05,
@@ -1553,7 +1546,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pose_2d (Iterable): (x, y, yaw) 2d pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
             plan = plan_base_motion(
@@ -1582,7 +1575,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         trav_map = self.env.scene._trav_map
         for q in plan:
             # The below code is useful for plotting the RRT tree.
-            SEARCHED.append(np.flip(trav_map.world_to_map((q[0], q[1]))))
+            map_point = trav_map.world_to_map((q[0], q[1]))
+            SEARCHED.append(th.flip(map_point, dims=tuple(range(map_point.dim()))))
 
             fig = plt.figure()
             plt.imshow(trav_map.floor_map[0])
@@ -1590,7 +1584,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             fig.canvas.draw()
 
             # Convert the canvas to image
-            img = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+            img = th.frombuffer(fig.canvas.tostring_rgb(), dtype=th.uint8)
             img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
             plt.close(fig)
 
@@ -1609,7 +1603,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pose_on_obj (Iterable): (pos, quat) Pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         if pose_on_obj is not None:
             if self._target_in_reach_of_robot(pose_on_obj):
@@ -1629,7 +1623,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pose_on_obj (Iterable): (pos, quat) pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate in range or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
         pose = self._sample_pose_near_object(obj, pose_on_obj=pose_on_obj, **kwargs)
         yield from self._navigate_to_pose(pose)
@@ -1643,7 +1637,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             low_precision (bool): Determines whether to navigate to the pose within a large range (low precision) or small range (high precison)
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         dist_threshold = m.LOW_PRECISION_DIST_THRESHOLD if low_precision else m.DEFAULT_DIST_THRESHOLD
         angle_threshold = m.LOW_PRECISION_ANGLE_THRESHOLD if low_precision else m.DEFAULT_ANGLE_THRESHOLD
@@ -1652,32 +1646,33 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
-            if np.linalg.norm(body_target_pose[0][:2]) < dist_threshold:
+            if th.norm(body_target_pose[0][:2]) < dist_threshold:
                 break
 
             diff_pos = end_pose[0] - self.robot.get_position()
-            intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
+            intermediate_pose = (
+                end_pose[0],
+                T.euler2quat(th.tensor([0, 0, math.atan2(diff_pos[1], diff_pos[0])], dtype=th.float32)),
+            )
             body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
-            diff_yaw = T.quat2euler(body_intermediate_pose[1])[2]
+            diff_yaw = T.quat2euler(body_intermediate_pose[1])[2].item()
             if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
                 action = self._empty_action()
                 if self._base_controller_is_joint:
-                    base_action_size = self.robot.controller_action_idx["base"].size
+                    base_action_size = self.robot.controller_action_idx["base"].numel()
                     assert (
                         base_action_size == 3
                     ), "Currently, the action primitives only support [x, y, theta] joint controller"
                     direction_vec = (
-                        body_target_pose[0][:2]
-                        / np.linalg.norm(body_target_pose[0][:2])
-                        * m.KP_LIN_VEL[type(self.robot)]
+                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[type(self.robot)]
                     )
-                    base_action = [direction_vec[0], direction_vec[1], 0.0]
+                    base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     # Diff drive controller
-                    base_action = [m.KP_LIN_VEL[type(self.robot)], 0.0]
+                    base_action = th.tensor([m.KP_LIN_VEL[type(self.robot)], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 yield self._postprocess_action(action)
 
@@ -1701,10 +1696,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             angle_threshold (float): The angle difference between the robot's current and end pose that determines when the robot is done rotating
 
         Returns:
-            np.array or None: Action array for one step for the robot to rotate or None if it is done rotating
+            th.tensor or None: Action array for one step for the robot to rotate or None if it is done rotating
         """
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
-        diff_yaw = T.quat2euler(body_target_pose[1])[2]
+        diff_yaw = T.quat2euler(body_target_pose[1])[2].item()
 
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
             if abs(diff_yaw) < angle_threshold:
@@ -1725,7 +1720,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 base_action[1] = ang_vel
             else:
                 assert (
-                    base_action.size == 3
+                    base_action.numel() == 3
                 ), "Currently, the action primitives only support [x, y, theta] joint controller"
                 base_action[2] = ang_vel
 
@@ -1733,7 +1728,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield self._postprocess_action(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
-            diff_yaw = T.quat2euler(body_target_pose[1])[2]
+            diff_yaw = T.quat2euler(body_target_pose[1])[2].item()
         else:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
@@ -1761,16 +1756,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 if pose_on_obj is None:
                     pos_on_obj = self._sample_position_on_aabb_side(obj)
-                    pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
+                    pose_on_obj = [pos_on_obj, th.tensor([0, 0, 0, 1])]
 
-                distance = np.random.uniform(0.0, 5.0)
-                yaw = np.random.uniform(-np.pi, np.pi)
-                avg_arm_workspace_range = np.mean(self.robot.arm_workspace_range[self.arm])
-                pose_2d = np.array(
+                distance_lo, distance_hi = 0.0, 5.0
+                distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
+                yaw_lo, yaw_hi = -math.pi, math.pi
+                yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
+                avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
+                pose_2d = th.tensor(
                     [
-                        pose_on_obj[0][0] + distance * np.cos(yaw),
-                        pose_on_obj[0][1] + distance * np.sin(yaw),
-                        yaw + np.pi - avg_arm_workspace_range,
+                        pose_on_obj[0][0] + distance * th.cos(yaw),
+                        pose_on_obj[0][1] + distance * th.sin(yaw),
+                        yaw + math.pi - avg_arm_workspace_range,
                     ]
                 )
                 # Check room
@@ -1807,15 +1804,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         aabb_center, aabb_extent = target_obj.aabb_center, target_obj.aabb_extent
         # We want to sample only from the side-facing faces.
-        face_normal_axis = np.random.choice([0, 1])
-        face_normal_direction = np.random.choice([-1, 1])
-        face_center = aabb_center + np.eye(3)[face_normal_axis] * aabb_extent * face_normal_direction
+        face_normal_axis = random.choice([0, 1])
+        face_normal_direction = random.choice([-1, 1])
+        face_center = aabb_center + th.eye(3)[face_normal_axis] * aabb_extent * face_normal_direction
         face_lateral_axis = 0 if face_normal_axis == 1 else 1
-        face_lateral_half_extent = np.eye(3)[face_lateral_axis] * aabb_extent / 2
-        face_vertical_half_extent = np.eye(3)[2] * aabb_extent / 2
+        face_lateral_half_extent = th.eye(3)[face_lateral_axis] * aabb_extent / 2
+        face_vertical_half_extent = th.eye(3)[2] * aabb_extent / 2
         face_min = face_center - face_vertical_half_extent - face_lateral_half_extent
         face_max = face_center + face_vertical_half_extent + face_lateral_half_extent
-        return np.random.uniform(face_min, face_max)
+        return th.rand(face_min.size()) * (face_max - face_min) + face_min
 
     # def _sample_pose_in_room(self, room: str):
     #     """
@@ -1832,7 +1829,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     #     # TODO(MP): Bias the sampling near the agent.
     #     for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
     #         _, pos = self.env.scene.get_random_point_by_room_instance(room)
-    #         yaw = np.random.uniform(-np.pi, np.pi)
+    #         yaw_lo, yaw_hi = -math.pi, math.pi
+    #         yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
     #         pose = (pos[0], pos[1], yaw)
     #         if self._test_pose(pose):
     #             return pose
@@ -1868,7 +1866,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
             if sampling_results[0][0] is None:
                 continue
-            sampled_bb_center = sampling_results[0][0] + np.array([0, 0, m.PREDICATE_SAMPLING_Z_OFFSET])
+            sampled_bb_center = sampling_results[0][0] + th.tensor([0, 0, m.PREDICATE_SAMPLING_Z_OFFSET])
             sampled_bb_orn = sampling_results[0][2]
 
             # Get the object pose by subtracting the offset
@@ -1878,8 +1876,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Check that the pose is near one of the poses in the near_poses list if provided.
             if near_poses:
-                sampled_pos = np.array([sampled_obj_pose[0]])
-                if not np.any(np.linalg.norm(near_poses - sampled_pos, axis=1) < near_poses_threshold):
+                sampled_pos = th.tensor([sampled_obj_pose[0]])
+                if not th.any(th.norm(near_poses - sampled_pos, dim=1) < near_poses_threshold):
                     continue
 
             # Return the pose
@@ -1929,8 +1927,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        pos = np.array([pose_2d[0], pose_2d[1], m.DEFAULT_BODY_OFFSET_FROM_FLOOR])
-        orn = T.euler2quat([0, 0, pose_2d[2]])
+        pos = th.tensor([pose_2d[0], pose_2d[1], m.DEFAULT_BODY_OFFSET_FROM_FLOOR])
+        orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
         return pos, orn
 
     def _get_pose_in_robot_frame(self, pose):
@@ -1982,14 +1980,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields a no op action for a few steps to allow the robot and physics to settle
 
         Returns:
-            np.array or None: Action array for one step for the robot to do nothing
+            th.tensor or None: Action array for one step for the robot to do nothing
         """
         for _ in range(30):
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
 
         for _ in range(m.MAX_STEPS_FOR_SETTLING):
-            if np.linalg.norm(self.robot.get_linear_velocity()) < 0.01:
+            if th.norm(self.robot.get_linear_velocity()) < 0.01:
                 break
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)

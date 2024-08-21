@@ -1,4 +1,6 @@
-import numpy as np
+import math
+
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
@@ -95,7 +97,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             assert kp is None, "Cannot set kp for JointController with motor_type=effort!"
             assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=effort!"
         self.kp = kp
-        self.kd = None if damping_ratio is None else 2 * np.sqrt(self.kp) * damping_ratio
+        self.kd = None if damping_ratio is None else 2 * math.sqrt(self.kp) * damping_ratio
         self._use_impedances = use_impedances
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
@@ -133,7 +135,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
                 # Compute the final rotations in the quaternion space.
                 _, end_quat = T.pose_transform(
-                    np.zeros(3), T.euler2quat(delta_rots), np.zeros(3), T.euler2quat(start_rots)
+                    th.zeros(3), T.euler2quat(delta_rots), th.zeros(3), T.euler2quat(start_rots)
                 )
                 end_rots = T.quat2euler(end_quat)
 
@@ -186,9 +188,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = np.ix_(self.dof_idx, self.dof_idx)
+            dof_idxs_mat = th.meshgrid(self.dof_idx, self.dof_idx, indexing="xy")
             mm = control_dict["mass_matrix"][dof_idxs_mat]
-            u = np.dot(mm, u)
+            u = mm @ u
 
             # Add gravity compensation
             u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
@@ -207,7 +209,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         else:
             # For velocity / effort, directly set to 0
-            target = np.zeros(self.control_dim)
+            target = th.zeros(self.control_dim)
 
         return dict(target=target)
 

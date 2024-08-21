@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
@@ -132,13 +132,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.46938863, -3.97887141, 1.64106008]),
-        orientation=np.array([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
+        position=th.tensor([0.46938863, -3.97887141, 1.64106008]),
+        orientation=th.tensor([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
     )
 
     # Let objects settle
     for _ in range(25):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # Turn on all scene objects
     stove.states[object_states.ToggledOn].set_value(True)
@@ -149,7 +149,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for apple in apples:
         apple.states[object_states.Temperature].set_value(-50)
     apples[0].states[object_states.Inside].set_value(oven, True)
-    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + np.array([0, 0, 0.1]))
+    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + th.tensor([0, 0, 0.1]))
     apples[2].states[object_states.OnTop].set_value(tray, True)
     apples[3].states[object_states.Inside].set_value(fridge, True)
     apples[4].states[object_states.Inside].set_value(microwave, True)
@@ -162,13 +162,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     print()
     print(f"{'Apple location:':<20}", *locations)
     while steps != max_steps:
-        env.step(np.array([]))
+        env.step(th.empty(0))
         temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
         print(f"{'Apple temperature:':<20}", *temps, end="\r")
         steps += 1
 
     # Always close env at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

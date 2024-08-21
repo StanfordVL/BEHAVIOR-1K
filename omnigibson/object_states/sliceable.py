@@ -1,5 +1,3 @@
-import numpy as np
-
 from omnigibson.object_states.object_state_base import BaseObjectRequirement
 
 

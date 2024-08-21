@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -6,7 +6,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 from omnigibson.macros import gm
 from omnigibson.robots import *
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.transform_utils import mat2pose, pose2mat, relative_pose_transform
+from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
 
@@ -47,6 +47,7 @@ def camera_pose_test(flatcache):
     env = setup_environment(flatcache)
     robot = env.robots[0]
     env.reset()
+    og.sim.step()
 
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
@@ -60,11 +61,11 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = np.array([150.16513062, 150.0, 101.39360809])
-    sensor_world_ori_gt = np.array([-0.29444984, 0.29444979, 0.64288365, -0.64288352])
+    sensor_world_pos_gt = th.tensor([150.1703, 149.9969, 101.3649])
+    sensor_world_ori_gt = th.tensor([-0.2944, 0.2927, 0.6437, -0.6429])
 
-    assert np.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
-    assert np.allclose(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
+    assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
+    assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
 
     # Now, we want to move the robot and check if the sensor pose has been updated
     old_camera_local_pose = vision_sensor.get_local_pose()
@@ -74,9 +75,9 @@ def camera_pose_test(flatcache):
     new_camera_world_pose = vision_sensor.get_position_orientation()
     robot_pose_mat = pose2mat(robot.get_position_orientation())
     expected_camera_world_pos, expected_camera_world_ori = mat2pose(robot_pose_mat @ robot_to_sensor_mat)
-    assert np.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
-    assert np.allclose(new_camera_world_pose[0], expected_camera_world_pos, atol=1e-3)
-    assert np.allclose(new_camera_world_pose[1], expected_camera_world_ori, atol=1e-3)
+    assert th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
+    assert th.allclose(new_camera_world_pose[0], expected_camera_world_pos, atol=1e-3)
+    assert quaternions_close(new_camera_world_pose[1], expected_camera_world_ori, atol=1e-3)
 
     # Then, we want to move the local pose of the camera and check
     # 1) if the world pose is updated 2) if the robot stays in the same position
@@ -87,11 +88,12 @@ def camera_pose_test(flatcache):
     camera_parent_path = str(camera_parent_prim.GetPath())
     camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
     expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(
-        camera_parent_world_transform @ pose2mat([[10, 10, 10], [0, 0, 0, 1]])
+        camera_parent_world_transform
+        @ pose2mat((th.tensor([10, 10, 10], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)))
     )
-    assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
-    assert np.allclose(new_camera_world_pose[1], expected_new_camera_world_ori, atol=1e-3)
-    assert np.allclose(robot.get_position(), [100, 100, 100], atol=1e-3)
+    assert th.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
+    assert quaternions_close(new_camera_world_pose[1], expected_new_camera_world_ori, atol=1e-3)
+    assert th.allclose(robot.get_position(), th.tensor([100, 100, 100], dtype=th.float32), atol=1e-3)
 
     # Finally, we want to move the world pose of the camera and check
     # 1) if the local pose is updated 2) if the robot stays in the same position
@@ -99,9 +101,9 @@ def camera_pose_test(flatcache):
     old_camera_local_pose = vision_sensor.get_local_pose()
     vision_sensor.set_position_orientation([150, 150, 101.36912537], [-0.29444987, 0.29444981, 0.64288363, -0.64288352])
     new_camera_local_pose = vision_sensor.get_local_pose()
-    assert not np.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
-    assert not np.allclose(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)
-    assert np.allclose(robot.get_position(), [150, 150, 100], atol=1e-3)
+    assert not th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
+    assert not quaternions_close(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)
+    assert th.allclose(robot.get_position(), th.tensor([150, 150, 100], dtype=th.float32), atol=1e-3)
 
     # Another test we want to try is setting the camera's parent scale and check if the world pose is updated
     camera_parent_prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3d([2.0, 2.0, 2.0]))
@@ -109,7 +111,7 @@ def camera_pose_test(flatcache):
     camera_local_pose = vision_sensor.get_local_pose()
     expected_new_camera_world_pos, _ = mat2pose(camera_parent_world_transform @ pose2mat(camera_local_pose))
     new_camera_world_pose = vision_sensor.get_position_orientation()
-    assert np.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
+    assert th.allclose(new_camera_world_pose[0], expected_new_camera_world_pos, atol=1e-3)
 
     og.clear()
 
@@ -139,6 +141,11 @@ def test_robot_load_drive():
 
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+
+        if robot_name in ["FrankaMounted", "Stretch"]:
+            # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
+            continue
+
         robot = robot_cls(
             name=robot_name,
             obs_modalities=[],
@@ -155,8 +162,8 @@ def test_robot_load_drive():
 
         # Set viewer in front facing robot
         og.sim.viewer_camera.set_position_orientation(
-            position=np.array([2.69918369, -3.63686664, 4.57894564]),
-            orientation=np.array([0.39592411, 0.1348514, 0.29286304, 0.85982]),
+            position=[2.69918369, -3.63686664, 4.57894564],
+            orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
         )
 
         if not robot_name in ["Husky", "BehaviorRobot"]:
@@ -177,26 +184,26 @@ def test_robot_load_drive():
                 eef_pos = env.robots[0].get_eef_position()
                 eef_orn = env.robots[0].get_eef_orientation()
                 if isinstance(robot, Stretch):  # Stretch arm faces the y-axis
-                    target_eef_pos = (eef_pos[0], eef_pos[1] - 0.1, eef_pos[2])
+                    target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
                 else:
-                    target_eef_pos = (eef_pos[0] + 0.1, eef_pos[1], eef_pos[2])
+                    target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
                 target_eef_orn = eef_orn
                 for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn)):
                     env.step(action)
-                assert np.linalg.norm(robot.get_eef_position() - target_eef_pos) < 0.05
+                assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
 
             # If this is a locomotion robot, we want to test driving
             if isinstance(robot, LocomotionRobot):
                 # load diff drive controller
                 controller_config = {"base": {"name": "DifferentialDriveController"}}
                 action_primitives = StarterSemanticActionPrimitives(env)
-                goal_location = (0, 1, 0)
+                goal_location = th.tensor([0, 1, 0], dtype=th.float32)
                 for action in action_primitives._navigate_to_pose_direct(goal_location):
                     env.step(action)
-                assert np.linalg.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
+                assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()
-        og.sim.remove_object(obj=robot)
+        env.scene.remove_object(obj=robot)
 
     env.close()

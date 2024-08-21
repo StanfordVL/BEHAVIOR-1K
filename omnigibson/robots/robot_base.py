@@ -2,8 +2,7 @@ from abc import abstractmethod
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -19,6 +18,7 @@ from omnigibson.sensors import (
 )
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.usd_utils import (
     ControllableObjectViewAPI,
@@ -134,7 +134,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
         # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
         assert (
-            scale is None or isinstance(scale, int) or isinstance(scale, float) or np.all(scale == scale[0])
+            scale is None or isinstance(scale, int) or isinstance(scale, float) or th.all(scale == scale[0])
         ), f"Robot scale must be uniform! Got: {scale}"
 
         # All BaseRobots should have xform properties pre-loaded
@@ -339,7 +339,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
-        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
+        return th.cat([proprio_dict[obs] for obs in self._proprio_obs]), {}
 
     def _get_proprioception_dict(self):
         """
@@ -353,21 +353,21 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         ori = T.quat2euler(quat)
 
-        ori_2d = T.calculate_xy_plane_angle(quat)
+        ori_2d = T.z_angle_from_quat(quat)
 
         # Pack everything together
         return dict(
             joint_qpos=joint_positions,
-            joint_qpos_sin=np.sin(joint_positions),
-            joint_qpos_cos=np.cos(joint_positions),
+            joint_qpos_sin=th.sin(joint_positions),
+            joint_qpos_cos=th.cos(joint_positions),
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
-            robot_ori_cos=np.cos(ori),
-            robot_ori_sin=np.sin(ori),
+            robot_ori_cos=th.cos(ori),
+            robot_ori_sin=th.sin(ori),
             robot_2d_ori=ori_2d,
-            robot_2d_ori_cos=np.cos(ori_2d),
-            robot_2d_ori_sin=np.sin(ori_2d),
+            robot_2d_ori_cos=th.cos(ori_2d),
+            robot_2d_ori_sin=th.sin(ori_2d),
             robot_lin_vel=ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path),
             robot_ang_vel=ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path),
         )
@@ -383,7 +383,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
             obs_space["proprio"] = self._build_obs_box_space(
-                shape=(self.proprioception_dim,), low=-np.inf, high=np.inf, dtype=np.float64
+                shape=(self.proprioception_dim,), low=-float("inf"), high=float("inf"), dtype=NumpyTypes.FLOAT32
             )
 
         return obs_space
@@ -508,15 +508,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return self._reset_joint_pos_aabb_extent
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            np.ndarray: array of action data filled with update value
+            th.tensor: array of action data filled with update value
         """
-        return np.zeros(self.action_dim)
+        return th.zeros(self.action_dim)
 
     def get_generalized_gravity_forces(self, clone=True):
         # Override method based on whether we're using a dummy or not

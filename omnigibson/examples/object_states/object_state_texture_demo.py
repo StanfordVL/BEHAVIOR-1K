@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
@@ -11,7 +11,7 @@ gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_HQ_RENDERING = True
 
 
-def main():
+def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
         "scene": {
@@ -56,8 +56,8 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([1.7789, -1.68822, 1.13551]),
-        orientation=np.array([0.57065614, 0.20331904, 0.267029, 0.74947212]),
+        position=th.tensor([1.7789, -1.68822, 1.13551]),
+        orientation=th.tensor([0.57065614, 0.20331904, 0.267029, 0.74947212]),
     )
 
     # Grab reference to object of interest
@@ -72,7 +72,7 @@ def main():
     def report_states():
         # Make sure states are propagated before printing
         for i in range(5):
-            env.step(np.array([]))
+            env.step(th.empty(0))
 
         print("=" * 20)
         print("temperature:", obj.states[object_states.Temperature].get_value())
@@ -87,39 +87,46 @@ def main():
     report_states()
 
     # Notify user that we're about to freeze the object, and then freeze the object
-    input("\nObject will be frozen. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be frozen. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(-50)
     report_states()
 
     # Notify user that we're about to cook the object, and then cook the object
-    input("\nObject will be cooked. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be cooked. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(100)
     report_states()
 
     # Notify user that we're about to burn the object, and then burn the object
-    input("\nObject will be burned. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be burned. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(250)
     report_states()
 
     # Notify user that we're about to reset the object to its default state, and then reset state
-    input("\nObject will be reset to default state. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be reset to default state. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(macros.object_states.temperature.DEFAULT_TEMPERATURE)
     obj.states[object_states.MaxTemperature].set_value(macros.object_states.temperature.DEFAULT_TEMPERATURE)
     report_states()
 
     # Notify user that we're about to soak the object, and then soak the object
-    input("\nObject will be saturated with water. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be saturated with water. Press ENTER to continue.")
     obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), True)
     report_states()
 
     # Notify user that we're about to unsoak the object, and then unsoak the object
-    input("\nObject will be unsaturated with water. Press ENTER to continue.")
+    if not short_exec:
+        input("\nObject will be unsaturated with water. Press ENTER to continue.")
     obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), False)
     report_states()
 
     # Close environment at the end
-    input("Demo completed. Press ENTER to shutdown environment.")
-    env.close()
+    if not short_exec:
+        input("Demo completed. Press ENTER to shutdown environment.")
+    og.clear()
 
 
 if __name__ == "__main__":

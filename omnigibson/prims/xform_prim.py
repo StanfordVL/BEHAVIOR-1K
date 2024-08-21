@@ -1,8 +1,7 @@
+import math
 from collections.abc import Iterable
 
-import numpy as np
-import trimesh.transformations
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -66,7 +65,7 @@ class XFormPrim(BasePrim):
 
         # Cache the original scale from the USD so that when EntityPrim sets the scale for each link (Rigid/ClothPrim),
         # the new scale is with respect to the original scale. XFormPrim's scale always matches the scale in the USD.
-        self.original_scale = np.array(self.get_attribute("xformOp:scale"))
+        self.original_scale = th.tensor(self.get_attribute("xformOp:scale"))
 
         # Grab the attached material if it exists
         if self.has_material():
@@ -139,7 +138,7 @@ class XFormPrim(BasePrim):
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
-        assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), (
+        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-4), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )
@@ -179,12 +178,15 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
         """
-        current_position, current_orientation = self.get_position_orientation()
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation()
+            position = current_position if position is None else position
+            orientation = current_orientation if orientation is None else orientation
 
-        position = current_position if position is None else np.array(position, dtype=float)
-        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
-        assert np.isclose(
-            np.linalg.norm(orientation), 1, atol=1e-3
+        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         my_world_transform = T.pose2mat((position, orientation))
@@ -193,10 +195,10 @@ class XFormPrim(BasePrim):
         parent_path = str(parent_prim.GetPath())
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
-        local_transform = np.linalg.inv(parent_world_transform) @ my_world_transform
+        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert np.allclose(
-            product, np.diag(np.diag(product)), atol=1e-3
+        assert th.allclose(
+            product, th.diag(th.diag(product)), atol=1e-3
         ), f"{self.prim_path} local transform is not diagonal."
         self.set_local_pose(*T.mat2pose(local_transform))
 
@@ -276,7 +278,7 @@ class XFormPrim(BasePrim):
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
         pos, ori = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
-        return pos, ori[[1, 2, 3, 0]]
+        return th.tensor(pos, dtype=th.float32), th.tensor(ori[[1, 2, 3, 0]], dtype=th.float32)
 
     def set_local_pose(self, position=None, orientation=None):
         """
@@ -290,14 +292,19 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if position is not None:
-            position = lazy.pxr.Gf.Vec3d(*np.array(position, dtype=float))
+            position = position.tolist() if isinstance(position, th.Tensor) else position
+            position = lazy.pxr.Gf.Vec3d(*position)
             if "xformOp:translate" not in properties:
                 lazy.carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", position)
         if orientation is not None:
-            orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+            orientation = (
+                orientation[[3, 0, 1, 2]].tolist()
+                if isinstance(orientation, th.Tensor)
+                else [float(orientation[i]) for i in [3, 0, 1, 2]]
+            )
             if "xformOp:orient" not in properties:
                 lazy.carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
@@ -327,12 +334,12 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the world's frame.
 
         Returns:
-            np.ndarray: scale applied to the prim's dimensions in the world frame. shape is (3, ).
+            th.tensor: scale applied to the prim's dimensions in the world frame. shape is (3, ).
         """
         prim_tf = lazy.pxr.UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         transform = lazy.pxr.Gf.Transform()
         transform.SetMatrix(prim_tf)
-        return np.array(transform.GetScale())
+        return th.tensor(transform.GetScale())
 
     @property
     def scaled_transform(self):
@@ -342,7 +349,7 @@ class XFormPrim(BasePrim):
         return PoseAPI.get_world_pose_with_scale(self.prim_path)
 
     def transform_local_points_to_world(self, points):
-        return trimesh.transformations.transform_points(points, self.scaled_transform)
+        return T.transform_points(points, self.scaled_transform)
 
     @property
     def scale(self):
@@ -350,11 +357,11 @@ class XFormPrim(BasePrim):
         Gets prim's scale with respect to the local frame (the parent's frame).
 
         Returns:
-            np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
+            th.tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
-        return np.array(scale)
+        return th.tensor(scale)
 
     @scale.setter
     def scale(self, scale):
@@ -362,12 +369,17 @@ class XFormPrim(BasePrim):
         Sets prim's scale with respect to the local frame (the prim's parent frame).
 
         Args:
-            scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
+            scale (float or th.tensor): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
-        assert np.all(scale > 0), f"Scale {scale} must consist of positive numbers."
-        scale = lazy.pxr.Gf.Vec3d(*scale)
+        if isinstance(scale, th.Tensor):
+            scale = scale
+        elif isinstance(scale, Iterable):
+            scale = th.tensor(scale, dtype=th.float32)
+        else:
+            scale = th.ones(3, dtype=th.float32) * scale
+        assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
             lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
@@ -427,13 +439,15 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        pos, ori = np.array(state["pos"]), np.array(state["ori"])
+        pos, ori = state["pos"], state["ori"]
+        pos = pos if isinstance(pos, th.Tensor) else th.tensor(pos, dtype=th.float32)
+        ori = ori if isinstance(ori, th.Tensor) else th.tensor(ori, dtype=th.float32)
         if self.scene is not None:
             pos, ori = T.mat2pose(self.scene.pose @ T.pose2mat((pos, ori)))
         self.set_position_orientation(pos, ori)
 
     def serialize(self, state):
-        return np.concatenate([state["pos"], state["ori"]]).astype(float)
+        return th.cat([state["pos"], state["ori"]])
 
     def deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori

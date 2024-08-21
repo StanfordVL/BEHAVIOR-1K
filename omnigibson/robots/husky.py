@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.locomotion_robot import LocomotionRobot
@@ -29,7 +29,7 @@ class Husky(LocomotionRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def usd_path(self):

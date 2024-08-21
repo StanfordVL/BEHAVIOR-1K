@@ -1,5 +1,7 @@
-import numpy as np
+import math
+
 import pytest
+import torch as th
 from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_plane, place_objA_on_objB_bbox
 
 import omnigibson as og
@@ -8,7 +10,7 @@ from omnigibson.macros import macros as m
 from omnigibson.object_states import *
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
+from omnigibson.utils.physx_utils import apply_force_at_pos
 
 
 @og_test
@@ -25,7 +27,7 @@ def test_on_top(env):
 
         assert obj.states[OnTop].get_value(breakfast_table)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[OnTop].get_value(breakfast_table)
@@ -83,7 +85,7 @@ def test_under(env):
 
         assert obj.states[Under].get_value(breakfast_table)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Under].get_value(breakfast_table)
@@ -110,7 +112,7 @@ def test_touching(env):
         assert obj.states[Touching].get_value(breakfast_table)
         assert breakfast_table.states[Touching].get_value(obj)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Touching].get_value(breakfast_table)
@@ -137,7 +139,7 @@ def test_contact_bodies(env):
             assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
         assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
@@ -162,7 +164,7 @@ def test_next_to(env):
         assert obj.states[NextTo].get_value(bottom_cabinet)
         assert bottom_cabinet.states[NextTo].get_value(obj)
 
-        obj.set_position(np.ones(3) * 10 * (i + 1))
+        obj.set_position(th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[NextTo].get_value(bottom_cabinet)
@@ -185,7 +187,7 @@ def test_overlaid(env):
 
     assert carpet.states[Overlaid].get_value(breakfast_table)
 
-    carpet.set_position(np.ones(3) * 20.0)
+    carpet.set_position(th.ones(3) * 20.0)
     og.sim.step()
 
     assert not carpet.states[Overlaid].get_value(breakfast_table)
@@ -207,12 +209,12 @@ def test_pose(env):
     pos2, orn2 = get_random_pose()
     dishtowel.set_position_orientation(pos2, orn2)
 
-    assert np.allclose(breakfast_table.states[Pose].get_value()[0], pos1)
-    assert np.allclose(breakfast_table.states[Pose].get_value()[1], orn1) or np.allclose(
+    assert th.allclose(breakfast_table.states[Pose].get_value()[0], pos1)
+    assert th.allclose(breakfast_table.states[Pose].get_value()[1], orn1) or th.allclose(
         breakfast_table.states[Pose].get_value()[1], -orn1
     )
-    assert np.allclose(dishtowel.states[Pose].get_value()[0], pos2)
-    assert np.allclose(dishtowel.states[Pose].get_value()[1], orn2) or np.allclose(
+    assert th.allclose(dishtowel.states[Pose].get_value()[0], pos2)
+    assert th.allclose(dishtowel.states[Pose].get_value()[1], orn2) or th.allclose(
         dishtowel.states[Pose].get_value()[1], -orn2
     )
 
@@ -234,15 +236,20 @@ def test_aabb(env):
     # Need to take one sim step
     og.sim.step()
 
-    assert np.allclose(breakfast_table.states[AABB].get_value(), breakfast_table.aabb)
-    assert np.all(
+    assert th.allclose(breakfast_table.states[AABB].get_value()[0], breakfast_table.aabb[0])
+    assert th.allclose(breakfast_table.states[AABB].get_value()[1], breakfast_table.aabb[1])
+    assert th.all(
         (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
     )
 
     pp = dishtowel.root_link.compute_particle_positions()
     offset = dishtowel.root_link.cloth_system.particle_contact_offset
-    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(axis=0) - offset, pp.max(axis=0) + offset))
-    assert np.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
+    particle_aabb = (pp.min(dim=0).values - offset, pp.max(dim=0).values + offset)
+    assert th.allclose(dishtowel.states[AABB].get_value()[0], particle_aabb[0])
+    assert th.allclose(dishtowel.states[AABB].get_value()[1], particle_aabb[1])
+    assert th.all(
+        (dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1])
+    ).item()
 
     with pytest.raises(NotImplementedError):
         breakfast_table.states[AABB].set_value(None)
@@ -313,7 +320,7 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     # Open the microwave
-    microwave.joints["j_link_0"].set_pos(np.pi / 2)
+    microwave.joints["j_link_0"].set_pos(math.pi / 2)
 
     # Set the objects to be inside the microwave
     bagel.set_position_orientation([0, 0, 0.11], [0, 0, 0, 1])
@@ -453,7 +460,7 @@ def test_heat_source_or_sink(env):
     assert microwave.states[HeatSourceOrSink].requires_closed
     assert microwave.states[HeatSourceOrSink].requires_toggled_on
 
-    microwave.joints["j_link_0"].set_pos(np.pi / 2)
+    microwave.joints["j_link_0"].set_pos(math.pi / 2)
     microwave.states[ToggledOn].set_value(False)
 
     og.sim.step()
@@ -471,7 +478,7 @@ def test_heat_source_or_sink(env):
     assert fridge.states[HeatSourceOrSink].requires_closed
     assert not fridge.states[HeatSourceOrSink].requires_toggled_on
 
-    fridge.joints["j_link_0"].set_pos(np.pi / 2)
+    fridge.joints["j_link_0"].set_pos(math.pi / 2)
 
     og.sim.step()
     assert not fridge.states[HeatSourceOrSink].get_value()
@@ -635,13 +642,14 @@ def test_on_fire(env):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@pytest.mark.skip(reason="TODO(parallel-hang): fix this later")
 @og_test
 def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")
     robot = env.scene.object_registry("name", "robot0")
 
-    stove.set_position_orientation([1.48, 0.3, 0.443], T.euler2quat([0, 0, -np.pi / 2.0]))
+    stove.set_position_orientation(
+        [1.48, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, -math.pi / 2.0], dtype=th.float32))
+    )
     robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
@@ -649,8 +657,8 @@ def test_toggled_on(env):
     q = robot.get_joint_positions()
     jnt_idxs = {name: i for i, name in enumerate(robot.joints.keys())}
     q[jnt_idxs["torso_lift_joint"]] = 0.0
-    q[jnt_idxs["shoulder_pan_joint"]] = np.deg2rad(90.0)
-    q[jnt_idxs["shoulder_lift_joint"]] = np.deg2rad(9.0)
+    q[jnt_idxs["shoulder_pan_joint"]] = th.deg2rad(th.tensor([90.0])).item()
+    q[jnt_idxs["shoulder_lift_joint"]] = th.deg2rad(th.tensor([9.0])).item()
     q[jnt_idxs["upperarm_roll_joint"]] = 0.0
     q[jnt_idxs["elbow_flex_joint"]] = 0.0
     q[jnt_idxs["forearm_roll_joint"]] = 0.0
@@ -720,7 +728,7 @@ def test_attached_to(env):
     # shelf should be attached to the back panel
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
-    force_dir = np.array([0, 0, 1])
+    force_dir = th.tensor([0, 0, 1])
     # A small force will not break the attachment
     force_mag = 10
     apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
@@ -788,7 +796,7 @@ def test_particle_sink(env):
     assert water_system.n_particles == 0
 
     sink_pos = sink.states[ParticleSink].link.get_position()
-    water_system.generate_particles(positions=[sink_pos + np.array([0, 0, 0.05])])
+    water_system.generate_particles(positions=[(sink_pos + th.tensor([0, 0, 0.05])).tolist()])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
 
@@ -815,7 +823,7 @@ def test_particle_applier(env):
 
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(spray_bottle, breakfast_table, z_offset=0.1)
-    spray_bottle.set_orientation(np.array([0.707, 0, 0, 0.707]))
+    spray_bottle.set_orientation(th.tensor([0.707, 0, 0, 0.707]))
     for _ in range(3):
         og.sim.step()
 
@@ -843,7 +851,7 @@ def test_particle_applier(env):
     # Test adjacency
 
     water_system.remove_all_particles()
-    spray_bottle.set_position_orientation(position=np.ones(3) * 50.0, orientation=np.array([0, 0, 0, 1.0]))
+    spray_bottle.set_position_orientation(position=th.ones(3) * 50.0, orientation=th.tensor([0, 0, 0, 1.0]))
 
     place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
     og.sim.step()
@@ -883,7 +891,7 @@ def test_particle_remover(env):
     water_system = env.scene.get_system("water")
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
     )
     assert water_system.n_particles > 0
 
@@ -905,12 +913,12 @@ def test_particle_remover(env):
 
     # Test adjacency
 
-    vacuum.set_position(np.ones(3) * 50.0)
+    vacuum.set_position(th.ones(3) * 50.0)
     place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
     og.sim.step()
     # Place single particle of water on middle of table
     water_system.generate_particles(
-        positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])]
+        positions=[[0, 0, breakfast_table.aabb[1][2].item() + water_system.particle_radius]]
     )
 
     # Water should be present
@@ -947,7 +955,7 @@ def test_saturated(env):
     remover_dishtowel.states[Saturated].set_limit(water_system, n_particles)
     water_system.generate_particles(
         positions=[
-            np.array([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)])
+            [0, 0, remover_dishtowel.aabb[1][2].item() + water_system.particle_radius * (1 + 2 * i)]
             for i in range(n_particles)
         ],
     )
@@ -1026,23 +1034,32 @@ def test_folded_unfolded(env):
     assert carpet.states[Unfolded].get_value()
 
     pos = carpet.root_link.compute_particle_positions()
-    x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+    x_min, x_max = th.min(pos, dim=0).values[0], th.max(pos, dim=0).values[0]
     x_extent = x_max - x_min
     # Get indices for the bottom 10 percent vertices in the x-axis
-    indices = np.argsort(pos, axis=0)[:, 0][: (pos.shape[0] // 10)]
-    start = np.copy(pos[indices])
+    indices = th.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
+    start = th.clone(pos[indices])
 
     # lift up a bit
-    mid = np.copy(start)
+    mid = th.clone(start)
     mid[:, 2] += x_extent * 0.2
 
     # move towards x_max
-    end = np.copy(mid)
+    end = th.clone(mid)
     end[:, 0] += x_extent * 0.9
 
     increments = 25
-    for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
-        carpet.root_link.set_particle_positions(ctrl_pts, idxs=indices)
+    total_points = increments * 2
+
+    # Create interpolation weights
+    t = th.linspace(0, 1, total_points).unsqueeze(1).unsqueeze(2)
+
+    # Interpolate between start, mid, and end
+    first_half = t < 0.5
+    ctrl_pts = th.where(first_half, start * (1 - 2 * t) + mid * (2 * t), mid * (2 - 2 * t) + end * (2 * t - 1))
+
+    for pt in ctrl_pts:
+        carpet.root_link.set_particle_positions(pt, idxs=indices)
         og.sim.step()
 
     assert carpet.states[Folded].get_value()
@@ -1091,7 +1108,7 @@ def test_filled(env):
         if not issubclass(system_class, VisualParticleSystem)
     ]
     for system in systems:
-        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        stockpot.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
             og.sim.step()
@@ -1115,20 +1132,20 @@ def test_contains(env):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
         print(f"Testing Contains {stockpot.name} with {system.name}")
-        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        stockpot.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
         place_obj_on_floor_plane(stockpot)
         for _ in range(5):
             og.sim.step()
 
         # Sample single particle
         if env.scene.is_physical_particle_system(system_name=system.name):
-            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] - 0.1])])
+            system.generate_particles(positions=[[0, 0, stockpot.aabb[1][2].item() - 0.1]])
         else:
             if system.get_group_name(stockpot) not in system.groups:
                 system.create_attachment_group(stockpot)
             system.generate_group_particles(
                 group=system.get_group_name(stockpot),
-                positions=np.array([np.array([0, 0, stockpot.aabb[1][2] - 0.1])]),
+                positions=[th.tensor([0, 0, stockpot.aabb[1][2] - 0.1])],
                 link_prim_paths=[stockpot.root_link.prim_path],
             )
 
@@ -1159,7 +1176,7 @@ def test_covered(env):
             sampleable = env.scene.is_visual_particle_system(system.name) or obj != bracelet
             if sampleable:
                 print(f"Testing Covered {obj.name} with {system.name}")
-                obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+                obj.set_position_orientation(position=th.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
                 place_obj_on_floor_plane(obj)
                 for _ in range(5):
                     og.sim.step()
@@ -1177,7 +1194,7 @@ def test_covered(env):
 
                 system.remove_all_particles()
 
-        obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
+        obj.set_position_orientation(position=th.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
 
 def test_clear_sim():

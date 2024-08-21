@@ -1,7 +1,7 @@
 from functools import cached_property
 
 import networkx as nx
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -305,7 +305,7 @@ class EntityPrim(XFormPrim):
         Helper function to update internal joint limits for prismatic joints based on the object's scale
         """
         # If the scale is [1, 1, 1], we can skip this step
-        if np.allclose(self.scale, np.ones(3)):
+        if th.allclose(self.scale, th.ones(3)):
             return
 
         prismatic_joints = {
@@ -316,7 +316,7 @@ class EntityPrim(XFormPrim):
         if len(prismatic_joints) == 0:
             return
 
-        uniform_scale = np.allclose(self.scale, self.scale[0])
+        uniform_scale = th.allclose(self.scale, self.scale[0])
 
         for joint_name, joint in prismatic_joints.items():
             if uniform_scale:
@@ -331,9 +331,12 @@ class EntityPrim(XFormPrim):
                         _, link_local_orn = link.get_local_pose()
 
                         # Find the joint frame orientation in the parent link frame
-                        joint_local_orn = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
-                            joint.get_attribute("physics:localRot0")
-                        )[[1, 2, 3, 0]]
+                        joint_local_orn = th.tensor(
+                            lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                                joint.get_attribute("physics:localRot0")
+                            )[[1, 2, 3, 0]],
+                            dtype=th.float32,
+                        )
 
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
@@ -343,14 +346,14 @@ class EntityPrim(XFormPrim):
                         #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
 
                         # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
-                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame = th.zeros(3)
                         axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
 
                         # Compute the joint axis unit vector in the object frame
                         axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
 
                         # Find the correct scale along the joint axis direction
-                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+                        scale_along_axis = self.scale[th.argmax(th.abs(axis_in_obj_frame))]
 
             joint.lower_limit = joint.lower_limit * scale_along_axis
             joint.upper_limit = joint.upper_limit * scale_along_axis
@@ -642,8 +645,8 @@ class EntityPrim(XFormPrim):
 
         # Otherwise, set all joints to have 0 position and 0 velocity if this object has joints
         elif self.n_joints > 0:
-            self.set_joint_positions(positions=np.zeros(self.n_dof), drive=False)
-            self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
+            self.set_joint_positions(positions=th.zeros(self.n_dof), drive=False)
+            self.set_joint_velocities(velocities=th.zeros(self.n_dof), drive=False)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
@@ -651,7 +654,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            positions (np.ndarray): positions to set. This should be n-DOF length if all joints are being set,
+            positions (th.tensor): positions to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @positions must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF positions to set.
@@ -682,7 +685,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            velocities (np.ndarray): velocities to set. This should be n-DOF length if all joints are being set,
+            velocities (th.tensor): velocities to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @velocities must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF velocities to set.
@@ -712,7 +715,7 @@ class EntityPrim(XFormPrim):
         is actively running!
 
         Args:
-            efforts (np.ndarray): efforts to set. This should be n-DOF length if all joints are being set,
+            efforts (th.tensor): efforts to set. This should be n-DOF length if all joints are being set,
                 or k-length (k < n) if specific indices are being set. In this case, the length of @efforts must
                 be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF efforts to set.
@@ -874,7 +877,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_positions = self._articulation_view.get_joint_positions().reshape(self.n_dof)
+        joint_positions = self._articulation_view.get_joint_positions().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -892,7 +895,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_velocities = self._articulation_view.get_joint_velocities().reshape(self.n_dof)
+        joint_velocities = self._articulation_view.get_joint_velocities().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
@@ -910,7 +913,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_efforts = self._articulation_view.get_measured_joint_efforts().reshape(self.n_dof)
+        joint_efforts = self._articulation_view.get_measured_joint_efforts().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
@@ -928,7 +931,7 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_positions = self._articulation_view.get_joint_position_targets().reshape(self.n_dof)
+        joint_positions = self._articulation_view.get_joint_position_targets().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -946,17 +949,17 @@ class EntityPrim(XFormPrim):
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_velocities = self._articulation_view.get_joint_velocity_targets().reshape(self.n_dof)
+        joint_velocities = self._articulation_view.get_joint_velocity_targets().view(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
 
-    def set_linear_velocity(self, velocity: np.ndarray):
+    def set_linear_velocity(self, velocity: th.Tensor):
         """
         Sets the linear velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
@@ -965,7 +968,7 @@ class EntityPrim(XFormPrim):
         Gets the linear velocity of the root prim in stage.
 
         Returns:
-            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
@@ -974,7 +977,7 @@ class EntityPrim(XFormPrim):
         Sets the angular velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
@@ -982,7 +985,7 @@ class EntityPrim(XFormPrim):
         """Gets the angular velocity of the root prim in stage.
 
         Returns:
-            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
+            velocity (th.tensor): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
 
@@ -1001,6 +1004,16 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_orientation()).T @ self.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
+        position = (
+            position
+            if isinstance(position, th.Tensor)
+            else th.tensor(position, dtype=th.float32) if position is not None else None
+        )
+        orientation = (
+            orientation
+            if isinstance(orientation, th.Tensor)
+            else th.tensor(orientation, dtype=th.float32) if orientation is not None else None
+        )
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
@@ -1013,9 +1026,9 @@ class EntityPrim(XFormPrim):
         # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
-                position = np.asarray(position)[None, :]
+                position = th.asarray(position)[None, :]
             if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+                orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_world_poses(position, orientation)
             PoseAPI.invalidate()
 
@@ -1044,9 +1057,9 @@ class EntityPrim(XFormPrim):
         # Sim is running and articulation view exists, so use that physx API backend
         else:
             if position is not None:
-                position = np.asarray(position)[None, :]
+                position = th.asarray(position)[None, :]
             if orientation is not None:
-                orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
+                orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
             self._articulation_view.set_local_poses(position, orientation)
             PoseAPI.invalidate()
 
@@ -1069,7 +1082,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: joint damping values for this prim
         """
-        return np.concatenate([joint.damping for joint in self._joints.values()])
+        return th.cat([joint.damping for joint in self._joints.values()])
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1079,7 +1092,7 @@ class EntityPrim(XFormPrim):
             n-array: minimum values for this robot's joints. If joint does not have a range, returns -1000
                 for that joint
         """
-        return np.array([joint.lower_limit for joint in self._joints.values()])
+        return th.tensor([joint.lower_limit for joint in self._joints.values()])
 
     # TODO: These are cached, but they are not updated when the joint limit is changed
     @cached_property
@@ -1089,7 +1102,7 @@ class EntityPrim(XFormPrim):
             n-array: maximum values for this robot's joints. If joint does not have a range, returns 1000
                 for that joint
         """
-        return np.array([joint.upper_limit for joint in self._joints.values()])
+        return th.tensor([joint.upper_limit for joint in self._joints.values()])
 
     @property
     def joint_range(self):
@@ -1105,7 +1118,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum velocities for this robot's joints
         """
-        return np.array([joint.max_velocity for joint in self._joints.values()])
+        return th.tensor([joint.max_velocity for joint in self._joints.values()])
 
     @property
     def max_joint_efforts(self):
@@ -1113,7 +1126,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return np.array([joint.max_effort for joint in self._joints.values()])
+        return th.tensor([joint.max_effort for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):
@@ -1152,7 +1165,7 @@ class EntityPrim(XFormPrim):
             n-array: n-DOF length array specifying whether joint is at its limit,
                 with 1.0 --> at limit, otherwise 0.0
         """
-        return 1.0 * (np.abs(self.get_joint_positions(normalized=True)) > 0.99)
+        return 1.0 * (th.abs(self.get_joint_positions(normalized=True)) > 0.99)
 
     @property
     def joint_has_limits(self):
@@ -1160,7 +1173,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
-        return np.array([j.has_limit for j in self._joints.values()])
+        return th.tensor([j.has_limit for j in self._joints.values()])
 
     @property
     def disabled_collision_link_names(self):
@@ -1376,14 +1389,14 @@ class EntityPrim(XFormPrim):
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
             aabb_lo, aabb_hi = (
-                np.min(particle_positions, axis=0) - particle_contact_offset,
-                np.max(particle_positions, axis=0) + particle_contact_offset,
+                th.min(particle_positions, dim=0).values - particle_contact_offset,
+                th.max(particle_positions, dim=0).values + particle_contact_offset,
             )
         else:
             points_world = [link.collision_boundary_points_world for link in self._links.values()]
-            all_points = np.concatenate([p for p in points_world if p is not None], axis=0)
-            aabb_lo = np.min(all_points, axis=0)
-            aabb_hi = np.max(all_points, axis=0)
+            all_points = th.cat([p for p in points_world if p is not None], dim=0)
+            aabb_lo = th.min(all_points, dim=0).values
+            aabb_hi = th.max(all_points, dim=0).values
         return aabb_lo, aabb_hi
 
     @property
@@ -1417,7 +1430,7 @@ class EntityPrim(XFormPrim):
             n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
         """
         assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
-        return self._articulation_view.get_coriolis_and_centrifugal_forces(clone=clone).reshape(self.n_dof)
+        return self._articulation_view.get_coriolis_and_centrifugal_forces(clone=clone).view(self.n_dof)
 
     def get_generalized_gravity_forces(self, clone=True):
         """
@@ -1428,7 +1441,7 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
-        return self._articulation_view.get_generalized_gravity_forces(clone=clone).reshape(self.n_dof)
+        return self._articulation_view.get_generalized_gravity_forces(clone=clone).view(self.n_dof)
 
     def get_mass_matrix(self, clone=True):
         """
@@ -1439,7 +1452,7 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF mass matrix, if articulated
         """
         assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
-        return self._articulation_view.get_mass_matrices(clone=clone).reshape(self.n_dof, self.n_dof)
+        return self._articulation_view.get_mass_matrices(clone=clone).view(self.n_dof, self.n_dof)
 
     def get_jacobian(self, clone=True):
         """
@@ -1452,7 +1465,7 @@ class EntityPrim(XFormPrim):
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        return self._articulation_view.get_jacobians(clone=clone).squeeze(axis=0)
+        return self._articulation_view.get_jacobians(clone=clone).squeeze(dim=0)
 
     def get_relative_jacobian(self, clone=True):
         """
@@ -1466,8 +1479,8 @@ class EntityPrim(XFormPrim):
                 the world frame)
         """
         jac = self.get_jacobian(clone=clone)
-        ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
-        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        ori_t = T.quat2mat(self.get_orientation()).T
+        tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jac
@@ -1498,8 +1511,8 @@ class EntityPrim(XFormPrim):
         """
         Zero out all velocities for this prim
         """
-        self.set_linear_velocity(velocity=np.zeros(3))
-        self.set_angular_velocity(velocity=np.zeros(3))
+        self.set_linear_velocity(velocity=th.zeros(3))
+        self.set_angular_velocity(velocity=th.zeros(3))
         for joint in self._joints.values():
             joint.keep_still()
         # Make sure object is awake
@@ -1607,7 +1620,7 @@ class EntityPrim(XFormPrim):
                 state["joint_eff"],
             ]
 
-        return np.concatenate(state_flat).astype(float)
+        return th.cat(state_flat)
 
     def deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and

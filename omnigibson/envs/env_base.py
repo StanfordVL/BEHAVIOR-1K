@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import gymnasium as gym
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -18,6 +18,7 @@ from omnigibson.utils.gym_utils import (
     recursively_generate_compatible_dict,
     recursively_generate_flat_dict,
 )
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import (
     Recreatable,
     assert_valid_key,
@@ -395,7 +396,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 ), "Can only flatten action space where all individual spaces are 1D instances!"
                 lows.append(space.low)
                 highs.append(space.high)
-            action_space = gym.spaces.Box(np.concatenate(lows), np.concatenate(highs), dtype=np.float32)
+            action_space = gym.spaces.Box(
+                th.tensor(lows, dtype=th.float32).cpu().numpy(),
+                th.tensor(highs, dtype=th.float32).cpu().numpy(),
+                dtype=NumpyTypes.FLOAT32,
+            )
 
         # Store action space
         self.action_space = action_space
@@ -592,8 +597,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         following OpenAI Gym's convention
 
         Args:
-            action (gym.spaces.Dict or dict or np.array): robot actions. If a dict is specified, each entry should
-                map robot name to corresponding action. If a np.array, it should be the flattened, concatenated set
+            action (gym.spaces.Dict or dict or th.tensor): robot actions. If a dict is specified, each entry should
+                map robot name to corresponding action. If a th.tensor, it should be the flattened, concatenated set
                 of actions
             n_render_iterations (int): Number of rendering iterations to use before returning observations
 
@@ -638,7 +643,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()[0]["rgb"] for sensor in rgb_sensors]
-        return np.concatenate(rgb_images, axis=1)[:, :, :3]
+        return th.cat(rgb_images, dim=1)[:, :, :3]
 
     def _reset_variables(self):
         """
@@ -673,7 +678,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                         exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
                     real_obs = dict()
                     for key, value in recursively_generate_flat_dict(dic=check_obs).items():
-                        if isinstance(value, np.ndarray):
+                        if isinstance(value, th.Tensor):
                             real_obs[key] = ("obs", key, value.dtype, value.shape)
                         else:
                             real_obs[key] = ("obs", key, type(value), "()")

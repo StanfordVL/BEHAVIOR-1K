@@ -1,7 +1,7 @@
 import tempfile
 
-import numpy as np
 import pytest
+import torch as th
 
 import omnigibson as og
 from omnigibson.envs import DataCollectionWrapper, DataPlaybackWrapper
@@ -65,7 +65,7 @@ def test_data_collect_and_playback():
         # Manually add a random object, e.g.: a banana, and place on the floor
         obj = DatasetObject(name="banana", category="banana")
         env.scene.add_object(obj)
-        obj.set_position(np.ones(3) * 10.0)
+        obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
 
         # Take a few more steps
         for _ in range(5):
@@ -80,7 +80,7 @@ def test_data_collect_and_playback():
 
         # Add water particles
         water = env.scene.get_system("water")
-        pos = np.random.random((10, 3)) * 10.0
+        pos = th.rand(10, 3, dtype=th.float32) * 10.0
         water.generate_particles(positions=pos)
 
         # Take a few more steps
@@ -124,8 +124,8 @@ def test_data_collect_and_playback():
                 "image_width": 128,
                 "focal_length": 12.0,
             },
-            "local_position": np.array([-0.26549, -0.30288, 1.0 + 0.861]),
-            "local_orientation": np.array([0.36165891, -0.24745751, -0.50752921, 0.74187715]),
+            "local_position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
+            "local_orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
         },
     ]
 

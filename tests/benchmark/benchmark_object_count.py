@@ -2,11 +2,12 @@
 Script to benchmark speed vs. no. of objects in the scene.
 """
 
+import math
 import os
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 from omnigibson import app, launch
 from omnigibson.objects.primitive_object import PrimitiveObject
@@ -22,7 +23,7 @@ RAND_POSITION = True  # True to randomize positions.
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 
 # Internal constants.
-_N_PER_ROW = int(np.sqrt(MAX_NUM_OBJS))
+_N_PER_ROW = int(math.sqrt(MAX_NUM_OBJS))
 _MIN_VAL = -2.0
 _MAX_VAL = 2.0
 _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW
@@ -30,8 +31,8 @@ _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW
 
 def _get_position(obj_idx, is_random=False):
     if is_random:
-        pos_arange = np.arange(_MIN_VAL, _MAX_VAL, step=0.1, dtype=np.float32)
-        x, y, z = np.random.choice(pos_arange, size=3)
+        pos_arange = th.arange(_MIN_VAL, _MAX_VAL, step=0.1, dtype=th.float32)
+        x, y, z = pos_arange[th.randint(len(pos_arange), (3,))]
         return x, y, z
     x = _MIN_VAL + _STEP_SIZE * (obj_idx % _N_PER_ROW)
     y = _MIN_VAL + _STEP_SIZE * (obj_idx // _N_PER_ROW)
@@ -64,7 +65,7 @@ def benchmark_scene(sim):
             # x, y, z = _get_position(obj_idx, RAND_POSITION)
             x, y = 0, 0
             z = 0.5 + j * OBJ_SCALE * 2.25
-            obj.set_position(position=np.array([x, y, z]))
+            obj.set_position(position=th.tensor([x, y, z]))
             new_objs.append(obj)
 
         # Take a step to initialize the new objects (done in _non_physics_step()).
@@ -77,8 +78,8 @@ def benchmark_scene(sim):
             step_freqs.append(1 / (end - start))
 
         xs.append(i * NUM_OBJS_PER_ITER)
-        max_freq, min_freq = np.max(step_freqs), np.min(step_freqs)
-        ys.append(np.mean((max_freq, min_freq)))
+        max_freq, min_freq = th.max(step_freqs).item(), th.min(step_freqs).item()
+        ys.append(th.mean((max_freq, min_freq)))
         yerrs.append(max_freq - ys[-1])
 
     plt.figure(figsize=(9, 6))

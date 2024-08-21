@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
@@ -27,7 +27,7 @@ class Turtlebot(TwoWheelRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def usd_path(self):

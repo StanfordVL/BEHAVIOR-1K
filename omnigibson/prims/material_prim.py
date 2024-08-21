@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -272,7 +272,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) color
         """
-        return np.array(self.get_input(inp="diffuse_color_constant"))
+        diffuse_color_constant = self.get_input(inp="diffuse_color_constant")
+        return th.tensor(diffuse_color_constant, dtype=th.float32) if diffuse_color_constant is not None else None
 
     @diffuse_color_constant.setter
     def diffuse_color_constant(self, color):
@@ -280,7 +281,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) color
         """
-        self.set_input(inp="diffuse_color_constant", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_color_constant", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
     def diffuse_texture(self):
@@ -352,7 +353,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) diffuse_tint
         """
-        return np.array(self.get_input(inp="diffuse_tint"))
+        diffuse_tint = self.get_input(inp="diffuse_tint")
+        return th.tensor(diffuse_tint, dtype=th.float32) if diffuse_tint is not None else None
 
     @diffuse_tint.setter
     def diffuse_tint(self, color):
@@ -360,7 +362,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) diffuse_tint
         """
-        self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
     def reflection_roughness_constant(self):
@@ -568,7 +570,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) emissive_color
         """
-        return np.array(self.get_input(inp="emissive_color"))
+        color = self.get_input(inp="emissive_color")
+        return th.tensor(color, dtype=th.float32) if color is not None else None
 
     @emissive_color.setter
     def emissive_color(self, color):
@@ -576,7 +579,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied emissive_color
         """
-        self.set_input(inp="emissive_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="emissive_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def emissive_color_texture(self):
@@ -882,7 +885,7 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied texture_translate
         """
-        return np.array(self.get_input(inp="texture_translate"))
+        return th.tensor(self.get_input(inp="texture_translate"))
 
     @texture_translate.setter
     def texture_translate(self, translate):
@@ -890,7 +893,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied (x,y) texture_translate
         """
-        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*np.array(translate, dtype=float)))
+        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
 
     @property
     def texture_rotate(self):
@@ -914,7 +917,7 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied texture_scale
         """
-        return np.array(self.get_input(inp="texture_scale"))
+        return th.tensor(self.get_input(inp="texture_scale"))
 
     @texture_scale.setter
     def texture_scale(self, scale):
@@ -922,7 +925,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied (x,y) texture_scale
         """
-        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*np.array(scale, dtype=float)))
+        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
 
     @property
     def detail_texture_translate(self):
@@ -930,7 +933,8 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied detail_texture_translate
         """
-        return np.array(self.get_input(inp="detail_texture_translate"))
+        detail_texture_translate = self.get_input(inp="detail_texture_translate")
+        return th.tensor(detail_texture_translate, dtype=th.float32) if detail_texture_translate is not None else None
 
     @detail_texture_translate.setter
     def detail_texture_translate(self, translate):
@@ -938,7 +942,7 @@ class MaterialPrim(BasePrim):
         Args:
              translate (2-array): this material's applied detail_texture_translate
         """
-        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*np.array(translate, dtype=float)))
+        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
 
     @property
     def detail_texture_rotate(self):
@@ -962,7 +966,8 @@ class MaterialPrim(BasePrim):
         Returns:
             2-array: this material's applied detail_texture_scale
         """
-        return np.array(self.get_input(inp="detail_texture_scale"))
+        detail_texture_scale = self.get_input(inp="detail_texture_scale")
+        return th.tensor(detail_texture_scale, dtype=th.float32) if detail_texture_scale is not None else None
 
     @detail_texture_scale.setter
     def detail_texture_scale(self, scale):
@@ -970,7 +975,7 @@ class MaterialPrim(BasePrim):
         Args:
              scale (2-array): this material's applied detail_texture_scale
         """
-        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*np.array(scale, dtype=float)))
+        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
 
     @property
     def exclude_from_white_mode(self):
@@ -1042,7 +1047,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's diffuse_reflection_color in (R,G,B)
         """
-        return np.array(self.get_input(inp="diffuse_reflection_color"))
+        diffuse_reflection_color = self.get_input(inp="diffuse_reflection_color")
+        return th.tensor(diffuse_reflection_color, dtype=th.float32) if diffuse_reflection_color is not None else None
 
     @diffuse_reflection_color.setter
     def diffuse_reflection_color(self, color):
@@ -1050,7 +1056,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's diffuse_reflection_color in (R,G,B)
         """
-        self.set_input(inp="diffuse_reflection_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="diffuse_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def specular_reflection_color(self):
@@ -1058,7 +1064,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_reflection_color in (R,G,B)
         """
-        return np.array(self.get_input(inp="specular_reflection_color"))
+        specular_reflection_color = self.get_input(inp="specular_reflection_color")
+        return th.tensor(specular_reflection_color, dtype=th.float32) if specular_reflection_color is not None else None
 
     @specular_reflection_color.setter
     def specular_reflection_color(self, color):
@@ -1066,7 +1073,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_reflection_color in (R,G,B)
         """
-        self.set_input(inp="specular_reflection_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="specular_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def specular_transmission_color(self):
@@ -1074,7 +1081,12 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_color in (R,G,B)
         """
-        return np.array(self.get_input(inp="specular_transmission_color"))
+        specular_transmission_color = self.get_input(inp="specular_transmission_color")
+        return (
+            th.tensor(specular_transmission_color, dtype=th.float32)
+            if specular_transmission_color is not None
+            else None
+        )
 
     @specular_transmission_color.setter
     def specular_transmission_color(self, color):
@@ -1082,7 +1094,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_color in (R,G,B)
         """
-        self.set_input(inp="specular_transmission_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="specular_transmission_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def specular_transmission_scattering_color(self):
@@ -1090,7 +1102,12 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_scattering_color in (R,G,B)
         """
-        return np.array(self.get_input(inp="specular_transmission_scattering_color"))
+        specular_transmission_scattering_color = self.get_input(inp="specular_transmission_scattering_color")
+        return (
+            th.tensor(specular_transmission_scattering_color, dtype=th.float32)
+            if specular_transmission_scattering_color is not None
+            else None
+        )
 
     @specular_transmission_scattering_color.setter
     def specular_transmission_scattering_color(self, color):
@@ -1098,9 +1115,7 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
         """
-        self.set_input(
-            inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float))
-        )
+        self.set_input(inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def specular_reflection_ior_preset(self):
@@ -1144,7 +1159,8 @@ class MaterialPrim(BasePrim):
             f"Tried to query glass_color shader input, "
             f"but material at {self.prim_path} is not an OmniGlass material!"
         )
-        return np.array(self.get_input(inp="glass_color"))
+        glass_color = self.get_input(inp="glass_color")
+        return th.tensor(glass_color, dtype=th.float32) if glass_color is not None else None
 
     @glass_color.setter
     def glass_color(self, color):
@@ -1155,4 +1171,4 @@ class MaterialPrim(BasePrim):
         assert self.is_glass, (
             f"Tried to set glass_color shader input, " f"but material at {self.prim_path} is not an OmniGlass material!"
         )
-        self.set_input(inp="glass_color", val=lazy.pxr.Gf.Vec3f(*np.array(color, dtype=float)))
+        self.set_input(inp="glass_color", val=lazy.pxr.Gf.Vec3f(*color))

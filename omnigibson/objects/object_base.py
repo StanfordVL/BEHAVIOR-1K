@@ -1,10 +1,10 @@
+import math
 from abc import ABCMeta
 from collections.abc import Iterable
 from functools import cached_property
 
-import numpy as np
+import torch as th
 import trimesh
-from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -89,7 +89,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = np.array(scale) if isinstance(scale, Iterable) else scale
+        load_config["scale"] = (
+            scale
+            if isinstance(scale, th.Tensor)
+            else th.tensor(scale, dtype=th.float32) if isinstance(scale, Iterable) else scale
+        )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["kinematic_only"] = kinematic_only
@@ -136,10 +140,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # merely set this to be a static collider, i.e.: kinematic-only
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
             if (
                 self.n_joints == 0
-                and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0)
+                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
                 and (self._load_config["kinematic_only"] != False)
                 and not self.has_attachment_points
             ):
@@ -343,7 +347,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
             material.emissive_color = (
-                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
+                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
             )
             material.emissive_intensity = (
                 m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
@@ -377,34 +381,36 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
             # The desired frame is same as the base_com frame with its X/Y rotations removed.
-            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
+            translate = base_frame_to_world[:3, 3]
 
             # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
-            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
-                translate=translate, angles=[0, 0, rotation_around_Z_axis]
+            rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32)
+            xy_aligned_base_com_to_world[:3, 3] = translate
+            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(
+                th.tensor([0, 0, rotation_around_Z_axis], dtype=th.float32)
             )
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
         else:
             # Default desired frame is base CoM frame.
-            desired_frame_to_world = base_frame_to_world
+            desired_frame_to_world = th.tensor(base_frame_to_world, dtype=th.float32)
 
         # Compute the world-to-base frame transform.
-        world_to_desired_frame = np.linalg.inv(desired_frame_to_world)
+        world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse
 
         # Grab all the world-frame points corresponding to the object's visual or collision hulls.
         points_in_world = []
         if self.prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate(
-                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], axis=0
+            particles_in_world_frame = th.cat(
+                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], dim=0
             )
-            points_in_world.extend(particles_in_world_frame)
+            points_in_world.extend(particles_in_world_frame.tolist())
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
             for link_name, link in links.items():
@@ -414,23 +420,23 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     hull_points = link.collision_boundary_points_world
 
                 if hull_points is not None:
-                    points_in_world.extend(hull_points)
+                    points_in_world.extend(hull_points.tolist())
 
         # Move the points to the desired frame
-        points = trimesh.transformations.transform_points(points_in_world, world_to_desired_frame)
+        points = T.transform_points(th.tensor(points_in_world, dtype=th.float32), world_to_desired_frame)
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, axis=0)
-        aabb_max_in_desired_frame = np.amax(points, axis=0)
+        aabb_min_in_desired_frame = th.amin(points, dim=0)
+        aabb_max_in_desired_frame = th.amax(points, dim=0)
         bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
         bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
 
         # Transform the center to the world frame.
-        bbox_center_in_world = trimesh.transformations.transform_points(
-            [bbox_center_in_desired_frame], desired_frame_to_world
-        )[0]
-        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
+        bbox_center_in_world = T.transform_points(
+            bbox_center_in_desired_frame.unsqueeze(0), desired_frame_to_world
+        ).squeeze(0)
+        bbox_orn_in_world = T.mat2quat(desired_frame_to_world[:3, :3])
 
         return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
 
@@ -445,7 +451,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state
         """
         assert self._initialized, "Object must be initialized before dumping state!"
         return super().dump_state(serialized=serialized)

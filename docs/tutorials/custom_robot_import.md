@@ -110,7 +110,8 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 ??? code "stretch.py"
     ``` python linenums="1"
     import os
-    import numpy as np
+    import math
+    import torch as th
     from omnigibson.macros import gm
     from omnigibson.robots.active_camera_robot import ActiveCameraRobot
     from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
@@ -157,7 +158,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
         def _default_joint_pos(self):
             # Define the default joint positions for your robot
     
-            return np.array([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, np.pi / 8, np.pi / 8])
+            return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8]. dtype=th.float32)
     
         @property
         def wheel_radius(self):

@@ -1,10 +1,10 @@
 import itertools
-import os
 
 import networkx as nx
-import numpy as np
+import torch as th
 from matplotlib import pyplot as plt
 from PIL import Image
+from torchvision.transforms import ToPILImage, ToTensor
 
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
@@ -15,7 +15,7 @@ from omnigibson.utils import transform_utils as T
 
 
 def _formatted_aabb(obj):
-    return T.pose2mat((obj.aabb_center, [0, 0, 0, 1])), obj.aabb_extent
+    return T.pose2mat((obj.aabb_center, th.tensor([0, 0, 0, 1], dtype=th.float32))), obj.aabb_extent
 
 
 class SceneGraphBuilder(object):
@@ -62,8 +62,8 @@ class SceneGraphBuilder(object):
         return self._G.copy()
 
     def _get_desired_frame(self):
-        desired_frame_to_world = np.eye(4)
-        world_to_desired_frame = np.eye(4)
+        desired_frame_to_world = th.eye(4)
+        world_to_desired_frame = th.eye(4)
         if self._egocentric:
             desired_frame_to_world = self._get_robot_to_world_transform(self._robots[0])
             world_to_desired_frame = T.pose_inv(desired_frame_to_world)
@@ -74,7 +74,8 @@ class SceneGraphBuilder(object):
         robot_to_world = robot.get_position_orientation()
 
         # Get rid of any rotation outside xy plane
-        robot_to_world = T.pose2mat((robot_to_world[0], T.z_rotation_from_quat(robot_to_world[1])))
+        z_angle = T.z_angle_from_quat(robot_to_world[1])
+        robot_to_world = T.pose2mat((robot_to_world[0], T.euler2quat(th.tensor([0, 0, z_angle], dtype=th.float32))))
 
         return robot_to_world
 
@@ -157,8 +158,8 @@ class SceneGraphBuilder(object):
         # Update the position of everything that's already in the scene by using our relative position to last frame.
         old_desired_to_new_desired = world_to_desired_frame @ self._last_desired_frame_to_world
         nodes = list(self._G.nodes)
-        poses = np.array([self._G.nodes[obj]["pose"] for obj in nodes])
-        bbox_poses = np.array([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
+        poses = th.stack([self._G.nodes[obj]["pose"] for obj in nodes])
+        bbox_poses = th.stack([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
         updated_poses = old_desired_to_new_desired @ poses
         updated_bbox_poses = old_desired_to_new_desired @ bbox_poses
         for i, obj in enumerate(nodes):
@@ -285,12 +286,17 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     (robot_camera_sensor,) = [
         s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities
     ]
-    robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).astype(np.uint8)
+    robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
+
+    pil_transform = ToPILImage()
+    torch_transform = ToTensor()
 
     # check imgheight and imgwidth; if they are too small, we need to upsample the image to 1280x1280
     if imgheight < 640 or imgwidth < 640:
-        robot_view = np.array(Image.fromarray(robot_view).resize((640, 640), Image.BILINEAR))
+        robot_view = torch_transform(
+            pil_transform((robot_view.permute(2, 0, 1).cpu())).resize((640, 640), Image.BILINEAR)
+        ).permute(1, 2, 0)
         imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
@@ -303,13 +309,13 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     fig.canvas.draw()
 
     # Convert the canvas to image
-    graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    graph_view = th.frombuffer(fig.canvas.tostring_rgb(), dtype=th.uint8)
     graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     assert graph_view.shape == robot_view.shape
     plt.close(fig)
 
     # Combine the two images side-by-side
-    img = np.hstack((robot_view, graph_view))
+    img = th.cat((robot_view, graph_view), dim=1)
 
     # # Convert to BGR for cv2-based viewing.
     if show_window:
@@ -318,4 +324,4 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
         plt.axis("off")
         plt.show()
 
-    return Image.fromarray(img)
+    return img

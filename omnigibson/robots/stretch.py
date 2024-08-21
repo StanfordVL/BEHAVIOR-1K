@@ -1,6 +1,7 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
@@ -59,7 +60,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.array([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, np.pi / 8, np.pi / 8])
+        return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
 
     @property
     def wheel_radius(self):

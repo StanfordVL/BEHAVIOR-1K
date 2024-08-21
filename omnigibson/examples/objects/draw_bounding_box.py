@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 import omnigibson as og
 
@@ -52,8 +52,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
     cam.set_position_orientation(
-        position=np.array([-4.62785, -0.418575, 0.933943]),
-        orientation=np.array([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
+        position=th.tensor([-4.62785, -0.418575, 0.933943]),
+        orientation=th.tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
     )
 
     # Add bounding boxes to camera sensor
@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a few steps to let objects settle
     for i in range(100):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # Grab observations from viewer camera and write them to disk
     obs, _ = cam.get_obs()
@@ -76,13 +76,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         if "3d" not in bbox_modality:
             from omnigibson.utils.deprecated_utils import colorize_bboxes
 
-            colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
+            colorized_img = colorize_bboxes(
+                bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"].cpu().numpy(), num_channels=4
+            )
             fpath = f"{bbox_modality}_img.png"
             plt.imsave(fpath, colorized_img)
             og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")
 
     # Always close environment down at end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

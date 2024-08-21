@@ -1,4 +1,6 @@
-import numpy as np
+import math
+
+import torch as th
 from utils import place_obj_on_floor_plane
 
 import omnigibson as og
@@ -23,7 +25,7 @@ def test_scene_graph():
             "type": "Fetch",
             "obs_modalities": "all",
             "position": position,
-            "orientation": T.euler2quat([0, 0, -np.pi / 2]),
+            "orientation": T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)),
             "controller_config": {
                 "arm_0": {
                     "name": "NullJointController",
@@ -88,8 +90,11 @@ def test_scene_graph():
         og.sim.step()
         scene_graph_builder_single.step(scene)
 
-    assert visualize_scene_graph(
-        scene, scene_graph_builder_single.get_scene_graph(), show_window=False, cartesian_positioning=True
+    assert isinstance(
+        visualize_scene_graph(
+            scene, scene_graph_builder_single.get_scene_graph(), show_window=False, cartesian_positioning=True
+        ),
+        th.Tensor,
     )
 
     # Test multi robot scene graph
@@ -101,6 +106,9 @@ def test_scene_graph():
         og.sim.step()
         scene_graph_builder_multi.step(scene)
 
-    assert visualize_scene_graph(
-        scene, scene_graph_builder_multi.get_scene_graph(), show_window=False, cartesian_positioning=True
+    assert isinstance(
+        visualize_scene_graph(
+            scene, scene_graph_builder_multi.get_scene_graph(), show_window=False, cartesian_positioning=True
+        ),
+        th.Tensor,
     )

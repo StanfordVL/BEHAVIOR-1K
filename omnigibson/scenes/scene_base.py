@@ -6,7 +6,7 @@ import tempfile
 from abc import ABC
 from itertools import combinations
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -28,7 +28,7 @@ from omnigibson.systems.system_base import (
     get_all_system_names,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
-from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
@@ -37,6 +37,7 @@ from omnigibson.utils.python_utils import (
     classproperty,
     create_object_from_init_info,
     get_uuid,
+    recursively_convert_to_torch,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -257,11 +258,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             scene_file_path = self.scene_file
         else:
             # The scene file is a dict, so write it to disk directly
-            scene_file_str = json.dumps(self.scene_file, cls=NumpyEncoder, indent=4)
+            scene_file_str = json.dumps(self.scene_file, cls=TorchEncoder, indent=4)
             scene_file_hash = get_uuid(scene_file_str, deterministic=True)
             scene_file_path = os.path.join(og.tempdir, f"scene_file_{scene_file_hash}.json")
             with open(scene_file_path, "w+") as f:
-                json.dump(self.scene_file, f, cls=NumpyEncoder, indent=4)
+                json.dump(self.scene_file, f, cls=TorchEncoder, indent=4)
 
         if scene_file_path not in PREBUILT_USDS:
             # Prebuild the scene USD
@@ -353,7 +354,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
+        self._scene_prim.set_position(th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0]))
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
@@ -447,7 +448,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Cache this scene's pose
         self._pose = T.pose2mat(self._scene_prim.get_position_orientation())
-        self._pose_inv = np.linalg.inv(self._pose)
+        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
         if gm.ENABLE_TRANSITION_RULES:
             self._transition_rule_api = TransitionRuleAPI(scene=self)
@@ -508,6 +509,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             else:
                 scene_info = self.scene_file
             init_state = scene_info["state"]
+            init_state = recursively_convert_to_torch(init_state)
             self.load_state(init_state, serialized=False)
         self._initial_state = init_state
 
@@ -676,14 +678,29 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self.load_state(self._initial_state)
         og.sim.step_physics()
 
-    @property
-    def prim(self):
+    def get_position_orientation(self):
         """
+        Get the position and orientation of the scene
+
         Returns:
-            XFormPrim: the prim of the scene
+            2-tuple:
+                - th.Tensor: (3,) position of the scene
+                - th.Tensor: (4,) orientation of the scene
         """
-        assert self._scene_prim is not None, "Scene prim is not loaded yet!"
-        return self._scene_prim
+        return self._scene_prim.get_position_orientation()
+
+    def set_position_orientation(self, position=None, orientation=None):
+        """
+        Set the position and orientation of the scene
+
+        Args:
+            position (th.Tensor): (3,) position of the scene
+            orientation (th.Tensor): (4,) orientation of the scene
+        """
+        self._scene_prim.set_position_orientation(position, orientation)
+        # Update the cached pose and inverse pose
+        self._pose = T.pose2mat(self.get_position_orientation())
+        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
     @property
     def prim_path(self):
@@ -692,7 +709,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             str: the prim path of the scene
         """
         assert self._scene_prim is not None, "Scene prim is not loaded yet!"
-        return self.prim.prim_path
+        return self._scene_prim.prim_path
 
     @property
     def n_floors(self):
@@ -728,7 +745,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def pose(self):
         """
         Returns:
-            np.array: (4,4) homogeneous transformation matrix representing this scene's global pose
+            th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global pose
         """
         return self._pose
 
@@ -736,7 +753,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def pose_inv(self):
         """
         Returns:
-            np.array: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
+            th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
         """
         return self._pose_inv
 
@@ -799,7 +816,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             int: an integer between 0 and self.n_floors-1
         """
-        return np.random.randint(0, self.n_floors)
+        return th.randint(0, self.n_floors)
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
         """

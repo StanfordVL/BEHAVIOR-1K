@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import yaml
 
 import omnigibson as og

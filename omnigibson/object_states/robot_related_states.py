@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
@@ -32,7 +32,7 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 
 #         robot_pos = robot.get_position()
 #         object_pos = self.obj.get_position()
-#         return np.linalg.norm(object_pos - np.array(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
+#         return th.norm(object_pos - th.tensor(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
 
 
 # class InFOVOfRobot(AbsoluteObjectState, BooleanStateMixin):

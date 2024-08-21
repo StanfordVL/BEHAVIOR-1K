@@ -1,7 +1,8 @@
+import math
 from abc import abstractmethod
 from collections import defaultdict
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -107,12 +108,12 @@ def create_projection_visualization(
     # Modify the radius according to the desired @shape (and also infer the desired spread values)
     if shape == "Cylinder":
         source_radius = projection_radius
-        spread = np.zeros(3)
+        spread = th.zeros(3)
     elif shape == "Cone":
         # Default to close to singular point otherwise
         source_radius = m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS
         spread_ratio = projection_radius * 2.0 / projection_height
-        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
+        spread = th.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
     else:
         raise ValueError(
             f"Invalid shape specified for projection visualization! Valid options are: [Cone, Cylinder], got: {shape}"
@@ -134,7 +135,7 @@ def create_projection_visualization(
     # the source sphere is already scaled by its own parent frame
     # NOTE: The generated projection visualization will NOT match the underlying projection mesh if the parent link is
     # scaled non-uniformly!!
-    projection_radius *= np.mean(parent_scale[:2])
+    projection_radius *= th.mean(parent_scale[:2])
     projection_height *= parent_scale[2]
 
     # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
@@ -165,11 +166,11 @@ def create_projection_visualization(
     emitter_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(emitter_path)
     emitter_prim.GetProperty("inputs:active").Set(True)
     emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
-    emitter_prim.GetProperty("inputs:lifespan").Set(projection_height / m.PROJECTION_VISUALIZATION_SPEED)
+    emitter_prim.GetProperty("inputs:lifespan").Set(projection_height.item() / m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:speed").Set(m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:alongAxis").Set(m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS)
     emitter_prim.GetProperty("inputs:scale").Set(lazy.pxr.Gf.Vec3f(1.0, 1.0, 1.0))
-    emitter_prim.GetProperty("inputs:directionRandom").Set(lazy.pxr.Gf.Vec3f(*spread))
+    emitter_prim.GetProperty("inputs:directionRandom").Set(lazy.pxr.Gf.Vec3f(*spread.tolist()))
     emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
     # Make sure we render 4 times to fully propagate changes (validated empirically)
@@ -314,7 +315,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Sanity check scale if requested
         if self.requires_overlap:
             # Run sanity check to make sure compatibility with omniverse physx
-            if self.method == ParticleModifyMethod.PROJECTION and not np.isclose(
+            if self.method == ParticleModifyMethod.PROJECTION and not th.isclose(
                 self.obj.scale.max(), self.obj.scale.min(), atol=1e-04
             ):
                 raise ValueError(
@@ -372,7 +373,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if self._projection_mesh_params is None:
                     self._projection_mesh_params = {
                         "type": mesh_type,
-                        "extents": np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
+                        "extents": th.tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
                     }
                 # Otherwise, make sure we don't have a mismatch between the pre-existing shape type and the
                 # desired type since we can't delete the original mesh
@@ -401,7 +402,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     ), f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
 
             # Set the scale based on projection mesh params
-            self.projection_mesh.scale = np.array(self._projection_mesh_params["extents"])
+            self.projection_mesh.scale = self._projection_mesh_params["extents"]
 
             # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             self.link.update_meshes()
@@ -418,8 +419,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             self.projection_mesh.set_local_pose(
-                position=np.array([0, 0, -z_offset]),
-                orientation=T.euler2quat([0, 0, 0]),
+                position=th.tensor([0, 0, -z_offset]),
+                orientation=T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32)),
             )
 
             # Generate the function for checking whether points are within the projection mesh
@@ -443,7 +444,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 # Add the margin
                 lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
                 upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                return ((lower < particle_positions) & (particle_positions < upper)).all(axis=-1)
+                return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
 
             self._check_in_mesh = check_in_adjacency_mesh
 
@@ -453,9 +454,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 valid_hit = False
                 aabb = self.link.visual_aabb
                 og.sim.psqi.overlap_box(
-                    halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
-                    pos=(aabb[1] + aabb[0]) / 2.0,
-                    rot=np.array([0, 0, 0, 1.0]),
+                    halfExtent=((aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN).tolist(),
+                    pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                    rot=[0, 0, 0, 1.0],
                     reportFn=overlap_callback,
                 )
                 return valid_hit
@@ -511,9 +512,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Particles spawn in negative z-axis direction, so check positive dot product of link frame with global
             cond = (
                 lambda obj: (
-                    np.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ np.array([0, 0, 1]),
-                        np.array([0, 0, 1]),
+                    th.dot(
+                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ th.tensor([0, 0, 1]),
+                        th.tensor([0, 0, 1]),
                     )
                     > 0
                 )
@@ -744,7 +745,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._current_step = state["current_step"]
 
     def serialize(self, state):
-        return np.array([state["current_step"]], dtype=float)
+        return th.tensor([state["current_step"]], dtype=th.float32)
 
     def deserialize(self, state):
         current_step = int(state[0])
@@ -880,7 +881,7 @@ class ParticleRemover(ParticleModifier):
         if self.obj.scene.is_visual_particle_system(system_name=system.name):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             particle_positions = system.get_particles_position_orientation()[0]
-            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
+            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()
             modification_limit = self.visual_particle_modification_limit
 
         # Physical system
@@ -889,9 +890,9 @@ class ParticleRemover(ParticleModifier):
             # collisions via scene query interface. Alternatively, if we're using the projection method,
             # we also need to use check_in_mesh to check for overlap with the projection mesh.
             inbound_idxs = (
-                self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()[0]
+                self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()
                 if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION
-                else np.array(list(self.obj.states[ContactParticles].get_value(system, self.link)))
+                else th.tensor(list(self.obj.states[ContactParticles].get_value(system, self.link)))
             )
             modification_limit = self.physical_particle_modification_limit
 
@@ -1028,7 +1029,7 @@ class ParticleApplier(ParticleModifier):
                 "Cone",
             }, f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
             radius, height = (
-                np.mean(self._projection_mesh_params["extents"][:2]) / 2.0,
+                th.mean(self._projection_mesh_params["extents"][:2]) / 2.0,
                 self._projection_mesh_params["extents"][2],
             )
             # Generate the projection visualization
@@ -1079,17 +1080,20 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, np.pi / 2, 0]))
+            self.projection_source_sphere.set_local_pose(
+                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32))
+            )
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_local_pose()
-            assert np.all(
-                np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)
+            assert th.all(
+                th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
             ), "Projection mesh tip should align with metalink position!"
-            assert np.all(
-                np.isclose(T.quat2euler(local_quat), 0.0)
+            local_euler = T.quat2euler(local_quat)
+            assert th.all(
+                th.isclose(local_euler, th.zeros_like(local_euler))
             ), "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations
@@ -1140,22 +1144,22 @@ class ParticleApplier(ParticleModifier):
         # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
         # We sample over the entire object AABB, assuming most will be filtered out
         sampling_distance = 2 * system.particle_radius
-        extent = np.array(self._projection_mesh_params["extents"])
+        extent = self._projection_mesh_params["extents"]
         h = extent[2]
         low, high = self.obj.aabb
-        n_particles_per_axis = ((high - low) / sampling_distance).astype(int)
-        assert np.all(
+        n_particles_per_axis = ((high - low) / sampling_distance).int()
+        assert th.all(
             n_particles_per_axis
         ), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            np.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
+            th.arange(l + system.particle_radius, h - system.particle_radius + 1e-10, system.particle_radius * 2)
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        points = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         pos, quat = self.link.get_position_orientation()
-        points = points[np.where(self._check_in_mesh(points))[0]]
+        points = points[th.where(self._check_in_mesh(points))[0]]
         # Convert the points into local frame
         points_in_local_frame = get_particle_positions_in_frame(
             pos=pos,
@@ -1168,29 +1172,28 @@ class ParticleApplier(ParticleModifier):
         self._in_mesh_local_particle_positions = (
             points_in_local_frame
             if n_max_particles > len(points)
-            else points_in_local_frame[np.random.choice(len(points_in_local_frame), n_max_particles, replace=False)]
+            else points_in_local_frame[th.randperm(len(points_in_local_frame))[:n_max_particles]]
         )
         # Also programmatically compute the directions of each particle position -- this is the normalized
         # vector pointing from source to the particle
         projection_type = self._projection_mesh_params["type"]
         if projection_type == "Cone":
             # Particles point from source ([0, 0, 0]) to point location
-            directions = np.copy(self._in_mesh_local_particle_positions)
+            directions = th.clone(self._in_mesh_local_particle_positions)
         elif projection_type == "Cylinder":
             # All particle points in the same parallel direction towards the -z direction
-            directions = np.zeros_like(self._in_mesh_local_particle_positions)
+            directions = th.zeros_like(self._in_mesh_local_particle_positions)
             directions[:, 2] = -h
         else:
             raise ValueError(
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!"
             )
-        self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
+        self._in_mesh_local_particle_directions = directions / th.norm(directions, dim=-1).reshape(-1, 1)
 
     def _update(self):
         # If we're about to check for modification, update whether it the visualization should be active or not
         if self.visualize and self._current_step == 0:
             # Only one system in our conditions, so next(iter()) suffices
-            # is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
             is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
             self.projection_emitter.GetProperty("inputs:active").Set(is_active)
 
@@ -1214,12 +1217,12 @@ class ParticleApplier(ParticleModifier):
                 # Create an attachment group if necessary
                 if group not in system.groups:
                     system.create_attachment_group(obj=self.obj)
-                avg_scale = np.cbrt(np.prod(self.obj.scale))
+                avg_scale = th.pow(th.prod(self.obj.scale), 1 / 3)
                 scales = system.sample_scales_by_group(group=group, n=len(start_points))
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
-                cuboid_dimensions = np.zeros(3)
+                cuboid_dimensions = th.zeros(3)
 
             # Sample the rays to see where particle can be generated
             results = sample_cuboid_on_object(
@@ -1265,13 +1268,13 @@ class ParticleApplier(ParticleModifier):
             assert scales is not None, "applying visual particles at raycast hits requires scales."
             assert len(hits) == len(scales), "length of hits and scales are different when spawning visual particles."
             # Sample potential application points
-            z_up = np.zeros(3)
+            z_up = th.zeros(3)
             z_up[-1] = 1.0
             n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - n_modified_particles)
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
-            modifier_avg_scale = np.cbrt(np.prod(self.obj.scale))
+            modifier_avg_scale = th.pow(th.prod(self.obj.scale), 1 / 3)
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = self.obj.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
@@ -1287,16 +1290,18 @@ class ParticleApplier(ParticleModifier):
                     # (in the USD hierarchy) underneath the in_contact object, we need to compensate for the relative
                     # scale differences between the two objects, so that "moving" the particle to the new object won't
                     # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
-                    particles_info[group]["scales"].append(scale * modifier_avg_scale / np.cbrt(np.prod(hit_obj.scale)))
+                    particles_info[group]["scales"].append(
+                        scale * modifier_avg_scale / th.pow(th.prod(hit_obj.scale), 1 / 3)
+                    )
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
             for group, particle_info in particles_info.items():
                 # Generate particles for this group
                 system.generate_group_particles(
                     group=group,
-                    positions=np.array(particle_info["positions"]),
-                    orientations=np.array(particle_info["orientations"]),
-                    scales=np.array(particles_info[group]["scales"]),
+                    positions=th.tensor(particle_info["positions"]),
+                    orientations=th.tensor(particle_info["orientations"]),
+                    scales=th.tensor(particles_info[group]["scales"]),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
@@ -1313,10 +1318,10 @@ class ParticleApplier(ParticleModifier):
                 velocities = (
                     None
                     if self._initial_speed == 0
-                    else -self._initial_speed * np.array([hit[1] for hit in hits[:n_particles]])
+                    else -self._initial_speed * th.stack([hit[1] for hit in hits[:n_particles]])
                 )
                 system.generate_particles(
-                    positions=np.array([hit[0] for hit in hits[:n_particles]]),
+                    positions=th.stack([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
                 # Update our particle count
@@ -1378,25 +1383,25 @@ class ParticleApplier(ParticleModifier):
         # Randomly sample end points from the base of the cone / cylinder
         n_samples = self._get_max_particles_limit_per_step(system=system)
         r, h = self._projection_mesh_params["extents"][0] / 2, self._projection_mesh_params["extents"][2]
-        sampled_r_theta = np.random.rand(n_samples, 2)
-        sampled_r_theta = sampled_r_theta * np.array([r, np.pi * 2]).reshape(1, 2)
+        sampled_r_theta = th.rand(n_samples, 2)
+        sampled_r_theta = sampled_r_theta * th.tensor([r, math.pi * 2]).reshape(1, 2)
         # Get start, end points in local link frame, start points to end points along the -z direction
-        end_points = np.stack(
+        end_points = th.stack(
             [
-                sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
-                sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
-                -h * np.ones(n_samples),
+                sampled_r_theta[:, 0] * th.cos(sampled_r_theta[:, 1]),
+                sampled_r_theta[:, 0] * th.sin(sampled_r_theta[:, 1]),
+                -h * th.ones(n_samples),
             ],
-            axis=1,
+            dim=1,
         )
         projection_type = self._projection_mesh_params["type"]
         if projection_type == "Cone":
             # All start points are the cone tip, which is the local link origin
-            start_points = np.zeros((n_samples, 3))
+            start_points = th.zeros((n_samples, 3))
         elif projection_type == "Cylinder":
             # All start points are the parallel point for their corresponding end point
             # i.e.: (x, y, 0)
-            start_points = end_points + np.array([0, 0, h]).reshape(1, 3)
+            start_points = end_points + th.tensor([0, 0, h]).reshape(1, 3)
         else:
             # Other types not supported
             raise ValueError(f"Unsupported projection mesh type: {projection_type}!")
@@ -1404,7 +1409,7 @@ class ParticleApplier(ParticleModifier):
         # Convert sampled normalized radius and angle into 3D points
         # We convert r, theta --> 3D point in local link frame --> 3D point in global world frame
         # We also combine start and end points for efficiency when doing the transform, then split them up again
-        points = np.concatenate([start_points, end_points], axis=0)
+        points = th.cat([start_points, end_points], dim=0)
         pos, quat = self.link.get_position_orientation()
         points = get_particle_positions_from_frame(
             pos=pos,
@@ -1432,14 +1437,14 @@ class ParticleApplier(ParticleModifier):
         lower, upper = self.link.visual_aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-        lower_upper = np.concatenate([lower, upper], axis=0)
+        lower_upper = th.cat([lower, upper], dim=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
         pos = self.link.get_position()
-        start_points = np.ones((n_samples, 3)) * pos.reshape(1, 3)
-        end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
-        sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
-        end_points[np.arange(n_samples), axes] = lower_upper[sides, axes]
+        start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
+        end_points = th.rand(n_samples, 3) * (upper - lower) + lower
+        sides, axes = th.randint(2, size=(n_samples,)), th.randint(3, size=(n_samples,))
+        end_points[th.arange(n_samples), axes] = lower_upper[sides, axes]
 
         return start_points, end_points
 

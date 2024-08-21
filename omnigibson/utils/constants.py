@@ -7,14 +7,14 @@ import os
 from enum import Enum, IntEnum
 from functools import cache
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_all_object_categories, get_all_system_categories
 
-MAX_INSTANCE_COUNT = np.iinfo(np.uint32).max
-MAX_CLASS_COUNT = np.iinfo(np.uint32).max
+MAX_INSTANCE_COUNT = th.iinfo(th.int32).max
+MAX_CLASS_COUNT = th.iinfo(th.int32).max
 MAX_VIEWER_SIZE = 2048
 
 
@@ -178,12 +178,13 @@ def semantic_class_name_to_id():
         dict: class name to class id
     """
     categories = get_all_object_categories()
+    systems = get_all_system_categories(include_cloth=True)
 
-    systems = get_all_system_categories()
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
-    # Assign a unique class id to each class name with hashing
-    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**32) for s in all_semantics}
+    # Assign a unique class id to each class name with hashing, the upper limit here is the max of int32
+    max_int32 = th.iinfo(th.int32).max + 1
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % max_int32 for s in all_semantics}
 
     return class_name_to_class_id
 

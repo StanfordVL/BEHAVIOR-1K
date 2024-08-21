@@ -1,7 +1,6 @@
 import itertools
 
-import numpy as np
-import trimesh
+import torch as th
 from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
 
 import omnigibson as og
@@ -62,15 +61,18 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
         # Compute the base aligned bounding box of the rigid object.
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
-        vertices_local = np.array(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
-        vertices = trimesh.transformations.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn)))
+        vertices_local = th.tensor(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
+        vertices = th.tensor(
+            T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn))),
+            dtype=th.float32,
+        )
         rigid_hull = ConvexHull(vertices[:, :2])
 
         # The goal is to find the intersection of the convex hull and the bounding box.
         # We can do so with HalfspaceIntersection, which takes as input a list of equations that define the half spaces,
         # and an interior point. We assume the center of the bounding box is an interior point.
-        interior_pt = vertices.mean(axis=0)[:2]
-        half_spaces = np.vstack((cloth_hull.equations, rigid_hull.equations))
+        interior_pt = th.mean(vertices, dim=0)[:2]
+        half_spaces = th.vstack((th.tensor(cloth_hull.equations), th.tensor(rigid_hull.equations)))
         try:
             half_space_intersection = HalfspaceIntersection(half_spaces, interior_pt)
         except QhullError:

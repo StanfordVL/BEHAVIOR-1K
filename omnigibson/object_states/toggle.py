@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -68,8 +68,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
             finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
             n_bodies = len(finger_impulses)
-            touching_bodies = np.any(finger_impulses.reshape(n_bodies, -1), axis=-1)
-            touching_bodies_idxs = np.where(touching_bodies)[0]
+            touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
+            touching_bodies_idxs = th.where(touching_bodies)[0]
             if len(touching_bodies_idxs) > 0:
                 for idx in touching_bodies_idxs:
                     body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
@@ -88,7 +88,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.value = new_value
 
         # Choose which color to apply to the toggle marker
-        self.visual_marker.color = np.array([0, 1.0, 0]) if self.value else np.array([1.0, 0, 0])
+        self.visual_marker.color = th.tensor([0, 1.0, 0]) if self.value else th.tensor([1.0, 0, 0])
 
         return True
 
@@ -114,7 +114,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         else:
             # Infer radius from mesh if not specified as an input
             lazy.omni.isaac.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
-            self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
+            self.scale = th.tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
@@ -178,7 +178,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     def get_texture_change_params():
         # By default, it keeps the original albedo unchanged.
         albedo_add = 0.0
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     @property
@@ -195,7 +195,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
     def serialize(self, state):
-        return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
+        return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=th.float32)
 
     def deserialize(self, state):
         return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

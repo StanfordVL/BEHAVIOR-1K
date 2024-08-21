@@ -3,6 +3,7 @@ import contextlib
 import itertools
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -12,7 +13,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -30,11 +31,11 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
-from omnigibson.utils.python_utils import create_object_from_init_info
+from omnigibson.utils.python_utils import create_object_from_init_info, recursively_convert_to_torch
 from omnigibson.utils.ui_utils import (
     CameraMover,
     create_module_logger,
@@ -306,6 +307,7 @@ def _launch_simulator(*args, **kwargs):
             super().__init__(
                 physics_dt=physics_dt,
                 rendering_dt=rendering_dt,
+                backend="torch",
                 device=device,
             )
 
@@ -391,8 +393,8 @@ def _launch_simulator(*args, **kwargs):
             if gm.RENDER_VIEWER_CAMERA:
                 self._set_viewer_camera()
                 self.viewer_camera.set_position_orientation(
-                    position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
-                    orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+                    position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
+                    orientation=th.tensor(m.DEFAULT_VIEWER_CAMERA_QUAT),
                 )
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
@@ -499,14 +501,14 @@ def _launch_simulator(*args, **kwargs):
             """
             render_physics_ratio = rendering_dt / physics_dt
             sim_render_ratio = sim_step_dt / rendering_dt
-            assert np.isclose(
-                render_physics_ratio, np.round(render_physics_ratio)
+            assert math.isclose(
+                render_physics_ratio, round(render_physics_ratio)
             ), f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
             assert (
                 rendering_dt >= physics_dt
             ), f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
-            assert np.isclose(
-                sim_render_ratio, np.round(sim_render_ratio)
+            assert math.isclose(
+                sim_render_ratio, round(sim_render_ratio)
             ), f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
             assert (
                 sim_step_dt >= rendering_dt
@@ -588,7 +590,7 @@ def _launch_simulator(*args, **kwargs):
                 name="ground_plane",
                 z_position=0,
                 size=None,
-                color=None if floor_plane_color is None else np.array(floor_plane_color),
+                color=None if floor_plane_color is None else th.tensor(floor_plane_color),
                 visible=floor_plane_visible,
                 # TODO: update with new PhysicsMaterial API
                 # static_friction=static_friction,
@@ -781,7 +783,7 @@ def _launch_simulator(*args, **kwargs):
                 # we first move the object to a safe location, then remove it.
                 pos = list(m.OBJECT_GRAVEYARD_POS)
                 for ob in objs:
-                    ob.set_position_orientation(pos, [0, 0, 0, 1])
+                    ob.set_position_orientation(pos, th.tensor([0, 0, 0, 1], dtype=th.float32))
                     pos[0] += max(ob.aabb_extent)
 
                 # One physics timestep will elapse
@@ -794,7 +796,11 @@ def _launch_simulator(*args, **kwargs):
                 self._pre_remove_object(obj)
                 # Prune from the state if recorded
                 if playing:
-                    state[obj.scene.idx]["object_registry"].pop(obj.name)
+                    obj_registry = state[obj.scene.idx]["object_registry"]
+                    if (
+                        obj.name in obj_registry
+                    ):  # a particle system template object might not exist in the registry when it's empty
+                        obj_registry.pop(obj.name)
 
             # Run the main method
             yield
@@ -1506,7 +1512,7 @@ def _launch_simulator(*args, **kwargs):
             for i, scene_file in enumerate(scene_files):
                 if isinstance(scene_file, str):
                     if not scene_file.endswith(".json"):
-                        log.error(f"You have to define the full json_path to load from. Got: {json_path}")
+                        log.error(f"You have to define the full json_path to load from. Got: {scene_file}")
                         return
 
                     # Load the info from the json
@@ -1515,7 +1521,8 @@ def _launch_simulator(*args, **kwargs):
                 else:
                     scene_info = scene_file
                 init_info = scene_info["init_info"]
-                state = scene_info["state"]
+                # The saved state are lists, convert them to torch tensors
+                state = recursively_convert_to_torch(scene_info["state"])
                 states.append(state)
 
                 if load_from_scratch:
@@ -1616,12 +1623,12 @@ def _launch_simulator(*args, **kwargs):
 
                 # Write this to the json file
                 if json_path is None:
-                    jsons.append(json.dumps(scene_info, cls=NumpyEncoder, indent=4))
+                    jsons.append(json.dumps(scene_info, cls=TorchEncoder, indent=4))
 
                 else:
                     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
                     with open(json_path, "w+") as f:
-                        json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
+                        json.dump(scene_info, f, cls=TorchEncoder, indent=4)
 
                     log.info(f"Scene {scene.idx} saved.")
 
@@ -1751,7 +1758,7 @@ def _launch_simulator(*args, **kwargs):
 
         def serialize(self, state):
             # Default state is from the scene
-            return np.concatenate([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], axis=0)
+            return th.cat([scene.serialize(state=state[i]) for i, scene in enumerate(self.scenes)], dim=0)
 
         def deserialize(self, state):
             # Default state is from the scene

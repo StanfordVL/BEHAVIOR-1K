@@ -1,15 +1,17 @@
+import math
 from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
 
 import gymnasium as gym
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -76,7 +78,7 @@ class ControllableObject(BaseObject):
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = None if reset_joint_pos is None else np.array(reset_joint_pos)
+        self._reset_joint_pos = None if reset_joint_pos is None else th.tensor(reset_joint_pos)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -181,7 +183,7 @@ class ControllableObject(BaseObject):
             )
             self._control_freq = expected_control_freq
         else:
-            assert np.isclose(
+            assert math.isclose(
                 expected_control_freq, self._control_freq
             ), "Stored control frequency does not match environment's render timestep."
 
@@ -314,10 +316,15 @@ class ControllableObject(BaseObject):
         low, high = [], []
         for controller in self._controllers.values():
             limits = controller.command_input_limits
-            low.append(np.array([-np.inf] * controller.command_dim) if limits is None else limits[0])
-            high.append(np.array([np.inf] * controller.command_dim) if limits is None else limits[1])
+            low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
+            high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
-        return gym.spaces.Box(shape=(self.action_dim,), low=np.concatenate(low), high=np.concatenate(high), dtype=float)
+        return gym.spaces.Box(
+            shape=(self.action_dim,),
+            low=th.cat(low).cpu().numpy(),
+            high=th.cat(high).cpu().numpy(),
+            dtype=NumpyTypes.FLOAT32,
+        )
 
     def apply_action(self, action):
         """
@@ -333,7 +340,10 @@ class ControllableObject(BaseObject):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = np.array(self.discrete_action_list[action])
+            action = th.tensor(self.discrete_action_list[action], dtype=th.float32)
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
 
         # Sanity check that action is 1D array
         assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
@@ -390,9 +400,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self.n_dof)
-        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
-        u_type_vec = np.array([ControlType.NONE] * self.n_dof)
+        u_vec = th.zeros(self.n_dof)
+        # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
+        u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -455,7 +465,7 @@ class ControllableObject(BaseObject):
             "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
         )
         # Set indices manually so that we're standardized
-        indices = np.arange(self.n_dof)
+        indices = range(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -523,15 +533,15 @@ class ControllableObject(BaseObject):
         # set the targets for joints
         if using_pos:
             ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path, positions=np.array(pos_vec), indices=np.array(pos_idxs)
+                self.articulation_root_path, positions=th.tensor(pos_vec), indices=th.tensor(pos_idxs)
             )
         if using_vel:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
+                self.articulation_root_path, velocities=th.tensor(vel_vec), indices=th.tensor(vel_idxs)
             )
         if using_eff:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
+                self.articulation_root_path, efforts=th.tensor(eff_vec), indices=th.tensor(eff_idxs)
             )
 
     def get_control_dict(self):
@@ -626,12 +636,12 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = np.concatenate(
+        controller_states_flat = th.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
         )
 
         # Concatenate and return
-        return np.concatenate([state_flat, controller_states_flat]).astype(float)
+        return th.cat([state_flat, controller_states_flat])
 
     def deserialize(self, state):
         # Run super first
@@ -707,7 +717,7 @@ class ControllableObject(BaseObject):
         idx = 0
         for controller in self.controller_order:
             cmd_dim = self._controllers[controller].command_dim
-            dic[controller] = np.arange(idx, idx + cmd_dim)
+            dic[controller] = th.arange(idx, idx + cmd_dim)
             idx += cmd_dim
 
         return dic

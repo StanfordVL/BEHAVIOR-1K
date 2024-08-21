@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm, macros
@@ -72,7 +72,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Either Cone or Cylinder; shape of the projection where particles can be applied / removed
             "type": "Cone",
             # Size of the cone
-            "extents": np.array([0.1875, 0.1875, 0.375]),
+            "extents": th.tensor([0.1875, 0.1875, 0.375]),
         },
     }
 
@@ -129,8 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.61340969, -1.79803028, 2.53167412]),
-        orientation=np.array([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
+        position=th.tensor([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=th.tensor([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
@@ -163,12 +163,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     modifier._post_load()
     env.scene.object_registry.add(modifier)
     og.sim._post_import_object(modifier)
-    modifier.set_position(np.array([0, 0, 5.0]))
+    modifier.set_position(th.tensor([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle
     og.sim.play()
     for _ in range(25):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
@@ -176,7 +176,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Take a few steps to let particles settle
         for _ in range(25):
-            env.step(np.array([]))
+            env.step(th.empty(0))
 
     # Enable camera teleoperation for convenience
     og.sim.enable_viewer_camera_teleoperation()
@@ -193,24 +193,24 @@ def main(random_selection=False, headless=False, short_exec=False):
         z = 1.22
     modifier.keep_still()
     modifier.set_position_orientation(
-        position=np.array([0, 0.3, z]),
-        orientation=np.array([0, 0, 0, 1.0]),
+        position=th.tensor([0, 0.3, z]),
+        orientation=th.tensor([0, 0, 0, 1.0]),
     )
 
     # Move object in square around table
     deltas = [
-        [130, np.array([-0.01, 0, 0])],
-        [60, np.array([0, -0.01, 0])],
-        [130, np.array([0.01, 0, 0])],
-        [60, np.array([0, 0.01, 0])],
+        [130, th.tensor([-0.01, 0, 0])],
+        [60, th.tensor([0, -0.01, 0])],
+        [130, th.tensor([0.01, 0, 0])],
+        [60, th.tensor([0, 0.01, 0])],
     ]
     for t, delta in deltas:
         for i in range(t):
             modifier.set_position(modifier.get_position() + delta)
-            env.step(np.array([]))
+            env.step(th.empty(0))
 
     # Always shut down environment at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

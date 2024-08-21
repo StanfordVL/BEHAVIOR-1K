@@ -1,4 +1,6 @@
-import numpy as np
+import math
+
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
@@ -108,8 +110,8 @@ class ParticleSource(ParticleApplier):
         # Note: height must be considered in the world frame, so we convert the distance from local into world frame
         # Extents are in local frame, so we need to convert to world frame using link scale
         distance = self.link.scale[2] * self._projection_mesh_params["extents"][2]
-        t = (-self._initial_speed + np.sqrt(self._initial_speed**2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
-        self._n_steps_per_modification = np.ceil(1 + t / og.sim.get_sim_step_dt()).astype(int)
+        t = (-self._initial_speed + th.sqrt(self._initial_speed**2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
+        self._n_steps_per_modification = math.ceil(1 + t / og.sim.get_sim_step_dt())
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system

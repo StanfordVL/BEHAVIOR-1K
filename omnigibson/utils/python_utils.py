@@ -11,7 +11,8 @@ from functools import cache, wraps
 from hashlib import md5
 from importlib import import_module
 
-import numpy as np
+import h5py
+import torch as th
 
 # Global dictionary storing all unique names
 NAMES = set()
@@ -171,11 +172,11 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
                 base_dict[k] = merge_nested_dicts(base_dict[k], v)
             else:
                 not_equal = base_dict[k] != v
-                if isinstance(not_equal, np.ndarray):
+                if isinstance(not_equal, th.Tensor):
                     not_equal = not_equal.any()
                 if not_equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")
-                base_dict[k] = np.array(v) if isinstance(v, list) else v
+                base_dict[k] = v
 
     # Return new dict
     return base_dict
@@ -292,7 +293,7 @@ def get_uuid(name, n_digits=8, deterministic=True):
     """
     # Make sure the number is float32 compatible
     val = int(md5(name.encode()).hexdigest(), 16) if deterministic else abs(hash(name))
-    return int(np.float32(val % (10**n_digits)))
+    return int(th.tensor(val % (10**n_digits), dtype=th.float32).item())
 
 
 def meets_minimum_version(test_version, minimum_version):
@@ -394,7 +395,7 @@ class Serializable:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
         state = self._dump_state()
         return self.serialize(state=state) if serialized else state
@@ -415,7 +416,7 @@ class Serializable:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
@@ -438,7 +439,7 @@ class Serializable:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
         raise NotImplementedError()
 
@@ -448,7 +449,7 @@ class Serializable:
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -488,7 +489,7 @@ class SerializableNonInstance:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
         """
         state = cls._dump_state()
         return cls.serialize(state=state) if serialized else state
@@ -511,7 +512,7 @@ class SerializableNonInstance:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state.
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
@@ -535,7 +536,7 @@ class SerializableNonInstance:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
         # Simply returns self.serialize() for now. this is for future proofing
         return NotImplementedError()
@@ -547,7 +548,7 @@ class SerializableNonInstance:
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -704,7 +705,7 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
-def nums2array(nums, dim, dtype=float):
+def nums2array(nums, dim, dtype=th.float32):
     """
     Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
     corresponding dimension size @dim before converting into numpy array
@@ -719,7 +720,7 @@ def nums2array(nums, dim, dtype=float):
     # Make sure the inputted nums isn't a string
     assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
 
-    out = np.array(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+    out = th.tensor(nums, dtype=dtype) if isinstance(nums, Iterable) else th.ones(dim, dtype=dtype) * nums
 
     return out
 
@@ -730,3 +731,55 @@ def clear():
     """
     NAMES.clear()
     CLASS_NAMES.clear()
+
+
+def torch_delete(tensor: th.Tensor, indices: th.Tensor | int, dim: int | None = None) -> th.Tensor:
+    """
+    Delete elements from a tensor along a specified dimension.
+
+    Parameters:
+    tensor (torch.Tensor): Input tensor.
+    indices (int or torch.Tensor): Indices of elements to remove.
+    dim (int, optional): The dimension along which to delete the elements.
+                         If None, the tensor is flattened before deletion.
+
+    Returns:
+    torch.Tensor: Tensor with specified elements removed.
+    """
+    assert tensor.dim() > 0, "Input tensor must have at least one dimension"
+
+    if dim is None:
+        # Flatten the tensor if no dim is specified
+        tensor = tensor.flatten()
+        dim = 0
+
+    if not isinstance(indices, th.Tensor):
+        indices = th.tensor(indices, dtype=th.long, device=tensor.device)
+
+    assert th.all(indices >= 0) and th.all(indices < tensor.size(dim)), "Indices out of bounds"
+
+    # Create a mask for the indices to keep
+    keep_indices = th.ones(tensor.size(dim), dtype=th.bool, device=tensor.device)
+    keep_indices[indices] = False
+
+    return th.index_select(tensor, dim, th.nonzero(keep_indices).squeeze(1))
+
+
+def recursively_convert_to_torch(state):
+    # For all the lists in state dict, convert to torch tensor
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_to_torch(value)
+        elif isinstance(value, list):
+            state[key] = th.tensor(value, dtype=th.float32)
+    return state
+
+
+def h5py_group_to_torch(group):
+    state = {}
+    for key, value in group.items():
+        if isinstance(value, h5py.Group):
+            state[key] = h5py_group_to_torch(value)
+        else:
+            state[key] = th.tensor(value[()], dtype=th.float32)
+    return state

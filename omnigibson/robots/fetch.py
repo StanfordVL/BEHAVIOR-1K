@@ -1,6 +1,7 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.controllers import ControlType
 from omnigibson.macros import gm
@@ -155,7 +156,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def tucked_default_joint_pos(self):
-        return np.array(
+        return th.tensor(
             [
                 0.0,
                 0.0,  # wheels
@@ -176,31 +177,31 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def untucked_default_joint_pos(self):
-        pos = np.zeros(self.n_joints)
+        pos = th.zeros(self.n_joints)
         pos[self.base_control_idx] = 0.0
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
-        pos[self.camera_control_idx] = np.array([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.05, 0.05])  # open gripper
+        pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
+        pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
 
         # Choose arm based on setting
         if self.default_arm_pose == "vertical":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
             )
         elif self.default_arm_pose == "diagonal15":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]
             )
         elif self.default_arm_pose == "diagonal30":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
             )
         elif self.default_arm_pose == "diagonal45":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
             )
         elif self.default_arm_pose == "horizontal":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
             )
         else:
@@ -303,7 +304,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Need to override joint idx being controlled to include trunk in default arm controller configs
         for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
-            arm_control_idx = np.concatenate([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
+            arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
             arm_cfg["dof_idx"] = arm_control_idx
 
             # Need to modify the default joint positions also if this is a null joint controller
@@ -361,7 +362,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return np.array([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def disabled_collision_pairs(self):
@@ -470,7 +471,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {self.default_arm: [np.deg2rad(-45), np.deg2rad(45)]}
+        return {self.default_arm: [th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()]}
 
     @property
     def eef_usd_path(self):
@@ -478,4 +479,4 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
+        return {self.default_arm: euler2quat([0, math.pi / 2, math.pi])}

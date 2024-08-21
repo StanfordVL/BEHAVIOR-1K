@@ -2,8 +2,7 @@
 Helper utility functions for computing relevant object information
 """
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -25,13 +24,13 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
         n-array: (N, 4) array, where each of the N rows are sampled (x,y,z,w) stable orientations
     """
     og.sim.play()
-    assert np.all(obj.scale == 1.0)
+    assert th.all(obj.scale == 1.0)
     aabb_extent = obj.aabb_extent
-    radius = np.linalg.norm(aabb_extent) / 2.0
-    drop_pos = np.array([0, 0, radius + drop_aabb_offset])
+    radius = th.norm(aabb_extent) / 2.0
+    drop_pos = th.tensor([0, 0, radius + drop_aabb_offset])
     center_offset = obj.get_position() - obj.aabb_center
-    drop_orientations = R.random(n_samples).as_quat()
-    stable_orientations = np.zeros_like(drop_orientations)
+    drop_orientations = T.random_quaternion(n_samples)
+    stable_orientations = th.zeros_like(drop_orientations)
     for i, drop_orientation in enumerate(drop_orientations):
         # Sample orientation, drop, wait to stabilize, then record
         pos = drop_pos + T.quat2mat(drop_orientation) @ center_offset
@@ -56,8 +55,8 @@ def compute_bbox_offset(obj):
         n-array: (x,y,z) offset specifying the relative position from the root link to @obj's bounding box center
     """
     og.sim.stop()
-    assert np.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), np.array([0, 0, 0, 1.0]))
+    assert th.all(obj.scale == 1.0)
+    obj.set_position_orientation(th.zeros(3), th.tensor([0, 0, 0, 1.0]))
     return obj.aabb_center - obj.get_position()
 
 
@@ -73,8 +72,8 @@ def compute_native_bbox_extent(obj):
         n-array: (x,y,z) native bounding box extent
     """
     og.sim.stop()
-    assert np.all(obj.scale == 1.0)
-    obj.set_position_orientation(np.zeros(3), np.array([0, 0, 0, 1.0]))
+    assert th.all(obj.scale == 1.0)
+    obj.set_position_orientation(th.zeros(3), th.tensor([0, 0, 0, 1.0]))
     return obj.aabb_extent
 
 
@@ -88,12 +87,12 @@ def compute_base_aligned_bboxes(obj):
                 pts = mesh.get_attribute("points")
                 local_pos, local_orn = mesh.get_local_pose()
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
-            pts_in_link_frame = np.concatenate(pts_in_link_frame, axis=0)
-            max_pt = np.max(pts_in_link_frame, axis=0)
-            min_pt = np.min(pts_in_link_frame, axis=0)
+            pts_in_link_frame = th.cat(pts_in_link_frame, dim=0)
+            max_pt = th.max(pts_in_link_frame, dim=0).values
+            min_pt = th.min(pts_in_link_frame, dim=0).values
             extent = max_pt - min_pt
             center = (max_pt + min_pt) / 2.0
-            transform = T.pose2mat((center, np.array([0, 0, 0, 1.0])))
+            transform = T.pose2mat((center, th.tensor([0, 0, 0, 1.0])))
             print(pts_in_link_frame.shape)
             link_bounding_boxes[link_name][mesh_type] = {
                 "extent": extent,
@@ -121,7 +120,7 @@ def compute_obj_kinematic_metadata(obj):
     assert obj.scene is not None
     assert og.sim.floor_plane is not None
     assert type(obj.scene) == Scene, "An empty scene must be used in order to compute kinematic metadata!"
-    assert np.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
+    assert th.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
     og.sim.stop()
 
     return {

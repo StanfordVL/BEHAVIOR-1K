@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
@@ -107,7 +107,7 @@ class BehaviorTask(BaseTask):
         self.future_obj_instances = None  # set of str
 
         # Info for demonstration collection
-        self.instruction_order = None  # np.array of int
+        self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
         self.activity_natural_language_goal_conditions = None  # str
@@ -262,8 +262,9 @@ class BehaviorTask(BaseTask):
         )
 
         # Demo attributes
-        self.instruction_order = np.arange(len(self.activity_conditions.parsed_goal_conditions))
-        np.random.shuffle(self.instruction_order)
+        self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
+        self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
+
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
         self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
@@ -376,15 +377,15 @@ class BehaviorTask(BaseTask):
         # Batch rpy calculations for much better efficiency
         objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
-            np.array(
+            th.stack(
                 [
-                    obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
+                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
                     for obj, obj_exist in objs_exist.items()
                 ]
             )
         )
-        objs_rpy_cos = np.cos(objs_rpy)
-        objs_rpy_sin = np.sin(objs_rpy)
+        objs_rpy_cos = th.cos(objs_rpy)
+        objs_rpy_sin = th.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)
@@ -396,21 +397,21 @@ class BehaviorTask(BaseTask):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.array([1.0])
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
                 low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
                 low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
                 low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.zeros(1)
+                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 
