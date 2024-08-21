@@ -199,6 +199,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             # Desired is the exact goal
             u = target
 
+        # Return control
         return u
 
     def compute_no_op_goal(self, control_dict):
