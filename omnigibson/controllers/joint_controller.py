@@ -12,6 +12,10 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -42,6 +46,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         kp=None,
         damping_ratio=None,
         use_impedances=False,
+        use_gravity_compensation=False,
+        use_cc_compensation=False,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
     ):
@@ -74,6 +80,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 damping ratio applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
+            use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
+                an experimental feature that only works on fixed base robots. We do not recommend enabling this.
+            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts
+                This is an experimental feature. We do not recommend enabling this.
             use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values
             compute_delta_in_quat_space (None or List[(rx_idx, ry_idx, rz_idx), ...]): if specified, groups of
                 joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
@@ -99,6 +109,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self.kp = kp
         self.kd = None if damping_ratio is None else 2 * math.sqrt(self.kp) * damping_ratio
         self._use_impedances = use_impedances
+        self._use_gravity_compensation = use_gravity_compensation
+        self._use_cc_compensation = use_cc_compensation
+
+        # Warn the user about gravity compensation and Coriolis / centrifugal compensation being experimental.
+        if self._use_gravity_compensation:
+            log.warning(
+                "JointController is using gravity compensation. This is an experimental feature that only works on "
+                "fixed base robots. We do not recommend enabling this."
+            )
+        if self._use_cc_compensation:
+            log.warning(
+                "JointController is using Coriolis / centrifugal compensation. This is an experimental feature. We do "
+                "not recommend enabling this."
+            )
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
@@ -193,7 +217,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             u = mm @ u
 
             # Add gravity compensation
-            u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
+            if self._use_gravity_compensation:
+                u += control_dict["gravity_force"][self.dof_idx]
+
+            # Add Coriolis / centrifugal compensation
+            if self._use_cc_compensation:
+                u += control_dict["cc_force"][self.dof_idx]
 
         else:
             # Desired is the exact goal
