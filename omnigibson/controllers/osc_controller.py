@@ -140,12 +140,12 @@ class OperationalSpaceController(ManipulationController):
         # Warn the user about gravity compensation and Coriolis / centrifugal compensation being experimental.
         if self._use_gravity_compensation:
             log.warning(
-                "JointController is using gravity compensation. This is an experimental feature that only works on "
+                "OperationalSpaceController is using gravity compensation. This is an experimental feature that only works on "
                 "fixed base robots. We do not recommend enabling this."
             )
         if self._use_cc_compensation:
             log.warning(
-                "JointController is using Coriolis / centrifugal compensation. This is an experimental feature. We do "
+                "OperationalSpaceController is using Coriolis / centrifugal compensation. This is an experimental feature. We do "
                 "not recommend enabling this."
             )
 

@@ -590,8 +590,8 @@ class KeyboardRobotController:
                 "command_dim": controller.command_dim,
             }
             idx += controller.command_dim
-            for i in controller.dof_idx:
-                self.joint_idx_to_controller[i.item()] = controller
+            for i in controller.dof_idx.tolist():
+                self.joint_idx_to_controller[i] = controller
 
         # Other persistent variables we need to keep track of
         self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
