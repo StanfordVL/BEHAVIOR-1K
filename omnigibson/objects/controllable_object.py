@@ -135,10 +135,9 @@ class ControllableObject(BaseObject):
         assert (
             len(robot_name_components) == 3
         ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
-        assert robot_name_components[0] in (
-            "controllable",
-            "dummy",
-        ), "Third component of articulation root path (robot name) must start with 'controllable' or 'dummy'"
+        assert (
+            robot_name_components[0] == "controllable",
+        ), "Third component of articulation root path (robot name) must start with 'controllable'"
         assert (
             robot_name_components[1] == self.__class__.__name__.lower()
         ), "Third component of articulation root path (robot name) must contain the class name as the second part"
@@ -582,11 +581,8 @@ class ControllableObject(BaseObject):
         fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
-        # TODO: Move gravity force computation dummy to this class instead of BaseRobot
-        fcns["gravity_force"] = lambda: (
-            ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
-            if self.fixed_base
-            else ControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+            self.articulation_root_path
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
             self.articulation_root_path
