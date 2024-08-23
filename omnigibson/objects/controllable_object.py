@@ -188,6 +188,18 @@ class ControllableObject(BaseObject):
 
         return prim
 
+    def _post_load(self):
+        # Call super first
+        super()._post_load()
+
+        # For controllable objects, we disable gravity of all links that are not the base link. This
+        # is because we cannot accurately apply gravity compensation in the absence of a working
+        # generalized gravity force computation. This may have some side effects on the measured
+        # torque on each of these links, but it provides a greatly improved joint control behavior.
+        for link in self._links.values():
+            if link is not self.root_link:
+                link.disable_gravity()
+
     def _load_controllers(self):
         """
         Loads controller(s) to map inputted actions into executable (pos, vel, and / or effort) signals on this object.

@@ -292,7 +292,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # We use multi finger gripper, differential drive, and IK controllers as default
         controllers["base"] = "DifferentialDriveController"
         controllers["camera"] = "JointController"
-        controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
+        controllers["arm_{}".format(self.default_arm)] = "JointController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
 
         return controllers
