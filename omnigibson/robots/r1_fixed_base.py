@@ -49,7 +49,7 @@ class R1FixedBase(ManipulationRobot):
         grasping_mode="physical",
         disable_grasp_handling=False,
         # Unique to r1
-        rigid_trunk=True,
+        rigid_trunk=False,
         **kwargs,
     ):
         """
@@ -212,8 +212,8 @@ class R1FixedBase(ManipulationRobot):
         # Add trunk info
         joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
         joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
-        dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
-        dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
+        # dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
+        # dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
         return dic
 
@@ -230,17 +230,17 @@ class R1FixedBase(ManipulationRobot):
     #     limits["velocity"][1][self.base_idx[3:]] = m.MAX_ANGULAR_VELOCITY
     #     return limits
 
-    def get_control_dict(self):
-        # Modify the right hand's pos_relative in the z-direction based on the trunk's value
-        # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
-        # hand, which does not control the trunk
-        fcns = super().get_control_dict()
-        native_fcn = fcns.get_fcn("eef_right_pos_relative")
-        fcns["eef_right_pos_relative"] = lambda: (
-            native_fcn() + th.tensor([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
-        )
+    # def get_control_dict(self):
+    #     # Modify the right hand's pos_relative in the z-direction based on the trunk's value
+    #     # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
+    #     # hand, which does not control the trunk
+    #     fcns = super().get_control_dict()
+    #     native_fcn = fcns.get_fcn("eef_right_pos_relative")
+    #     fcns["eef_right_pos_relative"] = lambda: (
+    #         native_fcn() + th.tensor([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
+    #     )
 
-        return fcns
+    #     return fcns
 
     @property
     def default_proprio_obs(self):
@@ -384,7 +384,8 @@ class R1FixedBase(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/r1/r1.usd")
+        return os.path.join(gm.ASSET_PATH, "models/r1/r1_fixed_base.usd")
+        # return os.path.join(gm.ASSET_PATH, "models/r1/r1_fixed_torso.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
