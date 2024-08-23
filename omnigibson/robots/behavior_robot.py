@@ -358,14 +358,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return "base"
 
-    @property
-    def base_footprint_link(self):
-        """
-        Returns:
-            RigidPrim: base footprint link of this object prim
-        """
-        return self._links[self.base_footprint_link_name]
-
     def get_position_orientation(self, clone=True):
         return self.base_footprint_link.get_position_orientation(clone=clone)
 

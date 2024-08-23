@@ -70,7 +70,7 @@ class OperationalSpaceController(ManipulationController):
         decouple_pos_ori=False,
         workspace_pose_limiter=None,
         use_gravity_compensation=False,
-        use_cc_compensation=False,
+        use_cc_compensation=True,
     ):
         """
         Args:
@@ -129,8 +129,7 @@ class OperationalSpaceController(ManipulationController):
                 values, and the returned tuple is the processed (pos, quat) command.
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
                 an experimental feature that only works on fixed base robots. We do not recommend enabling this.
-            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts
-                This is an experimental feature. We do not recommend enabling this.
+            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -142,11 +141,6 @@ class OperationalSpaceController(ManipulationController):
             log.warning(
                 "OperationalSpaceController is using gravity compensation. This is an experimental feature that only works on "
                 "fixed base robots. We do not recommend enabling this."
-            )
-        if self._use_cc_compensation:
-            log.warning(
-                "OperationalSpaceController is using Coriolis / centrifugal compensation. This is an experimental feature. We do "
-                "not recommend enabling this."
             )
 
         # Store gains

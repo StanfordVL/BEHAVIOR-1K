@@ -4,6 +4,7 @@ from copy import deepcopy
 from functools import cached_property
 
 import gymnasium as gym
+import networkx as nx
 import torch as th
 
 import omnigibson as og
@@ -192,13 +193,29 @@ class ControllableObject(BaseObject):
         # Call super first
         super()._post_load()
 
-        # For controllable objects, we disable gravity of all links that are not the base link. This
-        # is because we cannot accurately apply gravity compensation in the absence of a working
+        # For controllable objects, we disable gravity of all links that are not fixed to the base link.
+        # This is because we cannot accurately apply gravity compensation in the absence of a working
         # generalized gravity force computation. This may have some side effects on the measured
         # torque on each of these links, but it provides a greatly improved joint control behavior.
-        for link in self._links.values():
-            if link is not self.root_link:
-                link.disable_gravity()
+        # Note that we do NOT disable gravity for links that are fixed to the base link, as these links
+        # are typically where most of the downward force on the robot is applied. Disabling gravity
+        # for these links would result in the robot floating in the air easily. Also note that here
+        # we use the base link footprint which takes into account the presence of virtual joints.
+
+        # Find all the links that are accessible from the base link footprint via a chain of fixed
+        # joints. We will disable gravity for all links that are not in this set.
+        articulation_tree = self.articulation_tree
+        base_footprint = self.base_footprint_link_name
+        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == "FixedJoint"
+        only_fixed_joints = nx.subgraph_view(articulation_tree, filter_edge=is_edge_fixed)
+        fixed_link_names = nx.descendants(only_fixed_joints, base_footprint) | {base_footprint}
+
+        # Find the links that are NOT fixed.
+        other_link_names = set(self.links.keys()) - fixed_link_names
+
+        # Disable gravity for those links.
+        for link_name in other_link_names:
+            self.links[link_name].disable_gravity()
 
     def _load_controllers(self):
         """
@@ -663,6 +680,36 @@ class ControllableObject(BaseObject):
         state_dict["controllers"] = controller_states
 
         return state_dict, idx
+
+    @property
+    def base_footprint_link_name(self):
+        """
+        Get the base footprint link name for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            str: Name of the base footprint link for this object
+        """
+        return self.root_link_name
+
+    @property
+    def base_footprint_link(self):
+        """
+        Get the base footprint link for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            RigidPrim: Base footprint link for this object
+        """
+        return self.links[self.base_footprint_link_name]
 
     @property
     def action_dim(self):

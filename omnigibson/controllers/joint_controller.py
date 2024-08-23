@@ -47,7 +47,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         damping_ratio=None,
         use_impedances=False,
         use_gravity_compensation=False,
-        use_cc_compensation=False,
+        use_cc_compensation=True,
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
     ):
@@ -82,8 +82,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 applied
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
                 an experimental feature that only works on fixed base robots. We do not recommend enabling this.
-            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts
-                This is an experimental feature. We do not recommend enabling this.
+            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts.
             use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values
             compute_delta_in_quat_space (None or List[(rx_idx, ry_idx, rz_idx), ...]): if specified, groups of
                 joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
@@ -112,16 +111,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._use_gravity_compensation = use_gravity_compensation
         self._use_cc_compensation = use_cc_compensation
 
-        # Warn the user about gravity compensation and Coriolis / centrifugal compensation being experimental.
+        # Warn the user about gravity compensation being experimental.
         if self._use_gravity_compensation:
             log.warning(
                 "JointController is using gravity compensation. This is an experimental feature that only works on "
                 "fixed base robots. We do not recommend enabling this."
-            )
-        if self._use_cc_compensation:
-            log.warning(
-                "JointController is using Coriolis / centrifugal compensation. This is an experimental feature. We do "
-                "not recommend enabling this."
             )
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
