@@ -136,7 +136,7 @@ class ControllableObject(BaseObject):
             len(robot_name_components) == 3
         ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
         assert (
-            robot_name_components[0] == "controllable",
+            robot_name_components[0] == "controllable"
         ), "Third component of articulation root path (robot name) must start with 'controllable'"
         assert (
             robot_name_components[1] == self.__class__.__name__.lower()
