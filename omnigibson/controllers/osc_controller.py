@@ -69,6 +69,8 @@ class OperationalSpaceController(ManipulationController):
         mode="pose_delta_ori",
         decouple_pos_ori=False,
         workspace_pose_limiter=None,
+        use_gravity_compensation=False,
+        use_cc_compensation=True,
     ):
         """
         Args:
@@ -125,9 +127,21 @@ class OperationalSpaceController(ManipulationController):
 
                 where target_pos is (x,y,z) cartesian position values, target_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
+            use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
+                an experimental feature that only works on fixed base robots. We do not recommend enabling this.
+            use_cc_compensation (bool): If True, will add Coriolis / centrifugal compensation to the computed efforts.
         """
         # Store arguments
         control_dim = len(dof_idx)
+        self._use_gravity_compensation = use_gravity_compensation
+        self._use_cc_compensation = use_cc_compensation
+
+        # Warn the user about gravity compensation and Coriolis / centrifugal compensation being experimental.
+        if self._use_gravity_compensation:
+            log.warning(
+                "OperationalSpaceController is using gravity compensation. This is an experimental feature that only works on "
+                "fixed base robots. We do not recommend enabling this."
+            )
 
         # Store gains
         self.kp = nums2array(nums=kp, dim=6, dtype=th.float32) if kp is not None else None
@@ -407,8 +421,13 @@ class OperationalSpaceController(ManipulationController):
             base_ang_vel=base_ang_vel,
         ).flatten()
 
-        # Apply gravity compensation from the control dict
-        u += control_dict["gravity_force"][self.dof_idx] + control_dict["cc_force"][self.dof_idx]
+        # Add gravity compensation
+        if self._use_gravity_compensation:
+            u += control_dict["gravity_force"][self.dof_idx]
+
+        # Add Coriolis / centrifugal compensation
+        if self._use_cc_compensation:
+            u += control_dict["cc_force"][self.dof_idx]
 
         # Return the control torques
         return u

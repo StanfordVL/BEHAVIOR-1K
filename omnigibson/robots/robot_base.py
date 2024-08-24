@@ -129,7 +129,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Initialize internal attributes that will be loaded later
         self._sensors = None  # e.g.: scan sensor, vision sensor
-        self._dummy = None  # Dummy version of the robot w/ fixed base for computing generalized gravity forces
 
         # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
         # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
@@ -164,28 +163,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             **kwargs,
         )
 
-    def _load(self):
-        # Run super first
-        prim = super()._load()
-
-        # Also import dummy object if this robot is not fixed base AND it has a controller that
-        # requires generalized gravity forces. We incur a relatively heavy cost at every step if we
-        # have to move the dummy. So we only do this if we absolutely need to.
-        if not self.fixed_base:
-            dummy_path = self.prim_path.replace("controllable__", "dummy__")
-            dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
-            self._dummy = BaseObject(
-                name=f"{self.name}_dummy",
-                relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, dummy_path),
-                scale=self._load_config.get("scale", None),
-                visible=False,
-                fixed_base=True,
-                visual_only=True,
-            )
-            self._dummy.load(self.scene)
-
-        return prim
-
     def _post_load(self):
         # Run super post load first
         super()._post_load()
@@ -194,10 +171,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self._load_sensors()
 
     def _initialize(self):
-        # Initialize the dummy first if it exists
-        if self._dummy is not None:
-            self._dummy.initialize()
-
         # Run super
         super()._initialize()
 
@@ -290,22 +263,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Run any needed sanity checks to make sure this robot was created correctly.
         """
         pass
-
-    def step(self):
-        # Skip this step if our articulation view is not valid
-        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
-            return
-
-        # Before calling super, update the dummy robot's kinematic state based on this robot's kinematic state
-        # This is done prior to any state getter calls, since setting kinematic state results in physx backend
-        # having to re-fetch tensorized state.
-        # We do this so we have more optimal runtime performance
-        if self._dummy is not None:
-            self._dummy.set_joint_positions(self.get_joint_positions())
-            self._dummy.set_joint_velocities(self.get_joint_velocities())
-            self._dummy.set_position_orientation(*self.get_position_orientation())
-
-        super().step()
 
     def get_obs(self):
         """
@@ -484,10 +441,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Call super first
         super().update_handles()
 
-        # If we have a dummy robot, also update its handles too
-        if self._dummy is not None:
-            self._dummy.update_handles()
-
     def remove(self):
         """
         Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
@@ -517,17 +470,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             th.tensor: array of action data filled with update value
         """
         return th.zeros(self.action_dim)
-
-    def get_generalized_gravity_forces(self, clone=True):
-        # Override method based on whether we're using a dummy or not
-        assert (
-            self._dummy is not None or not self.fixed_base
-        ), "Cannot compute generalized gravity forces for fixed base robot without a dummy!"
-        return (
-            self._dummy.get_generalized_gravity_forces(clone=clone)
-            if not self.fixed_base
-            else super().get_generalized_gravity_forces(clone=clone)
-        )
 
     @property
     def sensors(self):
@@ -638,15 +580,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # For all robots, this must be specified a priori, before we actually initialize the USDObject constructor!
         # So we override the parent implementation, and make this an abstract method
         raise NotImplementedError
-
-    @property
-    def _dummy_usd_path(self):
-        """
-        Returns:
-            str: Absolute path to the dummy USD to load for, e.g., computing gravity compensation
-        """
-        # By default, this is just the normal usd path
-        return self.usd_path
 
     @property
     def urdf_path(self):

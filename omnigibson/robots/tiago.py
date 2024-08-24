@@ -286,14 +286,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def base_footprint_link_name(self):
         return "base_footprint"
 
-    @property
-    def base_footprint_link(self):
-        """
-        Returns:
-            RigidPrim: base footprint link of this object prim
-        """
-        return self._links[self.base_footprint_link_name]
-
     def _postprocess_control(self, control, control_type):
         # Run super method first
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)

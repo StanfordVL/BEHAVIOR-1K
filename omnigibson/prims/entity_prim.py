@@ -125,6 +125,7 @@ class EntityPrim(XFormPrim):
         # Setup links info FIRST before running any other post loading behavior
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links()
+        self._compute_articulation_tree()
 
         # Optionally set the scale
         if "scale" in self._load_config and self._load_config["scale"] is not None:
@@ -298,7 +299,6 @@ class EntityPrim(XFormPrim):
         )
 
         self._update_joint_limits()
-        self._compute_articulation_tree()
 
     def _update_joint_limits(self):
         """
