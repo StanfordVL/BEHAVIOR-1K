@@ -802,7 +802,7 @@ class BatchControlViewAPIImpl:
         self._link_idx = {}
 
         # Mapping from prim path to base footprint link name if one exists, None if the root is the base link.
-        self._base_footprint_link_name = {}
+        self._base_footprint_link_names = {}
 
     def clear(self):
         self._read_cache = {}
@@ -859,9 +859,9 @@ class BatchControlViewAPIImpl:
             {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
             for articulation_link_paths in self._view.link_paths
         ]
-        self._base_footprint_link_name = {
+        self._base_footprint_link_names = {
             obj.articulation_root_path: (
-                obj._base_footprint_link_name if obj._base_footprint_link_name != obj.root_link_name else None
+                obj.base_footprint_link_name if obj.base_footprint_link_name != obj.root_link_name else None
             )
             for obj in controllable_objects
         }
@@ -919,8 +919,8 @@ class BatchControlViewAPIImpl:
     def get_position_orientation(self, prim_path):
         # Here we want to return the position of the base footprint link. If the base footprint link is None,
         # we return the position of the root link.
-        if self._base_footprint_link_name[prim_path] is not None:
-            link_name = self._base_footprint_link_name[prim_path]
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
             return self.get_link_transform(prim_path, link_name)
         else:
             return self.get_root_transform(prim_path)
