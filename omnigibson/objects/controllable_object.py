@@ -11,7 +11,7 @@ import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.utils.constants import PrimType
+from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
@@ -206,7 +206,7 @@ class ControllableObject(BaseObject):
         # joints. We will disable gravity for all links that are not in this set.
         articulation_tree = self.articulation_tree
         base_footprint = self.base_footprint_link_name
-        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == "FixedJoint"
+        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
         only_fixed_joints = nx.subgraph_view(articulation_tree, filter_edge=is_edge_fixed)
         fixed_link_names = nx.descendants(only_fixed_joints, base_footprint) | {base_footprint}
 
