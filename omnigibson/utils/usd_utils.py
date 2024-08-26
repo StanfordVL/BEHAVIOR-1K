@@ -801,6 +801,9 @@ class BatchControlViewAPIImpl:
         # Mapping from prim idx to a dict that maps link name to link index in the view.
         self._link_idx = {}
 
+        # Mapping from prim path to base footprint link name if one exists, None if the root is the base link.
+        self._base_footprint_link_names = {}
+
     def clear(self):
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
@@ -856,6 +859,12 @@ class BatchControlViewAPIImpl:
             {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
             for articulation_link_paths in self._view.link_paths
         ]
+        self._base_footprint_link_names = {
+            obj.articulation_root_path: (
+                obj.base_footprint_link_name if obj.base_footprint_link_name != obj.root_link_name else None
+            )
+            for obj in controllable_objects
+        }
 
     def set_joint_position_targets(self, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
@@ -899,13 +908,22 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path):
+    def get_root_transform(self, prim_path):
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
         idx = self._idx[prim_path]
         pose = self._read_cache["root_transforms"][idx]
         return pose[:3], pose[3:]
+
+    def get_position_orientation(self, prim_path):
+        # Here we want to return the position of the base footprint link. If the base footprint link is None,
+        # we return the position of the root link.
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_transform(prim_path, link_name)
+        else:
+            return self.get_root_transform(prim_path)
 
     def get_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
@@ -973,14 +991,17 @@ class BatchControlViewAPIImpl:
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
-    def get_link_relative_position_orientation(self, prim_path, link_name):
+    def get_link_transform(self, prim_path, link_name):
         if "link_transforms" not in self._read_cache:
             self._read_cache["link_transforms"] = self._view.get_link_transforms()
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         pose = self._read_cache["link_transforms"][idx][link_idx]
-        pos, orn = pose[:3], pose[3:]
+        return pose[:3], pose[3:]
+
+    def get_link_relative_position_orientation(self, prim_path, link_name):
+        pos, orn = self.get_link_transform(prim_path, link_name)
 
         # Get the root world transform too
         world_pos, world_orn = self.get_position_orientation(prim_path)
