@@ -65,6 +65,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
         condition_on_current_position=True,
+        use_local_approximation=True,
     ):
         """
         Args:
@@ -126,6 +127,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 values, and the returned tuple is the processed (pos, quat) command.
             condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
                 Otherwise, will use the reset_joint_pos as the initial guess.
+            use_local_approximation (bool): if True, will use a local approximation using the Jacobian to compute the IK solution.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -140,14 +142,17 @@ class InverseKinematicsController(JointController, ManipulationController):
         self.task_name = task_name
         self.reset_joint_pos = reset_joint_pos[dof_idx]
         self.condition_on_current_position = condition_on_current_position
+        self.use_local_approximation = use_local_approximation
 
         # Create the lula IKSolver
-        self.solver = IKSolver(
-            robot_description_path=robot_description_path,
-            robot_urdf_path=robot_urdf_path,
-            eef_name=eef_name,
-            reset_joint_pos=self.reset_joint_pos,
-        )
+        self.solver = None
+        if not self.use_local_approximation:
+            self.solver = IKSolver(
+                robot_description_path=robot_description_path,
+                robot_urdf_path=robot_urdf_path,
+                eef_name=eef_name,
+                reset_joint_pos=self.reset_joint_pos,
+            )
 
         # Other variables that will be filled in at runtime
         self._fixed_quat_target = None
@@ -331,27 +336,52 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_joint_pos = current_joint_pos
         else:
             # Otherwise we try to solve for the IK configuration.
-            if self.condition_on_current_position:
-                target_joint_pos = self.solver.solve(
-                    target_pos=target_pos,
-                    target_quat=target_quat,
-                    tolerance_pos=m.IK_POS_TOLERANCE,
-                    tolerance_quat=m.IK_ORN_TOLERANCE,
-                    weight_pos=m.IK_POS_WEIGHT,
-                    weight_quat=m.IK_ORN_WEIGHT,
-                    max_iterations=m.IK_MAX_ITERATIONS,
-                    initial_joint_pos=current_joint_pos,
-                )
+            if not self.use_local_approximation:
+                # Use Lula for an absolute IK solution
+                if self.condition_on_current_position:
+                    target_joint_pos = self.solver.solve(
+                        target_pos=target_pos,
+                        target_quat=target_quat,
+                        tolerance_pos=m.IK_POS_TOLERANCE,
+                        tolerance_quat=m.IK_ORN_TOLERANCE,
+                        weight_pos=m.IK_POS_WEIGHT,
+                        weight_quat=m.IK_ORN_WEIGHT,
+                        max_iterations=m.IK_MAX_ITERATIONS,
+                        initial_joint_pos=current_joint_pos,
+                    )
+                else:
+                    target_joint_pos = self.solver.solve(
+                        target_pos=target_pos,
+                        target_quat=target_quat,
+                        tolerance_pos=m.IK_POS_TOLERANCE,
+                        tolerance_quat=m.IK_ORN_TOLERANCE,
+                        weight_pos=m.IK_POS_WEIGHT,
+                        weight_quat=m.IK_ORN_WEIGHT,
+                        max_iterations=m.IK_MAX_ITERATIONS,
+                    )
             else:
-                target_joint_pos = self.solver.solve(
-                    target_pos=target_pos,
-                    target_quat=target_quat,
-                    tolerance_pos=m.IK_POS_TOLERANCE,
-                    tolerance_quat=m.IK_ORN_TOLERANCE,
-                    weight_pos=m.IK_POS_WEIGHT,
-                    weight_quat=m.IK_ORN_WEIGHT,
-                    max_iterations=m.IK_MAX_ITERATIONS,
-                )
+                # Compute the pose error. Note that this is computed NOT in the EEF frame but still
+                # in the base frame.
+                pos_err = target_pos - pos_relative
+                quat_err = T.quat_mul(T.quat_inverse(quat_relative), target_quat)
+                aa_err = T.quat2axisangle(quat_err)
+                err = th.cat([pos_err, aa_err])
+
+                # Use the jacobian to compute a local approximation
+                j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
+                j_eef_pinv = th.linalg.pinv(j_eef)
+                delta_j = j_eef_pinv @ err
+                target_joint_pos = current_joint_pos + delta_j
+
+                # Check if the target joint position is within the joint limits
+                if not th.all(
+                    th.logical_and(
+                        self._control_limits[ControlType.get_type("position")][0][self.dof_idx] <= target_joint_pos,
+                        target_joint_pos <= self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
+                    )
+                ):
+                    # If not, we'll just use the current joint position
+                    target_joint_pos = None
 
             if target_joint_pos is None:
                 # Print warning that we couldn't find a valid solution, and return the current joint configuration
