@@ -89,7 +89,7 @@ class SegmentationMap(BaseMap):
             for i, ins_id in enumerate(ins_ids):
                 # valid class start from 1
                 ins_name = "{}_{}".format(sem_name, i)
-                room_ins_name_to_ins_id[ins_name] = ins_id
+                room_ins_name_to_ins_id[ins_name] = ins_id.item()
                 if sem_name not in room_sem_name_to_ins_name:
                     room_sem_name_to_ins_name[sem_name] = []
                 room_sem_name_to_ins_name[sem_name].append(ins_name)
@@ -189,7 +189,7 @@ class SegmentationMap(BaseMap):
         x, y = self.world_to_map(xy)
         if x < 0 or x >= self.room_ins_map.shape[0] or y < 0 or y >= self.room_ins_map.shape[1]:
             return None
-        ins_id = self.room_ins_map[x, y]
+        ins_id = self.room_ins_map[x, y].item()
         # room boundary
         if ins_id == 0:
             return None

@@ -471,7 +471,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {self.default_arm: [th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()]}
+        return {self.default_arm: th.tensor([th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()], dtype=th.float32)}
 
     @property
     def eef_usd_path(self):
@@ -479,4 +479,4 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([0, math.pi / 2, math.pi])}
+        return {self.default_arm: euler2quat(th.tensor([0, math.pi / 2, math.pi], dtype=th.float32))}

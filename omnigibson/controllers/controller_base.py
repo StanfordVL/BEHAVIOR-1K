@@ -169,7 +169,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             Array[float]: Processed command vector
         """
         # Make sure command is a th.tensor
-        command = th.tensor([command]) if type(command) in {int, float} else command
+        command = th.tensor([command], dtype=th.float32) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip

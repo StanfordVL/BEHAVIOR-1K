@@ -106,6 +106,7 @@ def plan_base_motion(
             segment = []
             segment.append(p2[0] - p1[0])
             segment.append(p2[1] - p1[1])
+            segment = th.tensor(segment, dtype=th.float32)
             return th.arctan2(segment[1], segment[0])
 
     def create_state(space, x, y, yaw):
@@ -122,7 +123,7 @@ def plan_base_motion(
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
-        pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
+        pose = (th.tensor([x, y, 0.0], dtype=th.float32), T.euler2quat(th.tensor([0, 0, yaw], dtype=th.float32)))
         return not set_base_and_detect_collision(context, pose)
 
     def remove_unnecessary_rotations(path):
@@ -327,7 +328,7 @@ def plan_arm_motion_ik(
         planning_time (float): Time to plan for
 
     Returns:
-        Array of arrays: Array of end effector pose that the robot should navigate to
+        Th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
@@ -361,7 +362,7 @@ def plan_arm_motion_ik(
 
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
-        eef_pose = [q[i] for i in range(6)]
+        eef_pose = th.tensor([q[i] for i in range(6)], dtype=th.float32)
         control_joint_pos = ik_solver.solve(
             target_pos=eef_pose[:3],
             target_quat=T.axisangle2quat(eef_pose[3:]),
@@ -428,7 +429,7 @@ def plan_arm_motion_ik(
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
-            eef_pose = [sol_path.getState(i)[j] for j in range(DOF)]
+            eef_pose = th.tensor([sol_path.getState(i)[j] for j in range(DOF)], dtype=th.float32)
             return_path.append(eef_pose)
         return return_path
     return None
@@ -448,10 +449,10 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=th.float32).tolist())
+    translation = lazy.pxr.Gf.Vec3d(pose[0].tolist())
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+    orientation = pose[1][[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)
@@ -480,9 +481,9 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lazy.pxr.Gf.Vec3d(*th.tensor(mesh_pose[0], dtype=th.float32).tolist())
+                translation = lazy.pxr.Gf.Vec3d(*mesh_pose[0].tolist())
                 mesh.GetAttribute("xformOp:translate").Set(translation)
-                orientation = th.tensor(mesh_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+                orientation = mesh_pose[1][[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     return detect_robot_collision(context)

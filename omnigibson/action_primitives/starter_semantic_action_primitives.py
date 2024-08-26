@@ -116,8 +116,8 @@ class RobotCopy:
         self.relative_poses = {}
         self.links_relative_poses = {}
         self.reset_pose = {
-            "original": ([0, 0, -5.0], [0, 0, 0, 1]),
-            "simplified": ([5, 0, -5.0], [0, 0, 0, 1]),
+            "original": (th.tensor([0, 0, -5.0], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)),
+            "simplified": (th.tensor([5, 0, -5.0], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)),
         }
 
 
@@ -164,14 +164,17 @@ class PlanningContext(object):
         if m.TIAGO_TORSO_FIXED:
             assert self.arm == "left", "Fixed torso mode only supports left arm!"
             joint_control_idx = self.robot.arm_control_idx["left"]
-            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_control_idx])
+            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_control_idx], dtype=th.float32)
         else:
             joint_combined_idx = th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
-            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_combined_idx])
+            joint_pos = th.tensor(self.robot.get_joint_positions()[joint_combined_idx], dtype=th.float32)
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
-        # Set position of robot copy root prim
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        # Set position of robot copy root prim as a tensor tuple
+        pos, orn = self.robot.get_position_orientation()
+        pos = th.tensor(pos, dtype=th.float32)
+        orn = th.tensor(orn, dtype=th.float32)
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], (pos, orn))
 
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
@@ -191,9 +194,9 @@ class PlanningContext(object):
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
     def _set_prim_pose(self, prim, pose):
-        translation = lazy.pxr.Gf.Vec3d(*(th.tensor(pose[0], dtype=th.float32).tolist()))
+        translation = lazy.pxr.Gf.Vec3d(*pose[0].tolist())
         prim.GetAttribute("xformOp:translate").Set(translation)
-        orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+        orientation = pose[1][[3, 0, 1, 2]]
         prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
     def _construct_disabled_collision_pairs(self):
@@ -376,9 +379,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             lazy.omni.usd.commands.CreatePrimCommand("Xform", rc["copy_path"]).do()
             copy_robot = lazy.omni.isaac.core.utils.prims.get_prim_at_path(rc["copy_path"])
             reset_pose = robot_copy.reset_pose[robot_type]
-            translation = lazy.pxr.Gf.Vec3d(*th.tensor(reset_pose[0], dtype=th.float32).tolist())
+            translation = lazy.pxr.Gf.Vec3d(*reset_pose[0].tolist())
             copy_robot.GetAttribute("xformOp:translate").Set(translation)
-            orientation = th.tensor(reset_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+            orientation = reset_pose[1][[3, 0, 1, 2]]
             copy_robot.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
             robot_to_copy = None
@@ -493,6 +496,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(attempts):
             # Attempt
             success = False
+
             try:
                 yield from ctrl(*args)
                 success = True
@@ -1205,8 +1209,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = th.norm(target_pose[0] - start_pos)
-        num_poses = th.max([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1]).item()
-        pos_waypoints = th.linspace(start_pos, target_pose[0], num_poses)
+        num_poses = int(th.max(th.tensor([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1], dtype=th.float32)).item())
+        pos_waypoints = self.linspace_1d_tensor(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
         t_values = th.linspace(0, 1, num_poses)
@@ -1236,7 +1240,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
+                pos_diff = th.norm(th.tensor(current_pos - target_pose[0], dtype=th.float32))
                 orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn).item()
                 if pos_diff < 0.005 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
@@ -1761,7 +1765,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 distance_lo, distance_hi = 0.0, 5.0
                 distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
                 yaw_lo, yaw_hi = -math.pi, math.pi
-                yaw = (th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item()
+                yaw = th.tensor((th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item(), dtype=th.float32)
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.tensor(
                     [
@@ -1923,11 +1927,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pose_2d (Iterable): (x, y, yaw) 2d pose
 
         Returns:
-            2-tuple:
-                - 3-array: (x,y,z) Position in the world frame
-                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+            th.tensor: (x,y,z) Position in the world frame
+            th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        pos = th.tensor([pose_2d[0], pose_2d[1], m.DEFAULT_BODY_OFFSET_FROM_FLOOR])
+        pos = th.tensor([pose_2d[0], pose_2d[1], m.DEFAULT_BODY_OFFSET_FROM_FLOOR], dtype=th.float32)
         orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
         return pos, orn
 
@@ -1991,3 +1994,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 break
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
+
+
+    def linspace_1d_tensor(self, start_pos, target_pose, num_poses):
+        """
+        Create evenly spaced samples between two 1D tensors.
+        
+        :param start_pos: Starting 1D tensor
+        :param target_pose: Ending 1D tensor
+        :param num_poses: Number of poses (samples) to generate
+        :return: Tensor of shape (num_poses, dim) where dim is the dimension of input tensors
+        """
+        # Ensure inputs are 1D tensors
+        assert start_pos.dim() == 1 and target_pose.dim() == 1, "Input tensors must be 1D"
+        assert start_pos.shape == target_pose.shape, "Input tensors must have the same shape"
+
+        # Create a tensor of interpolation factors
+        t = th.linspace(0, 1, num_poses)
+
+        # Perform the interpolation
+        interpolated_points = start_pos.unsqueeze(0) + (target_pose - start_pos).unsqueeze(0) * t.unsqueeze(1)
+
+        return interpolated_points
