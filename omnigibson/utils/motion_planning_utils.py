@@ -254,7 +254,7 @@ def plan_arm_motion(
 
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
-        joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
+        joint_pos[control_idx_in_joint_pos] = th.tensor([q[i] for i in range(dim)])
         return not set_arm_and_detect_collision(context, joint_pos)
 
     # create an SE2 state space
@@ -262,8 +262,8 @@ def plan_arm_motion(
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(dim)
-    joints = th.tensor([joint for joint in robot.joints.values()])
-    arm_joints = joints[joint_control_idx]
+    all_joints = list(robot.joints.values())
+    arm_joints = [all_joints[i] for i in joint_control_idx.tolist()]
     for i, joint in enumerate(arm_joints):
         if end_conf[i] > joint.upper_limit:
             end_conf[i] = joint.upper_limit

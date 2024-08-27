@@ -388,7 +388,7 @@ class RigidContactAPIImpl:
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
         return {
-            (interesting_row_paths[row], interesting_col_paths[col])
+            (interesting_row_paths[row.item()], interesting_col_paths[col.item()])
             for row, col in [th.nonzero(interesting_impulses > 0, as_tuple=True)]
         }
 

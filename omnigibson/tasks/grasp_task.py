@@ -200,7 +200,7 @@ class GraspTask(BaseTask):
     def _get_random_joint_position(self, robot):
         joint_positions = []
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        joints = th.tensor([joint for joint in robot.joints.values()])
+        joints = th.tensor([joint for joint in robot.joints.values()], dtype=th.float32)
         arm_joints = joints[joint_control_idx]
         for i, joint in enumerate(arm_joints):
             val = random.uniform(joint.lower_limit, joint.upper_limit)

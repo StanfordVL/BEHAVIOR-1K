@@ -575,7 +575,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
-
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
@@ -1098,9 +1097,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             action = self._empty_action()
             if use_delta:
-                action[self.robot.controller_action_idx[controller_name]] = diff_joint_pos
+                action[self.robot.controller_action_idx[controller_name]] = th.tensor(diff_joint_pos, dtype=th.float32)
             else:
-                action[self.robot.controller_action_idx[controller_name]] = joint_pos
+                action[self.robot.controller_action_idx[controller_name]] = th.tensor(joint_pos, dtype=th.float32)
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
             yield self._postprocess_action(action)
@@ -1786,7 +1785,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 if not self._test_pose(pose_2d, context, pose_on_obj=pose_on_obj, **kwargs):
                     continue
-
+                
+                indented_print("Found valid position near object.")
                 return pose_2d
 
             raise ActionPrimitiveError(
