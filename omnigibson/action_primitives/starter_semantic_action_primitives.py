@@ -1208,7 +1208,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # into 1cm-long pieces
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = th.norm(target_pose[0] - start_pos)
-        num_poses = int(th.max(th.tensor([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1], dtype=th.float32)).item())
+        num_poses = int(
+            th.max(th.tensor([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1], dtype=th.float32)).item()
+        )
         pos_waypoints = self.linspace_1d_tensor(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
@@ -1995,11 +1997,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
 
-
     def linspace_1d_tensor(self, start_pos, target_pose, num_poses):
         """
         Create evenly spaced samples between two 1D tensors.
-        
+
         :param start_pos: Starting 1D tensor
         :param target_pose: Ending 1D tensor
         :param num_poses: Number of poses (samples) to generate
