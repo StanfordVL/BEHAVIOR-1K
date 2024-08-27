@@ -1787,7 +1787,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 if not self._test_pose(pose_2d, context, pose_on_obj=pose_on_obj, **kwargs):
                     continue
-                
+
                 indented_print("Found valid position near object.")
                 return pose_2d
 
