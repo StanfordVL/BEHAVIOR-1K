@@ -496,7 +496,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(attempts):
             # Attempt
             success = False
-
             try:
                 yield from ctrl(*args)
                 success = True
@@ -575,6 +574,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+                
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
