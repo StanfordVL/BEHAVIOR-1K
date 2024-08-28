@@ -177,14 +177,6 @@ class R1(ManipulationRobot, LocomotionRobot):
     def base_footprint_link_name(self):
         return "base_link"
 
-    @property
-    def base_footprint_link(self):
-        """
-        Returns:
-            RigidPrim: base footprint link of this object prim
-        """
-        return self._links[self.base_footprint_link_name]
-
     def _postprocess_control(self, control, control_type):
         # Run super method first
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
@@ -286,17 +278,17 @@ class R1(ManipulationRobot, LocomotionRobot):
         # Get default base controller for omnidirectional Tiago
         cfg["base"] = {"JointController": self._default_base_controller_configs}
 
-        # for arm in self.arm_names:
-        #     for arm_cfg in cfg["arm_{}".format(arm)].values():
+        for arm in self.arm_names:
+            for arm_cfg in cfg["arm_{}".format(arm)].values():
 
-        #         if arm == "left":
-        #             # Need to override joint idx being controlled to include trunk in default arm controller configs
-        #             arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[arm]])
-        #             arm_cfg["dof_idx"] = arm_control_idx
+                if arm == "left":
+                    # Need to override joint idx being controlled to include trunk in default arm controller configs
+                    arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[arm]])
+                    arm_cfg["dof_idx"] = arm_control_idx
 
-        #             # Need to modify the default joint positions also if this is a null joint controller
-        #             if arm_cfg["name"] == "NullJointController":
-        #                 arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
+                    # Need to modify the default joint positions also if this is a null joint controller
+                    if arm_cfg["name"] == "NullJointController":
+                        arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
 
         return cfg
 
