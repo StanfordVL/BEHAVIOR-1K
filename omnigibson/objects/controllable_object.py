@@ -260,7 +260,8 @@ class ControllableObject(BaseObject):
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
+                    kd=self.default_kd if control_type == ControlType.POSITION or control_type == ControlType.VELOCITY
+                    else None,
                 )
 
     def _generate_controller_config(self, custom_config=None):
