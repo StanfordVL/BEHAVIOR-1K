@@ -491,8 +491,11 @@ def _compute_osc_torques(
     # For angular velocity, this is just the base angular velocity
     # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
     #   due to the base linear velocity
-    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos)
-    vel_err = th.cat((lin_vel_err, base_ang_vel)) - ee_vel
+    # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
+    # properly, not simply "subtraction" as in the linear case
+    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_vel[:3]
+    ang_vel_err = T.quat2axisangle(T.quat_multiply(T.axisangle2quat(-ee_vel[3:]), T.axisangle2quat(base_ang_vel)))
+    vel_err = th.cat((lin_vel_err, ang_vel_err))
 
     # Determine desired wrench
     err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)
