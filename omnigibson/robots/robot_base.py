@@ -589,6 +589,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         raise NotImplementedError
 
+    @property
+    def curobo_path(self):
+        """
+        Returns:
+            str: file path to the robot curobo configuration yaml file.
+        """
+        raise NotImplementedError
+
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template

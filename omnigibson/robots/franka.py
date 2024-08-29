@@ -274,6 +274,13 @@ class FrankaPanda(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
 
     @property
+    def curobo_path(self):
+        # Only supported for normal franka now
+        assert self._model_name == "franka_panda", \
+            f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
+
+    @property
     def eef_usd_path(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_eef.usd")}
 
