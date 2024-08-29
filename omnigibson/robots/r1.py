@@ -49,7 +49,7 @@ class R1(ManipulationRobot, LocomotionRobot):
         grasping_mode="physical",
         disable_grasp_handling=False,
         # Unique to r1
-        rigid_trunk=True,
+        rigid_trunk=False,
         **kwargs,
     ):
         """
@@ -290,6 +290,13 @@ class R1(ManipulationRobot, LocomotionRobot):
                     if arm_cfg["name"] == "NullJointController":
                         arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
 
+                # If using rigid trunk, we also clamp its limits
+                # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving
+                # via the left arm??
+                if self.rigid_trunk:
+                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = th.zeros(4)
+                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = th.zeros(4)
+
         return cfg
 
     @property
@@ -472,3 +479,8 @@ class R1(ManipulationRobot, LocomotionRobot):
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
         ]
+
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
+        action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
+        action[self.base_action_idx] = teleop_action.base * 0.1
+        return action
