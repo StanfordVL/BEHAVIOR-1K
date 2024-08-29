@@ -417,7 +417,7 @@ class ManipulationRobot(BaseRobot):
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
             self.articulation_root_path
-        )[eef_link_idx, :, start_idx : start_idx + self.n_joints]
+        )[-(self.n_links - eef_link_idx), :, start_idx : start_idx + self.n_joints]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
