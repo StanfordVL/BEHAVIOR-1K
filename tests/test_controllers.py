@@ -1,10 +1,10 @@
-import pytest
 import numpy as np
+import pytest
 import torch as th
 
 import omnigibson as og
-from omnigibson.robots import LocomotionRobot
 import omnigibson.utils.transform_utils as T
+from omnigibson.robots import LocomotionRobot
 
 
 def test_arm_control():
@@ -43,22 +43,28 @@ def test_arm_control():
 
     def check_forward_error(curr_position, init_position, tol=1e-2, forward_tol=1e-2):
         # x should be positive
-        return (curr_position[0] - init_position[0]).item() > forward_tol and th.norm(curr_position[[1, 2]] - init_position[[1, 2]]).item() < tol
+        return (curr_position[0] - init_position[0]).item() > forward_tol and th.norm(
+            curr_position[[1, 2]] - init_position[[1, 2]]
+        ).item() < tol
 
     def check_side_error(curr_position, init_position, tol=1e-2, side_tol=1e-2):
         # y should be positive
-        return (curr_position[1] - init_position[1]).item() > side_tol and th.norm(curr_position[[0, 2]] - init_position[[0, 2]]).item() < tol
+        return (curr_position[1] - init_position[1]).item() > side_tol and th.norm(
+            curr_position[[0, 2]] - init_position[[0, 2]]
+        ).item() < tol
 
     def check_up_error(curr_position, init_position, tol=1e-2, up_tol=1e-2):
         # z should be positive
-        return (curr_position[2] - init_position[2]).item() > up_tol and th.norm(curr_position[[0, 1]] - init_position[[0, 1]]).item() < tol
+        return (curr_position[2] - init_position[2]).item() > up_tol and th.norm(
+            curr_position[[0, 1]] - init_position[[0, 1]]
+        ).item() < tol
 
     pos_err_checks = {
         "zero": check_zero_error,
         "forward": check_forward_error,
         "side": check_side_error,
         "up": check_up_error,
-        "base_move": lambda x, y: check_zero_error(x, y, tol=0.02)      # Slightly bigger tolerance with base moving
+        "base_move": lambda x, y: check_zero_error(x, y, tol=0.02),  # Slightly bigger tolerance with base moving
     }
 
     n_steps = {
@@ -66,7 +72,7 @@ def test_arm_control():
         "forward": 10,
         "side": 10,
         "up": 10,
-        "base_move": 30      # Slightly bigger tolerance with base moving
+        "base_move": 30,  # Slightly bigger tolerance with base moving
     }
 
     for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
@@ -79,7 +85,9 @@ def test_arm_control():
         }
         for i, robot in enumerate(env.robots):
             controller_config = {f"arm_{arm}": {"name": controller} for arm in robot.arm_names}
-            robot.set_position_orientation(th.tensor([0.0, i * 5.0, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3])))
+            robot.set_position_orientation(
+                th.tensor([0.0, i * 5.0, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
+            )
             robot.reset()
             robot.keep_still()
             robot.reload_controllers(controller_config)
@@ -143,11 +151,15 @@ def test_arm_control():
                     init_pos, init_quat = initial_eef_pose[robot.name][arm]
                     curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
                     is_valid_pos = pos_err_checks[action_name](curr_pos, init_pos)
-                    assert is_valid_pos, \
-                        (f"Got mismatch for controller [{controller}], robot [{robot.model_name}], action [{action_name}]\n"
-                         f"curr_pos: {curr_pos}, init_pos: {init_pos}")
-                    ori_err_normalized = th.norm(T.quat2axisangle(T.mat2quat(T.quat2mat(init_quat).T @ T.quat2mat(curr_quat)))).item() / (np.pi * 2)
+                    assert is_valid_pos, (
+                        f"Got mismatch for controller [{controller}], robot [{robot.model_name}], action [{action_name}]\n"
+                        f"curr_pos: {curr_pos}, init_pos: {init_pos}"
+                    )
+                    ori_err_normalized = th.norm(
+                        T.quat2axisangle(T.mat2quat(T.quat2mat(init_quat).T @ T.quat2mat(curr_quat)))
+                    ).item() / (np.pi * 2)
                     ori_err = np.abs(np.pi * 2 * (np.round(ori_err_normalized) - ori_err_normalized))
-                    assert ori_err < 0.1, \
-                        (f"Got mismatch for controller [{controller}], robot [{robot.model_name}], action [{action_name}]\n"
-                         f"curr_quat: {curr_quat}, init_quat: {init_quat}, err: {ori_err}")
+                    assert ori_err < 0.1, (
+                        f"Got mismatch for controller [{controller}], robot [{robot.model_name}], action [{action_name}]\n"
+                        f"curr_quat: {curr_quat}, init_quat: {init_quat}, err: {ori_err}"
+                    )
