@@ -294,7 +294,7 @@ class ManipulationRobot(BaseRobot):
             return {other for other, _ in raw_contact_data}, robot_contact_links
 
         # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
-        contacts = GripperRigidContactAPI.get_contact_data(self.scene.idx, column_prim_paths=link_paths)
+        contacts = GripperRigidContactAPI.get_contact_data(self.scene.idx)
         contact_data = {(contact[0], contact[3]) for contact in contacts}
         robot_contact_links = {}
         for con_data in contacts:

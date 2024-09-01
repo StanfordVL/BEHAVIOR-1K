@@ -241,7 +241,6 @@ class RigidContactAPIImpl:
             for i, link_path in enumerate(filters):
                 self._PATH_TO_COL_IDX[scene_idx][link_path] = i
                 self._PATH_TO_SCENE_IDX[link_path] = scene_idx
-
         # If there are no valid objects, clear the view and terminate early
         if len(column_filters) == 0:
             self._CONTACT_VIEW = dict()
@@ -387,26 +386,32 @@ class RigidContactAPIImpl:
             return set()
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
+        nonzero_indices = th.nonzero(interesting_impulses > 0, as_tuple=True)
         return {
             (interesting_row_paths[row.item()], interesting_col_paths[col.item()])
-            for row, col in [th.nonzero(interesting_impulses > 0, as_tuple=True)]
+            for row, col in zip(*nonzero_indices)
         }
 
-    def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
-        # First check if the object has any contacts
+    def get_contact_data(self, scene_idx):
+        # First check if the object has any contacts. Since impulses is pre-filtered, we no longer need to use row_idx and col_idx filtering here
         impulses = self.get_all_impulses(scene_idx)
-        row_idx = (
-            list(range(impulses.shape[0]))
-            if row_prim_paths is None
-            else [self.get_body_row_idx(path)[1] for path in row_prim_paths]
-        )
-        col_idx = (
-            list(range(impulses.shape[1]))
-            if column_prim_paths is None
-            else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
-        )
-        relevant_impulses = impulses[row_idx][:, col_idx]
-        if not th.any(relevant_impulses > 0):
+
+        # row_idx = (
+        #     list(range(impulses.shape[0]))
+        #     if row_prim_paths is None
+        #     else [self.get_body_row_idx(path)[1] for path in row_prim_paths]
+        # )
+        # col_idx = (
+        #     list(range(impulses.shape[1]))
+        #     if column_prim_paths is None
+        #     else [self.get_body_col_idx(path)[1] for path in row_prim_paths]
+        # )
+        # relevant_impulses = impulses[row_idx][:, col_idx]
+
+        impulse_height = len(impulses)
+        impulse_width = len(impulses[0])
+
+        if not th.any(impulses > 0):
             return []
 
         # Get the contact data
@@ -421,9 +426,9 @@ class RigidContactAPIImpl:
         # repeat the single prim data for all contacts. Otherwise, it is not clear which contacts are
         # happening between which two objects, so we return no contacts while printing an error.
         contacts = []
-        for row in row_idx:
+        for row in range(impulse_height):
             row_prim_path = self.get_row_idx_prim_path(scene_idx, row)
-            for col in col_idx:
+            for col in range(impulse_width):
                 if contact_counts[row, col] == 0:
                     continue
                 col_prim_path = self.get_col_idx_prim_path(scene_idx, col)

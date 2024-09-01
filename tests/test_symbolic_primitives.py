@@ -163,7 +163,6 @@ def knife(env):
 
 
 class TestSymbolicPrimitives:
-    @pytest.mark.skip(reason="primitives are broken")
     def test_in_hand_state(self, env, robot, prim_gen, apple):
         assert not robot.states[object_states.IsGrasping].get_value(apple)
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
@@ -173,14 +172,12 @@ class TestSymbolicPrimitives:
     # def test_navigate():
     #    pass
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_open(self, env, prim_gen, fridge):
         assert not fridge.states[object_states.Open].get_value()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
             env.step(action)
         assert fridge.states[object_states.Open].get_value()
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_close(self, env, prim_gen, fridge):
         fridge.states[object_states.Open].set_value(True)
         assert fridge.states[object_states.Open].get_value()
@@ -188,7 +185,6 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert not fridge.states[object_states.Open].get_value()
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_place_inside(self, env, prim_gen, apple, fridge):
         assert not apple.states[object_states.Inside].get_value(fridge)
         assert not fridge.states[object_states.Open].get_value()
@@ -200,7 +196,6 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert apple.states[object_states.Inside].get_value(fridge)
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_place_ontop(self, env, prim_gen, apple, pan):
         assert not apple.states[object_states.OnTop].get_value(pan)
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
@@ -209,14 +204,12 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert apple.states[object_states.OnTop].get_value(pan)
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_toggle_on(self, env, prim_gen, stove):
         assert not stove.states[object_states.ToggledOn].get_value()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
             env.step(action)
         assert stove.states[object_states.ToggledOn].get_value()
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_soak_under(self, env, prim_gen, robot, sponge, sink):
         water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
@@ -240,7 +233,6 @@ class TestSymbolicPrimitives:
     # def test_soak_inside():
     #    pass
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_wipe(self, env, prim_gen, sponge, sink, countertop):
         # Some pre-assertions
         water_system = env.scene.get_system("water")
@@ -272,7 +264,6 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert not countertop.states[object_states.Covered].get_value(mud_system)
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_cut(self, env, prim_gen, apple, knife, countertop):
         # assert not apple.states[object_states.Cut].get_value(knife)
         print("Grasping knife")
@@ -285,6 +276,7 @@ class TestSymbolicPrimitives:
             env.step(action)
         for _ in range(60):
             env.step(prim_gen._empty_action())
+        breakpoint()
         print("Putting knife back on countertop")
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
             env.step(action)
@@ -327,11 +319,13 @@ def main():
         env.step(prim_gen._empty_action())
 
     try:
-        test_cut(env, prim_gen, apple, knife, countertop)
+        TestSymbolicPrimitives.test_cut(env, prim_gen, apple, knife, countertop)
     except:
         raise
     while True:
         og.sim.step()
+
+
 
 
 if __name__ == "__main__":

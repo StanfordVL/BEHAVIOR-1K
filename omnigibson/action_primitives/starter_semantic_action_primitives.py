@@ -240,7 +240,7 @@ class PlanningContext(object):
 
         # Disable original robot colliders so copy can't collide with it
         disabled_colliders += [link.prim_path for link in self.robot.links.values()]
-        filter_categories = ["floors"]
+        filter_categories = ["floors", "carpet"]
         for obj in self.env.scene.objects:
             if obj.category in filter_categories:
                 disabled_colliders += [link.prim_path for link in obj.links.values()]
@@ -574,7 +574,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
-                
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
@@ -994,7 +993,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 torso_fixed=m.TIAGO_TORSO_FIXED,
             )
 
-        # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
         if plan is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -1002,9 +1000,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         # Follow the plan to navigate.
-        indented_print("Plan has %d steps", len(plan))
+        indented_print(f"Plan has {len(plan)} steps")
         for i, joint_pos in enumerate(plan):
-            indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+            indented_print(f"Executing arm movement plan step {i + 1}/{len(plan)}")
             yield from self._move_hand_direct_joint(joint_pos, ignore_failure=True)
 
     def _move_hand_ik(self, eef_pose, stop_if_stuck=False):
@@ -1029,7 +1027,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 torso_fixed=m.TIAGO_TORSO_FIXED,
             )
 
-        # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
         if plan is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -1037,11 +1034,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         # Follow the plan to navigate.
-        indented_print("Plan has %d steps", len(plan))
+        indented_print(f"Plan has {len(plan)} steps")
         for i, target_pose in enumerate(plan):
             target_pos = target_pose[:3]
             target_quat = T.axisangle2quat(target_pose[3:])
-            indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+            indented_print(f"Executing grasp plan step {i + 1}/{len(plan)}")
             yield from self._move_hand_direct_ik(
                 (target_pos, target_quat), ignore_failure=True, in_world_frame=False, stop_if_stuck=stop_if_stuck
             )
@@ -1437,6 +1434,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action_idx = self.robot.controller_action_idx[name]
             no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
 
+            # TODO: wip solution for goal pose not consistent with action pose. if the controller uses delta motion, convert the no_op to all zeros
+            if self.robot._controller_config[name].get("use_delta_commands", True):
+                no_op_goal = {key: th.zeros_like(value) for key, value in no_op_goal.items()}
+
             if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
                 assert (
                     self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
@@ -1567,11 +1568,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Could not make a navigation plan to get to the target position",
             )
 
+        # #Follow the plan to navigate.
         # self._draw_plan(plan)
-        # Follow the plan to navigate.
-        indented_print("Plan has %d steps", len(plan))
+        indented_print(f"Navigation plan has {len(plan)} steps")
         for i, pose_2d in enumerate(plan):
-            indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
+            indented_print(f"Executing navigation plan step {i + 1}/{len(plan)}")
             low_precision = True if i < len(plan) - 1 else False
             yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
 
@@ -1877,7 +1878,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Get the object pose by subtracting the offset
             sampled_obj_pose = T.pose2mat((sampled_bb_center, sampled_bb_orn)) @ T.pose_inv(
-                T.pose2mat((bb_center_in_base, [0, 0, 0, 1]))
+                T.pose2mat((bb_center_in_base, th.tensor([0, 0, 0, 1], dtype=th.float32)))
             )
 
             # Check that the pose is near one of the poses in the near_poses list if provided.
