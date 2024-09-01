@@ -388,8 +388,7 @@ class RigidContactAPIImpl:
         # Get all of the (row, col) pairs where the impulse is greater than 0
         nonzero_indices = th.nonzero(interesting_impulses > 0, as_tuple=True)
         return {
-            (interesting_row_paths[row.item()], interesting_col_paths[col.item()])
-            for row, col in zip(*nonzero_indices)
+            (interesting_row_paths[row.item()], interesting_col_paths[col.item()]) for row, col in zip(*nonzero_indices)
         }
 
     def get_contact_data(self, scene_idx):
