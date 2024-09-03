@@ -1079,11 +1079,12 @@ def _launch_simulator(*args, **kwargs):
             for scene in self.scenes:
                 scene.clear_updated_objects()
 
-            if render:
-                super().step(render=True)
-            else:
-                for i in range(self.n_physics_timesteps_per_render):
-                    super().step(render=False)
+            for _ in range(self._n_steps_per_loop):
+                if render:
+                    super().step(render=True)
+                else:
+                    for i in range(self.n_physics_timesteps_per_render):
+                        super().step(render=False)
 
             # Additionally run non physics things
             self._non_physics_step()
