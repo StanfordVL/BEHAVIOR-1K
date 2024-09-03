@@ -169,6 +169,12 @@ class OperationalSpaceController(ManipulationController):
         # By default, the input limits are set as 1, so we modify this to have a correct range.
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         assert_valid_key(key=mode, valid_keys=OSC_MODES, name="OSC mode")
+
+        # If mode is absolute pose, make sure command input limits / output limits are None
+        if mode == "absolute_pose":
+            assert command_input_limits is None, "command_input_limits should be None if using absolute_pose mode!"
+            assert command_output_limits is None, "command_output_limits should be None if using absolute_pose mode!"
+
         self.mode = mode
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
@@ -309,8 +315,8 @@ class OperationalSpaceController(ManipulationController):
                         frame to control, computed in its local frame (e.g.: robot base frame)
         """
         # Grab important info from control dict
-        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"].clone()
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"].clone()
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -434,8 +440,8 @@ class OperationalSpaceController(ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
-        target_pos = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        target_quat = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
+        target_pos = control_dict[f"{self.task_name}_pos_relative"].clone()
+        target_quat = control_dict[f"{self.task_name}_quat_relative"].clone()
 
         # Convert quat into eef ori mat
         return dict(

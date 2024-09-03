@@ -697,7 +697,7 @@ def axisangle2quat(vec, eps=1e-6):
     angle = th.norm(vec, dim=-1, keepdim=True)
 
     # Create return array
-    quat = th.zeros(th.prod(th.tensor(input_shape)), 4, device=vec.device)
+    quat = th.zeros(th.prod(th.tensor(input_shape, dtype=th.int)), 4, device=vec.device)
     quat[:, 3] = 1.0
 
     # Grab indexes where angle is not zero an convert the input to its quaternion form
