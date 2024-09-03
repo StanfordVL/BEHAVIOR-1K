@@ -1,10 +1,10 @@
-import pytest
 import numpy as np
+import pytest
 import torch as th
 
 import omnigibson as og
-from omnigibson.robots import LocomotionRobot
 import omnigibson.utils.transform_utils as T
+from omnigibson.robots import LocomotionRobot
 
 
 def test_arm_control():
@@ -47,18 +47,26 @@ def test_arm_control():
 
     def check_forward_error(curr_position, init_position, tol=1e-2, forward_tol=1e-2):
         # x should be positive
-        return (curr_position[0] - init_position[0]).item() > forward_tol and th.norm(curr_position[[1, 2]] - init_position[[1, 2]]).item() < tol
+        return (curr_position[0] - init_position[0]).item() > forward_tol and th.norm(
+            curr_position[[1, 2]] - init_position[[1, 2]]
+        ).item() < tol
 
     def check_side_error(curr_position, init_position, tol=1e-2, side_tol=1e-2):
         # y should be positive
-        return (curr_position[1] - init_position[1]).item() > side_tol and th.norm(curr_position[[0, 2]] - init_position[[0, 2]]).item() < tol
+        return (curr_position[1] - init_position[1]).item() > side_tol and th.norm(
+            curr_position[[0, 2]] - init_position[[0, 2]]
+        ).item() < tol
 
     def check_up_error(curr_position, init_position, tol=1e-2, up_tol=1e-2):
         # z should be positive
-        return (curr_position[2] - init_position[2]).item() > up_tol and th.norm(curr_position[[0, 1]] - init_position[[0, 1]]).item() < tol
+        return (curr_position[2] - init_position[2]).item() > up_tol and th.norm(
+            curr_position[[0, 1]] - init_position[[0, 1]]
+        ).item() < tol
 
     def check_ori_error(curr_orientation, init_orientation, tol=0.1):
-        ori_err_normalized = th.norm(T.quat2axisangle(T.mat2quat(T.quat2mat(init_orientation).T @ T.quat2mat(curr_orientation)))).item() / (np.pi * 2)
+        ori_err_normalized = th.norm(
+            T.quat2axisangle(T.mat2quat(T.quat2mat(init_orientation).T @ T.quat2mat(curr_orientation)))
+        ).item() / (np.pi * 2)
         ori_err = np.abs(np.pi * 2 * (np.round(ori_err_normalized) - ori_err_normalized))
         return ori_err < tol
 
@@ -86,7 +94,9 @@ def test_arm_control():
                 "ori": None,
             },
             "base_move": {
-                "pos": lambda target, curr, init: check_zero_error(curr, init, tol=0.02),      # Slightly bigger tolerance with base moving
+                "pos": lambda target, curr, init: check_zero_error(
+                    curr, init, tol=0.02
+                ),  # Slightly bigger tolerance with base moving
                 "ori": lambda target, curr, init: check_ori_error(curr, init),
             },
         },
@@ -157,7 +167,9 @@ def test_arm_control():
 
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
-                robot.set_position_orientation(th.tensor([0.0, i * 5.0, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3])))
+                robot.set_position_orientation(
+                    th.tensor([0.0, i * 5.0, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
+                )
                 robot.reset()
                 robot.keep_still()
                 robot.reload_controllers(controller_config)
@@ -188,12 +200,14 @@ def test_arm_control():
                         rot_action[start_idx + 3] = 0.1
                     elif controller_mode == "absolute_pose":
                         for act in [zero_action, forward_action, side_action, up_action, rot_action]:
-                            act[start_idx: start_idx + 3] = init_eef_pos.clone()
-                            act[start_idx + 3: start_idx + 6] = T.quat2axisangle(init_eef_quat.clone())
+                            act[start_idx : start_idx + 3] = init_eef_pos.clone()
+                            act[start_idx + 3 : start_idx + 6] = T.quat2axisangle(init_eef_quat.clone())
                         forward_action[start_idx] += 0.1
                         side_action[start_idx + 1] += 0.1
                         up_action[start_idx + 2] += 0.1
-                        rot_action[start_idx + 3: start_idx + 6] = T.quat2axisangle(T.quat_multiply(T.euler2quat(th.tensor([th.pi / 10, 0, 0])), init_eef_quat.clone()))
+                        rot_action[start_idx + 3 : start_idx + 6] = T.quat2axisangle(
+                            T.quat_multiply(T.euler2quat(th.tensor([th.pi / 10, 0, 0])), init_eef_quat.clone())
+                        )
 
                     else:
                         raise ValueError(f"Got invalid controller mode: {controller}")
@@ -233,7 +247,9 @@ def test_arm_control():
                 # Record initial poses
                 initial_eef_pose = dict()
                 for i, robot in enumerate(env.robots):
-                    initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names}
+                    initial_eef_pose[robot.name] = {
+                        arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names
+                    }
 
                 # Take 10 steps with given action and check for error
                 for _ in range(n_steps[controller_mode][action_name]):
@@ -244,26 +260,32 @@ def test_arm_control():
 
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
-                        assert not th.any(th.abs(normalized_qpos) == 1.0), \
-                            (f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
-                             f"Some joints are at their limit (normalized values): {normalized_qpos}")
+                        assert not th.any(th.abs(normalized_qpos) == 1.0), (
+                            f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
+                            f"Some joints are at their limit (normalized values): {normalized_qpos}"
+                        )
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
                         arm_controller = robot.controllers[f"arm_{arm}"]
                         arm_goal = arm_controller.goal
                         target_pos = arm_goal["target_pos"]
-                        target_quat = arm_goal["target_quat"] if controller == "InverseKinematicsController" else T.mat2quat(arm_goal["target_ori_mat"])
+                        target_quat = (
+                            arm_goal["target_quat"]
+                            if controller == "InverseKinematicsController"
+                            else T.mat2quat(arm_goal["target_ori_mat"])
+                        )
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
-                            assert is_valid_pos, \
-                                (f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                 f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}")
+                            assert is_valid_pos, (
+                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
+                            )
                         ori_check = err_checks[controller_mode][action_name]["ori"]
                         if ori_check is not None:
                             is_valid_ori = ori_check(target_quat, curr_quat, init_quat)
-                            assert is_valid_ori, \
-                                (f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                 f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}")
-
+                            assert is_valid_ori, (
+                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
+                            )
