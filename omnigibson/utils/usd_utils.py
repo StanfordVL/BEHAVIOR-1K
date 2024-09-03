@@ -956,11 +956,13 @@ class BatchControlViewAPIImpl:
     def get_relative_linear_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         linvel = self.get_linear_velocity(prim_path)
+        # x.T --> transpose (inverse) orientation
         return T.quat2mat(orn).T @ linvel
 
     def get_relative_angular_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         angvel = self.get_angular_velocity(prim_path)
+        # x.T --> transpose (inverse) orientation
         return T.quat2mat(orn).T @ angvel
 
     def get_joint_positions(self, prim_path):
