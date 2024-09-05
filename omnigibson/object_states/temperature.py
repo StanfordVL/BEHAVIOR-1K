@@ -54,7 +54,7 @@ class Temperature(TensorizedValueState):
     @classmethod
     def _update_values(cls, values):
         # Apply temperature decay
-        return values + (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
+        return values + (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_sim_step_dt()
 
     @classproperty
     def value_name(cls):
