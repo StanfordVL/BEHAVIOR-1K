@@ -266,7 +266,7 @@ def quat_inverse(quaternion: th.Tensor) -> th.Tensor:
 
 
 @th.jit.script
-def quat_distance(quaternion1, quaternion0):
+def quat_distance(quaternion0, quaternion1):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
 
@@ -277,7 +277,7 @@ def quat_distance(quaternion1, quaternion0):
     Returns:
         th.tensor: (x,y,z,w) quaternion distance
     """
-    return quat_multiply(quaternion1, quat_inverse(quaternion0))
+    return quat_multiply(quat_inverse(quaternion0), quaternion1)
 
 
 @th.jit.script
