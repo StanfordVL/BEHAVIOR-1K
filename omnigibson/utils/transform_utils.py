@@ -80,30 +80,6 @@ def dot(v1, v2, dim=-1, keepdim=False):
 
 
 @th.jit.script
-def quat_mul(a, b):
-    assert a.shape == b.shape
-    shape = a.shape
-    a = a.reshape(-1, 4)
-    b = b.reshape(-1, 4)
-
-    x1, y1, z1, w1 = a[:, 0], a[:, 1], a[:, 2], a[:, 3]
-    x2, y2, z2, w2 = b[:, 0], b[:, 1], b[:, 2], b[:, 3]
-    ww = (z1 + x1) * (x2 + y2)
-    yy = (w1 - y1) * (w2 + z2)
-    zz = (w1 + y1) * (w2 - z2)
-    xx = ww + yy + zz
-    qq = 0.5 * (xx + (z1 - x1) * (x2 - y2))
-    w = qq - ww + (z1 - y1) * (y2 - z2)
-    x = qq - xx + (x1 + w1) * (x2 + w2)
-    y = qq - yy + (w1 - x1) * (y2 + z2)
-    z = qq - zz + (z1 + y1) * (w2 - x2)
-
-    quat = th.stack([x, y, z, w], dim=-1).view(shape)
-
-    return quat / th.norm(quat, dim=-1, keepdim=True)
-
-
-@th.jit.script
 def unit_vector(data: th.Tensor, dim: Optional[int] = None, out: Optional[th.Tensor] = None) -> th.Tensor:
     """
     Returns tensor normalized by length, i.e. Euclidean norm, along axis.
@@ -266,7 +242,7 @@ def quat_inverse(quaternion: th.Tensor) -> th.Tensor:
 
 
 @th.jit.script
-def quat_distance(quaternion0, quaternion1):
+def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
 
@@ -277,7 +253,7 @@ def quat_distance(quaternion0, quaternion1):
     Returns:
         th.tensor: (x,y,z,w) quaternion distance
     """
-    return quat_multiply(quat_inverse(quaternion0), quaternion1)
+    return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
 @th.jit.script
@@ -1076,7 +1052,7 @@ def get_orientation_error(desired, current):
     current = current.reshape(-1, 4)
 
     cc = quat_conjugate(current)
-    q_r = quat_mul(desired, cc)
+    q_r = quat_multiply(desired, cc)
     return (q_r[:, 0:3] * th.sign(q_r[:, 3]).unsqueeze(-1)).reshape(list(input_shape) + [3])
 
 
@@ -1093,7 +1069,7 @@ def get_orientation_diff_in_radian(orn0: th.Tensor, orn1: th.Tensor) -> th.Tenso
         orn_diff (th.Tensor): orientation difference in radians
     """
     # Compute the difference quaternion
-    diff_quat = quat_multiply(quat_inverse(orn0), orn1)
+    diff_quat = quat_distance(orn0, orn1)
 
     # Convert to axis-angle representation
     axis_angle = quat2axisangle(diff_quat)
