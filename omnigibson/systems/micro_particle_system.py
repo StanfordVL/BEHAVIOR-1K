@@ -15,6 +15,7 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
@@ -1670,7 +1671,9 @@ class Cloth(MicroParticleSystem):
                 mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
             )
             texcoord = (
-                th.tensor(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32) if has_uv_mapping else None
+                vtarray_to_torch(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32)
+                if has_uv_mapping
+                else None
             )
         else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so

@@ -13,6 +13,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -1316,9 +1317,10 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    face_vertex_counts = th.tensor(mesh_prim.GetAttribute("faceVertexCounts").Get())
-    vertices = th.tensor(mesh_prim.GetAttribute("points").Get())
-    face_indices = th.tensor(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    breakpoint()
+    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get())
+    vertices = vtarray_to_torch(mesh_prim.GetAttribute("points").Get())
+    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get())
 
     faces = []
     i = 0
@@ -1330,12 +1332,12 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = th.tensor(mesh_prim.GetAttribute("normals").Get())
+        kwargs["vertex_normals"] = vtarray_to_torch(mesh_prim.GetAttribute("normals").Get())
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
         if raw_texture is not None:
-            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=th.tensor(raw_texture))
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=vtarray_to_torch(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 
