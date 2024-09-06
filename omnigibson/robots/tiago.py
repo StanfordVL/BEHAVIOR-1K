@@ -72,9 +72,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Unique to Tiago
         variant="default",
         rigid_trunk=False,
-        default_trunk_offset=0.365,
+        default_trunk_offset=0.2,
         default_reset_mode="untuck",
-        default_arm_pose="vertical",
+        default_arm_pose="diagonal15",
         **kwargs,
     ):
         """
@@ -214,15 +214,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 )
             elif self.default_arm_pose == "diagonal15":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, 2.05251]
+                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]
                 )
             elif self.default_arm_pose == "diagonal30":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, 2.03113]
+                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, -1.11046]
                 )
             elif self.default_arm_pose == "diagonal45":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, 1.81302]
+                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, -1.32857]
                 )
             elif self.default_arm_pose == "horizontal":
                 pos[self.arm_control_idx[arm]] = th.tensor(
@@ -336,18 +336,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         limits["velocity"][0][self.base_idx[3:]] = -m.MAX_ANGULAR_VELOCITY
         limits["velocity"][1][self.base_idx[3:]] = m.MAX_ANGULAR_VELOCITY
         return limits
-
-    def get_control_dict(self):
-        # Modify the right hand's pos_relative in the z-direction based on the trunk's value
-        # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
-        # hand, which does not control the trunk
-        fcns = super().get_control_dict()
-        native_fcn = fcns.get_fcn("eef_right_pos_relative")
-        fcns["eef_right_pos_relative"] = lambda: (
-            native_fcn() + th.tensor([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
-        )
-
-        return fcns
 
     @property
     def default_proprio_obs(self):

@@ -180,7 +180,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return list(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []))
+        return list(sorted(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []), key=lambda x: x.name))
 
     @property
     def systems(self):

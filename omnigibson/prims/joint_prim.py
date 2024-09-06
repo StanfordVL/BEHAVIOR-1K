@@ -187,8 +187,9 @@ class JointPrim(BasePrim):
         assert_valid_key(key=control_type, valid_keys=ControlType.VALID_TYPES, name="control type")
         if control_type == ControlType.POSITION:
             assert kp is not None, "kp gain must be specified for setting POSITION control!"
-            assert kd is None, "kd gain must not be specified for setting POSITION control!"
-            kd = 0.0
+            if kd is None:
+                # kd could have bene optionally set, if not, then set 0 as default
+                kd = 0.0
         elif control_type == ControlType.VELOCITY:
             assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
             assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
