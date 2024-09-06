@@ -1317,10 +1317,9 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    breakpoint()
-    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get())
+    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
     vertices = vtarray_to_torch(mesh_prim.GetAttribute("points").Get())
-    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
 
     faces = []
     i = 0

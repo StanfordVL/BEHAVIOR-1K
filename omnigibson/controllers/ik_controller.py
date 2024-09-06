@@ -363,7 +363,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 # Compute the pose error. Note that this is computed NOT in the EEF frame but still
                 # in the base frame.
                 pos_err = target_pos - pos_relative
-                quat_err = T.quat_mul(T.quat_inverse(quat_relative), target_quat)
+                quat_err = T.quat_multiply(T.quat_inverse(quat_relative), target_quat)
                 aa_err = T.quat2axisangle(quat_err)
                 err = th.cat([pos_err, aa_err])
 
