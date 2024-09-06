@@ -790,7 +790,7 @@ class KeyboardRobotController:
                 )
                 new_arm = self.ik_arms[self.active_arm_idx]
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(self.controller_info[new_arm]))
-                print(f"Now controlling arm {new_arm} with IK")
+                print(f"Now controlling arm {new_arm} EEF")
 
             elif (
                 event.input in {lazy.carb.input.KeyboardInput.KEY_5, lazy.carb.input.KeyboardInput.KEY_6}

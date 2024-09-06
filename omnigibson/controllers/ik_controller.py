@@ -6,7 +6,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.control_utils import IKSolver, orientation_error
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
@@ -137,6 +137,12 @@ class InverseKinematicsController(JointController, ManipulationController):
             else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
         )
         assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
+
+        # If mode is absolute pose, make sure command input limits / output limits are None
+        if mode == "absolute_pose":
+            assert command_input_limits is None, "command_input_limits should be None if using absolute_pose mode!"
+            assert command_output_limits is None, "command_output_limits should be None if using absolute_pose mode!"
+
         self.mode = mode
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
@@ -363,9 +369,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                 # Compute the pose error. Note that this is computed NOT in the EEF frame but still
                 # in the base frame.
                 pos_err = target_pos - pos_relative
-                quat_err = T.quat_multiply(T.quat_inverse(quat_relative), target_quat)
-                aa_err = T.quat2axisangle(quat_err)
-                err = th.cat([pos_err, aa_err])
+                ori_err = orientation_error(T.quat2mat(target_quat), T.quat2mat(quat_relative))
+                err = th.cat([pos_err, ori_err])
 
                 # Use the jacobian to compute a local approximation
                 j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
@@ -373,15 +378,11 @@ class InverseKinematicsController(JointController, ManipulationController):
                 delta_j = j_eef_pinv @ err
                 target_joint_pos = current_joint_pos + delta_j
 
-                # Check if the target joint position is within the joint limits
-                if not th.all(
-                    th.logical_and(
-                        self._control_limits[ControlType.get_type("position")][0][self.dof_idx] <= target_joint_pos,
-                        target_joint_pos <= self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
-                    )
-                ):
-                    # If not, we'll just use the current joint position
-                    target_joint_pos = None
+                # Clip values to be within the joint limits
+                target_joint_pos = target_joint_pos.clamp(
+                    min=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
+                    max=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
+                )
 
             if target_joint_pos is None:
                 # Print warning that we couldn't find a valid solution, and return the current joint configuration
