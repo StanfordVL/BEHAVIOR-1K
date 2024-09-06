@@ -1,3 +1,4 @@
+from omnigibson.robots.a1 import A1
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.behavior_robot import BehaviorRobot
 from omnigibson.robots.fetch import Fetch
