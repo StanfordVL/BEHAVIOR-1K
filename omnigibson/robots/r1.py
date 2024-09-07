@@ -54,8 +54,8 @@ class R1(ManipulationRobot, LocomotionRobot):
         grasping_mode="physical",
         disable_grasp_handling=False,
         # Unique to r1
-        default_reset_mode="tuck",
-        rigid_trunk=True,
+        default_reset_mode="untuck",
+        rigid_trunk=False,
         **kwargs,
     ):
         """
@@ -342,22 +342,20 @@ class R1(ManipulationRobot, LocomotionRobot):
 
     @property
     def assisted_grasp_start_points(self):
-        # TODO
         return {
-            self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=[0.025, -0.012, 0.0]),
-                GraspingPoint(link_name="r_gripper_finger_link", position=[-0.025, -0.012, 0.0]),
-            ]
+            arm: [
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+            ] for arm in self.arm_names
         }
 
     @property
     def assisted_grasp_end_points(self):
-        # TODO
         return {
-            self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=[0.025, 0.012, 0.0]),
-                GraspingPoint(link_name="l_gripper_finger_link", position=[-0.025, 0.012, 0.0]),
-            ]
+            arm: [
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+            ] for arm in self.arm_names
         }
 
     @property
@@ -515,5 +513,5 @@ class R1(ManipulationRobot, LocomotionRobot):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = teleop_action.base * 0.1
+        action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
         return action

@@ -417,8 +417,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             arm: [
-                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=[0.002, 0.0, -0.2]),
-                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=[0.002, 0.0, -0.13]),
+                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.2])),
+                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.13])),
             ]
             for arm in self.arm_names
         }
@@ -427,8 +427,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             arm: [
-                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=[-0.002, 0.0, -0.2]),
-                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=[-0.002, 0.0, -0.13]),
+                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.2])),
+                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.13])),
             ]
             for arm in self.arm_names
         }
@@ -744,5 +744,5 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = teleop_action.base * 0.1
+        action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
         return action

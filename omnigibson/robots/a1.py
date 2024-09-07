@@ -198,9 +198,9 @@ class A1(ManipulationRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name=f"base_link", position=[-0.025, -0.07, 0.012]),
-                GraspingPoint(link_name=f"base_link", position=[-0.015, -0.11, 0.012]),
-                GraspingPoint(link_name=f"link14", position=[-0.01, 0.015, 0.004]),
+                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
+                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
+                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
             ]
         }
 
@@ -208,10 +208,10 @@ class A1(ManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name=f"link22", position=[0.006, 0.04, 0.003]),
-                GraspingPoint(link_name=f"link32", position=[0.006, 0.045, 0.003]),
-                GraspingPoint(link_name=f"link42", position=[0.006, 0.04, 0.003]),
-                GraspingPoint(link_name=f"link52", position=[0.006, 0.04, 0.003]),
+                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
+                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
             ]
         }
 

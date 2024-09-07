@@ -209,7 +209,7 @@ class VX300S(ManipulationRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }
 
@@ -217,6 +217,6 @@ class VX300S(ManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }
