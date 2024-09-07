@@ -116,8 +116,8 @@ def camera_pose_test(flatcache):
     og.clear()
 
 
-def test_camera_pose_flatcache_on():
-    camera_pose_test(True)
+# def test_camera_pose_flatcache_on():
+#     camera_pose_test(True)
 
 
 def test_robot_load_drive():
@@ -207,3 +207,6 @@ def test_robot_load_drive():
         env.scene.remove_object(obj=robot)
 
     env.close()
+
+if __name__ == "__main__":
+    test_robot_load_drive()

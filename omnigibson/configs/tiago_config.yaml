@@ -1,0 +1,42 @@
+type: Tiago
+obs_modalities: [rgb, depth, seg_semantic, normal, seg_instance, seg_instance_id]
+scale: 1.0
+self_collisions: true
+action_normalize: false
+action_type: continuous
+grasping_mode: sticky
+rigid_trunk: false
+default_trunk_offset: 0.15
+default_arm_pose: vertical
+sensor_config:
+  VisionSensor:
+    sensor_kwargs:
+      image_height: 128
+      image_width: 128
+controller_config:
+  base:
+    name: JointController
+  arm_left:
+    name: JointController
+    motor_type: position
+    command_output_limits: null
+    use_delta_commands: true
+  arm_right:
+    name: JointController
+    motor_type: position
+    command_output_limits: null
+    use_delta_commands: true
+  gripper_left:
+    name: JointController
+    motor_type: position
+    command_input_limits: [-1, 1]
+    command_output_limits: null
+    use_delta_commands: true
+  gripper_right:
+    name: JointController
+    motor_type: position
+    command_input_limits: [-1, 1]
+    command_output_limits: null
+    use_delta_commands: true
+  camera:
+    name: JointController

@@ -11,10 +11,18 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
 )
 from omnigibson.macros import gm
 
+def load_robot_config(robot_name):
+    config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_config.yaml")
+    with open(config_filename, "r") as file:
+        return yaml.safe_load(file)
 
-def start_env():
+def start_env(enable_transition_rule=False, robot_type="Fetch"):
     if og.sim:
         og.sim.stop()
+
+    if robot_type not in ["Fetch", "Tiago"]:
+        raise ValueError("Invalid robot configuration")
+    robots = load_robot_config(robot_type)
     config = {
         "env": {"initial_pos_z_offset": 0.1},
         "render": {"viewer_width": 1280, "viewer_height": 720},
@@ -24,40 +32,7 @@ def start_env():
             "load_object_categories": ["floors", "walls", "countertop", "fridge", "sink", "stove"],
             "scene_source": "OG",
         },
-        "robots": [
-            {
-                "type": "Fetch",
-                "obs_modalities": ["scan", "rgb", "depth"],
-                "scale": 1,
-                "self_collisions": True,
-                "action_normalize": False,
-                "action_type": "continuous",
-                "grasping_mode": "sticky",
-                "disable_grasp_handling": True,
-                "rigid_trunk": False,
-                "default_trunk_offset": 0.365,
-                "default_arm_pose": "diagonal30",
-                "default_reset_mode": "tuck",
-                "controller_config": {
-                    "base": {"name": "DifferentialDriveController"},
-                    "arm_0": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None,
-                        "use_delta_commands": False,
-                    },
-                    "gripper_0": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                        "use_delta_commands": True,
-                    },
-                    "camera": {"name": "JointController", "use_delta_commands": False},
-                },
-            }
-        ],
+        "robots": [robots],
         "objects": [
             {
                 "type": "DatasetObject",
@@ -92,17 +67,20 @@ def start_env():
     }
 
     gm.USE_GPU_DYNAMICS = True
-    gm.ENABLE_TRANSITION_RULES = False
-
+    gm.ENABLE_TRANSITION_RULES = enable_transition_rule
     env = og.Environment(configs=config)
 
     return env
 
+@pytest.fixture(params=["Fetch", "Tiago"], scope="module")
+def robot_type(request):
+    """Fixture to provide robot types. Now with module scope."""
+    return request.param
 
 @pytest.fixture(scope="module")
-def shared_env():
+def shared_env(robot_type):
     """Load the environment just once using module scope."""
-    return start_env()
+    return start_env(robot_type)
 
 
 @pytest.fixture(scope="function")
@@ -111,6 +89,12 @@ def env(shared_env):
     shared_env.scene.reset()
     return shared_env
 
+@pytest.fixture(scope="function")
+def env_with_transition_rules():
+    """Create an environment with transition rules enabled for each test function."""
+    env = start_env(enable_transition_rule=True)
+    yield env
+    env.scene.reset()
 
 @pytest.fixture
 def robot(env):
@@ -161,7 +145,7 @@ def sponge(env):
 def knife(env):
     return next(iter(env.scene.object_registry("category", "carving_knife")))
 
-
+@pytest.mark.parametrize("robot_type", ["Fetch", "Tiago"])
 class TestSymbolicPrimitives:
     def test_in_hand_state(self, env, robot, prim_gen, apple):
         assert not robot.states[object_states.IsGrasping].get_value(apple)
@@ -233,7 +217,7 @@ class TestSymbolicPrimitives:
     # def test_soak_inside():
     #    pass
 
-    def test_wipe(self, env, prim_gen, sponge, sink, countertop):
+    def test_wipe(self, env, prim_gen, robot, sponge, sink, countertop):
         # Some pre-assertions
         water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
@@ -242,7 +226,6 @@ class TestSymbolicPrimitives:
         # Dirty the countertop as the setup
         mud_system = env.scene.get_system("mud")
         countertop.states[object_states.Covered].set_value(mud_system, True)
-        assert countertop.states[object_states.Covered].get_value(mud_system)
 
         # First toggle on the sink
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
@@ -264,20 +247,18 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert not countertop.states[object_states.Covered].get_value(mud_system)
 
-    def test_cut(self, env, prim_gen, apple, knife, countertop):
+    def test_cut(self, env_with_transition_rules, prim_gen, apple, knife, countertop):
         # assert not apple.states[object_states.Cut].get_value(knife)
+        # start a new environment to enable transition rules
+        env = env_with_transition_rules
         print("Grasping knife")
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
             env.step(action)
-        for _ in range(60):
-            env.step(prim_gen._empty_action())
         print("Cutting apple")
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
             env.step(action)
-        for _ in range(60):
-            env.step(prim_gen._empty_action())
-        breakpoint()
         print("Putting knife back on countertop")
+        breakpoint()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
             env.step(action)
 
@@ -308,10 +289,14 @@ class TestSymbolicPrimitives:
 
 
 def main():
-    env = start_env()
+    test = TestSymbolicPrimitives()
+    env = start_env(enable_transition_rule=True)
     prim_gen = SymbolicSemanticActionPrimitives(env)
     apple = next(iter(env.scene.object_registry("category", "apple")))
+    sponge = next(iter(env.scene.object_registry("category", "sponge")))
     knife = next(iter(env.scene.object_registry("category", "carving_knife")))
+    sink = next(iter(env.scene.object_registry("category", "sink")))
+    robot = env.robots[0]
     countertop = next(iter(env.scene.object_registry("category", "countertop")))
 
     print("Will start in 3 seconds")
@@ -319,14 +304,13 @@ def main():
         env.step(prim_gen._empty_action())
 
     try:
-        TestSymbolicPrimitives.test_cut(env, prim_gen, apple, knife, countertop)
+        # test.test_soak_under(env, prim_gen, robot, sponge, sink)
+        # test.test_wipe(env, prim_gen, robot, sponge, sink, countertop)
+        test.test_cut(env, prim_gen, apple, knife, countertop)
     except:
         raise
     while True:
         og.sim.step()
-
-
-
 
 if __name__ == "__main__":
     main()

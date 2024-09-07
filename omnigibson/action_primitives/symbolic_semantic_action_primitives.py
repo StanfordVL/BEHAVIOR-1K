@@ -97,6 +97,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             except ActionPrimitiveError as e:
                 errors.append(e)
 
+            breakpoint()
+
             try:
                 # Settle before returning.
                 yield from self._settle_robot()
@@ -291,7 +293,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         producing_systems = {
             ps
             for ps in obj.scene.system_registry.objects
-            if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)
+            if obj.states[object_states.ParticleSource].check_conditions_for_system(ps.name)
         }
         if not producing_systems:
             raise ActionPrimitiveError(
@@ -309,8 +311,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
+
         if not supported_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -328,7 +331,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -345,6 +348,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # If so, remove the particles.
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Saturated].set_value(system, True)
+
+        # WIP HERE
 
     def _soak_inside(self, obj):
         # Check that our current object is a particle remover
@@ -382,7 +387,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
         if not supported_systems:
             raise ActionPrimitiveError(
@@ -401,7 +406,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -523,7 +528,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # TODO: Do some more validation
         added_obj_attrs = []
         removed_objs = []
-        output = REGISTERED_RULES["SlicingRule"].transition({"sliceable": [obj]})
+        slicing_rule = REGISTERED_RULES["SlicingRule"]
+        output = REGISTERED_RULES["SlicingRule"].transition(slicing_rule, object_candidates={"sliceable": [obj]})
         added_obj_attrs += output.add
         removed_objs += output.remove
 

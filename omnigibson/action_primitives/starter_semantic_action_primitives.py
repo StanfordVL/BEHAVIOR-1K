@@ -99,6 +99,7 @@ m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
+m.TIME_WITHOUT_CHECKING = 1.0
 
 log = create_module_logger(module_name=__name__)
 
@@ -574,10 +575,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
-<<<<<<< HEAD
-=======
-
->>>>>>> 53494c300418f374c70c2fe8e22636c3498511be
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
@@ -831,12 +828,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Update the tracking to track the object.
         self._tracking_object = obj
 
+        breakpoint()
+
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "You need to be grasping an object first to place it somewhere.",
             )
+        
+        breakpoint()
 
         # Sample location to place object
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
@@ -1085,14 +1086,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Store the previous eef pose for checking if we got stuck
         prev_eef_pos = th.zeros(3)
 
-        for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
+        for i in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = th.tensor(joint_pos) - th.tensor(current_joint_pos)
             if th.max(th.abs(diff_joint_pos)).item() < m.JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001:
+            # check if the eef stayed in the same pose for sufficiently long
+            if og.sim.get_sim_step_dt() * i > m.TIME_WITHOUT_CHECKING and th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001:
                 # We're stuck!
                 break
 
@@ -1244,7 +1246,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
                 pos_diff = th.norm(th.tensor(current_pos - target_pose[0], dtype=th.float32))
                 orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn).item()
-                if pos_diff < 0.005 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
+                if pos_diff < 0.002 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):

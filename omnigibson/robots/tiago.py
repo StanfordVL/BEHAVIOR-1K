@@ -468,7 +468,13 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_control_idx(self):
         # Add combined entry
         idxs = super().arm_control_idx
-        idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))
+        # Concatenate all values and sort them
+        combined_tensor = th.cat([val for val in idxs.values()])
+        sorted_tensor, _ = th.sort(combined_tensor)
+        
+        # Add the sorted tensor as the "combined" entry
+        idxs["combined"] = sorted_tensor
+        
         return idxs
 
     @property
@@ -673,8 +679,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def arm_workspace_range(self):
         return {
-            "left": [th.deg2rad(th.tensor([15])).item(), th.deg2rad(th.tensor([75])).item()],
-            "right": [th.deg2rad(th.tensor([-75])).item(), th.deg2rad(th.tensor([-15])).item()],
+            "left": th.tensor([th.deg2rad(th.tensor([15])).item(), th.deg2rad(th.tensor([75])).item()], dtype=th.float32),
+            "right": th.tensor([th.deg2rad(th.tensor([-75])).item(), th.deg2rad(th.tensor([-15])).item()], dtype=th.float32),
         }
 
     def get_position_orientation(self, clone=True):
