@@ -346,7 +346,8 @@ class R1(ManipulationRobot, LocomotionRobot):
             arm: [
                 GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
                 GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
-            ] for arm in self.arm_names
+            ]
+            for arm in self.arm_names
         }
 
     @property
@@ -355,7 +356,8 @@ class R1(ManipulationRobot, LocomotionRobot):
             arm: [
                 GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
                 GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
-            ] for arm in self.arm_names
+            ]
+            for arm in self.arm_names
         }
 
     @property

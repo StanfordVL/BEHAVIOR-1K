@@ -417,8 +417,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             arm: [
-                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.2])),
-                GraspingPoint(link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.13])),
+                GraspingPoint(
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.2])
+                ),
+                GraspingPoint(
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.13])
+                ),
             ]
             for arm in self.arm_names
         }
@@ -427,8 +431,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             arm: [
-                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.2])),
-                GraspingPoint(link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.13])),
+                GraspingPoint(
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.2])
+                ),
+                GraspingPoint(
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.13])
+                ),
             ]
             for arm in self.arm_names
         }
