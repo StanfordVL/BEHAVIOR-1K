@@ -148,7 +148,7 @@ class A1(ManipulationRobot):
         """
         This will setup the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
         """
-        return th.cat([th.tensor([0.075, 1.908, -0.995, 1.666, 0.915, -1.626]), th.zeros(12)])
+        return th.cat([th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571]), th.zeros(12)])
 
     @property
     def finger_lengths(self):
@@ -164,7 +164,7 @@ class A1(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "palm_center"}
+        return {self.default_arm: "palm_lower"}
 
     @property
     def finger_link_names(self):
@@ -188,7 +188,7 @@ class A1(ManipulationRobot):
 
     @property
     def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_eef.usd")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_eef.usd")}
 
     @property
     def teleop_rotation_offset(self):

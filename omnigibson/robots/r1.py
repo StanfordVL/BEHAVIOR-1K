@@ -5,16 +5,21 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.controllers import ControlType
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 m = create_module_macros(module_path=__file__)
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
 m.MAX_ANGULAR_VELOCITY = th.pi  # angular velocity in radians/second
+
+
+RESET_JOINT_OPTIONS = {
+    "tuck",
+    "untuck",
+}
 
 
 class R1(ManipulationRobot, LocomotionRobot):
@@ -49,7 +54,8 @@ class R1(ManipulationRobot, LocomotionRobot):
         grasping_mode="physical",
         disable_grasp_handling=False,
         # Unique to r1
-        rigid_trunk=False,
+        default_reset_mode="tuck",
+        rigid_trunk=True,
         **kwargs,
     ):
         """
@@ -97,12 +103,16 @@ class R1(ManipulationRobot, LocomotionRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
+                If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store args
         self.rigid_trunk = rigid_trunk
+        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+        self.default_reset_mode = default_reset_mode
         # Other args that will be created at runtime
         self._world_base_fixed_joint_prim = None
 
@@ -180,11 +190,6 @@ class R1(ManipulationRobot, LocomotionRobot):
     def _postprocess_control(self, control, control_type):
         # Run super method first
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
-
-        # Override trunk value if we're keeping the trunk rigid
-        if self.rigid_trunk:
-            u_vec[self.trunk_control_idx] = self._default_joint_pos[self.trunk_control_idx]
-            u_type_vec[self.trunk_control_idx] = ControlType.POSITION
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
         base_orn = self.base_footprint_link.get_orientation()
@@ -299,9 +304,37 @@ class R1(ManipulationRobot, LocomotionRobot):
 
         return cfg
 
+    def tuck(self):
+        """
+        Immediately set this robot's configuration to be in tucked mode
+        """
+        self.set_joint_positions(self.tucked_default_joint_pos)
+
+    def untuck(self):
+        """
+        Immediately set this robot's configuration to be in untucked mode
+        """
+        self.set_joint_positions(self.untucked_default_joint_pos)
+
+    @property
+    def tucked_default_joint_pos(self):
+        pos = th.zeros(self.n_dof)
+        # Keep the current joint positions for the base joints
+        pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        return pos
+
+    @property
+    def untucked_default_joint_pos(self):
+        pos = th.zeros(self.n_dof)
+        # Keep the current joint positions for the base joints
+        pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        for arm in self.arm_names:
+            pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
+        return pos
+
     @property
     def _default_joint_pos(self):
-        return th.zeros(len(self.joints))
+        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     def finger_lengths(self):
@@ -414,7 +447,7 @@ class R1(ManipulationRobot, LocomotionRobot):
             orientation = current_orientation
         position, orientation = th.tensor(position), th.tensor(orientation)
         assert th.isclose(
-            th.linalg.norm(orientation), 1, atol=1e-3
+            th.linalg.norm(orientation), th.ones(1), atol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
