@@ -194,8 +194,6 @@ def test_robot_load_drive():
 
             # If this is a locomotion robot, we want to test driving
             if isinstance(robot, LocomotionRobot):
-                # load diff drive controller
-                controller_config = {"base": {"name": "DifferentialDriveController"}}
                 action_primitives = StarterSemanticActionPrimitives(env)
                 goal_location = th.tensor([0, 1, 0], dtype=th.float32)
                 for action in action_primitives._navigate_to_pose_direct(goal_location):

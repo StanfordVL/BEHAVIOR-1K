@@ -194,6 +194,35 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Return processed command
         return command
 
+    def _reverse_preprocess_command(self, processed_command):
+        """
+        Reverses the scaling operation performed by _preprocess_command.
+        Note: This method does not reverse the clipping operation as it's not reversible.
+
+        Args:
+            processed_command (th.Tensor[float]): Processed command vector
+
+        Returns:
+            th.Tensor[float]: Original command vector (before scaling, clipping not reversed)
+        """
+        # We only reverse the scaling if both input and output limits exist
+        if self._command_input_limits is not None and self._command_output_limits is not None:
+            # If we haven't calculated how to scale the command, do that now (once)
+            if self._command_scale_factor is None:
+                self._command_scale_factor = abs(self._command_output_limits[1] - self._command_output_limits[0]) / abs(
+                    self._command_input_limits[1] - self._command_input_limits[0]
+                )
+                self._command_output_transform = (self._command_output_limits[1] + self._command_output_limits[0]) / 2.0
+                self._command_input_transform = (self._command_input_limits[1] + self._command_input_limits[0]) / 2.0
+
+            original_command = (
+                processed_command - self._command_output_transform
+            ) / self._command_scale_factor + self._command_input_transform
+        else:
+            original_command = processed_command
+
+        return original_command
+
     def update_goal(self, command, control_dict):
         """
         Updates inputted @command internally, writing any necessary internal variables as needed.
@@ -302,6 +331,20 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             dict: Maps relevant goal keys (from self._goal_shapes.keys()) to relevant goal data to be used
                 in controller computations
+        """
+        raise NotImplementedError
+
+    def compute_no_op_action(self, control_dict):
+        """
+        Compute no-op action given the goal
+        """
+        if self._goal is None:
+            self._goal = self.compute_no_op_goal(control_dict=control_dict)
+        return self._compute_no_op_action(control_dict=control_dict)
+
+    def _compute_no_op_action(self, control_dict):
+        """
+        Compute no-op action given the goal
         """
         raise NotImplementedError
 
