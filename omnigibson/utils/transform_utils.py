@@ -5,7 +5,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Optional, Tuple, Literal
+from typing import List, Literal, Optional, Tuple
 
 import torch as th
 
@@ -1361,6 +1361,7 @@ def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["w
             position, orientation = mat2pose(prim.scene.pose @ pose2mat((position, orientation)))
 
     return position, orientation
+
 
 @th.jit.script
 def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = True) -> th.Tensor:

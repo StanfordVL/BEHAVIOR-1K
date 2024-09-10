@@ -762,12 +762,13 @@ class PoseAPI:
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-        
+
         cls._refresh()
 
         if frame == "world":
             # Avoid premature imports
             from omnigibson.utils.deprecated_utils import get_world_pose
+
             position, orientation = get_world_pose(cls.PRIMS[prim_path])
         else:
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)

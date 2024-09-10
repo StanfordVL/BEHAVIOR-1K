@@ -1199,4 +1199,3 @@ def test_covered(env):
 
 def test_clear_sim():
     og.clear()
-

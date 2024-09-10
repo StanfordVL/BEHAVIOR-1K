@@ -21,11 +21,11 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
-from omnigibson.utils.constants import PrimType, JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -1492,9 +1492,9 @@ class ManipulationRobot(BaseRobot):
                     raise ValueError("Cannot transform position and orientation relative to scene without a scene")
                 else:
                     ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
-                        ag_params[arm]["contact_pos"], 
-                        th.tensor([0, 0, 0, 1], dtype=th.float32), 
-                        *self.scene.get_position_orientation()
+                        ag_params[arm]["contact_pos"],
+                        th.tensor([0, 0, 0, 1], dtype=th.float32),
+                        *self.scene.get_position_orientation(),
                     )
         state["ag_obj_constraint_params"] = ag_params
         return state

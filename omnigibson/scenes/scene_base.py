@@ -354,7 +354,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position_orientation(position=th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0]))
+        self._scene_prim.set_position_orientation(
+            position=th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
+        )
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
@@ -363,7 +365,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Set the init pose accordingly
             obj.set_position_orientation(
                 position=self._init_state[obj_name]["root_link"]["pos"],
-                orientation=self._init_state[obj_name]["root_link"]["ori"]
+                orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
 
         # Position the scene prim based on the last scene's right edge

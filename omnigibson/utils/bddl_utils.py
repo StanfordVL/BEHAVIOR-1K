@@ -1283,7 +1283,9 @@ class BDDLSampler:
                 self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
-                simulator_obj.set_position_orientation(th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0)
+                simulator_obj.set_position_orientation(
+                    th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0
+                )
 
                 self._sampled_objects.add(simulator_obj)
                 self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
