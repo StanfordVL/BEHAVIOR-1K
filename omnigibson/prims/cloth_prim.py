@@ -133,12 +133,6 @@ class ClothPrim(GeomPrim):
         dists = th.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = th.argmin(dists)
 
-    def _initialize(self):
-        super()._initialize()
-        # TODO (eric): hacky way to get cloth rendering to work (otherwise, there exist some rendering artifacts).
-        self._prim.CreateAttribute("primvars:isVolume", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(True)
-        self._prim.GetAttribute("primvars:isVolume").Set(False)
-
         # Store the default position of the points in the local frame
         self._default_positions = th.tensor(self.get_attribute(attr="points"))
 
