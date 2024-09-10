@@ -823,7 +823,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_frequency": gm.DEFAULT_RENDERING_FREQ,
+                "action_frequency": gm.DEFAULT_SIM_STEP_FREQ,
                 "rendering_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
                 "device": None,
