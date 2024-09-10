@@ -340,7 +340,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         if self._goal is None:
             self._goal = self.compute_no_op_goal(control_dict=control_dict)
-        return self._compute_no_op_action(control_dict=control_dict)
+        command = self._compute_no_op_action(control_dict=control_dict)
+        return self._reverse_preprocess_command(command)
 
     def _compute_no_op_action(self, control_dict):
         """

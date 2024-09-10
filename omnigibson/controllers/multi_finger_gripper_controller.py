@@ -269,7 +269,7 @@ class MultiFingerGripperController(GripperController):
         return dict(target=th.zeros(self.command_dim))
 
     def _compute_no_op_action(self, control_dict):
-        return self._reverse_preprocess_command(self._goal["target"])
+        return self._goal["target"]
 
     def _get_goal_shapes(self):
         return dict(target=(self.command_dim,))

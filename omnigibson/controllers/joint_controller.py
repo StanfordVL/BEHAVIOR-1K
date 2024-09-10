@@ -244,7 +244,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         else:
             command = self._goal["target"]
 
-        return self._reverse_preprocess_command(command)
+        return command
 
     def _get_goal_shapes(self):
         return dict(target=(self.control_dim,))

@@ -478,7 +478,7 @@ class OperationalSpaceController(ManipulationController):
             delta_axisangle = T.quat2axisangle(T.mat2quat(delta_rot))
             command[3:] = delta_axisangle
 
-        return self._reverse_preprocess_command(command)
+        return command
 
     def _get_goal_shapes(self):
         return dict(
