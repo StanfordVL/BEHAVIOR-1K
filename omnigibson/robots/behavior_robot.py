@@ -1,11 +1,11 @@
 import itertools
+import math
 import os
 from abc import ABC
 from collections import OrderedDict
 from typing import Iterable, List, Literal, Tuple
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -19,20 +19,25 @@ from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import PoseAPI
 
 m = create_module_macros(module_path=__file__)
+
 # component suffixes for the 6-DOF arm joint names
 m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # Offset between the body and parts
-m.HEAD_TO_BODY_OFFSET = [0, 0, -0.4]
-m.HAND_TO_BODY_OFFSET = {"left": [0, -0.15, -0.4], "right": [0, 0.15, -0.4]}
+m.HEAD_TO_BODY_OFFSET = th.tensor([0, 0, -0.4], dtype=th.float32)
+m.HAND_TO_BODY_OFFSET = {
+    "left": th.tensor([0, -0.15, -0.4], dtype=th.float32),
+    "right": th.tensor([0, 0.15, -0.4], dtype=th.float32),
+}
 m.BODY_HEIGHT_OFFSET = 0.45
+
 # Hand parameters
 m.HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
-m.THUMB_2_POS = [0, -0.02, -0.05]
-m.THUMB_1_POS = [0, -0.015, -0.02]
-m.PALM_CENTER_POS = [0, -0.04, 0.01]
-m.PALM_BASE_POS = [0, 0, 0.015]
-m.FINGER_TIP_POS = [0, -0.025, -0.055]
+m.THUMB_2_POS = th.tensor([0, -0.02, -0.05], dtype=th.float32)
+m.THUMB_1_POS = th.tensor([0, -0.015, -0.02], dtype=th.float32)
+m.PALM_CENTER_POS = th.tensor([0, -0.04, 0.01], dtype=th.float32)
+m.PALM_BASE_POS = th.tensor([0, 0, 0.015], dtype=th.float32)
+m.FINGER_TIP_POS = th.tensor([0, -0.025, -0.055], dtype=th.float32)
 
 # Hand link index constants
 m.PALM_LINK_NAME = "palm"
@@ -47,7 +52,7 @@ m.ARM_JOINT_STIFFNESS = 1e6
 m.ARM_JOINT_MAX_EFFORT = 300
 m.FINGER_JOINT_STIFFNESS = 1e3
 m.FINGER_JOINT_MAX_EFFORT = 50
-m.FINGER_JOINT_MAX_VELOCITY = np.pi * 4
+m.FINGER_JOINT_MAX_VELOCITY = math.pi * 4
 
 
 class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -60,7 +65,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -92,7 +96,6 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super(BehaviorRobot, self).__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=True,
@@ -204,7 +207,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
+        return th.zeros(self.n_joints)
 
     @property
     def controller_order(self):
@@ -364,24 +367,25 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return self._links[self.base_footprint_link_name]
 
-    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world"):
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
         Gets robot's pose with respect to the specified frame.
 
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world. parent frame
             get position relative to the object parent. scene frame get position relative to the scene.
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:
             2-tuple:
-                - 3-array: (x,y,z) position in the specified frame
-                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+                - th.Tensor: (x,y,z) position in the specified frame
+                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
         if frame == "world" or frame == "scene":
-            return self.base_footprint_link.get_position_orientation(frame=frame)
+            return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
         else:
             # Get the position and orientation of the root_link in the world frame
             position, orientation = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
@@ -408,12 +412,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
-        current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else np.array(position, dtype=float)
-        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
 
-        assert np.isclose(
-            np.linalg.norm(orientation), 1, atol=1e-3
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
@@ -449,7 +454,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 if self.scene is None:
                     raise ValueError("Cannot set pose relative to scene without a scene.")
                 else:
-                    position, orientation = T.pose_transform(*self.scene.prim.get_position_orientation(), position, orientation)
+                    position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
             elif frame == "parent":
                
                 # get the parent prim path
@@ -468,7 +473,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def assisted_grasp_start_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_BASE_POS),
@@ -483,7 +488,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def assisted_grasp_end_points(self):
-        side_coefficients = {"left": np.array([1, -1, 1]), "right": np.array([1, 1, 1])}
+        side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
                 GraspingPoint(link_name=f"{arm}_{finger}", position=m.FINGER_TIP_POS * side_coefficients[arm])
@@ -499,11 +504,11 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         self._part_is_in_contact["body"] = len(self.links["body"].contact_list()) > 0
         for hand_name in self.arm_names:
-            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or np.any(
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 or th.any(
                 [len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]]
             )
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generates an action for the BehaviorRobot to perform based on teleop action data dict.
 
@@ -519,17 +524,17 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Total size: 44
         """
         # Actions are stored as 1D numpy array
-        action = np.zeros(self.action_dim)
+        action = th.zeros(self.action_dim)
         # Update body action space
         if teleop_action.is_valid["head"]:
             head_pos, head_orn = teleop_action.head[:3], T.euler2quat(teleop_action.head[3:6])
-            des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
-            des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
+            des_body_pos = head_pos - th.tensor([0, 0, m.BODY_HEIGHT_OFFSET])
+            des_body_rpy = th.tensor([0, 0, T.quat2euler(head_orn)[2][0]])
             des_body_orn = T.euler2quat(des_body_rpy)
         else:
             des_body_pos, des_body_orn = self.get_position_orientation()
-            des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
-        action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
+            des_body_rpy = th.stack(T.quat2euler(des_body_orn)).squeeze(1)
+        action[self.controller_action_idx["base"]] = th.cat((des_body_pos, des_body_rpy))
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
@@ -562,9 +567,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             des_local_part_pos, des_local_part_orn = T.pose_transform(
                 eef_part.offset_to_body, [0, 0, 0, 1], des_local_part_pos, des_local_part_orn
             )
-            des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
+            des_part_rpy = th.stack(T.quat2euler(des_local_part_orn)).squeeze(1)
             controller_name = "camera" if part_name == "head" else "arm_" + part_name
-            action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
+            action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose
             if part_name in self.arm_names and teleop_action.reset[part_name]:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
@@ -583,7 +588,7 @@ class BRPart(ABC):
         Args:
             name (str): unique name of this BR part
             parent (BehaviorRobot): the parent BR object
-            relative_prim_path (str): prim path to the root link of the eef
+            relative_prim_path (str): relative prim path to the root link of the eef
             eef_type (str): type of eef. One of hand, head
             offset_to_body (List[float]): relative POSITION offset between the rz link and the eef link.
         """
@@ -599,7 +604,6 @@ class BRPart(ABC):
     def load(self, scene) -> None:
         self.scene = scene
         self._root_link = self.parent.links[self.relative_prim_path.replace("/", "")]
-
         # setup ghost hand
         if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
@@ -627,7 +631,7 @@ class BRPart(ABC):
         return self.get_position_orientation(frame="parent")
 
     def get_position_orientation(
-        self, frame: Literal["world", "scene", "parent"] = "world"
+        self, frame: Literal["world", "scene", "parent"] = "world", clone=True
     ) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Gets robot's pose with respect to the specified frame.
@@ -635,24 +639,23 @@ class BRPart(ABC):
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world. parent frame
             get position relative to the object parent. scene frame get position relative to the scene.
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:
             2-tuple:
-                - 3-array: (x,y,z) position in the specified frame
-                - 4-array: (x,y,z,w) quaternion orientation in the specified frame
+                - th.Tensor: (x,y,z) position in the specified frame
+                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
 
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         if frame == "world" or frame == "scene":
-            position, orientation = self._root_link.get_position_orientation()
+            position, orientation = self._root_link.get_position_orientation(clone=clone)
 
             if frame == "scene":
                 if self.scene is None:
-                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
+                    raise ValueError("Cannot get position and orientation relative to scene without a scene")
                 else:
-                    position, orientation = T.relative_pose_transform(
-                        position, orientation, *self.scene.get_position_orientation()
-                    )
+                    position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
 
             return position, orientation
 
@@ -681,7 +684,7 @@ class BRPart(ABC):
             if self.scene is None:
                 raise ValueError("Cannot set pose relative to scene without a scene.")
             else:
-                pos, orn = T.pose_transform(*self.scene.prim.get_position_orientation(), pos, orn)
+                pos, orn = T.mat2pose(self.scene.pose @ T.pose2mat((pos, orn)))
         elif frame == "parent":
             
             # get the parent prim path
@@ -711,7 +714,7 @@ class BRPart(ABC):
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears
-        dist_to_real_controller = np.linalg.norm(pos - self.get_position_orientation()[0])
+        dist_to_real_controller = th.norm(pos - self.get_position_orientation()[0])
         should_visible = dist_to_real_controller > m.HAND_GHOST_HAND_APPEAR_THRESHOLD
 
         # Only toggle visibility if we are transition from hidden to unhidden, or the other way around

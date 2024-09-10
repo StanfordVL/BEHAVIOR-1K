@@ -1,11 +1,8 @@
+import math
 import os
 
 import cv2
-import numpy as np
-from PIL import Image
-
-# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
-Image.MAX_IMAGE_PIXELS = None
+import torch as th
 
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.motion_planning_utils import astar
@@ -76,9 +73,13 @@ class TraversableMap(BaseMap):
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
+                trav_map = th.tensor(
+                    cv2.imread(os.path.join(maps_path, "floor_trav_{}.png".format(floor)), cv2.IMREAD_GRAYSCALE)
+                )
             else:
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+                trav_map = th.tensor(
+                    cv2.imread(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor)), cv2.IMREAD_GRAYSCALE)
+                )
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the
@@ -90,7 +91,7 @@ class TraversableMap(BaseMap):
                 map_size = int(self.trav_map_original_size * self.map_default_resolution / self.map_resolution)
 
             # We resize the traversability map to the new size computed before
-            trav_map = cv2.resize(trav_map, (map_size, map_size))
+            trav_map = th.tensor(cv2.resize(trav_map.cpu().numpy(), (map_size, map_size)))
 
             # We make the pixels of the image to be either 0 or 255
             trav_map[trav_map < 255] = 0
@@ -111,11 +112,11 @@ class TraversableMap(BaseMap):
         # Erode the traversability map to account for the robot's size
         if robot:
             robot_chassis_extent = robot.reset_joint_pos_aabb_extent[:2]
-            radius = np.linalg.norm(robot_chassis_extent) / 2.0
+            radius = th.norm(robot_chassis_extent) / 2.0
         else:
             radius = self.default_erosion_radius
-        radius_pixel = int(np.ceil(radius / self.map_resolution))
-        trav_map = cv2.erode(trav_map, np.ones((radius_pixel, radius_pixel)))
+        radius_pixel = int(math.ceil(radius / self.map_resolution))
+        trav_map = th.tensor(cv2.erode(trav_map.cpu().numpy(), th.ones((radius_pixel, radius_pixel)).cpu().numpy()))
         return trav_map
 
     def get_random_point(self, floor=None, reference_point=None, robot=None):
@@ -139,27 +140,28 @@ class TraversableMap(BaseMap):
 
         # If nothing is given, sample a random floor and a random point on that floor
         if floor is None and reference_point is None:
-            floor = np.random.randint(0, self.n_floors)
+            floor = th.randint(0, self.n_floors)
 
         # create a deep copy so that we don't erode the original map
-        trav_map = self.floor_map[floor].copy()
+        trav_map = th.clone(self.floor_map[floor])
         trav_map = self._erode_trav_map(trav_map, robot=robot)
 
         if reference_point is not None:
             # Find connected component
-            _, component_labels = cv2.connectedComponents(trav_map, connectivity=4)
+            _, component_labels = cv2.connectedComponents(trav_map.cpu().numpy(), connectivity=4)
+            component_labels = th.tensor(component_labels)
 
             # If previous point is given, sample a point in the same connected component
             prev_xy_map = self.world_to_map(reference_point[:2])
             prev_label = component_labels[prev_xy_map[0]][prev_xy_map[1]]
-            trav_space = np.where(component_labels == prev_label)
+            trav_space = th.where(component_labels == prev_label)
         else:
-            trav_space = np.where(trav_map == 255)
-        idx = np.random.randint(0, high=trav_space[0].shape[0])
-        xy_map = np.array([trav_space[0][idx], trav_space[1][idx]])
+            trav_space = th.where(trav_map == 255)
+        idx = th.randint(0, high=trav_space[0].shape[0], size=(1,)).item()
+        xy_map = th.tensor([trav_space[0][idx], trav_space[1][idx]])
         x, y = self.map_to_world(xy_map)
         z = self.floor_heights[floor]
-        return floor, np.array([x, y, z])
+        return floor, th.tensor([x, y, z])
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False, robot=None):
         """
@@ -179,11 +181,11 @@ class TraversableMap(BaseMap):
                 - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
                 - float: geodesic distance of the path
         """
-        source_map = tuple(self.world_to_map(source_world))
-        target_map = tuple(self.world_to_map(target_world))
+        source_map = tuple(self.world_to_map(source_world).tolist())
+        target_map = tuple(self.world_to_map(target_world).tolist())
 
         # create a deep copy so that we don't erode the original map
-        trav_map = self.floor_map[floor].copy()
+        trav_map = th.clone(self.floor_map[floor])
 
         trav_map = self._erode_trav_map(trav_map, robot=robot)
 
@@ -192,14 +194,14 @@ class TraversableMap(BaseMap):
             # No traversable path found
             return None, None
         path_world = self.map_to_world(path_map)
-        geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))
+        geodesic_distance = th.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
         path_world = path_world[:: self.waypoint_interval]
 
         if not entire_path:
             path_world = path_world[: self.num_waypoints]
             num_remaining_waypoints = self.num_waypoints - path_world.shape[0]
             if num_remaining_waypoints > 0:
-                remaining_waypoints = np.tile(target_world, (num_remaining_waypoints, 1))
-                path_world = np.concatenate((path_world, remaining_waypoints), axis=0)
+                remaining_waypoints = th.tile(target_world, (num_remaining_waypoints, 1))
+                path_world = th.cat((path_world, remaining_waypoints), dim=0)
 
         return path_world, geodesic_distance

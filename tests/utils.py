@@ -1,4 +1,6 @@
-import numpy as np
+import math
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -96,7 +98,7 @@ def assert_test_env():
                 get_obj_cfg("shelf_baseboard", "shelf_baseboard", "hlhneo", abilities={"attachable": {}}),
                 get_obj_cfg("bracelet", "bracelet", "thqqmo"),
                 get_obj_cfg("oyster", "oyster", "enzocs"),
-                get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
+                get_obj_cfg("sink", "sink", "egwapq", scale=th.ones(3)),
                 get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}, "heatable": {}}),
                 get_obj_cfg(
                     "applier_dishtowel",
@@ -151,13 +153,13 @@ def assert_test_env():
                 get_obj_cfg(
                     "baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]
                 ),
-                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm", scale=np.ones(3) * 0.8),
+                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm", scale=th.ones(3) * 0.8),
                 get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
                 get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
                 get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
-                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.7),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=th.ones(3) * 0.7),
                 get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
                 get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
                 get_obj_cfg("apple", "apple", "agveuv"),
@@ -170,7 +172,7 @@ def assert_test_env():
             "robots": [
                 {
                     "type": "Fetch",
-                    "obs_modalities": ["seg_semantic", "seg_instance", "seg_instance_id"],
+                    "obs_modalities": "rgb",
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
                 }
@@ -203,8 +205,9 @@ def assert_test_env():
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
-    pos = np.random.uniform(pos_low, pos_hi, 3)
-    orn = T.euler2quat(np.random.uniform(-np.pi, np.pi, 3))
+    pos = th.rand(3) * (pos_hi - pos_low) + pos_low
+    ori_lo, ori_hi = -math.pi, math.pi
+    orn = T.euler2quat(th.rand(3) * (ori_hi - ori_lo) + ori_lo)
     return pos, orn
 
 
@@ -221,8 +224,8 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
     target_objA_aabb_pos = (
         objB_aabb_center
-        + np.array([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
-        + np.array([x_offset, y_offset, z_offset])
+        + th.tensor([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
+        + th.tensor([x_offset, y_offset, z_offset])
     )
     objA.set_position_orientation(position=target_objA_aabb_pos + objA_aabb_offset)
 
@@ -236,7 +239,7 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
     obj_aabb_center, obj_aabb_extent = obj.aabb_center, obj.aabb_extent
     obj_aabb_offset = obj.get_position_orientation()[0] - obj_aabb_center
 
-    target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
+    target_obj_aabb_pos = th.tensor([0, 0, obj_aabb_extent[2] / 2.0]) + th.tensor([x_offset, y_offset, z_offset])
     obj.set_position_orientation(position=target_obj_aabb_pos + obj_aabb_offset)
 
 

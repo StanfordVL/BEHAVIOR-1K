@@ -1,6 +1,7 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.controllers import ControlType
 from omnigibson.macros import gm
@@ -39,7 +40,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -55,7 +55,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         action_normalize=True,
         reset_joint_pos=None,
         # Unique to BaseRobot
-        obs_modalities="all",
+        obs_modalities=("rgb", "proprio"),
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -63,7 +63,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         disable_grasp_handling=False,
         # Unique to Fetch
         rigid_trunk=False,
-        default_trunk_offset=0.365,
+        default_trunk_offset=0.2,
         default_reset_mode="untuck",
         default_arm_pose="vertical",
         **kwargs,
@@ -73,8 +73,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             name (str): Name for the object. Names need to be unique per scene
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -97,9 +95,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
                 Set this value instead if you want to initialize the robot with a different rese joint position.
-            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
-                corresponds to all modalities being used.
-                Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
+            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
+                Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
@@ -137,7 +134,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -160,7 +156,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def tucked_default_joint_pos(self):
-        return np.array(
+        return th.tensor(
             [
                 0.0,
                 0.0,  # wheels
@@ -181,31 +177,31 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def untucked_default_joint_pos(self):
-        pos = np.zeros(self.n_joints)
+        pos = th.zeros(self.n_joints)
         pos[self.base_control_idx] = 0.0
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
-        pos[self.camera_control_idx] = np.array([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.05, 0.05])  # open gripper
+        pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
+        pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
 
         # Choose arm based on setting
         if self.default_arm_pose == "vertical":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]
             )
         elif self.default_arm_pose == "diagonal15":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-0.95587, -0.34778, 1.46388, 1.47821, -0.93813, 1.4587, 1.9939]
             )
         elif self.default_arm_pose == "diagonal30":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
             )
         elif self.default_arm_pose == "diagonal45":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
             )
         elif self.default_arm_pose == "horizontal":
-            pos[self.arm_control_idx[self.default_arm]] = np.array(
+            pos[self.arm_control_idx[self.default_arm]] = th.tensor(
                 [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
             )
         else:
@@ -227,7 +223,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Also apply a convex decomposition to the torso lift link
         torso_lift_link = self.links["torso_lift_link"]
-        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "torso link should only have 1 collision!"
         torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
 
     @property
@@ -308,7 +304,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Need to override joint idx being controlled to include trunk in default arm controller configs
         for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
-            arm_control_idx = np.concatenate([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
+            arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
             arm_cfg["dof_idx"] = arm_control_idx
 
             # Need to modify the default joint positions also if this is a null joint controller
@@ -366,7 +362,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to trunk joints.
         """
-        return np.array([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def disabled_collision_pairs(self):
@@ -475,7 +471,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {self.default_arm: [np.deg2rad(-45), np.deg2rad(45)]}
+        return {self.default_arm: [th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()]}
 
     @property
     def eef_usd_path(self):
@@ -483,4 +479,4 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
+        return {self.default_arm: euler2quat([0, math.pi / 2, math.pi])}

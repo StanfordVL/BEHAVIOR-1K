@@ -1,9 +1,11 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
-import numpy as np
+import torch as th
 
+import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_TASKS = dict()
@@ -98,7 +100,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Create the low dim obs space and add to the main obs space dict -- make sure we're flattening low dim obs
         if self._low_dim_obs_dim > 0:
             obs_space["low_dim"] = self._build_obs_box_space(
-                shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64
+                shape=(self._low_dim_obs_dim,), low=-float("inf"), high=float("inf"), dtype=NumpyTypes.FLOAT32
             )
 
         return obs_space
@@ -117,12 +119,45 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Run internal method
         self._load(env=env)
 
-        # Load the obs space dim
+        # We're now initialized
+        self._loaded = True
+
+    def post_play_load(self, env):
+        """
+        Complete any loading tasks that require the simulator to be playing
+
+        Args:
+            env (Environment): environment instance
+        """
+        # Compute the low dimensional observation dimension
         obs = self.get_obs(env=env, flatten_low_dim=True)
         self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
 
-        # We're now initialized
-        self._loaded = True
+    @property
+    def task_metadata(self):
+        """
+        Returns:
+            dict: Relevant metadata for the current task
+        """
+        # Default is empty dictionary
+        return dict()
+
+    def write_task_metadata(self):
+        """
+        Store any relevant task metadata that should be written when the simulation state is saved
+        """
+        # Write to sim
+        og.sim.write_metadata(key="task", data=self.task_metadata)
+
+    def load_task_metadata(self):
+        """
+        Load relevant task metadata stored in the simulator
+
+        Returns:
+            dict: Relevant metadata for the ucrrent task
+        """
+        # Load from sim
+        return og.sim.get_metadata(key="task")
 
     @abstractmethod
     def _create_termination_conditions(self):
@@ -288,7 +323,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             n-array: 1D-numpy array of flattened low-dim observations
         """
         # By default, we simply concatenate all values in our obs dict
-        return np.concatenate([ob for ob in obs.values()]) if len(obs.values()) > 0 else np.array([])
+        return th.cat([ob for ob in obs.values()]) if len(obs.values()) > 0 else th.empty(0)
 
     def get_obs(self, env, flatten_low_dim=True):
         # Args: env (Environment): environment instance

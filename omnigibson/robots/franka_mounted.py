@@ -1,11 +1,8 @@
 import os
 
-import numpy as np
-
 from omnigibson.macros import gm
 from omnigibson.robots.franka import FrankaPanda
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
+from omnigibson.robots.manipulation_robot import GraspingPoint
 
 
 class FrankaMounted(FrankaPanda):

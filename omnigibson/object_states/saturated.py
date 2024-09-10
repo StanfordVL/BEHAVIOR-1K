@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
@@ -69,13 +69,13 @@ class ModifiedParticles(RelativeObjectState):
         }
 
     def serialize(self, state):
-        state_flat = np.array([state["n_systems"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
-            state_flat = np.concatenate(
+            state_flat = th.cat(
                 [
                     state_flat,
-                    np.concatenate(
+                    th.cat(
                         [
                             (
                                 self.obj.scene.get_system(system_name, force_init=False).uuid,
@@ -85,7 +85,7 @@ class ModifiedParticles(RelativeObjectState):
                         ]
                     ),
                 ]
-            ).astype(float)
+            )
         return state_flat
 
     def deserialize(self, state):
@@ -149,6 +149,9 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         """
         self._limits[system.name] = limit
 
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
+
     def _get_value(self, system):
         limit = self.get_limit(system=system)
 
@@ -175,16 +178,15 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         if len(colors) == 0:
             # If no fluid system has Soaked=True, keep the default albedo value
             albedo_add = 0.0
-            diffuse_tint = [1.0, 1.0, 1.0]
+            diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         else:
             albedo_add = 0.1
-            avg_color = np.mean(colors, axis=0)
+            avg_color = th.mean(th.stack(colors), dim=0)
             # Add a tint of avg_color
             # We want diffuse_tint to sum to 2.5 to result in the final RGB to sum to 1.5 on average
             # This is because an average RGB color sum to 1.5 (i.e. [0.5, 0.5, 0.5])
             # (0.5 [original avg RGB per channel] + 0.1 [albedo_add]) * 2.5 = 1.5
-            diffuse_tint = np.array([0.5, 0.5, 0.5]) + avg_color / np.sum(avg_color)
-            diffuse_tint = diffuse_tint.tolist()
+            diffuse_tint = th.tensor([0.5, 0.5, 0.5]) + avg_color / th.sum(avg_color)
 
         return albedo_add, diffuse_tint
 
@@ -227,23 +229,23 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 self._limits[k] = v
 
     def serialize(self, state):
-        state_flat = np.array([state["n_systems"], state["default_limit"]], dtype=float)
+        state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]
-            state_flat = np.concatenate(
+            state_flat = th.cat(
                 [
                     state_flat,
-                    np.concatenate(
+                    th.cat(
                         [
-                            (
-                                self.obj.scene.get_system(system_name, force_init=False).uuid,
-                                state[system_name],
+                            th.tensor(
+                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
+                                dtype=th.float32,
                             )
                             for system_name in system_names
                         ]
                     ),
                 ]
-            ).astype(float)
+            )
         return state_flat
 
     def deserialize(self, state):

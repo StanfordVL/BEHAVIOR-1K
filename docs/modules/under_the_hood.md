@@ -5,12 +5,6 @@ icon: material/car-wrench
 # Under the Hood: Isaac Sim Details
 In this page, we discuss the particulars of certain Isaac Sim features and behaviors.
 
-## Playing and Stopping
-TODO
-
-## CPU and GPU dynamics and pipelines
-TODO
-
 ## Sources of Truth: USD, PhysX and Fabric
 In Isaac Sim, there are three competing representations of the current state of the scene: USD, PhysX, and Fabric. These are used in different contexts, with USD being the main source of truth for loading and representing the scene, PhysX only being used opaquely during physics simulation, and Fabric providing a faster source of truth for the renderer during physics simulation.
 
@@ -41,6 +35,28 @@ Fabric (formerly Flatcache) is an optimized representation of the scene that is 
 To conclude, with ENABLE_FLATCACHE enabled, there will be three concurrent representations of the scene state in OmniGibson. USD will be the source of truth for the meshes and the hierarchy. While physics simulation is playing, PhysX will be the source of truth for the physics state of the scene, and we will use it for fast accesses to compute controls etc., and finally on every render step, PhysX will update Fabric which will then be the source of truth for the renderer and for the OmniGibson pose APIs.
 
 The ENABLE_FLATCACHE macro is recommended to be enabled since large scenes will be unplayable without it, but it can be disabled for small scenes, in which case the Fabric representation will not be used, PhysX will update the USD's local transforms on every step, and the renderer will use USD directly.
+
+## Playing and Stopping
+First read the [Sources of Truth](#sources-of-truth-usd-physx-and-fabric) section to understand the three representations of the scene in Isaac Sim to understand the different representations of the scene state.
+
+The purpose of the playing and stopping feature is to determine when the PhysX representation of the scene will exist or not. In the default, _stopped_ state of the simulation, Isaac Sim represents the scene using its usual USD and/or Fabric representations, however PhysX is entirely disabled. There is no copy of the scene in PhysX and no PhysX code is running.
+
+_Playing_ the simulation essentially means enabling PhysX on the stage, e.g. asking PhysX physics steps to be applied when `og.sim.step()` is called. When play is called, the PhysX representation of the scene is created from scratch. This involves copying everything from the USD buffers into the corresponding PhysX representations and thus is a slow operation, especially for large scenes. After the _play_ call is complete, calls to `og.sim.step()` will now be applying physics steps to the state of the scene.
+
+When the simulation is _stopped_, the PhysX representation of the scene is freed, e.g. all internal state of PhysX will be destroyed, and PhysX will be disabled (e.g. the scene is no longer being simulated physically). **The scene will also be reset to the state it was in prior to playing.** The scene is still represented by the USD and/or Fabric representations, but the PhysX representation is not available. One can play the simulation again to repopulate the PhysX representation and continue simulating physics.
+
+There are certain operations that may only be performed when simulation is playing, e.g. when a PhysX representation is present. This include using Tensor APIs, getting physical state like collisions, impulses, etc., and using the physics simulation APIs. When the simulation is stopped, these operations will not be available.
+
+On the other hand, while operations like adding and removing objects are in theory supported by PhysX (e.g. they are supposed to be OK to call even when the simulation is playing), we have found that adding and removing objects may result in partially updated PhysX states and cause crashes. As a result, if you are running into issues with adding and removing objects, it is recommended to stop the simulation before doing so. When you play again, the scene will be reloaded from USD and the PhysX state will be recreated from scratch, leaving no trace of the addition/removal.
+
+## CPU and GPU dynamics and pipelines
+Isaac Sim (and thus OmniGibson) supports CPU and GPU dynamics, and when using GPU dynamics, it supports CPU and GPU pipelines. Here we discuss the differences between these and how they are used in OmniGibson.
+
+### Dynamics: CPU vs GPU
+Dynamics refers to the physics simulation of the scene, e.g. the simulation of rigid bodies, particles, etc. In Isaac Sim, this can be done on the CPU or the GPU. The GPU dynamics simulation is highly parallelized and enables the simulation of particles (both for fluids and cloth), which are thus **only** usable when GPU dynamics is enabled. The downside of GPU dynamics is that it is less stable than CPU dynamics (some unexplained crashes can occur), uses more VRAM, and can be slower for some scenes. We thus recommend using CPU dynamics when not using particles, and GPU dynamics when using particles.
+
+### Pipelines: CPU vs GPU
+When the GPU dynamics is enabled, it is possible to represent the entire simulation state on the CPU (e.g. accessible as Torch CPU tensors or numpy arrays) or on the GPU (e.g. accessible as Torch GPU tensors). The CPU pipeline is more stable and easier to debug, but since dynamics is happening on the GPU, suffers from a performance hit when transferring data between the CPU and GPU. The GPU pipeline is faster and more efficient, especially if the returned tensors are also directly used on GPU (e.g. not copied to CPU but used in neural nets etc.), but can be harder to debug and can be less stable. We recommend running the GPU pipeline when running GPU dynamics, especially if the tensors are directly used on the GPU e.g. for RL / IL training.
 
 ## Lazy Imports
 Almost all of OmniGibson's simulation functionality uses Isaac Sim code, objects, and components to function. These Python components often need to be imported e.g. via an `import omni.isaac.core.utils.prims` statement. However, such imports of Omniverse libraries can only be performed if the Isaac Sim application has already been launched. Launching the application takes up to 10 minutes on the first try due to shader compilation, and 20 seconds every time after that, and requires the presence of a compatible GPU and permissions. However, certain OmniGibson functionality (e.g. downloading datasets, running linters, etc.) does not require the actual _execution_ of any Isaac Sim code, and should not be blocked by the need to import Isaac Sim libraries.

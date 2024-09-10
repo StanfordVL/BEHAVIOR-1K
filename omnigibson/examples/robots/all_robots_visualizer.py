@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -43,8 +43,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         if not headless:
             # Set viewer in front facing robot
             og.sim.viewer_camera.set_position_orientation(
-                position=np.array([2.69918369, -3.63686664, 4.57894564]),
-                orientation=np.array([0.39592411, 0.1348514, 0.29286304, 0.85982]),
+                position=th.tensor([2.69918369, -3.63686664, 4.57894564]),
+                orientation=th.tensor([0.39592411, 0.1348514, 0.29286304, 0.85982]),
             )
 
         og.sim.enable_viewer_camera_teleoperation()
@@ -55,18 +55,20 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Then apply random actions for a bit
         for _ in range(30):
-            action = np.random.uniform(-0.1, 0.1, robot.action_dim)
+            action_lo, action_hi = -0.1, 0.1
+            action = th.rand(robot.action_dim) * (action_hi - action_lo) + action_lo
             if robot_name == "Tiago":
-                action[robot.base_action_idx] = np.random.uniform(-0.1, 0.1, len(robot.base_action_idx))
+                tiago_lo, tiago_hi = -0.1, 0.1
+                action[robot.base_action_idx] = th.rand(len(robot.base_action_idx)) * (tiago_hi - tiago_lo) + tiago_lo
             for _ in range(10):
                 env.step(action)
 
         # Stop the simulator and remove the robot
         og.sim.stop()
-        og.sim.remove_object(obj=robot)
+        env.scene.remove_object(obj=robot)
 
     # Always shut down the environment cleanly at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

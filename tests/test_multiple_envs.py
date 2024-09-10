@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -6,9 +6,10 @@ from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
+import omnigibson.utils.transform_utils as T
 
 
-def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
+def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[]):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -17,7 +18,7 @@ def setup_multi_environment(num_of_envs, additional_objects_cfg=[]):
         },
         "robots": [
             {
-                "type": "Fetch",
+                "type": robot,
                 "obs_modalities": [],
             }
         ],
@@ -54,14 +55,16 @@ def test_multi_scene_dump_load_states():
     dist_0_1 = robot_1_pos - robot_0_pos
     dist_1_2 = robot_2_pos - robot_1_pos
 
-    assert np.allclose(dist_0_1, dist_1_2, atol=1e-3)
+    assert th.allclose(dist_0_1, dist_1_2, atol=1e-3)
 
     # Set different poses for the cube in each environment
-    poses = [([1, 1, 0], [0, 0, 0, 1]), ([0, 2, 1], [0, 0, 0.7071, 0.7071]), ([-1, -1, 0.5], [0.5, 0.5, 0.5, 0.5])]
+    pose_1 = (th.tensor([1, 1, 1], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32))
+    pose_2 = (th.tensor([0, 2, 1], dtype=th.float32), th.tensor([0, 0, 0.7071, 0.7071], dtype=th.float32))
+    pose_3 = (th.tensor([-1, -1, 0.5], dtype=th.float32), th.tensor([0.5, 0.5, 0.5, 0.5], dtype=th.float32))
 
-    robot_0.set_position_orientation(*poses[0], frame="scene")
-    robot_1.set_position_orientation(*poses[1], frame="scene")
-    robot_2.set_position_orientation(*poses[2], frame="scene")
+    robot_0.set_position_orientation(*pose_1, frame="scene")
+    robot_1.set_position_orientation(*pose_2, frame="scene")
+    robot_2.set_position_orientation(*pose_3, frame="scene")
 
     # Run simulation for a bit
     for _ in range(10):
@@ -90,13 +93,13 @@ def test_multi_scene_dump_load_states():
     post_robot_pos_scene_0 = vec_env.envs[0].scene.robots[0].get_position_orientation(frame="scene")
 
     # Check that the poses are the same
-    assert np.allclose(initial_robot_pos_scene_0[0], post_robot_pos_scene_0[0], atol=1e-3)
-    assert np.allclose(initial_robot_pos_scene_1[0], post_robot_pos_scene_1[0], atol=1e-3)
-    assert np.allclose(initial_robot_pos_scene_2[0], post_robot_pos_scene_2[0], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_0[0], post_robot_pos_scene_0[0], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_1[0], post_robot_pos_scene_1[0], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_2[0], post_robot_pos_scene_2[0], atol=1e-3)
 
-    assert np.allclose(initial_robot_pos_scene_0[1], post_robot_pos_scene_0[1], atol=1e-3)
-    assert np.allclose(initial_robot_pos_scene_1[1], post_robot_pos_scene_1[1], atol=1e-3)
-    assert np.allclose(initial_robot_pos_scene_2[1], post_robot_pos_scene_2[1], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_0[1], post_robot_pos_scene_0[1], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_1[1], post_robot_pos_scene_1[1], atol=1e-3)
+    assert th.allclose(initial_robot_pos_scene_2[1], post_robot_pos_scene_2[1], atol=1e-3)
 
     og.clear()
 
@@ -107,10 +110,9 @@ def test_multi_scene_get_local_position():
     robot_1_pos_local = vec_env.envs[1].scene.robots[0].get_position_orientation(frame="parent")[0]
     robot_1_pos_global = vec_env.envs[1].scene.robots[0].get_position_orientation()[0]
 
-    scene_prim = vec_env.envs[1].scene.prim
-    pos_scene = scene_prim.get_position_orientation()[0]
+    pos_scene = vec_env.envs[1].scene.get_position_orientation()[0]
 
-    assert np.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
+    assert th.allclose(robot_1_pos_global, pos_scene + robot_1_pos_local, atol=1e-3)
     og.clear()
 
 
@@ -125,7 +127,7 @@ def test_multi_scene_set_local_position():
     initial_global_pos = robot.get_position_orientation()[0]
 
     # Define a new global position
-    new_global_pos = initial_global_pos + np.array([1.0, 0.5, 0.0])
+    new_global_pos = initial_global_pos + th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
 
     # Set the new global position
     robot.set_position_orientation(position=new_global_pos)
@@ -134,7 +136,7 @@ def test_multi_scene_set_local_position():
     updated_global_pos = robot.get_position_orientation()[0]
 
     # Get the scene's global position
-    scene_pos = vec_env.envs[1].scene.prim.get_position_orientation()[0]
+    scene_pos = vec_env.envs[1].scene.get_position_orientation()[0]
 
     # Get the updated local position
     updated_local_pos = robot.get_position_orientation(frame="parent")[0]
@@ -143,19 +145,19 @@ def test_multi_scene_set_local_position():
     expected_local_pos = new_global_pos - scene_pos
 
     # Assert that the global position has been updated correctly
-    assert np.allclose(
+    assert th.allclose(
         updated_global_pos, new_global_pos, atol=1e-3
     ), f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
 
     # Assert that the local position has been updated correctly
-    assert np.allclose(
+    assert th.allclose(
         updated_local_pos, expected_local_pos, atol=1e-3
     ), f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
 
     # Assert that the change in global position is correct
     global_pos_change = updated_global_pos - initial_global_pos
-    expected_change = np.array([1.0, 0.5, 0.0])
-    assert np.allclose(
+    expected_change = th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
+    assert th.allclose(
         global_pos_change, expected_change, atol=1e-3
     ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
 
@@ -166,16 +168,14 @@ def test_multi_scene_scene_prim():
     vec_env = setup_multi_environment(1)
     original_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
     scene_state = vec_env.envs[0].scene._dump_state()
-    scene_prim_displacement = [10.0, 0.0, 0.0]
+    scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
     original_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
-    vec_env.envs[0].scene._scene_prim.set_position_orientation(
-        position=original_scene_prim_pos + scene_prim_displacement
-    )
+    vec_env.envs[0].scene.set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
     vec_env.envs[0].scene._load_state(scene_state)
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
-    assert np.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
-    assert np.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
+    assert th.allclose(new_robot_pos - original_robot_pos, scene_prim_displacement, atol=1e-3)
 
     og.clear()
 
@@ -224,12 +224,9 @@ def test_multi_scene_position_orientation_relative_to_scene():
     # Get the robot from the second environment
     robot = vec_env.envs[1].scene.robots[0]
 
-    # Get the scene prim
-    scene_prim = vec_env.envs[1].scene.prim
-
     # Define a new position and orientation relative to the scene
-    new_relative_pos = np.array([1.0, 2.0, 0.5])
-    new_relative_ori = np.array([0, 0, 0.7071, 0.7071])  # 90 degrees rotation around z-axis
+    new_relative_pos = th.tensor([1.0, 2.0, 0.5])
+    new_relative_ori = th.tensor([0, 0, 0.7071, 0.7071])  # 90 degrees rotation around z-axis
 
     # Set the new position and orientation relative to the scene
     robot.set_position_orientation(position=new_relative_pos, orientation=new_relative_ori, frame="scene")
@@ -238,17 +235,17 @@ def test_multi_scene_position_orientation_relative_to_scene():
     updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
 
     # Assert that the relative position has been updated correctly
-    assert np.allclose(
+    assert th.allclose(
         updated_relative_pos, new_relative_pos, atol=1e-3
     ), f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
 
     # Assert that the relative orientation has been updated correctly
-    assert np.allclose(
+    assert th.allclose(
         updated_relative_ori, new_relative_ori, atol=1e-3
     ), f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
 
     # Get the scene's global position and orientation
-    scene_pos, scene_ori = scene_prim.get_position_orientation()
+    scene_pos, scene_ori = vec_env.envs[1].scene.get_position_orientation()
 
     # Get the robot's global position and orientation
     global_pos, global_ori = robot.get_position_orientation()
@@ -257,7 +254,7 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_pos = scene_pos + updated_relative_pos
 
     # Assert that the global position is correct
-    assert np.allclose(
+    assert th.allclose(
         global_pos, expected_global_pos, atol=1e-3
     ), f"Global position {global_pos} does not match expected {expected_global_pos}"
 
@@ -265,6 +262,239 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
 
     # Assert that the global orientation is correct
-    assert np.allclose(
+    assert th.allclose(
         global_ori, expected_global_ori, atol=1e-3
     ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+
+    og.clear()
+
+def test_tiago_getter():
+
+    vec_env = setup_multi_environment(2, robot="Tiago")
+    robot1 = vec_env.envs[0].scene.robots[0]
+
+    robot1_world_position, robot1_world_orientation = robot1.get_position_orientation()
+    robot1_scene_position, robot1_scene_orientation = robot1.get_position_orientation(frame="scene")
+    robot1_parent_position, robot1_parent_orientation = robot1.get_position_orientation(frame="parent")
+    
+    # Test the get_position_orientation method for 3 different frames
+    # since the robot is at the origin, the position and orientation should be the same
+    assert th.allclose(robot1_world_position, robot1_parent_position, atol=1e-3)
+    assert th.allclose(robot1_world_position, robot1_scene_position, atol=1e-3)
+    assert th.allclose(robot1_world_orientation, robot1_parent_orientation, atol=1e-3)
+    assert th.allclose(robot1_world_orientation, robot1_scene_orientation, atol=1e-3)
+
+    # test if the scene position is non-zero, the getter with parent and world frame should return different values
+    robot2 = vec_env.envs[1].scene.robots[0]
+    scene_position, scene_orientation = vec_env.envs[1].scene.get_position_orientation()
+    
+    robot2_world_position, robot2_world_orientation = robot2.get_position_orientation()
+    robot2_scene_position, robot2_scene_orientation = robot2.get_position_orientation(frame="scene")
+    robot2_parent_position, robot2_parent_orientation = robot2.get_position_orientation(frame="parent")
+
+    assert th.allclose(robot2_parent_position, robot2_scene_position, atol=1e-3)
+    assert th.allclose(robot2_parent_orientation, robot2_scene_orientation, atol=1e-3)
+
+    combined_position, combined_orientation = T.pose_transform(scene_position, scene_orientation, robot2_parent_position, robot2_parent_orientation)
+    assert th.allclose(robot2_world_position, combined_position, atol=1e-3)
+    assert th.allclose(robot2_world_orientation, combined_orientation, atol=1e-3)
+
+    # Clean up
+    og.clear()
+
+def test_tiago_setter():
+    vec_env = setup_multi_environment(2, robot="Tiago")
+
+    # use a robot with non-zero scene position
+    robot = vec_env.envs[1].scene.robots[0]
+    
+    # Test setting position and orientation in world frame
+    new_world_pos = th.tensor([1.0, 2.0, 0.5])
+    new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
+    robot.set_position_orientation(new_world_pos, new_world_ori)
+    
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Test setting position and orientation in scene frame
+    new_scene_pos = th.tensor([0.5, 1.0, 0.25])
+    new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
+    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    
+    got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
+    assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
+    assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
+    
+    # Test setting position and orientation in parent frame
+    new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
+    new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
+    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    
+    got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
+    assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
+    assert th.allclose(got_parent_ori, new_parent_ori, atol=1e-3)
+    
+    # Verify that world frame position/orientation has changed after setting in parent frame
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Clean up
+    og.clear()
+
+    # assert that when the simulator is stopped, the behavior for getter/setter is not affected
+    vec_env = setup_multi_environment(2)
+    og.sim.stop()
+
+    # use a robot with non-zero scene position
+    robot = vec_env.envs[1].scene.robots[0]
+    
+    # Test setting position and orientation in world frame
+    new_world_pos = th.tensor([1.0, 2.0, 0.5])
+    new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
+    robot.set_position_orientation(new_world_pos, new_world_ori)
+    
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Test setting position and orientation in scene frame
+    new_scene_pos = th.tensor([0.5, 1.0, 0.25])
+    new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
+    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    
+    got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
+    assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
+    assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
+    
+    # Test setting position and orientation in parent frame
+    new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
+    new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
+    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    
+    got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
+    assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
+    assert th.allclose(got_parent_ori, new_parent_ori, atol=1e-3)
+    
+    # Verify that world frame position/orientation has changed after setting in parent frame
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+
+    og.clear()
+
+def test_behavior_getter():
+
+    vec_env = setup_multi_environment(2, robot="BehaviorRobot")
+    robot1 = vec_env.envs[0].scene.robots[0]
+
+    robot1_world_position, robot1_world_orientation = robot1.get_position_orientation()
+    robot1_scene_position, robot1_scene_orientation = robot1.get_position_orientation(frame="scene")
+    robot1_parent_position, robot1_parent_orientation = robot1.get_position_orientation(frame="parent")
+    
+    # Test the get_position_orientation method for 3 different frames
+    # since the robot is at the origin, the position and orientation should be the same
+    assert th.allclose(robot1_world_position, robot1_parent_position, atol=1e-3)
+    assert th.allclose(robot1_world_position, robot1_scene_position, atol=1e-3)
+    assert th.allclose(robot1_world_orientation, robot1_parent_orientation, atol=1e-3)
+    assert th.allclose(robot1_world_orientation, robot1_scene_orientation, atol=1e-3)
+
+    # test if the scene position is non-zero, the getter with parent and world frame should return different values
+    robot2 = vec_env.envs[1].scene.robots[0]
+    scene_position, scene_orientation = vec_env.envs[1].scene.get_position_orientation()
+    robot2_world_position, robot2_world_orientation = robot2.get_position_orientation()
+    robot2_scene_position, robot2_scene_orientation = robot2.get_position_orientation(frame="scene")
+    robot2_parent_position, robot2_parent_orientation = robot2.get_position_orientation(frame="parent")
+
+    assert th.allclose(robot2_parent_position, robot2_scene_position, atol=1e-3)
+    assert th.allclose(robot2_parent_orientation, robot2_scene_orientation, atol=1e-3)
+
+    combined_position, combined_orientation = T.pose_transform(scene_position, scene_orientation, robot2_parent_position, robot2_parent_orientation)
+    assert th.allclose(robot2_world_position, combined_position, atol=1e-3)
+    assert th.allclose(robot2_world_orientation, combined_orientation, atol=1e-3)
+
+    # Clean up
+    og.clear()
+
+def test_behavior_setter():
+    vec_env = setup_multi_environment(2, robot="BehaviorRobot")
+
+    # use a robot with non-zero scene position
+    robot = vec_env.envs[1].scene.robots[0]
+    
+    # Test setting position and orientation in world frame
+    new_world_pos = th.tensor([1.0, 2.0, 0.5])
+    new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
+
+    robot.set_position_orientation(new_world_pos, new_world_ori)
+    
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Test setting position and orientation in scene frame
+    new_scene_pos = th.tensor([0.5, 1.0, 0.25])
+    new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
+    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    
+    got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
+    assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
+    assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
+    
+    # Test setting position and orientation in parent frame
+    new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
+    new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
+    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    
+    got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
+    assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
+    assert th.allclose(got_parent_ori, new_parent_ori, atol=1e-3)
+    
+    # Verify that world frame position/orientation has changed after setting in parent frame
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Clean up
+    og.clear()
+
+    # assert that when the simulator is stopped, the behavior for getter/setter is not affected
+    vec_env = setup_multi_environment(2)
+    og.sim.stop()
+
+    # use a robot with non-zero scene position
+    robot = vec_env.envs[1].scene.robots[0]
+    
+    # Test setting position and orientation in world frame
+    new_world_pos = th.tensor([1.0, 2.0, 0.5])
+    new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
+    robot.set_position_orientation(new_world_pos, new_world_ori)
+    
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+    
+    # Test setting position and orientation in scene frame
+    new_scene_pos = th.tensor([0.5, 1.0, 0.25])
+    new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
+    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    
+    got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
+    assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
+    assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
+    
+    # Test setting position and orientation in parent frame
+    new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
+    new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
+    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    
+    got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
+    assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
+    assert th.allclose(got_parent_ori, new_parent_ori, atol=1e-3)
+    
+    # Verify that world frame position/orientation has changed after setting in parent frame
+    got_world_pos, got_world_ori = robot.get_position_orientation()
+    assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
+    assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+

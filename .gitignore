@@ -88,3 +88,6 @@ coverage.xml
 # Doc
 docs/reference
 site/
+
+# Tests of examples
+tests/tests_of_examples

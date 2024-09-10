@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 
 class BaseMap:
@@ -45,8 +45,8 @@ class BaseMap:
         Returns:
             2-array or (N, 2)-array: 2D location(s) in world reference frame (in metric space)
         """
-        axis = 0 if len(xy.shape) == 1 else 1
-        return np.flip((xy - self.map_size / 2.0) * self.map_resolution, axis=axis)
+        dims = 0 if xy.dim() == 1 else 1
+        return th.flip((xy - self.map_size / 2.0) * self.map_resolution, dims=(dims,))
 
     def world_to_map(self, xy):
         """
@@ -55,4 +55,5 @@ class BaseMap:
             xy: 2D location in world reference frame (metric)
         :return: 2D location in map reference frame (image)
         """
-        return np.flip((np.array(xy) / self.map_resolution + self.map_size / 2.0)).astype(int)
+        point_wrt_map = xy / self.map_resolution + self.map_size / 2.0
+        return th.flip(point_wrt_map, dims=tuple(range(point_wrt_map.dim()))).int()

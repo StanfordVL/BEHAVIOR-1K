@@ -1,10 +1,11 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.object_states.pose import Pose
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.object_state_utils import sample_kinematics
@@ -49,8 +50,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         outer_object_aabb_lo, outer_object_aabb_hi = other.states[AABB].get_value()
 
         if not (
-            np.less_equal(outer_object_aabb_lo, inner_object_pos).all()
-            and np.less_equal(inner_object_pos, outer_object_aabb_hi).all()
+            th.le(outer_object_aabb_lo, inner_object_pos).all() and th.le(inner_object_pos, outer_object_aabb_hi).all()
         ):
             return False
 

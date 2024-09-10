@@ -2,8 +2,7 @@ import json
 import os
 import random
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -85,11 +84,11 @@ class GraspTask(BaseTask):
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = np.array(robot_pose["base_pos"])
-            robot_orn = np.array(robot_pose["base_ori"])
+            robot_pos = th.tensor(robot_pose["base_pos"])
+            robot_orn = th.tensor(robot_pose["base_ori"])
             robot.set_position_orientation(robot_pos, robot_orn, frame="scene")
 
         # Otherwise, reset using the primitive controller.
@@ -98,17 +97,17 @@ class GraspTask(BaseTask):
                 self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
             # Randomize the robots joint positions
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             dim = len(joint_control_idx)
             # For Tiago
             if "combined" in robot.robot_arm_descriptor_yamls:
-                joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-                initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-                control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+                joint_combined_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+                initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_combined_idx])
+                control_idx_in_joint_pos = th.where(th.isin(joint_combined_idx, joint_control_idx))[0]
             # For Fetch
             else:
-                initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-                control_idx_in_joint_pos = np.arange(dim)
+                initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+                control_idx_in_joint_pos = th.arange(dim)
 
             with PlanningContext(
                 env, self._primitive_controller.robot, self._primitive_controller.robot_copy, "original"
@@ -136,17 +135,16 @@ class GraspTask(BaseTask):
             # Wait for the robot to fully stabilize.
             for _ in range(100):
                 og.sim.step()
-                if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+                if th.norm(robot.get_linear_velocity()) > 1e-2:
                     continue
-                if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+                if th.norm(robot.get_angular_velocity()) > 1e-2:
                     continue
                 break
             else:
                 raise ValueError("Robot could not settle")
 
             # Check if the robot has toppled
-            rotation = R.from_quat(robot.get_position_orientation()[1])
-            robot_up = rotation.apply(np.array([0, 0, 1]))
+            robot_up = T.quat_apply(robot.get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32))
             if robot_up[2] < 0.75:
                 raise ValueError("Robot has toppled over")
 
@@ -197,8 +195,8 @@ class GraspTask(BaseTask):
 
     def _get_random_joint_position(self, robot):
         joint_positions = []
-        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        joints = np.array([joint for joint in robot.joints.values()])
+        joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        joints = th.tensor([joint for joint in robot.joints.values()])
         arm_joints = joints[joint_control_idx]
         for i, joint in enumerate(arm_joints):
             val = random.uniform(joint.lower_limit, joint.upper_limit)

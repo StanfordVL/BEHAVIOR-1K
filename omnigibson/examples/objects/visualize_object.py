@@ -1,6 +1,7 @@
 import argparse
+import math
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -94,8 +95,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-0.00913503, -1.95750906, 1.36407314]),
-        orientation=np.array([0.6350064, 0.0, 0.0, 0.77250687]),
+        position=th.tensor([-0.00913503, -1.95750906, 1.36407314]),
+        orientation=th.tensor([0.6350064, 0.0, 0.0, 0.77250687]),
     )
 
     # Grab the object references
@@ -105,12 +106,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     # in order to set the scale
     extents = obj.aabb_extent
     og.sim.stop()
-    obj.scale = (np.ones(3) / extents).min()
+    obj.scale = (th.ones(3) / extents).min()
     og.sim.play()
-    env.step(np.array([]))
+    env.step(th.empty(0))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + np.array([0, 0, 1.0])
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + th.tensor([0, 0, 1.0])
     obj.set_position_orientation(position=center_offset)
 
     # Allow the user to easily move the camera around
@@ -121,19 +122,19 @@ def main(random_selection=False, headless=False, short_exec=False):
     steps_per_joint = steps_per_rotate / 10
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        z_angle = 2 * np.pi * (i % steps_per_rotate) / steps_per_rotate
-        quat = T.euler2quat(np.array([0, 0, z_angle]))
+        z_angle = 2 * math.pi * (i % steps_per_rotate) / steps_per_rotate
+        quat = T.euler2quat(th.tensor([0, 0, z_angle]))
         pos = T.quat2mat(quat) @ center_offset
         if obj.n_dof > 0:
             frac = (i % steps_per_joint) / steps_per_joint
             j_frac = -1.0 + 2.0 * frac if (i // steps_per_joint) % 2 == 0 else 1.0 - 2.0 * frac
-            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, drive=False)
+            obj.set_joint_positions(positions=j_frac * th.ones(obj.n_dof), normalized=True, drive=False)
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # Shut down at the end
-    og.shutdown()
+    og.clear()
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ info:
 
 ### Vision
 
-Vision observations are captured by the [`VisionSensor`](../reference/sensors/vision_sensor.html) class, which encapsulates a virtual pinhole camera sensor equipped with various modalities, including RGB, depth, normals, three types of segmentation, optical flow, 2D and 3D bounding boxes, shown below:
+Vision observations are captured by the [`VisionSensor`](../reference/sensors/vision_sensor.md) class, which encapsulates a virtual pinhole camera sensor equipped with various modalities, including RGB, depth, normals, three types of segmentation, optical flow, 2D and 3D bounding boxes, shown below:
 
 <table markdown="span">
     <tr>
@@ -219,7 +219,7 @@ Vision observations are captured by the [`VisionSensor`](../reference/sensors/vi
 </table>
 
 ### Range
-Range observations are captured by the [`ScanSensor`](../reference/sensors/scan_sensor.html) class, which encapsulates a virtual 2D LiDAR range sensor with the following observations:
+Range observations are captured by the [`ScanSensor`](../reference/sensors/scan_sensor.md) class, which encapsulates a virtual 2D LiDAR range sensor with the following observations:
 
 <table markdown="span">
     <tr>

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
@@ -28,10 +28,11 @@ class Frozen(AbsoluteObjectState, BooleanStateMixin):
 
     def _set_value(self, new_value):
         if new_value:
-            temperature = np.random.uniform(
+            temp_lo, temp_hi = (
                 self.freeze_temperature + m.FROZEN_SAMPLING_RANGE_MIN,
                 self.freeze_temperature + m.FROZEN_SAMPLING_RANGE_MAX,
             )
+            temperature = (th.rand(1) * (temp_hi - temp_lo) + temp_lo).item()
             return self.obj.states[Temperature].set_value(temperature)
         else:
             # We'll set the temperature just one degree above freezing. Hopefully the object
@@ -46,7 +47,7 @@ class Frozen(AbsoluteObjectState, BooleanStateMixin):
         # Increase all channels by 0.3 (to make it white)
         albedo_add = 0.3
         # No final scaling
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     # Nothing needs to be done to save/load Frozen since it will happen due to temperature caching.

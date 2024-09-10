@@ -198,7 +198,7 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
     def cache_info(self, get_value_args):
         """
         Helper function to cache relevant information at the current timestep.
-        Stores it under @self._cache[<KEY>]["info"]
+        Stores it under @self._cache [<KEY>]["info"]
 
         Args:
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
@@ -344,6 +344,8 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         self.clear_cache()
         # Set the value
         val = self._set_value(*args, **kwargs)
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
         return val
 
     def _set_value(self, *args, **kwargs):

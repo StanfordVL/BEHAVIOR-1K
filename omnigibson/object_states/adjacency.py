@@ -1,6 +1,7 @@
+import math
 from collections import namedtuple
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
@@ -33,7 +34,7 @@ def get_equidistant_coordinate_planes(n_planes):
 
     The samples will cover all 360 degrees (although rotational symmetry
     is assumed, e.g. if you take into account the axis index and the
-    positive/negative directions, only 1/4 of the possible coordinate (1 quadrant, np.pi / 2.0)
+    positive/negative directions, only 1/4 of the possible coordinate (1 quadrant, math.pi / 2.0)
     planes will be sampled: the ones where the first axis' positive direction
     is in the first quadrant).
 
@@ -47,17 +48,18 @@ def get_equidistant_coordinate_planes(n_planes):
             corresponding to the axis.
     """
     # Compute the positive directions of the 1st axis of each plane.
-    first_axis_angles = np.linspace(0, np.pi / 2, n_planes)
-    first_axes = np.stack(
-        [np.cos(first_axis_angles), np.sin(first_axis_angles), np.zeros_like(first_axis_angles)], axis=1
+    first_axis_angles = th.linspace(0, math.pi / 2, n_planes)
+    first_axes = th.stack(
+        [th.cos(first_axis_angles), th.sin(first_axis_angles), th.zeros_like(first_axis_angles)], dim=1
     )
 
     # Compute the positive directions of the 2nd axes. These axes are
     # orthogonal to both their corresponding first axes and to the Z axis.
-    second_axes = np.cross([0, 0, 1], first_axes)
+    constant_vector = th.tensor([0.0, 0.0, 1.0]).unsqueeze(0).expand(first_axes.size(0), -1)
+    second_axes = th.linalg.cross(constant_vector, first_axes, dim=1)
 
     # Return the axes in the shape (n_planes, 2, 3)
-    return np.stack([first_axes[:, None, :], second_axes[:, None, :]], axis=1)
+    return th.stack([first_axes[:, None, :], second_axes[:, None, :]], dim=1)
 
 
 def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
@@ -80,18 +82,18 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
     """
     # Get vectors for each of the axes' directions.
     # The ordering is axes1+, axis1-, axis2+, axis2- etc.
-    directions = np.empty((len(axes) * 2, 3))
+    directions = th.empty((len(axes) * 2, 3))
     directions[0::2] = axes
     directions[1::2] = -axes
 
     # Prepare this object's info for ray casting.
     if obj.prim_type == PrimType.CLOTH:
-        ray_starts = np.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
+        ray_starts = th.tile(obj.root_link.centroid_particle_position, (len(directions), 1))
 
     else:
         aabb_lower, aabb_higher = obj.states[AABB].get_value()
         object_position = (aabb_lower + aabb_higher) / 2.0
-        ray_starts = np.tile(object_position, (len(directions), 1))
+        ray_starts = th.tile(object_position, (len(directions), 1))
 
         if not use_aabb_center:
             # Dynamically compute start points by iterating over the directions and pre-shooting rays from
@@ -111,7 +113,7 @@ def compute_adjacencies(obj, axes, max_distance, use_aabb_center=True):
                 # Check for self-hit -- if so, record the position and terminate early
                 should_continue = True
                 if hit.rigid_body in obj_link_paths:
-                    ray_starts[idx] = np.array(hit.position)
+                    ray_starts[idx] = th.tensor(hit.position)
                     should_continue = False
                 return should_continue
 
@@ -165,7 +167,7 @@ class VerticalAdjacency(AbsoluteObjectState):
     def _get_value(self):
         # Call the adjacency computation with th Z axis.
         bodies_by_axis = compute_adjacencies(
-            self.obj, np.array([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False
+            self.obj, th.tensor([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL, use_aabb_center=False
         )
 
         # Return the adjacencies from the only axis we passed in.

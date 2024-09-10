@@ -82,7 +82,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 
 1. Create a new python file named after your robot. In our case, our file exists under `omnigibson/robots` and is named `stretch.py`.
 
-2. Determine which robot interfaces it should inherit. We currently support three modular interfaces that can be used together: [`LocomotionRobot`](../reference/robots/locomotion_robot.html) for robots whose bases can move (and a more specific [`TwoWheelRobot`](../reference/robots/two_wheel_robot.html) for locomotive robots that only have two wheels), [`ManipulationRobot`](../reference/robots/manipulation_robot.html) for robots equipped with one or more arms and grippers, and [`ActiveCameraRobot`](../reference/robots/active_camera_robot.html) for robots with a controllable head or camera mount. In our case, our robot is a mobile manipulator with a moveable camera mount, so our Python class inherits all three interfaces.
+2. Determine which robot interfaces it should inherit. We currently support three modular interfaces that can be used together: [`LocomotionRobot`](../reference/robots/locomotion_robot.md) for robots whose bases can move (and a more specific [`TwoWheelRobot`](../reference/robots/two_wheel_robot.md) for locomotive robots that only have two wheels), [`ManipulationRobot`](../reference/robots/manipulation_robot.md) for robots equipped with one or more arms and grippers, and [`ActiveCameraRobot`](../reference/robots/active_camera_robot.md) for robots with a controllable head or camera mount. In our case, our robot is a mobile manipulator with a moveable camera mount, so our Python class inherits all three interfaces.
 
 3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify.
 
@@ -110,7 +110,8 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 ??? code "stretch.py"
     ``` python linenums="1"
     import os
-    import numpy as np
+    import math
+    import torch as th
     from omnigibson.macros import gm
     from omnigibson.robots.active_camera_robot import ActiveCameraRobot
     from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
@@ -157,7 +158,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
         def _default_joint_pos(self):
             # Define the default joint positions for your robot
     
-            return np.array([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, np.pi / 8, np.pi / 8])
+            return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8]. dtype=th.float32)
     
         @property
         def wheel_radius(self):

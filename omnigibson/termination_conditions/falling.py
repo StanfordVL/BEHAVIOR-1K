@@ -1,6 +1,6 @@
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
 
@@ -37,8 +37,9 @@ class Falling(FailureCondition):
 
         # Terminate if the robot has toppled over
         if self._topple:
-            rotation = R.from_quat(env.scene.robots[self._robot_idn].get_position_orientation()[1])
-            robot_up = rotation.apply(np.array([0, 0, 1]))
+            robot_up = T.quat_apply(
+                env.scene.robots[self._robot_idn].get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32)
+            )
             if robot_up[2] < self._tilt_tolerance:
                 return True
 

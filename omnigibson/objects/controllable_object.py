@@ -1,15 +1,18 @@
+import math
 from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
 
 import gymnasium as gym
-import numpy as np
+import networkx as nx
+import torch as th
 
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.utils.constants import PrimType
+from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -30,7 +33,6 @@ class ControllableObject(BaseObject):
         name,
         relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -50,8 +52,6 @@ class ControllableObject(BaseObject):
             name (str): Name for the object. Names need to be unique per scene
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -79,7 +79,7 @@ class ControllableObject(BaseObject):
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = None if reset_joint_pos is None else np.array(reset_joint_pos)
+        self._reset_joint_pos = None if reset_joint_pos is None else th.tensor(reset_joint_pos)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -116,7 +116,6 @@ class ControllableObject(BaseObject):
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -137,10 +136,9 @@ class ControllableObject(BaseObject):
         assert (
             len(robot_name_components) == 3
         ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
-        assert robot_name_components[0] in (
-            "controllable",
-            "dummy",
-        ), "Third component of articulation root path (robot name) must start with 'controllable' or 'dummy'"
+        assert (
+            robot_name_components[0] == "controllable"
+        ), "Third component of articulation root path (robot name) must start with 'controllable'"
         assert (
             robot_name_components[1] == self.__class__.__name__.lower()
         ), "Third component of articulation root path (robot name) must contain the class name as the second part"
@@ -178,18 +176,46 @@ class ControllableObject(BaseObject):
         prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
-        expected_control_freq = 1.0 / og.sim.get_rendering_dt()
+        expected_control_freq = 1.0 / og.sim.get_sim_step_dt()
         if self._control_freq is None:
             log.info(
                 "Control frequency is None - being set to default of render_frequency: %.4f", expected_control_freq
             )
             self._control_freq = expected_control_freq
         else:
-            assert np.isclose(
+            assert math.isclose(
                 expected_control_freq, self._control_freq
             ), "Stored control frequency does not match environment's render timestep."
 
         return prim
+
+    def _post_load(self):
+        # Call super first
+        super()._post_load()
+
+        # For controllable objects, we disable gravity of all links that are not fixed to the base link.
+        # This is because we cannot accurately apply gravity compensation in the absence of a working
+        # generalized gravity force computation. This may have some side effects on the measured
+        # torque on each of these links, but it provides a greatly improved joint control behavior.
+        # Note that we do NOT disable gravity for links that are fixed to the base link, as these links
+        # are typically where most of the downward force on the robot is applied. Disabling gravity
+        # for these links would result in the robot floating in the air easily. Also note that here
+        # we use the base link footprint which takes into account the presence of virtual joints.
+
+        # Find all the links that are accessible from the base link footprint via a chain of fixed
+        # joints. We will disable gravity for all links that are not in this set.
+        articulation_tree = self.articulation_tree
+        base_footprint = self.base_footprint_link_name
+        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
+        only_fixed_joints = nx.subgraph_view(articulation_tree, filter_edge=is_edge_fixed)
+        fixed_link_names = nx.descendants(only_fixed_joints, base_footprint) | {base_footprint}
+
+        # Find the links that are NOT fixed.
+        other_link_names = set(self.links.keys()) - fixed_link_names
+
+        # Disable gravity for those links.
+        for link_name in other_link_names:
+            self.links[link_name].disable_gravity()
 
     def _load_controllers(self):
         """
@@ -234,7 +260,11 @@ class ControllableObject(BaseObject):
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
+                    kd=(
+                        self.default_kd
+                        if control_type == ControlType.POSITION or control_type == ControlType.VELOCITY
+                        else None
+                    ),
                 )
 
     def _generate_controller_config(self, custom_config=None):
@@ -318,10 +348,15 @@ class ControllableObject(BaseObject):
         low, high = [], []
         for controller in self._controllers.values():
             limits = controller.command_input_limits
-            low.append(np.array([-np.inf] * controller.command_dim) if limits is None else limits[0])
-            high.append(np.array([np.inf] * controller.command_dim) if limits is None else limits[1])
+            low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
+            high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
-        return gym.spaces.Box(shape=(self.action_dim,), low=np.concatenate(low), high=np.concatenate(high), dtype=float)
+        return gym.spaces.Box(
+            shape=(self.action_dim,),
+            low=th.cat(low).cpu().numpy(),
+            high=th.cat(high).cpu().numpy(),
+            dtype=NumpyTypes.FLOAT32,
+        )
 
     def apply_action(self, action):
         """
@@ -337,7 +372,13 @@ class ControllableObject(BaseObject):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = np.array(self.discrete_action_list[action])
+            action = th.tensor(self.discrete_action_list[action], dtype=th.float32)
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
 
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
@@ -391,9 +432,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self.n_dof)
-        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
-        u_type_vec = np.array([ControlType.NONE] * self.n_dof)
+        u_vec = th.zeros(self.n_dof)
+        # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
+        u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -456,7 +497,7 @@ class ControllableObject(BaseObject):
             "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
         )
         # Set indices manually so that we're standardized
-        indices = np.arange(self.n_dof)
+        indices = range(self.n_dof)
 
         # Standardize normalized input
         n_indices = len(indices)
@@ -524,15 +565,15 @@ class ControllableObject(BaseObject):
         # set the targets for joints
         if using_pos:
             ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path, positions=np.array(pos_vec), indices=np.array(pos_idxs)
+                self.articulation_root_path, positions=th.tensor(pos_vec, dtype=th.float), indices=th.tensor(pos_idxs)
             )
         if using_vel:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path, velocities=np.array(vel_vec), indices=np.array(vel_idxs)
+                self.articulation_root_path, velocities=th.tensor(vel_vec, dtype=th.float), indices=th.tensor(vel_idxs)
             )
         if using_eff:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path, efforts=np.array(eff_vec), indices=np.array(eff_idxs)
+                self.articulation_root_path, efforts=th.tensor(eff_vec, dtype=th.float), indices=th.tensor(eff_idxs)
             )
 
     def get_control_dict(self):
@@ -573,11 +614,8 @@ class ControllableObject(BaseObject):
         fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
-        # TODO: Move gravity force computation dummy to this class instead of BaseRobot
-        fcns["gravity_force"] = lambda: (
-            ControllableObjectViewAPI.get_generalized_gravity_forces(self.articulation_root_path)
-            if self.fixed_base
-            else ControllableObjectViewAPI.get_generalized_gravity_forces(self._dummy.articulation_root_path)
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+            self.articulation_root_path
         )
         fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
             self.articulation_root_path
@@ -627,12 +665,12 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = np.concatenate(
+        controller_states_flat = th.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
         )
 
         # Concatenate and return
-        return np.concatenate([state_flat, controller_states_flat]).astype(float)
+        return th.cat([state_flat, controller_states_flat])
 
     def deserialize(self, state):
         # Run super first
@@ -646,6 +684,36 @@ class ControllableObject(BaseObject):
         state_dict["controllers"] = controller_states
 
         return state_dict, idx
+
+    @property
+    def base_footprint_link_name(self):
+        """
+        Get the base footprint link name for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            str: Name of the base footprint link for this object
+        """
+        return self.root_link_name
+
+    @property
+    def base_footprint_link(self):
+        """
+        Get the base footprint link for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            RigidPrim: Base footprint link for this object
+        """
+        return self.links[self.base_footprint_link_name]
 
     @property
     def action_dim(self):
@@ -708,7 +776,7 @@ class ControllableObject(BaseObject):
         idx = 0
         for controller in self.controller_order:
             cmd_dim = self._controllers[controller].command_dim
-            dic[controller] = np.arange(idx, idx + cmd_dim)
+            dic[controller] = th.arange(idx, idx + cmd_dim)
             idx += cmd_dim
 
         return dic

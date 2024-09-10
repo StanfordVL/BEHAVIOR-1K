@@ -4,7 +4,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -64,7 +64,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         og.sim.step()
         water_system = scene.get_system("water")
         for i in range(100):
-            water_system.generate_particles(positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
+            water_system.generate_particles(positions=[th.tensor([0.5, 0, 0.5]) + th.randn(3) * 0.1])
         og.sim.step()
 
     og.sim.play()
@@ -79,7 +79,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
         start = time.time()
         if import_robot:
             # Apply random actions.
-            turtlebot.apply_action(np.zeros(2))
+            turtlebot.apply_action(th.zeros(2))
         og.sim.step(render=False)
         physics_end = time.time()
 
@@ -112,15 +112,15 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     ax.set_xlabel("Step fps")
     ax = plt.subplot(6, 1, 4)
     plt.plot(render_fps)
-    ax.set_xlabel("Render fps with time, converge to {}".format(np.mean(render_fps[-100:])))
+    ax.set_xlabel("Render fps with time, converge to {}".format(th.mean(render_fps[-100:])))
     ax.set_ylabel("fps")
     ax = plt.subplot(6, 1, 5)
     plt.plot(physics_fps)
-    ax.set_xlabel("Physics fps with time, converge to {}".format(np.mean(physics_fps[-100:])))
+    ax.set_xlabel("Physics fps with time, converge to {}".format(th.mean(physics_fps[-100:])))
     ax.set_ylabel("fps")
     ax = plt.subplot(6, 1, 6)
     plt.plot(fps)
-    ax.set_xlabel("Overall fps with time, converge to {}".format(np.mean(fps[-100:])))
+    ax.set_xlabel("Overall fps with time, converge to {}".format(th.mean(fps[-100:])))
     ax.set_ylabel("fps")
     plt.tight_layout()
     plt.savefig(

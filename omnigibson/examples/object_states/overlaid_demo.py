@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -56,8 +56,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.88215526, -1.40086216, 2.00311063]),
-        orientation=np.array([0.42013364, 0.12342107, 0.25339685, 0.86258043]),
+        position=th.tensor([0.88215526, -1.40086216, 2.00311063]),
+        orientation=th.tensor([0.42013364, 0.12342107, 0.25339685, 0.86258043]),
     )
 
     max_steps = 100 if short_exec else -1
@@ -67,10 +67,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     while steps != max_steps:
         print(f"Overlaid {carpet.states[Overlaid].get_value(breakfast_table)}    ", end="\r")
-        env.step(np.array([]))
+        env.step(th.empty(0))
+        steps += 1
 
     # Shut down env at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

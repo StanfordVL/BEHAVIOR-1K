@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
@@ -61,16 +61,16 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Place the object so it rests on the floor
     obj = env.scene.object_registry("name", "obj")
-    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + np.array([0, 0, obj.aabb_extent[2] / 2.0])
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + th.tensor([0, 0, obj.aabb_extent[2] / 2.0])
     obj.set_position_orientation(position=center_offset)
 
     # Step through the environment
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # Always close the environment at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

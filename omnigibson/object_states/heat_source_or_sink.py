@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, macros
@@ -211,7 +211,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 nonlocal affected_objects
                 # global affected_objects
                 obj = self.obj.scene.object_registry("prim_path", "/".join(hit.rigid_body.split("/")[:-1]))
-                if obj is not None:
+                if obj is not None and obj != self.obj and obj in Temperature.OBJ_IDXS:
                     affected_objects.add(obj)
                 # Always continue traversal
                 return True
@@ -223,9 +223,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 aabb_center = (aabb_upper + aabb_lower) / 2.0
 
                 og.sim.psqi.overlap_box(
-                    halfExtent=half_extent,
-                    pos=aabb_center,
-                    rot=np.array([0, 0, 0, 1.0]),
+                    halfExtent=half_extent.tolist(),
+                    pos=aabb_center.tolist(),
+                    rot=[0, 0, 0, 1.0],
                     reportFn=overlap_callback,
                 )
 
@@ -233,18 +233,20 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
-                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position_orientation()[0]
-                    for idx in np.where(
-                        np.all(
+                    for idx in th.where(
+                        th.all(
                             (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
-                            axis=-1,
+                            dim=-1,
                         )
                     )[0]:
-                        affected_objects.add(cloth_objs[idx])
+                        # Only add if object has temperature
+                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
+                            affected_objects.add(cloth_objs[idx])
 
-                # Additionally prune objects based on Inside requirement -- cast to avoid in-place operations
+                # Additionally prune objects based on Temperature / Inside requirement -- cast to avoid in-place operations
                 for obj in tuple(affected_objects):
                     if not obj.states[Inside].get_value(self.obj):
                         affected_objects.remove(obj)
@@ -260,7 +262,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 # Use overlap_sphere check!
                 og.sim.psqi.overlap_sphere(
                     radius=self.distance_threshold,
-                    pos=heat_source_pos,
+                    pos=heat_source_pos.tolist(),
                     reportFn=overlap_callback,
                 )
 
@@ -268,21 +270,20 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 cloth_objs = tuple(self.obj.scene.object_registry("prim_type", PrimType.CLOTH, []))
                 n_cloth_objs = len(cloth_objs)
                 if n_cloth_objs > 0:
-                    cloth_positions = np.zeros((n_cloth_objs, 3))
+                    cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
                         cloth_positions[i] = obj.get_position_orientation()[0]
-                    for idx in np.where(
-                        np.linalg.norm(heat_source_pos.reshape(1, 3) - cloth_positions, axis=-1)
-                        <= self.distance_threshold
+                    for idx in th.where(
+                        th.norm(heat_source_pos.reshape(1, 3) - cloth_positions, dim=-1) <= self.distance_threshold
                     )[0]:
-                        affected_objects.add(cloth_objs[idx])
+                        # Only add if object has temperature
+                        if cloth_objs[idx] in Temperature.OBJ_IDXS:
+                            affected_objects.add(cloth_objs[idx])
 
         # Remove self (we cannot affect ourselves) and update the internal set of objects, and remove self
         if self.obj in affected_objects:
             affected_objects.remove(self.obj)
-        self._affected_objects = {
-            obj for obj in affected_objects if isinstance(obj, StatefulObject) and Temperature in obj.states
-        }
+        self._affected_objects = affected_objects
 
         # Propagate the affected objects' temperatures
         if len(self._affected_objects) > 0:

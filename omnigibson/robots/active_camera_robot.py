@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-import numpy as np
+import torch as th
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
@@ -40,8 +40,8 @@ class ActiveCameraRobot(BaseRobot):
         joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
         joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
-        dic["camera_qpos_sin"] = np.sin(joint_positions[self.camera_control_idx])
-        dic["camera_qpos_cos"] = np.cos(joint_positions[self.camera_control_idx])
+        dic["camera_qpos_sin"] = th.sin(joint_positions[self.camera_control_idx])
+        dic["camera_qpos_cos"] = th.cos(joint_positions[self.camera_control_idx])
         dic["camera_qvel"] = joint_velocities[self.camera_control_idx]
 
         return dic
@@ -132,7 +132,7 @@ class ActiveCameraRobot(BaseRobot):
         Returns:
             n-array: Indices in low-level control vector corresponding to camera joints.
         """
-        return np.array([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
     @classproperty
     def _do_not_register_classes(cls):

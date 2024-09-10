@@ -46,7 +46,11 @@ setup(
         "aenum~=3.1.15",
         "rtree~=1.2.0",
         "graphviz~=0.20",
+        "numba~=0.60.0",
     ],
+    extras_require={
+        "isaac": ["isaacsim-for-omnigibson>=4.1.0"],
+    },
     tests_require=[],
     python_requires=">=3",
     include_package_data=True,
