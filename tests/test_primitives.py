@@ -138,7 +138,7 @@ class TestPrimitives:
         assert primitive_tester(env, objects, primitives, primitives_args)
 
     @pytest.mark.skip(reason="primitives are broken")
-    def test_open_prismatic(robot):
+    def test_open_prismatic(self, robot):
         categories = ["floors"]
         env = setup_environment(categories, robot=robot)
 
@@ -158,7 +158,7 @@ class TestPrimitives:
         assert primitive_tester(env, objects, primitives, primitives_args)
 
     @pytest.mark.skip(reason="primitives are broken")
-    def test_open_revolute(robot):
+    def test_open_revolute(self, robot):
         categories = ["floors"]
         env = setup_environment(categories, robot=robot)
 
