@@ -196,6 +196,8 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
+        # unscale local transform's rotation
+        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
         assert th.allclose(
             product, th.diag(th.diag(product)), atol=1e-3

@@ -351,6 +351,38 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_quat=control_dict[f"{self.task_name}_quat_relative"],
         )
 
+    def _compute_no_op_action(self, control_dict):
+
+        target_pos = self._goal["target_pos"]
+        target_quat = self._goal["target_quat"]
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
+
+        command = th.zeros(6, dtype=th.float32, device=target_pos.device)
+
+        # Handle position
+        if self.mode == "absolute_pose":
+            command[:3] = target_pos
+        else:
+            command[:3] = target_pos - pos_relative
+
+        # Handle orientation
+        if self.mode == "position_fixed_ori" or self.mode == "position_compliant_ori":
+            # For these modes, we don't need to add orientation to the command
+            pass
+        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
+            command[3:] = T.quat2axisangle(target_quat)
+        else:  # pose_delta_ori control
+            current_rot = T.quat2mat(quat_relative)
+            target_rot = T.quat2mat(target_quat)
+            delta_rot = target_rot @ (current_rot.T)
+
+            # Convert delta rotation to axis-angle representation
+            delta_axisangle = T.quat2axisangle(T.mat2quat(delta_rot))
+            command[3:] = delta_axisangle
+
+        return command
+
     def _get_goal_shapes(self):
         return dict(
             target_pos=(3,),
