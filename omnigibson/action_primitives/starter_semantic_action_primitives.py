@@ -827,18 +827,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         # Update the tracking to track the object.
         self._tracking_object = obj
-
-        breakpoint()
-
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "You need to be grasping an object first to place it somewhere.",
             )
-        
-        breakpoint()
-
         # Sample location to place object
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)

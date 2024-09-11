@@ -97,8 +97,6 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             except ActionPrimitiveError as e:
                 errors.append(e)
 
-            breakpoint()
-
             try:
                 # Settle before returning.
                 yield from self._settle_robot()
@@ -349,7 +347,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Saturated].set_value(system, True)
 
-        # WIP HERE
+        # Yield some actions
+        yield from self._settle_robot()
 
     def _soak_inside(self, obj):
         # Check that our current object is a particle remover
@@ -424,6 +423,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Saturated].set_value(system, True)
 
+        # Yield some actions
+        yield from self._settle_robot()
+
     def _wipe(self, obj):
         # Check that our current object is a particle remover
         obj_in_hand = self._get_obj_in_hand()
@@ -443,7 +445,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Check if the target object has any particles on it
         covering_systems = {
-            ps for ps in obj.scene.system_registry.objects if obj.states[object_states.Covered].get_value(ps.states)
+            ps for ps in obj.scene.system_registry.objects if obj.states[object_states.Covered].get_value(ps)
         }
         if not covering_systems:
             raise ActionPrimitiveError(
@@ -461,7 +463,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in covering_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in covering_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
         if not supported_systems:
             raise ActionPrimitiveError(
@@ -480,7 +482,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -497,6 +499,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # If so, remove the particles.
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Covered].set_value(system, False)
+
+        # Yield some actions
+        yield from self._settle_robot()
 
     def _cut(self, obj):
         # Check that our current object is a slicer

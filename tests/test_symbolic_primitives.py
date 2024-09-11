@@ -12,7 +12,7 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
 from omnigibson.macros import gm
 
 def load_robot_config(robot_name):
-    config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_config.yaml")
+    config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_symbolic_primitives.yaml")
     with open(config_filename, "r") as file:
         return yaml.safe_load(file)
 
@@ -72,16 +72,10 @@ def start_env(enable_transition_rule=False, robot_type="Fetch"):
 
     return env
 
-@pytest.fixture(params=["Fetch", "Tiago"], scope="module")
-def robot_type(request):
-    """Fixture to provide robot types. Now with module scope."""
-    return request.param
-
 @pytest.fixture(scope="module")
-def shared_env(robot_type):
+def shared_env():
     """Load the environment just once using module scope."""
-    return start_env(robot_type)
-
+    return start_env()
 
 @pytest.fixture(scope="function")
 def env(shared_env):
@@ -145,7 +139,6 @@ def sponge(env):
 def knife(env):
     return next(iter(env.scene.object_registry("category", "carving_knife")))
 
-@pytest.mark.parametrize("robot_type", ["Fetch", "Tiago"])
 class TestSymbolicPrimitives:
     def test_in_hand_state(self, env, robot, prim_gen, apple):
         assert not robot.states[object_states.IsGrasping].get_value(apple)
@@ -258,7 +251,6 @@ class TestSymbolicPrimitives:
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
             env.step(action)
         print("Putting knife back on countertop")
-        breakpoint()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
             env.step(action)
 
@@ -301,16 +293,15 @@ def main():
 
     print("Will start in 3 seconds")
     for _ in range(180):
-        env.step(prim_gen._empty_action())
+        empty_action = prim_gen._empty_action()
+        env.step(empty_action)
 
     try:
         # test.test_soak_under(env, prim_gen, robot, sponge, sink)
-        # test.test_wipe(env, prim_gen, robot, sponge, sink, countertop)
-        test.test_cut(env, prim_gen, apple, knife, countertop)
+        test.test_wipe(env, prim_gen, robot, sponge, sink, countertop)
+        # test.test_cut(env, prim_gen, apple, knife, countertop)
     except:
         raise
-    while True:
-        og.sim.step()
 
 if __name__ == "__main__":
     main()

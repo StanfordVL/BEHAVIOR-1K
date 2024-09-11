@@ -511,7 +511,7 @@ def detect_robot_collision(context, sample=True):
     """
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
-
+    
     # Define function for checking overlap
     valid_hit = False
     mesh_path = None
