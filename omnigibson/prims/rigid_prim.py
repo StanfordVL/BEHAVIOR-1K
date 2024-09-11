@@ -496,7 +496,7 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        self._rigid_prim_view.set_masses([mass])
+        self._rigid_prim_view.set_masses(th.tensor([mass]))
 
     @property
     def density(self):
@@ -523,7 +523,7 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        self._rigid_prim_view.set_densities([density])
+        self._rigid_prim_view.set_densities(th.tensor([density]))
 
     @cached_property
     def kinematic_only(self):

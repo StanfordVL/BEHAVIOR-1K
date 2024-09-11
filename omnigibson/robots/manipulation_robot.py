@@ -413,11 +413,14 @@ class ManipulationRobot(BaseRobot):
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
+        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
+        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
+        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
         start_idx = 0 if self.fixed_base else 6
         eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
         fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
             self.articulation_root_path
-        )[eef_link_idx, :, start_idx : start_idx + self.n_joints]
+        )[-(self.n_links - eef_link_idx), :, start_idx : start_idx + self.n_joints]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()

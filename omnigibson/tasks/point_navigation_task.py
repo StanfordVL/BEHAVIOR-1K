@@ -381,7 +381,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = th.tensor(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
+        delta_pos_global = pos - env.robots[self._robot_idn].states[Pose].get_value()[0]
         return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
 
     def _get_obs(self, env):

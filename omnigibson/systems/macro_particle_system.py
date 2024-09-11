@@ -642,7 +642,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position, normal, quaternion, hit_link, reasons = result
                 if position is not None:
                     positions.append(position)
-                    orientations.append(th.tensor(quaternion))
+                    orientations.append(quaternion)
                     particle_scales.append(scale)
                     link_prim_paths.append(hit_link)
             scales = particle_scales
@@ -1287,7 +1287,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
     def get_particles_position_orientation(self):
         # Note: This gets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if self.n_particles > 0:
-            tfs = th.tensor(self.particles_view.get_transforms())
+            tfs = self.particles_view.get_transforms()
             pos, ori = tfs[:, :3], tfs[:, 3:]
             pos = pos + T.quat2mat(ori) @ self._particle_offset
         else:
@@ -1344,7 +1344,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 - (n, 3)-array: per-particle (ax, ay, az) angular velocities in the world frame
         """
         if self.n_particles > 0:
-            vels = th.tensor(self.particles_view.get_velocities())
+            vels = self.particles_view.get_velocities()
             lin_vel, ang_vel = vels[:, :3], vels[:, 3:]
         else:
             lin_vel, ang_vel = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 3)

@@ -17,6 +17,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
 
@@ -131,12 +132,6 @@ class ClothPrim(GeomPrim):
         aabb_center = (aabb_min + aabb_max) / 2.0
         dists = th.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = th.argmin(dists)
-
-    def _initialize(self):
-        super()._initialize()
-        # TODO (eric): hacky way to get cloth rendering to work (otherwise, there exist some rendering artifacts).
-        self._prim.CreateAttribute("primvars:isVolume", lazy.pxr.Sdf.ValueTypeNames.Bool, False).Set(True)
-        self._prim.GetAttribute("primvars:isVolume").Set(False)
 
         # Store the default position of the points in the local frame
         self._default_positions = th.tensor(self.get_attribute(attr="points"))
@@ -428,7 +423,7 @@ class ClothPrim(GeomPrim):
         Returns:
             th.tensor: current average linear velocity of the particles of the cloth prim. Shape (3,).
         """
-        return th.tensor(self._prim.GetAttribute("velocities").Get()).mean(dim=0)
+        return vtarray_to_torch(self._prim.GetAttribute("velocities").Get()).mean(dim=0)
 
     def get_angular_velocity(self):
         """

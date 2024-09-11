@@ -675,11 +675,16 @@ def test_toggled_on(env):
     # End-effector not close to the button, stays False
     assert not stove.states[ToggledOn].get_value()
 
+    # Settle robot
+    for _ in range(10):
+        og.sim.step()
+
     q[jnt_idxs["shoulder_pan_joint"]] = 0.0
     robot.set_joint_positions(q, drive=False)
 
     for _ in range(steps - 1):
         og.sim.step()
+        robot.keep_still()
 
     # End-effector close to the button, but not enough time has passed, still False
     assert not stove.states[ToggledOn].get_value()

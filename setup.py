@@ -47,6 +47,7 @@ setup(
         "rtree~=1.2.0",
         "graphviz~=0.20",
         "numba~=0.60.0",
+        "torchvision~=0.18.1",
     ],
     extras_require={
         "isaac": ["isaacsim-for-omnigibson>=4.1.0"],

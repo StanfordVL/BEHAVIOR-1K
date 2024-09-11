@@ -13,6 +13,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -926,13 +927,27 @@ class BatchControlViewAPIImpl:
             return self.get_root_transform(prim_path)
 
     def get_linear_velocity(self, prim_path):
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_linear_velocity(prim_path, link_name)
+        else:
+            return self.get_root_linear_velocity(prim_path)
+
+    def get_angular_velocity(self, prim_path):
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_angular_velocity(prim_path, link_name)
+        else:
+            return self.get_root_angular_velocity(prim_path)
+
+    def get_root_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
             self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
         idx = self._idx[prim_path]
         return self._read_cache["root_velocities"][idx][:3]
 
-    def get_angular_velocity(self, prim_path):
+    def get_root_angular_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
             self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
@@ -942,12 +957,14 @@ class BatchControlViewAPIImpl:
     def get_relative_linear_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         linvel = self.get_linear_velocity(prim_path)
+        # x.T --> transpose (inverse) orientation
         return T.quat2mat(orn).T @ linvel
 
     def get_relative_angular_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         angvel = self.get_angular_velocity(prim_path)
-        return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
+        # x.T --> transpose (inverse) orientation
+        return T.quat2mat(orn).T @ angvel
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
@@ -1009,7 +1026,7 @@ class BatchControlViewAPIImpl:
         # Compute the relative position and orientation
         return T.relative_pose_transform(pos, orn, world_pos, world_orn)
 
-    def get_link_relative_linear_velocity(self, prim_path, link_name):
+    def get_link_linear_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
             self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
@@ -1018,13 +1035,18 @@ class BatchControlViewAPIImpl:
         vel = self._read_cache["link_velocities"][idx][link_idx]
         linvel = vel[:3]
 
+        return linvel
+
+    def get_link_relative_linear_velocity(self, prim_path, link_name):
+        linvel = self.get_link_linear_velocity(prim_path, link_name)
+
         # Get the root world transform too
         _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
         return T.quat2mat(world_orn).T @ linvel
 
-    def get_link_relative_angular_velocity(self, prim_path, link_name):
+    def get_link_angular_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
             self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
@@ -1033,11 +1055,16 @@ class BatchControlViewAPIImpl:
         vel = self._read_cache["link_velocities"][idx][link_idx]
         angvel = vel[3:]
 
+        return angvel
+
+    def get_link_relative_angular_velocity(self, prim_path, link_name):
+        angvel = self.get_link_angular_velocity(prim_path, link_name)
+
         # Get the root world transform too
         _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
-        return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
+        return T.quat2mat(world_orn).T @ angvel
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
@@ -1316,9 +1343,9 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    face_vertex_counts = th.tensor(mesh_prim.GetAttribute("faceVertexCounts").Get())
-    vertices = th.tensor(mesh_prim.GetAttribute("points").Get())
-    face_indices = th.tensor(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+    vertices = vtarray_to_torch(mesh_prim.GetAttribute("points").Get())
+    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
 
     faces = []
     i = 0
@@ -1330,12 +1357,12 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = th.tensor(mesh_prim.GetAttribute("normals").Get())
+        kwargs["vertex_normals"] = vtarray_to_torch(mesh_prim.GetAttribute("normals").Get())
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
         if raw_texture is not None:
-            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=th.tensor(raw_texture))
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=vtarray_to_torch(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 
