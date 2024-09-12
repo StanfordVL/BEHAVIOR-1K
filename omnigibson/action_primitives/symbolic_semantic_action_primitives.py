@@ -495,10 +495,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
                     "particles the target object is covered by": sorted(x.name for x in covering_systems),
                 },
             )
-
-        # If so, remove the particles.
+        # If so, remove the particles on the target object
         for system in currently_removable_systems:
-            obj_in_hand.states[object_states.Covered].set_value(system, False)
+            obj.states[object_states.Covered].set_value(system, False)
 
         # Yield some actions
         yield from self._settle_robot()

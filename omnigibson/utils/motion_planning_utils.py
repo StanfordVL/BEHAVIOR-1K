@@ -6,12 +6,12 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.utils.usd_utils import GripperRigidContactAPI
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
 
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
@@ -202,7 +202,7 @@ def plan_base_motion(
 
     ss.setStartAndGoalStates(start, goal)
     if not state_valid_fn(start(), sample=False) or not state_valid_fn(goal(), sample=False):
-         return
+        return
 
     solved = ss.solve(planning_time)
 
@@ -431,7 +431,7 @@ def plan_arm_motion_ik(
     solved = ss.solve(planning_time)
 
     if solved:
-        #try to shorten the path
+        # try to shorten the path
         ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
@@ -525,7 +525,7 @@ def detect_robot_collision(context, sample=True):
         if valid_hit and not sample:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
-                f"Could not make a plan to get to the target position, colliding objects: {hit.rigid_body} and {mesh_path}"
+                f"Could not make a plan to get to the target position, colliding objects: {hit.rigid_body} and {mesh_path}",
             )
 
         return not valid_hit

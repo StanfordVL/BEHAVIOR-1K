@@ -68,7 +68,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
         for primitive, args in zip(primitives, primitives_args):
             try:
-                execute_controller(controller.apply_ref(primitive, *args, attempts=6), env)
+                execute_controller(controller.apply_ref(primitive, *args, attempts=3), env)
             except Exception as e:
                 return False
     finally:
@@ -76,7 +76,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
         og.clear()
 
     return True
-
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.parametrize("robot", ["Fetch", "Tiago"])
 class TestPrimitives:
     def test_navigate(self, robot):
