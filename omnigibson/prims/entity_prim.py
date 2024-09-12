@@ -496,6 +496,10 @@ class EntityPrim(XFormPrim):
         return self._links
 
     @cached_property
+    def link_prim_paths(self):
+        return [link.prim_path for link in self._links.values()]
+
+    @cached_property
     def has_attachment_points(self):
         """
         Returns:

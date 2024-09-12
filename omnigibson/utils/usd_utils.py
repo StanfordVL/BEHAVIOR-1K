@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable
 
 import torch as th
+import numpy as np
 import trimesh
 
 import omnigibson as og
@@ -473,7 +474,7 @@ class RigidContactAPIImpl:
         if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
             self._CONTACT_CACHE[key] = th.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-        return self._CONTACT_CACHE[key]
+        return self._CONTACT_CACHE[key].item()
 
     def clear(self):
         """
@@ -1574,6 +1575,14 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
             [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
         )
     )
+
+    # Modify values so that all faces are triangular
+    tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+    face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+    mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
+    mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
+    mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
+    mesh.GetPrim().GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()]))
 
     return mesh
 

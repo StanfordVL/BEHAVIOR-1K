@@ -40,7 +40,7 @@ class KinematicsMixin(BaseObjectState):
         t = self._cache[get_value_args]["t"]
         for obj, pose in self._cache[get_value_args]["info"].items():
             if isinstance(obj, StatefulObject):
-                if obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
+                if obj.articulated or obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
                     return False
         return True
 
