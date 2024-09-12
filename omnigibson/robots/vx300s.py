@@ -195,6 +195,7 @@ class VX300S(ManipulationRobot):
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
+
     @property
     def curobo_path(self):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")

@@ -1,14 +1,15 @@
-import pytest
-import omnigibson as og
-from omnigibson.macros import gm
-from omnigibson.scenes import Scene
-from omnigibson.robots import Fetch, VX300S, FrankaPanda
-from omnigibson.objects import DatasetObject, PrimitiveObject
-from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
-from omnigibson.utils.usd_utils import RigidContactAPI
-from omnigibson.object_states import Touching
 import numpy as np
+import pytest
 import torch as th
+
+import omnigibson as og
+from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
+from omnigibson.macros import gm
+from omnigibson.object_states import Touching
+from omnigibson.objects import DatasetObject, PrimitiveObject
+from omnigibson.robots import VX300S, Fetch, FrankaPanda
+from omnigibson.scenes import Scene
+from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 def test_curobo():
@@ -113,7 +114,9 @@ def test_curobo():
     )
 
     # Execute the trajectory and make sure there's no collision at all
-    assert th.all(traj_result.success[:n_eefs]), f"Failed to find some collision-free trajectories: {traj_result.success[:n_eefs]}"
+    assert th.all(
+        traj_result.success[:n_eefs]
+    ), f"Failed to find some collision-free trajectories: {traj_result.success[:n_eefs]}"
     for traj_path in traj_result.get_paths()[:n_eefs]:
         q_traj = cmg.path_to_joint_trajectory(traj_path)
         for q in q_traj:
