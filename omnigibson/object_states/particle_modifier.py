@@ -422,7 +422,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             self.projection_mesh.set_position_orientation(
                 position=th.tensor([0, 0, -z_offset]),
                 orientation=T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32)),
-                frame="parent"
+                frame="parent",
             )
 
             # Generate the function for checking whether points are within the projection mesh
@@ -1083,8 +1083,7 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
             self.projection_source_sphere.set_position_orientation(
-                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32)),
-                frame="parent"
+                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32)), frame="parent"
             )
 
             # Make sure the meta mesh is aligned with the meta link if visualizing

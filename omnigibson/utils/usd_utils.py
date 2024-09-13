@@ -758,7 +758,7 @@ class PoseAPI:
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
-        
+
         cls._refresh()
 
         # Avoid premature imports

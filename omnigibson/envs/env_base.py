@@ -271,7 +271,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if position is not None:
                     position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
                 if orientation is not None:
-                    orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+                    orientation = (
+                        orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+                    )
 
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
