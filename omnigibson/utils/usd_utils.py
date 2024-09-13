@@ -785,8 +785,23 @@ class PoseAPI:
         return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
 
     @classmethod
-    def convert_pose_to_local(cls):
-        pass
+    def convert_world_pose_to_local(cls, prim, position, orientation):
+        """Converts a world pose to a local pose under a prim's parent."""
+        world_transform = T.pose2mat((position, orientation))
+        parent_prim = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_world_transform = cls.get_world_pose_with_scale(parent_path)
+
+        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
+        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
+
+        # Check that the local transform consists only of a position, scale and rotation
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        assert th.allclose(
+            product, th.diag(th.diag(product)), atol=1e-3
+        ), f"{prim.GetPath()} local transform is not orthogonal."
+
+        # Return the local pose
+        return T.mat2pose(local_transform)
 
 
 class BatchControlViewAPIImpl:

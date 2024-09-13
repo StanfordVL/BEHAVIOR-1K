@@ -188,66 +188,62 @@ class XFormPrim(BasePrim):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        # if no position or no orientation are given, get the current position and orientation of the object
+
+        # If no position or no orientation are given, get the current position and orientation of the object
         if position is None or orientation is None:
             current_position, current_orientation = self.get_position_orientation(frame=frame)
         position = current_position if position is None else position
         orientation = current_orientation if orientation is None else orientation
-        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
-        # perform the transformation only if the frame is scene and the requirements are met
+
+        # Convert to th.Tensor if necessary
+        position = th.as_tensor(position)
+        orientation = th.as_tensor(orientation)
+
+        # Convert to from scene-relative to world if necessary
         if frame == "scene":
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
+        # If the current pose is not in parent frame, convert to parent frame since that's what we can set.
+        if frame != "parent":
+            position, orientation = PoseAPI.convert_world_pose_to_local(self._prim, position, orientation)
+
+        # Assert validity of the orientation
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-        if frame == "world" or frame == "scene":
-            my_world_transform = T.pose2mat((position, orientation))
-            parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
-            parent_path = str(parent_prim.GetPath())
-            parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
-            local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
-            # unscale local transform's rotation
-            local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)
-            product = local_transform[:3, :3] @ local_transform[:3, :3].T
-            assert th.allclose(
-                product, th.diag(th.diag(product)), atol=1e-3
-            ), f"{self.prim_path} local transform is not diagonal."
-            self.set_position_orientation(*T.mat2pose(local_transform), frame="parent")
+        # Actually set the local pose now.
+        properties = self.prim.GetPropertyNames()
+        position = lazy.pxr.Gf.Vec3d(*position.tolist())
+        if "xformOp:translate" not in properties:
+            logger.error(
+                "Translate property needs to be set for {} before setting its position".format(self.name)
+            )
+        self.set_attribute("xformOp:translate", position)
+        orientation = orientation[[3, 0, 1, 2]].tolist()
+        if "xformOp:orient" not in properties:
+            logger.error(
+                "Orient property needs to be set for {} before setting its orientation".format(self.name)
+            )
+        xform_op = self._prim.GetAttribute("xformOp:orient")
+        if xform_op.GetTypeName() == "quatf":
+            rotq = lazy.pxr.Gf.Quatf(*orientation)
         else:
-            properties = self.prim.GetPropertyNames()
-            position = lazy.pxr.Gf.Vec3d(*position.tolist())
-            if "xformOp:translate" not in properties:
-                lazy.carb.log_error(
-                    "Translate property needs to be set for {} before setting its position".format(self.name)
-                )
-            self.set_attribute("xformOp:translate", position)
-            orientation = orientation[[3, 0, 1, 2]].tolist()
-            if "xformOp:orient" not in properties:
-                lazy.carb.log_error(
-                    "Orient property needs to be set for {} before setting its orientation".format(self.name)
-                )
-            xform_op = self._prim.GetAttribute("xformOp:orient")
-            if xform_op.GetTypeName() == "quatf":
-                rotq = lazy.pxr.Gf.Quatf(*orientation)
-            else:
-                rotq = lazy.pxr.Gf.Quatd(*orientation)
-            xform_op.Set(rotq)
-            PoseAPI.invalidate()
-            if gm.ENABLE_FLATCACHE:
-                # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
-                # Ideally we should call usdrt's set local pose directly, but there is no such API.
-                # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
-                xformable_prim = lazy.usdrt.Rt.Xformable(
-                    lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
-                )
-                assert (
-                    not xformable_prim.HasWorldXform()
-                ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
-                xformable_prim.SetLocalXformFromUsd()
+            rotq = lazy.pxr.Gf.Quatd(*orientation)
+        xform_op.Set(rotq)
+        PoseAPI.invalidate()
+        if gm.ENABLE_FLATCACHE:
+            # If flatcache is on, make sure the USD local pose is synced to the fabric local pose.
+            # Ideally we should call usdrt's set local pose directly, but there is no such API.
+            # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
+            xformable_prim = lazy.usdrt.Rt.Xformable(
+                lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+            )
+            assert (
+                not xformable_prim.HasWorldXform()
+            ), "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this."
+            xformable_prim.SetLocalXformFromUsd()
 
     def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
         """
@@ -267,18 +263,14 @@ class XFormPrim(BasePrim):
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        if frame == "world" or frame == "scene":
-            position, orientation = PoseAPI.get_world_pose(self.prim_path)
-            # If we are in a scene, compute the scene-local transform (and save this as the world transform
-            # for legacy compatibility)
-            if frame == "scene":
-                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-                position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
-            return position, orientation
+        if frame == "world":
+            return PoseAPI.get_world_pose(self.prim_path)
+        elif frame == "scene":
+            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+            return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
         else:
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
-            orientation = orientation[[1, 2, 3, 0]]
-            return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
+            return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
 
     def set_position(self, position):
         """
@@ -426,7 +418,7 @@ class XFormPrim(BasePrim):
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
-            lazy.carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
+            logger.error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
 
     @property
