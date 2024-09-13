@@ -323,8 +323,10 @@ class EntityPrim(XFormPrim):
                 ), "Cannot update joint limits for a non-uniformly scaled object when already initialized."
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
-                        # Find the parent link frame orientation in the object frame
-                        _, link_local_orn = link.get_position_orientation(frame="parent")
+                        # Find the parent link frame orientation in the object frame. Note that we
+                        # are OK getting this from XFormPrim since we actually want it relative to
+                        # the object frame, notwithstanding the physics.
+                        _, link_local_orn = XFormPrim.get_position_orientation(link, frame="parent")
 
                         # Find the joint frame orientation in the parent link frame
                         joint_local_orn = th.tensor(
