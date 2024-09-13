@@ -1488,10 +1488,9 @@ class ManipulationRobot(BaseRobot):
         for arm in ag_params.keys():
             if len(ag_params[arm]) > 0:
                 assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-                ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
+                ag_params[arm]["contact_pos"], _ = self.scene.convert_world_pose_to_scene_relative(
                     ag_params[arm]["contact_pos"],
                     th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    *self.scene.get_position_orientation(),
                 )
         state["ag_obj_constraint_params"] = ag_params
         return state
@@ -1516,8 +1515,7 @@ class ManipulationRobot(BaseRobot):
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 contact_pos_global = data["contact_pos"]
                 assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene"
-                contact_pos_global, _ = T.pose_transform(
-                    *self.scene.get_position_orientation(),
+                contact_pos_global, _ = self.scene.convert_scene_relative_pose_to_world(
                     contact_pos_global,
                     th.tensor([0, 0, 0, 1], dtype=th.float32),
                 )
