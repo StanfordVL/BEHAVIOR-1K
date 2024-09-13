@@ -932,21 +932,7 @@ class BatchControlViewAPIImpl:
         pose = self._read_cache["root_transforms"][idx]
         return pose[:3], pose[3:]
 
-    def get_position_orientation(self, prim_path, frame="world"):
-        """
-        Gets pose with respect to the world frame.
-
-        Args:
-            frame (Literal): frame to get the pose with respect to world.
-
-        Returns:
-            2-tuple:
-                - th.Tensor: (x,y,z) position in the world frame
-                - th.Tensor: (x,y,z,w) quaternion orientation in the world frame
-        """
-
-        assert frame == "world", f"Invalid frame '{frame}'. Must be 'world'"
-
+    def get_position_orientation(self, prim_path):
         # Here we want to return the position of the base footprint link. If the base footprint link is None,
         # we return the position of the root link.
         if self._base_footprint_link_names[prim_path] is not None:
