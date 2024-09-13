@@ -363,7 +363,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Gets robot's pose with respect to the specified frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. 
+            frame (Literal): frame to get the pose with respect to. Default to world.
                 scene frame get position relative to the scene.
             clone (bool): Whether to clone the internal buffer or not when grabbing data
 
@@ -385,7 +385,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world". 
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
                 scene frame set position relative to the scene.
         """
         super().set_position_orientation(position, orientation, frame=frame)
