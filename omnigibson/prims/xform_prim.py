@@ -11,7 +11,11 @@ from omnigibson.macros import gm
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import PoseAPI
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class XFormPrim(BasePrim):
@@ -283,7 +287,7 @@ class XFormPrim(BasePrim):
         Args:
             position (3-array): (x,y,z) global cartesian position to set
         """
-        og.log.warning(
+        logger.warning(
             "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead"
         )
         return self.set_position_orientation(position=position)
@@ -295,7 +299,7 @@ class XFormPrim(BasePrim):
         Returns:
             3-array: (x,y,z) global cartesian position of this prim
         """
-        og.log.warning(
+        logger.warning(
             "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead."
         )
         return self.get_position_orientation()[0]
@@ -307,7 +311,7 @@ class XFormPrim(BasePrim):
         Args:
             orientation (4-array): (x,y,z,w) global quaternion orientation to set
         """
-        og.log.warning(
+        logger.warning(
             "set_orientation is deprecated and will be removed in a future release. Use set_position_orientation(orientation=orientation) instead"
         )
         self.set_position_orientation(orientation=orientation)
@@ -319,7 +323,7 @@ class XFormPrim(BasePrim):
         Returns:
             4-array: (x,y,z,w) global quaternion orientation of this prim
         """
-        og.log.warning(
+        logger.warning(
             "get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead"
         )
         return self.get_position_orientation()[1]
@@ -349,7 +353,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the local frame
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
-        og.log.warning(
+        logger.warning(
             'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
         )
         return self.get_position_orientation(self.prim_path, frame="parent")
@@ -364,7 +368,7 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
-        og.log.warning(
+        logger.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
         return self.set_position_orientation(self.prim_path, position, orientation, frame)

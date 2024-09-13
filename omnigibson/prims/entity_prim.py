@@ -1086,18 +1086,6 @@ class EntityPrim(XFormPrim):
 
         return position, orientation
 
-    def set_local_pose(self, position=None, orientation=None, frame="parent"):
-        og.log.warning(
-            'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
-        )
-        return self.set_position_orientation(position=position, orientation=orientation, frame=frame)
-
-    def get_local_pose(self):
-        og.log.warning(
-            'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
-        )
-        return self.get_position_orientation(frame="parent")
-
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
     def joint_damping(self):
