@@ -16,7 +16,6 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import PoseAPI
 
 m = create_module_macros(module_path=__file__)
 
@@ -359,21 +358,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return "base"
 
-    @property
-    def base_footprint_link(self):
-        """
-        Returns:
-            RigidPrim: base footprint link of this object prim
-        """
-        return self._links[self.base_footprint_link_name]
-
-    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
+    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
         Gets robot's pose with respect to the specified frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world. 
+                scene frame get position relative to the scene.
             clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:
@@ -381,19 +372,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        if frame == "world" or frame == "scene":
-            return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
-        else:
-            # Get the position and orientation of the root_link in the world frame
-            position, orientation = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
-            # Get the position and orientation of the base_footprint_link with respect to robot root__link
-            parent_position, parent_orientation = PoseAPI.get_position_orientation(
-                self.base_footprint_link.prim_path, frame="parent"
-            )
-            # Find the relative transformation from the root_link to the base_footprint_link
-            relative_pos, relative_orn = T.pose_transform(position, orientation, parent_position, parent_orientation)
-            return relative_pos, relative_orn
+        return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
@@ -406,61 +385,15 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world". 
+                scene frame set position relative to the scene.
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        if position is None or orientation is None:
-            current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
-
-        # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
-        # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
-        if og.sim.is_playing() and self.initialized:
-            # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
-            # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
-            # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
-            if frame == "world" or frame == "scene":
-                # get the pose of the root link in the world/parent frame, invert to get the pose from root_link to world/scene frame
-                joint_pos, joint_orn = self.root_link.get_position_orientation(frame=frame)
-            else:
-                # getting root link pose in the parent frame is tricky, use PoseAPI to get the parent of the robot directly
-                joint_pos, joint_orn = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
-            inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
-
-            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
-            relative_rpy = T.quat2euler(relative_orn)
-            self.joints["base_x_joint"].set_pos(relative_pos[0], drive=False)
-            self.joints["base_y_joint"].set_pos(relative_pos[1], drive=False)
-            self.joints["base_z_joint"].set_pos(relative_pos[2], drive=False)
-            self.joints["base_rx_joint"].set_pos(relative_rpy[0], drive=False)
-            self.joints["base_ry_joint"].set_pos(relative_rpy[1], drive=False)
-            self.joints["base_rz_joint"].set_pos(relative_rpy[2], drive=False)
-
-        # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
-        else:
-            # Call the super() method to move the robot frame first
-            super().set_position_orientation(position, orientation, frame=frame)
-            # convert the position and orientation to world frame
-            if frame == "scene":
-                assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
-                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-            elif frame == "parent":
-                # get the parent prim path
-                parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
-                parent_position, parent_orientation = PoseAPI.get_world_pose(parent_prim_path)
-
-                # combine them to get the pose from root link to the world frame
-                position, orientation = T.pose_transform(parent_position, parent_orientation, position, orientation)
-
-            # Move the joint frame for the world_base_joint
-            if self._world_base_fixed_joint_prim is not None:
+        super().set_position_orientation(position, orientation, frame=frame)
+        # Move the joint frame for the world_base_joint
+        if self._world_base_fixed_joint_prim is not None:
+            if position is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
+            if orientation is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
                     lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                 )
@@ -551,7 +484,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                     if self._use_ghost_hands:
                         self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
             else:
-                des_world_part_pos, des_world_part_orn = eef_part.get_position_orientation(frame="parent")
+                des_world_part_pos, des_world_part_orn = eef_part.local_position_orientation
 
             # Get local pose with respect to the new body frame
             des_local_part_pos, des_local_part_orn = T.relative_pose_transform(
@@ -612,73 +545,31 @@ class BRPart(ABC):
             self.scene.add_object(self.ghost_hand)
 
     @property
-    def local_position_orientation(
-        self,
-    ) -> Tuple[Iterable[float], Iterable[float]]:
+    def local_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get local position and orientation w.r.t. to the body
         Returns:
             Tuple[Array[x, y, z], Array[x, y, z, w]]
 
         """
-        og.log.warning(
-            'local_position_orientation is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
-        )
-        return self.get_position_orientation(frame="parent")
+        return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
-    def get_position_orientation(
-        self, frame: Literal["world", "scene", "parent"] = "world", clone=True
-    ) -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(self, clone=True) -> Tuple[Iterable[float], Iterable[float]]:
         """
-        Gets robot's pose with respect to the specified frame.
+        Get position and orientation in the world space
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
             clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:
-            2-tuple:
-                - th.Tensor: (x,y,z) position in the specified frame
-                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
+            Tuple[Array[x, y, z], Array[x, y, z, w]]
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        if frame == "world" or frame == "scene":
-            position, orientation = self._root_link.get_position_orientation(clone=clone)
-            if frame == "scene":
-                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-                position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
+        return self._root_link.get_position_orientation(clone=clone)
 
-            return position, orientation
-
-        else:
-            return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
-
-    def set_position_orientation(
-        self, pos: Iterable[float], orn: Iterable[float], frame: Literal["world", "parent", "scene"] = "world"
-    ) -> None:
+    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """
-        Sets BRPart's pose with respect to the specified frame
-
-        Args:
-            position (None or 3-array): if specified, (x,y,z) position in the world frame
-                Default is None, which means left unchanged.
-            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
-                Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+        Call back function to set the base's position
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-        # convert the position and orientation to world frame
-        if frame == "scene":
-            assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
-            pos, orn = self.scene.convert_scene_relative_pose_to_world(pos, orn)
-        elif frame == "parent":
-            # get the parent prim path
-            parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
-            parent_position, parent_orientation = PoseAPI.get_world_pose(parent_prim_path)
-            # combine them to get the pose from root link to the world frame
-            pos, orn = T.pose_transform(parent_position, parent_orientation, pos, orn)
         self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
         self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
         self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
