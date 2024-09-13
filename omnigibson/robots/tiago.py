@@ -680,7 +680,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-        return self.base_footprint_link.get_position_orientation(clone=clone)
+        return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
 
 
     def set_position_orientation(
