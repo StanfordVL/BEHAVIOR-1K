@@ -217,15 +217,11 @@ class XFormPrim(BasePrim):
         properties = self.prim.GetPropertyNames()
         position = lazy.pxr.Gf.Vec3d(*position.tolist())
         if "xformOp:translate" not in properties:
-            logger.error(
-                "Translate property needs to be set for {} before setting its position".format(self.name)
-            )
+            logger.error("Translate property needs to be set for {} before setting its position".format(self.name))
         self.set_attribute("xformOp:translate", position)
         orientation = orientation[[3, 0, 1, 2]].tolist()
         if "xformOp:orient" not in properties:
-            logger.error(
-                "Orient property needs to be set for {} before setting its orientation".format(self.name)
-            )
+            logger.error("Orient property needs to be set for {} before setting its orientation".format(self.name))
         xform_op = self._prim.GetAttribute("xformOp:orient")
         if xform_op.GetTypeName() == "quatf":
             rotq = lazy.pxr.Gf.Quatf(*orientation)
