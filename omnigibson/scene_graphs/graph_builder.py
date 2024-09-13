@@ -1,8 +1,8 @@
 import itertools
 
 import networkx as nx
-import torch as th
 import numpy as np
+import torch as th
 from matplotlib import pyplot as plt
 from PIL import Image
 
@@ -292,7 +292,9 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     # check imgheight and imgwidth; if they are too small, we need to upsample the image to 640x640
     if imgheight < 640 or imgwidth < 640:
         # Convert to PIL Image to upsample, then write back to tensor
-        robot_view = th.tensor(np.array(Image.fromarray(robot_view.cpu().numpy()).resize((640, 640), Image.BILINEAR)), dtype=th.uint8)
+        robot_view = th.tensor(
+            np.array(Image.fromarray(robot_view.cpu().numpy()).resize((640, 640), Image.BILINEAR)), dtype=th.uint8
+        )
         imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
