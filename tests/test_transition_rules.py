@@ -33,7 +33,9 @@ def test_dryer_rule(env):
     og.sim.step()
 
     # Place the two objects inside the dryer
-    remover_dishtowel.set_position_orientation(position=[0.06, 0, 0.2], orientation=[0.0311883, -0.23199339, -0.06849886, 0.96980107])
+    remover_dishtowel.set_position_orientation(
+        position=[0.06, 0, 0.2], orientation=[0.0311883, -0.23199339, -0.06849886, 0.96980107]
+    )
     bowl.set_position_orientation(position=[0.0, 0.0, 0.2], orientation=[0, 0, 0, 1])
     og.sim.step()
 
@@ -95,7 +97,9 @@ def test_washer_rule(env):
 
     # Place the two objects inside the washer
     # (Hacky) use baking_sheet as a stepping stone to elevate the objects so that they are inside the container volume.
-    baking_sheet.set_position_orientation(position=[0.0, 0.0, 0.04], orientation=T.euler2quat(th.tensor([math.pi, 0, 0], dtype=th.float32)))
+    baking_sheet.set_position_orientation(
+        position=[0.0, 0.0, 0.04], orientation=T.euler2quat(th.tensor([math.pi, 0, 0], dtype=th.float32))
+    )
     remover_dishtowel.set_position_orientation(position=[0.0, 0.0, 0.05], orientation=[0, 0, 0, 1])
     bowl.set_position_orientation(position=[0.10, 0.0, 0.08], orientation=[0, 0, 0, 1])
     og.sim.step()

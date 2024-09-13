@@ -1302,6 +1302,7 @@ def random_quaternion(num_quaternions: int = 1) -> th.Tensor:
 
     return quaternions
 
+
 @th.jit.script
 def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = True) -> th.Tensor:
     """

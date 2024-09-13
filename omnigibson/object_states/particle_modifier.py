@@ -515,7 +515,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             cond = (
                 lambda obj: (
                     th.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1]) @ th.tensor([0, 0, 1]),
+                        T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1])
+                        @ th.tensor([0, 0, 1]),
                         th.tensor([0, 0, 1]),
                     )
                     > 0

@@ -1031,7 +1031,9 @@ class EntityPrim(XFormPrim):
             orientation = current_orientation if orientation is None else orientation
 
             position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-            orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+            orientation = (
+                orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+            )
 
             # perform the transformation only if the frame is scene and the requirements are met
             if frame == "scene":

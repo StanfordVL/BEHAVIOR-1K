@@ -1489,9 +1489,9 @@ class ManipulationRobot(BaseRobot):
             if len(ag_params[arm]) > 0:
                 assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
                 ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
-                    ag_params[arm]["contact_pos"], 
-                    th.tensor([0, 0, 0, 1], dtype=th.float32), 
-                    *self.scene.get_position_orientation()
+                    ag_params[arm]["contact_pos"],
+                    th.tensor([0, 0, 0, 1], dtype=th.float32),
+                    *self.scene.get_position_orientation(),
                 )
         state["ag_obj_constraint_params"] = ag_params
         return state

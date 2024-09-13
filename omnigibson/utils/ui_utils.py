@@ -562,9 +562,7 @@ class CameraMover:
                     pos, orn = self.cam.get_position_orientation()
                     transform = T.quat2mat(orn)
                     delta_pos_global = transform @ command
-                    self.cam.set_position_orientation(
-                        position=pos + delta_pos_global
-                    )
+                    self.cam.set_position_orientation(position=pos + delta_pos_global)
 
         return True
 

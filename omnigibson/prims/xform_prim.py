@@ -195,7 +195,7 @@ class XFormPrim(BasePrim):
         if frame == "scene":
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
-        
+
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
@@ -323,7 +323,7 @@ class XFormPrim(BasePrim):
             "get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead"
         )
         return self.get_position_orientation()[1]
-    
+
     def get_rpy(self):
         """
         Get this prim's orientation with respect to the world frame

@@ -99,7 +99,9 @@ def camera_pose_test(flatcache):
     # 1) if the local pose is updated 2) if the robot stays in the same position
     robot.set_position_orientation(position=[150, 150, 100])
     old_camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
-    vision_sensor.set_position_orientation(position=[150, 150, 101.36912537], orientation=[-0.29444987, 0.29444981, 0.64288363, -0.64288352])
+    vision_sensor.set_position_orientation(
+        position=[150, 150, 101.36912537], orientation=[-0.29444987, 0.29444981, 0.64288363, -0.64288352]
+    )
     new_camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     assert not th.allclose(old_camera_local_pose[0], new_camera_local_pose[0], atol=1e-3)
     assert not quaternions_close(old_camera_local_pose[1], new_camera_local_pose[1], atol=1e-3)

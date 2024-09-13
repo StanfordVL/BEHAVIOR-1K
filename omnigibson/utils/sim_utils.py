@@ -308,7 +308,9 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     lower, _ = obj.states[AABB].get_value()
     cur_pos = obj.get_position_orientation()[0]
     z_diff = cur_pos[2] - lower[2]
-    obj.set_position_orientation(position=pos + th.tensor([0, 0, z_diff if z_offset is None else z_diff + z_offset]), orientation=quat)
+    obj.set_position_orientation(
+        position=pos + th.tensor([0, 0, z_diff if z_offset is None else z_diff + z_offset]), orientation=quat
+    )
 
 
 def test_valid_pose(obj, pos, quat=None, z_offset=None):
