@@ -185,7 +185,7 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
             frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+                set position relative to the object parent. scene frame set position relative to the scene.
         """
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
@@ -350,7 +350,7 @@ class XFormPrim(BasePrim):
         )
         return self.get_position_orientation(self.prim_path, frame="parent")
 
-    def set_local_pose(self, position=None, orientation=None, frame="parent"):
+    def set_local_pose(self, position=None, orientation=None):
         """
         Sets prim's pose with respect to the local frame (the prim's parent frame).
 
@@ -363,7 +363,7 @@ class XFormPrim(BasePrim):
         logger.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
-        return self.set_position_orientation(self.prim_path, position, orientation, frame)
+        return self.set_position_orientation(self.prim_path, position, orientation, frame="parent")
 
     def get_world_scale(self):
         """
@@ -465,7 +465,6 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-
         if self.scene is None:
             # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
             pos, ori = self.get_position_orientation()
@@ -475,7 +474,6 @@ class XFormPrim(BasePrim):
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-
         pos, orn = state["pos"], state["ori"]
         if self.scene is None:
             # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
