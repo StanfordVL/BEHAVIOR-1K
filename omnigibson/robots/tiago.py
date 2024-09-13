@@ -12,7 +12,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, PoseAPI
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
