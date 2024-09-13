@@ -123,14 +123,8 @@ class EntityPrim(XFormPrim):
             lazy.omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
             lazy.omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
 
-        # Setup links info FIRST before running any other post loading behavior
-        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links()
         self._compute_articulation_tree()
-
-        # Optionally set the scale
-        if "scale" in self._load_config and self._load_config["scale"] is not None:
-            self.scale = self._load_config["scale"]
 
         # Prepare the articulation view.
         if self.n_joints > 0:
@@ -252,6 +246,7 @@ class EntityPrim(XFormPrim):
                 "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
                 "remesh": self._load_config.get("remesh", True),
                 "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
+                "scale": self._load_config.get("scale", None),
             }
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
@@ -1016,7 +1011,6 @@ class EntityPrim(XFormPrim):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
         # If kinematic only, clear cache for the root link
@@ -1030,14 +1024,22 @@ class EntityPrim(XFormPrim):
             self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
         # Sim is running and articulation view exists, so use that physx API backend
         else:
+            # if no position or no orientation are given, get the current position and orientation of the object
+            if position is None or orientation is None:
+                current_position, current_orientation = self.get_position_orientation(frame=frame)
+            position = current_position if position is None else position
+            orientation = current_orientation if orientation is None else orientation
 
-            # compute desired pose in the specified frame
-            position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
+            position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+            orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+
+            # perform the transformation only if the frame is scene and the requirements are met
+            if frame == "scene":
+                position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
 
             # convert to format expected by articulation view
             position = th.asarray(position)[None, :]
             orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
-
             if frame == "world" or frame == "scene":
                 self._articulation_view.set_world_poses(position, orientation)
             else:
@@ -1059,7 +1061,6 @@ class EntityPrim(XFormPrim):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
@@ -1076,25 +1077,20 @@ class EntityPrim(XFormPrim):
                 positions, orientations = self._articulation_view.get_local_poses()
 
         position, orientation = positions[0], orientations[0][[1, 2, 3, 0]]
-
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
-            if self.scene is None:
-                raise ValueError("Cannot transform position and orientation relative to scene without a scene")
-            else:
-                position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
+            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+            position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
 
         return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
-
         og.log.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
         return self.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
     def get_local_pose(self):
-
         og.log.warning(
             'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
         )
@@ -1504,7 +1500,7 @@ class EntityPrim(XFormPrim):
                 the world frame)
         """
         jac = self.get_jacobian(clone=clone)
-        ori_t = T.quat2mat(self.get_orientation_orientation()[1]).T
+        ori_t = T.quat2mat(self.get_position_orientation()[1]).T
         tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t

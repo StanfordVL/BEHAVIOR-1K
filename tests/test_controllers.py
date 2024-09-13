@@ -168,7 +168,7 @@ def test_arm_control():
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
                 robot.set_position_orientation(
-                    th.tensor([0.0, i * 5.0, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
+                    position=th.tensor([0.0, i * 5.0, 0.0]), orientation=T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
                 )
                 robot.reset()
                 robot.keep_still()

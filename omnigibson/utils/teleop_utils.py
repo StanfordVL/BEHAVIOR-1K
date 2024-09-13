@@ -93,7 +93,7 @@ class TeleopSystem(TeleopPolicy):
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 base_pos, base_orn = self.robot.get_position_orientation()
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
-                self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
+                self.control_markers[arm_name].set_position_orientation(position=target_pos, orientation=target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
 
     def reset(self) -> None:

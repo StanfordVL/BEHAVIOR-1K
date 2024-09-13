@@ -42,7 +42,7 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     og.sim.import_scene(scene)
 
     if gm.RENDER_VIEWER_CAMERA:
-        og.sim.viewer_camera.set_position_orientation([0, 0, 0.2], [0.5, -0.5, -0.5, 0.5])
+        og.sim.viewer_camera.set_position_orientation(position=[0, 0, 0.2], orientation=[0.5, -0.5, -0.5, 0.5])
     print(time.time() - start)
 
     if import_robot:

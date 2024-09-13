@@ -26,6 +26,7 @@ from omnigibson.utils.geometry_utils import (
     get_particle_positions_from_frame,
     get_particle_positions_in_frame,
 )
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
@@ -373,7 +374,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 if self._projection_mesh_params is None:
                     self._projection_mesh_params = {
                         "type": mesh_type,
-                        "extents": th.tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
+                        "extents": vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
                     }
                 # Otherwise, make sure we don't have a mismatch between the pre-existing shape type and the
                 # desired type since we can't delete the original mesh
@@ -514,7 +515,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             cond = (
                 lambda obj: (
                     th.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_orientation_orientation()[1]) @ th.tensor([0, 0, 1]),
+                        T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1]) @ th.tensor([0, 0, 1]),
                         th.tensor([0, 0, 1]),
                     )
                     > 0

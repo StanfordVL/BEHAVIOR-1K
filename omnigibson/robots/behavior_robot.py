@@ -381,9 +381,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if frame == "world" or frame == "scene":
             return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
         else:
@@ -411,9 +409,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if position is None or orientation is None:
             current_position, current_orientation = self.get_position_orientation(frame=frame)
         position = current_position if position is None else position
@@ -450,18 +446,14 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         else:
             # Call the super() method to move the robot frame first
             super().set_position_orientation(position, orientation, frame=frame)
-
             # convert the position and orientation to world frame
             if frame == "scene":
-                if self.scene is None:
-                    raise ValueError("Cannot set pose relative to scene without a scene.")
-                else:
-                    position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+                assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
+                position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
             elif frame == "parent":
-
                 # get the parent prim path
                 parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
-                parent_position, parent_orientation = PoseAPI.get_position_orientation(parent_prim_path)
+                parent_position, parent_orientation = PoseAPI.get_world_pose(parent_prim_path)
 
                 # combine them to get the pose from root link to the world frame
                 position, orientation = T.pose_transform(parent_position, parent_orientation, position, orientation)
@@ -574,7 +566,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose
             if part_name in self.arm_names and teleop_action.reset[part_name]:
-                self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
+                self.parts[part_name].set_position_orientation(position=des_local_part_pos, orientation=des_part_rpy)
         return action
 
 
@@ -650,16 +642,12 @@ class BRPart(ABC):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         if frame == "world" or frame == "scene":
             position, orientation = self._root_link.get_position_orientation(clone=clone)
-
             if frame == "scene":
-                if self.scene is None:
-                    raise ValueError("Cannot get position and orientation relative to scene without a scene")
-                else:
-                    position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
+                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+                position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
 
             return position, orientation
 
@@ -680,24 +668,17 @@ class BRPart(ABC):
             frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         # convert the position and orientation to world frame
         if frame == "scene":
-            if self.scene is None:
-                raise ValueError("Cannot set pose relative to scene without a scene.")
-            else:
-                pos, orn = T.mat2pose(self.scene.pose @ T.pose2mat((pos, orn)))
+            assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
+            pos, orn = T.mat2pose(self.scene.pose @ T.pose2mat((pos, orn)))
         elif frame == "parent":
-
             # get the parent prim path
             parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
-            parent_position, parent_orientation = PoseAPI.get_position_orientation(parent_prim_path)
-
+            parent_position, parent_orientation = PoseAPI.get_world_pose(parent_prim_path)
             # combine them to get the pose from root link to the world frame
             pos, orn = T.pose_transform(parent_position, parent_orientation, pos, orn)
-
         self.parent.joints[f"{self.name}_x_joint"].set_pos(pos[0], drive=False)
         self.parent.joints[f"{self.name}_y_joint"].set_pos(pos[1], drive=False)
         self.parent.joints[f"{self.name}_z_joint"].set_pos(pos[2], drive=False)
@@ -714,7 +695,7 @@ class BRPart(ABC):
         """
         assert self.eef_type == "hand", "ghost hand is only valid for BR hand!"
         # Ghost hand tracks real hand whether it is hidden or not
-        self.ghost_hand.set_position_orientation(pos, orn)
+        self.ghost_hand.set_position_orientation(position=pos, orientation=orn)
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears

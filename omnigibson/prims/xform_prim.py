@@ -77,9 +77,9 @@ class XFormPrim(BasePrim):
             material.add_user(self)
             self._material = material
 
-        # Optionally set the scale and visibility
+        # Optionally set the scale, which is specified with respect to the original scale
         if "scale" in self._load_config and self._load_config["scale"] is not None:
-            self.scale = self._load_config["scale"]
+            self.scale = self._load_config["scale"] * self.original_scale
 
     def remove(self):
         # Remove the material prim if one exists
@@ -183,33 +183,37 @@ class XFormPrim(BasePrim):
             frame (Literal): frame to set the pose with respect to, defaults to "world". parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
-        # get the desired position and orientation in the specified frame
-        position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
-
+        # if no position or no orientation are given, get the current position and orientation of the object
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
+        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+        # perform the transformation only if the frame is scene and the requirements are met
+        if frame == "scene":
+            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+            position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+        
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
+        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
         if frame == "world" or frame == "scene":
-
-            assert math.isclose(
-                th.norm(orientation).item(), 1, abs_tol=1e-3
-            ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-
             my_world_transform = T.pose2mat((position, orientation))
-
             parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(self._prim)
             parent_path = str(parent_prim.GetPath())
             parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
             local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
+            # unscale local transform's rotation
+            local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)
             product = local_transform[:3, :3] @ local_transform[:3, :3].T
             assert th.allclose(
                 product, th.diag(th.diag(product)), atol=1e-3
             ), f"{self.prim_path} local transform is not diagonal."
             self.set_position_orientation(*T.mat2pose(local_transform), frame="parent")
-
         else:
-
             properties = self.prim.GetPropertyNames()
             position = lazy.pxr.Gf.Vec3d(*position.tolist())
             if "xformOp:translate" not in properties:
@@ -258,25 +262,19 @@ class XFormPrim(BasePrim):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if frame == "world" or frame == "scene":
-            position, orientation = PoseAPI.get_position_orientation(self.prim_path, "world")
-
+            position, orientation = PoseAPI.get_world_pose(self.prim_path)
             # If we are in a scene, compute the scene-local transform (and save this as the world transform
             # for legacy compatibility)
             if frame == "scene":
-                if self.scene is None:
-                    raise ValueError("Cannot get position and orientation relative to scene without a scene")
-                else:
-                    position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
-
+                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+                position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
             return position, orientation
         else:
-            return PoseAPI.get_position_orientation(self.prim_path, frame="parent")
-
-    # ------------------- Deprecated methods -------------------
+            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
+            orientation = orientation[[1, 2, 3, 0]]
+            return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
 
     def set_position(self, position):
         """
@@ -285,7 +283,6 @@ class XFormPrim(BasePrim):
         Args:
             position (3-array): (x,y,z) global cartesian position to set
         """
-
         og.log.warning(
             "set_position is deprecated and will be removed in a future release. Use set_position_orientation(position=position) instead"
         )
@@ -298,7 +295,6 @@ class XFormPrim(BasePrim):
         Returns:
             3-array: (x,y,z) global cartesian position of this prim
         """
-
         og.log.warning(
             "get_position is deprecated and will be removed in a future release. Use get_position_orientation()[0] instead."
         )
@@ -311,7 +307,6 @@ class XFormPrim(BasePrim):
         Args:
             orientation (4-array): (x,y,z,w) global quaternion orientation to set
         """
-
         og.log.warning(
             "set_orientation is deprecated and will be removed in a future release. Use set_position_orientation(orientation=orientation) instead"
         )
@@ -324,11 +319,26 @@ class XFormPrim(BasePrim):
         Returns:
             4-array: (x,y,z,w) global quaternion orientation of this prim
         """
-
         og.log.warning(
             "get_orientation is deprecated and will be removed in a future release. Use get_position_orientation()[1] instead"
         )
         return self.get_position_orientation()[1]
+    
+    def get_rpy(self):
+        """
+        Get this prim's orientation with respect to the world frame
+
+        Returns:
+            3-array: (roll, pitch, yaw) global euler orientation of this prim
+        """
+        return quat2euler(self.get_position_orientation()[1])
+
+    def get_xy_orientation(self):
+        """
+        Get this prim's orientation on the XY plane of the world frame. This is obtained by
+        projecting the forward vector onto the XY plane and then computing the angle.
+        """
+        return T.calculate_xy_plane_angle(self.get_position_orientation()[1])
 
     def get_local_pose(self):
         """
@@ -339,11 +349,10 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) position in the local frame
                 - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
-
         og.log.warning(
             'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
         )
-        return PoseAPI.get_position_orientation(self.prim_path, frame="parent")
+        return self.get_position_orientation(self.prim_path, frame="parent")
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
         """
@@ -355,31 +364,10 @@ class XFormPrim(BasePrim):
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
-
         og.log.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
         return self.set_position_orientation(self.prim_path, position, orientation, frame)
-
-    # -----------------------------------------------------------------------------------------------------------------
-
-    def get_rpy(self):
-        """
-        Get this prim's orientation with respect to the world frame
-
-        Returns:
-            3-array: (roll, pitch, yaw) global euler orientation of this prim
-        """
-
-        return quat2euler(self.get_position_orientation()[1])
-
-    def get_xy_orientation(self):
-        """
-        Get this prim's orientation on the XY plane of the world frame. This is obtained by
-        projecting the forward vector onto the XY plane and then computing the angle.
-        """
-
-        return T.calculate_xy_plane_angle(self.get_position_orientation()[1])
 
     def get_world_scale(self):
         """
@@ -495,7 +483,7 @@ class XFormPrim(BasePrim):
         pos, orn = state["pos"], state["ori"]
         if self.scene is None:
             # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
-            self.set_position_orientation()
+            self.set_position_orientation(pos, orn)
         else:
             self.set_position_orientation(pos, orn, frame="scene")
 

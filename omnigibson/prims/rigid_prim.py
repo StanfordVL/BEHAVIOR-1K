@@ -329,23 +329,29 @@ class RigidPrim(XFormPrim):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
 
-        # compute the pose in the desired frame
-        position, orientation = T.compute_desired_pose_in_frame(self, position, orientation, frame=frame)
-
-        # Invalidate kinematic-only object pose caches when new pose is set
-        if self.kinematic_only:
-            self.clear_kinematic_only_cache()
-
+        # if no position or no orientation are given, get the current position and orientation of the object
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
+        if frame == "scene":
+            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+            position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
         position = th.asarray(position)[None, :]
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
         orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
 
-        if frame == "world" or frame == "scene":
+        # Invalidate kinematic-only object pose caches when new pose is set
+        if self.kinematic_only:
+            self.clear_kinematic_only_cache()
+
+        if frame == "world":
+            self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
+        elif frame == "scene":
             self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
         else:
             self._rigid_prim_view.set_local_poses(positions=position, orientations=orientation)
@@ -366,30 +372,23 @@ class RigidPrim(XFormPrim):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if frame == "world" or frame == "scene":
             if self.kinematic_only and frame == "world" and self._kinematic_world_pose_cache is not None:
                 return self._kinematic_world_pose_cache
             elif self.kinematic_only and frame == "scene" and self._kinematic_scene_pose_cache is not None:
                 return self._kinematic_scene_pose_cache
-
             positions, orientations = self._rigid_prim_view.get_world_poses(clone=clone)
-
             assert math.isclose(
                 th.norm(orientations).item(), 1, abs_tol=1e-3
             ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
-
             position = positions[0]
             orientation = orientations[0][[1, 2, 3, 0]]
-
             # Cache pose if we're kinematic-only
             if self.kinematic_only:
                 self._kinematic_world_pose_cache = (position, orientation)
 
         else:
-
             # Return cached pose if we're kinematic-only
             if self.kinematic_only and self._kinematic_local_pose_cache is not None:
                 return self._kinematic_local_pose_cache
@@ -398,16 +397,12 @@ class RigidPrim(XFormPrim):
 
             position = positions[0]
             orientation = orientations[0][[1, 2, 3, 0]]
-
             if self.kinematic_only:
                 self._kinematic_local_pose_cache = (position, orientation)
-
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
-            if self.scene is None:
-                raise ValueError("Cannot transform position and orientation relative to scene without a scene")
-            else:
-                position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
+            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+            position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
 
             if self.kinematic_only:
                 self._kinematic_scene_pose_cache = (position, orientation)
@@ -415,14 +410,12 @@ class RigidPrim(XFormPrim):
         return position, orientation
 
     def set_local_pose(self, position=None, orientation=None, frame="parent"):
-
         og.log.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
         return self.set_position_orientation(position=position, orientation=orientation, frame="parent")
 
     def get_local_pose(self):
-
         og.log.warning(
             'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
         )

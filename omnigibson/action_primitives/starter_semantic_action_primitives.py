@@ -1113,7 +1113,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pose,
         stop_on_contact=False,
         ignore_failure=False,
-        pos_thresh=0.04,
+        pos_thresh=0.02,
         ori_thresh=0.4,
         in_world_frame=True,
         stop_if_stuck=False,
@@ -1431,16 +1431,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             action_idx = self.robot.controller_action_idx[name]
-            no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
-
-            if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
-                assert (
-                    self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
-                ), "Controller must be in pose_absolute_ori mode"
-                # convert quaternion to axis-angle representation for control input
-                no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
-
-            action[action_idx] = th.cat(list(no_op_goal.values()))
+            no_op_action = controller.compute_no_op_action(self.robot.get_control_dict())
+            action[action_idx] = no_op_action
         return action
 
     def _reset_hand(self):
@@ -1718,11 +1710,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = action[self.robot.controller_action_idx["base"]]
 
             if not self._base_controller_is_joint:
+                base_action[0] = 0.0
                 base_action[1] = ang_vel
             else:
                 assert (
                     base_action.numel() == 3
                 ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                base_action[0] = 0.0
+                base_action[1] = 0.0
                 base_action[2] = ang_vel
 
             action[self.robot.controller_action_idx["base"]] = base_action

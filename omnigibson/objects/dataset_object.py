@@ -321,7 +321,7 @@ class DatasetObject(USDObject):
                 th.tensor([0, 0, 0, 1], dtype=th.float32),
             )[0]
             position = position + rotated_offset
-        self.set_position_orientation(position, orientation)
+        self.set_position_orientation(position=position, orientation=orientation)
 
     @property
     def model(self):
@@ -447,7 +447,9 @@ class DatasetObject(USDObject):
                             prim.GetAttribute("physics:localRot1").Get()
                         )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                        local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+                        local_ori = T.quat_multiply(
+                            quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
+                        )
                         jnt_frame_rot = T.quat2mat(local_ori)
                         scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
                         scales[child_name] = scale_in_child_lf

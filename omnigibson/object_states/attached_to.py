@@ -303,7 +303,7 @@ class AttachedTo(
             new_child_root_quat = child_root_quat
 
         # Actually move the object and also keep it still for stability purposes.
-        self.obj.set_position_orientation(new_child_root_pos, new_child_root_quat)
+        self.obj.set_position_orientation(position=new_child_root_pos, orientation=new_child_root_quat)
         self.obj.keep_still()
         other.keep_still()
 

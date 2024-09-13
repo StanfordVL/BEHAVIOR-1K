@@ -14,6 +14,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -636,7 +637,7 @@ class FlatcacheAPI:
             obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame="parent")
             for link in prim.links.values():
                 rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_position_orientation(link, rel_pos, rel_quat, frame="parent")
+                XFormPrim.set_position_orientation(link, position=rel_pos, orientation=rel_quat, frame="parent")
             # 2. For every joint, update its linear / angular joint state
             if prim.n_joints > 0:
                 joints_pos = prim.get_joint_positions()
@@ -680,7 +681,7 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_position_orientation(link, th.zeros(3), th.tensor([0, 0, 0, 1.0]), frame="parent")
+                XFormPrim.set_position_orientation(link, position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]), frame="parent")
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -744,42 +745,26 @@ class PoseAPI:
             cls.mark_valid()
 
     @classmethod
-    def get_position_orientation(cls, prim_path, frame: Literal["world", "parent"] = "world"):
+    def get_world_pose(cls, prim_path):
         """
-        Gets pose with respect to the specified frame.
-
+        Gets pose of the prim object with respect to the world frame 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent.
-
+            Prim_path: the path of the prim object
         Returns:
             2-tuple:
-                - torch.Tensor: (x,y,z) position in the specified frame
-                - torch.Tensor: (x,y,z,w) quaternion orientation in the specified frame
+                - torch.Tensor: (x,y,z) position in the world frame
+                - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
-
-        assert frame in ["world", "parent"], f"Invalid frame '{frame}'. Must be 'world' or 'parent'"
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
         
         cls._refresh()
 
-        if frame == "world":
-            # Avoid premature imports
-            from omnigibson.utils.deprecated_utils import get_world_pose
-            position, orientation = get_world_pose(cls.PRIMS[prim_path])
-        else:
-            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(prim_path)
-            orientation = orientation[[1, 2, 3, 0]]
-
+        # Avoid premature imports
+        from omnigibson.utils.deprecated_utils import get_world_pose
+        position, orientation = get_world_pose(cls.PRIMS[prim_path])
         return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
-
-    @classmethod
-    def get_world_pose(cls, prim_path):
-
-        og.log.warning("This method is deprecated. Use get_position_orientation() instead.")
-        return cls.get_position_orientation(prim_path)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -796,6 +781,10 @@ class PoseAPI:
         from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
 
         return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
+    
+    @classmethod
+    def convert_pose_to_local(cls):
+        pass
 
 
 class BatchControlViewAPIImpl:
@@ -1381,9 +1370,9 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    face_vertex_counts = th.tensor(mesh_prim.GetAttribute("faceVertexCounts").Get())
-    vertices = th.tensor(mesh_prim.GetAttribute("points").Get())
-    face_indices = th.tensor(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+    vertices = vtarray_to_torch(mesh_prim.GetAttribute("points").Get())
+    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
 
     faces = []
     i = 0
@@ -1395,12 +1384,12 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = th.tensor(mesh_prim.GetAttribute("normals").Get())
+        kwargs["vertex_normals"] = vtarray_to_torch(mesh_prim.GetAttribute("normals").Get())
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
         if raw_texture is not None:
-            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=th.tensor(raw_texture))
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=vtarray_to_torch(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 

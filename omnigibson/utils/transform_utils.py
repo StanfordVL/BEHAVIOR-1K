@@ -80,30 +80,6 @@ def dot(v1, v2, dim=-1, keepdim=False):
 
 
 @th.jit.script
-def quat_mul(a, b):
-    assert a.shape == b.shape
-    shape = a.shape
-    a = a.reshape(-1, 4)
-    b = b.reshape(-1, 4)
-
-    x1, y1, z1, w1 = a[:, 0], a[:, 1], a[:, 2], a[:, 3]
-    x2, y2, z2, w2 = b[:, 0], b[:, 1], b[:, 2], b[:, 3]
-    ww = (z1 + x1) * (x2 + y2)
-    yy = (w1 - y1) * (w2 + z2)
-    zz = (w1 + y1) * (w2 - z2)
-    xx = ww + yy + zz
-    qq = 0.5 * (xx + (z1 - x1) * (x2 - y2))
-    w = qq - ww + (z1 - y1) * (y2 - z2)
-    x = qq - xx + (x1 + w1) * (x2 + w2)
-    y = qq - yy + (w1 - x1) * (y2 + z2)
-    z = qq - zz + (z1 + y1) * (w2 - x2)
-
-    quat = th.stack([x, y, z, w], dim=-1).view(shape)
-
-    return quat / th.norm(quat, dim=-1, keepdim=True)
-
-
-@th.jit.script
 def unit_vector(data: th.Tensor, dim: Optional[int] = None, out: Optional[th.Tensor] = None) -> th.Tensor:
     """
     Returns tensor normalized by length, i.e. Euclidean norm, along axis.
@@ -477,6 +453,7 @@ def mat2pose(hmat):
             - (th.tensor) (x,y,z) position array in cartesian coordinates
             - (th.tensor) (x,y,z,w) orientation array in quaternion form
     """
+    assert th.allclose(hmat[:3, :3].det(), th.tensor(1.0)), "Rotation matrix must not be scaled"
     pos = hmat[:3, 3]
     orn = mat2quat(hmat[:3, :3])
     return pos, orn
@@ -1075,7 +1052,7 @@ def get_orientation_error(desired, current):
     current = current.reshape(-1, 4)
 
     cc = quat_conjugate(current)
-    q_r = quat_mul(desired, cc)
+    q_r = quat_multiply(desired, cc)
     return (q_r[:, 0:3] * th.sign(q_r[:, 3]).unsqueeze(-1)).reshape(list(input_shape) + [3])
 
 
@@ -1092,7 +1069,7 @@ def get_orientation_diff_in_radian(orn0: th.Tensor, orn1: th.Tensor) -> th.Tenso
         orn_diff (th.Tensor): orientation difference in radians
     """
     # Compute the difference quaternion
-    diff_quat = quat_multiply(quat_inverse(orn0), orn1)
+    diff_quat = quat_distance(orn0, orn1)
 
     # Convert to axis-angle representation
     axis_angle = quat2axisangle(diff_quat)
@@ -1324,43 +1301,6 @@ def random_quaternion(num_quaternions: int = 1) -> th.Tensor:
     quaternions = th.stack([r1 * th.sin(t1), r1 * th.cos(t1), r2 * th.sin(t2), r2 * th.cos(t2)], dim=1)
 
     return quaternions
-
-
-def compute_desired_pose_in_frame(prim, position, orientation, frame: Literal["world", "parent", "scene"] = "scene"):
-    """
-    Compute the desired position and orientation of the object relative to frame. If desired position or orientation is set to none,
-    the current position and orientation of the object relative to that frame will be used. If the frame is scene,
-    compute the scene to world transform relative to the scene's position and orientation.
-
-    Args:
-        prim (object): The object whose position and orientation are to be computed
-        position (torch.tensor): The position of the object
-        orientation (torch.tensor): The orientation of the object
-        frame (str): The frame of reference for the position and orientation
-    Returns:
-        position (torch.tensor): The position of the object relative to the frame
-        orientation (torch.tensor): The orientation of the object relative to the orientation
-    """
-
-    assert frame in ["world", "parent", "scene"], "Frame must be either 'world', 'parent', or 'scene'."
-
-    if frame == "scene" and prim.scene is None:
-        raise ValueError("Cannot set position and orientation relative to scene without a scene")
-    else:
-        # if no position or no orientation are given, get the current position and orientation of the object
-        if position is None or orientation is None:
-            current_position, current_orientation = prim.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
-
-        # perform the transformation only if the frame is scene and the requirements are met
-        if frame == "scene":
-            position, orientation = mat2pose(prim.scene.pose @ pose2mat((position, orientation)))
-
-    return position, orientation
 
 @th.jit.script
 def transform_points(points: th.Tensor, matrix: th.Tensor, translate: bool = True) -> th.Tensor:

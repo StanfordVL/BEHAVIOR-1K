@@ -321,7 +321,6 @@ class ManipulationRobot(BaseRobot):
             set position relative to the object parent. scene frame set position relative to the scene.
         """
 
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
         # Store the original EEF poses.
         original_poses = {}
         for arm in self.arm_names:
@@ -1488,14 +1487,12 @@ class ManipulationRobot(BaseRobot):
         ag_params = self._ag_obj_constraint_params.copy()
         for arm in ag_params.keys():
             if len(ag_params[arm]) > 0:
-                if self.scene is None:
-                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
-                else:
-                    ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
-                        ag_params[arm]["contact_pos"], 
-                        th.tensor([0, 0, 0, 1], dtype=th.float32), 
-                        *self.scene.get_position_orientation()
-                    )
+                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+                ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
+                    ag_params[arm]["contact_pos"], 
+                    th.tensor([0, 0, 0, 1], dtype=th.float32), 
+                    *self.scene.get_position_orientation()
+                )
         state["ag_obj_constraint_params"] = ag_params
         return state
 
@@ -1518,14 +1515,12 @@ class ManipulationRobot(BaseRobot):
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 contact_pos_global = data["contact_pos"]
-                if self.scene is None:
-                    raise ValueError("Cannot transform position and orientation relative to scene without a scene")
-                else:
-                    contact_pos_global, _ = T.pose_transform(
-                        *self.scene.get_position_orientation(),
-                        contact_pos_global,
-                        th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    )
+                assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene"
+                contact_pos_global, _ = T.pose_transform(
+                    *self.scene.get_position_orientation(),
+                    contact_pos_global,
+                    th.tensor([0, 0, 0, 1], dtype=th.float32),
+                )
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
     def serialize(self, state):

@@ -31,7 +31,7 @@ class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
 #             return False
 
 #         robot_pos = robot.get_position_orientation()[0]
-#         object_pos = self.obj.get_position_position()[0]
+#         object_pos = self.obj.get_position_orientation()[0]
 #         return th.norm(object_pos - th.tensor(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
 
 

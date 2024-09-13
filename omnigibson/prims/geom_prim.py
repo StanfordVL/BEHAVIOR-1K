@@ -7,6 +7,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
 
@@ -128,7 +129,7 @@ class GeomPrim(XFormPrim):
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return th.tensor(self.prim.GetAttribute("points").Get(), dtype=th.float32)
+            return vtarray_to_torch(self.prim.GetAttribute("points").Get(), dtype=th.float32)
         else:
             # Return the vertices of the trimesh
             return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)

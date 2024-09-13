@@ -337,7 +337,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Load an initialize this sensor
                 sensor.load(self.scene)
                 sensor.initialize()
-                sensor.set_position_orientation(local_position, local_orientation, frame="scene")
+                sensor.set_position_orientation(position=local_position, orientation=local_orientation, frame="scene")
                 self._external_sensors[sensor.name] = sensor
                 self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 
@@ -827,7 +827,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_frequency": gm.DEFAULT_RENDERING_FREQ,
+                "action_frequency": gm.DEFAULT_SIM_STEP_FREQ,
                 "rendering_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
                 "device": None,

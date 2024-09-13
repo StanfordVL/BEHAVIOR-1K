@@ -109,7 +109,9 @@ class FrankaPanda(ManipulationRobot):
             self._finger_link_names = [f"link_{i}_0" for i in range(16)]
             self._finger_joint_names = [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]
             # position where the hand is parallel to the ground
-            self._default_robot_model_joint_pos = th.cat(([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], th.zeros(16)))
+            self._default_robot_model_joint_pos = th.cat(
+                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
+            )
             self._teleop_rotation_offset = th.tensor([0, 0.7071, 0, 0.7071])
             self._ag_start_points = [
                 GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
@@ -132,7 +134,9 @@ class FrankaPanda(ManipulationRobot):
                 f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]
             ]
             # position where the hand is parallel to the ground
-            self._default_robot_model_joint_pos = th.cat(([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], th.zeros(16)))
+            self._default_robot_model_joint_pos = th.cat(
+                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
+            )
             self._teleop_rotation_offset = th.tensor([-0.7071, 0.7071, 0, 0])
             self._ag_start_points = [
                 GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
@@ -152,7 +156,9 @@ class FrankaPanda(ManipulationRobot):
             self._finger_link_names = [f"link{i}" for i in hand_part_names]
             self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
             # position where the hand is parallel to the ground
-            self._default_robot_model_joint_pos = th.cat(([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], th.zeros(12)))
+            self._default_robot_model_joint_pos = th.cat(
+                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(12))
+            )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             # TODO: add ag support for inspire hand
             self._ag_start_points = [

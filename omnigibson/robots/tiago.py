@@ -680,12 +680,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if frame == "world" or frame == "scene":
             return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
         else:
+            breakpoint()
             # Get the position and orientation of the root_link in the world frame
             position, orientation = PoseAPI.get_position_orientation(self.prim_path, frame="parent")
             # Get the position and orientation of the base_footprint_link with respect to robot root__link
@@ -710,18 +709,14 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-
         assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         if position is None or orientation is None:
             current_position, current_orientation = self.get_position_orientation(frame=frame)
         position = current_position if position is None else position
         orientation = current_orientation if orientation is None else orientation
-
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
-
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if og.sim.is_playing() and self.initialized:
@@ -752,15 +747,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
             # convert the position and orientation to world frame
             if frame == "scene":
-                if self.scene is None:
-                    raise ValueError("Cannot set pose relative to scene without a scene.")
-                else:
-                    position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+                assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
+                position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
             elif frame == "parent":
-
                 # get the parent prim path
                 parent_prim_path = "/".join(self.prim_path.split("/")[:-1])
-                parent_position, parent_orientation = PoseAPI.get_position_orientation(parent_prim_path)
+                parent_position, parent_orientation = PoseAPI.get_world_pose(parent_prim_path)
 
                 # combine them to get the pose from root link to the world frame
                 position, orientation = T.pose_transform(parent_position, parent_orientation, position, orientation)

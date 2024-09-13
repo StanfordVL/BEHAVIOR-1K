@@ -123,7 +123,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float):float], (x,y,z) cartesian delta base position
         """
-        new_pos = th.tensor(delta) + self.get_position_orientation()
+        new_pos = th.tensor(delta) + self.get_position_orientation()[0]
         self.set_position_orientation(position=new_pos)
 
     def move_forward(self, delta=0.05):
@@ -169,7 +169,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): delta angle to rotate the base left
         """
-        quat = self.get_orientation_orientation()[1]
+        quat = self.get_position_orientation()[1]
         quat = quat_multiply((euler2quat(-delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
 
@@ -180,7 +180,7 @@ class LocomotionRobot(BaseRobot):
         Args:
             delta (float): angle to rotate the base right
         """
-        quat = self.get_orientation_orientatin()[1]
+        quat = self.get_position_orientation()[1]
         quat = quat_multiply((euler2quat(delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
 

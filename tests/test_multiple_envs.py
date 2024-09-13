@@ -42,7 +42,6 @@ def setup_multi_environment(num_of_envs, robot="Fetch", additional_objects_cfg=[
 
 
 def test_multi_scene_dump_load_states():
-
     vec_env = setup_multi_environment(3)
     robot_0 = vec_env.envs[0].scene.robots[0]
     robot_1 = vec_env.envs[1].scene.robots[0]
@@ -117,7 +116,6 @@ def test_multi_scene_get_local_position():
 
 
 def test_multi_scene_set_local_position():
-
     vec_env = setup_multi_environment(3)
 
     # Get the robot from the second environment
@@ -269,7 +267,6 @@ def test_multi_scene_position_orientation_relative_to_scene():
     og.clear()
 
 def test_tiago_getter():
-
     vec_env = setup_multi_environment(2, robot="Tiago")
     robot1 = vec_env.envs[0].scene.robots[0]
 
@@ -311,7 +308,7 @@ def test_tiago_setter():
     # Test setting position and orientation in world frame
     new_world_pos = th.tensor([1.0, 2.0, 0.5])
     new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
-    robot.set_position_orientation(new_world_pos, new_world_ori)
+    robot.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
     
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
@@ -320,7 +317,7 @@ def test_tiago_setter():
     # Test setting position and orientation in scene frame
     new_scene_pos = th.tensor([0.5, 1.0, 0.25])
     new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
-    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    robot.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
     
     got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
     assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
@@ -329,7 +326,7 @@ def test_tiago_setter():
     # Test setting position and orientation in parent frame
     new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
     new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
-    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    robot.set_position_orientation(position=new_parent_pos, orientation=new_parent_ori, frame="parent")
     
     got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
     assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
@@ -353,7 +350,7 @@ def test_tiago_setter():
     # Test setting position and orientation in world frame
     new_world_pos = th.tensor([1.0, 2.0, 0.5])
     new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
-    robot.set_position_orientation(new_world_pos, new_world_ori)
+    robot.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
     
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
@@ -362,7 +359,7 @@ def test_tiago_setter():
     # Test setting position and orientation in scene frame
     new_scene_pos = th.tensor([0.5, 1.0, 0.25])
     new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
-    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    robot.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
     
     got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
     assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
@@ -371,7 +368,7 @@ def test_tiago_setter():
     # Test setting position and orientation in parent frame
     new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
     new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
-    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    robot.set_position_orientation(position=new_parent_pos, orientation=new_parent_ori, frame="parent")
     
     got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
     assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
@@ -385,7 +382,6 @@ def test_tiago_setter():
     og.clear()
 
 def test_behavior_getter():
-
     vec_env = setup_multi_environment(2, robot="BehaviorRobot")
     robot1 = vec_env.envs[0].scene.robots[0]
 
@@ -427,7 +423,7 @@ def test_behavior_setter():
     new_world_pos = th.tensor([1.0, 2.0, 0.5])
     new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
 
-    robot.set_position_orientation(new_world_pos, new_world_ori)
+    robot.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
     
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
@@ -436,7 +432,7 @@ def test_behavior_setter():
     # Test setting position and orientation in scene frame
     new_scene_pos = th.tensor([0.5, 1.0, 0.25])
     new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
-    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    robot.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
     
     got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
     assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
@@ -445,7 +441,7 @@ def test_behavior_setter():
     # Test setting position and orientation in parent frame
     new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
     new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
-    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    robot.set_position_orientation(position=new_parent_pos, orientation=new_parent_ori, frame="parent")
     
     got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
     assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
@@ -469,7 +465,7 @@ def test_behavior_setter():
     # Test setting position and orientation in world frame
     new_world_pos = th.tensor([1.0, 2.0, 0.5])
     new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi/2]))
-    robot.set_position_orientation(new_world_pos, new_world_ori)
+    robot.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
     
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
@@ -478,7 +474,7 @@ def test_behavior_setter():
     # Test setting position and orientation in scene frame
     new_scene_pos = th.tensor([0.5, 1.0, 0.25])
     new_scene_ori = T.euler2quat(th.tensor([0, th.pi/4, 0]))
-    robot.set_position_orientation(new_scene_pos, new_scene_ori, frame="scene")
+    robot.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
     
     got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
     assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
@@ -487,7 +483,7 @@ def test_behavior_setter():
     # Test setting position and orientation in parent frame
     new_parent_pos = th.tensor([-1.0, -2.0, 0.1])
     new_parent_ori = T.euler2quat(th.tensor([th.pi/6, 0, 0]))
-    robot.set_position_orientation(new_parent_pos, new_parent_ori, frame="parent")
+    robot.set_position_orientation(position=new_parent_pos, orientation=new_parent_ori, frame="parent")
     
     got_parent_pos, got_parent_ori = robot.get_position_orientation(frame="parent")
     assert th.allclose(got_parent_pos, new_parent_pos, atol=1e-3)
@@ -497,4 +493,7 @@ def test_behavior_setter():
     got_world_pos, got_world_ori = robot.get_position_orientation()
     assert not th.allclose(got_world_pos, new_world_pos, atol=1e-3)
     assert not th.allclose(got_world_ori, new_world_ori, atol=1e-3)
+
+if __name__ == "__main__":
+    test_tiago_getter()
 

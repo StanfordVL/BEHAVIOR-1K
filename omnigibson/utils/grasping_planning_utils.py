@@ -333,7 +333,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         link_name=link_name, visual=False
     )
 
-    bbox_quat_in_world = link.get_orientation_orientation()[1]
+    bbox_quat_in_world = link.get_position_orientation()[1]
     bbox_extent_in_link_frame = th.tensor(
         target_obj.native_link_bboxes[link_name]["collision"]["axis_aligned"]["extent"]
     )

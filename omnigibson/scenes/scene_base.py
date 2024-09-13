@@ -298,8 +298,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         The elements to load may include: floor, building, objects, etc.
         """
         # There's nothing to load for the base scene. Subclasses can implement this method.
-        # We simply check that the simulator has a floor plane.
-        assert og.sim.floor_plane, "Simulator must have a floor plane if using an empty Scene!"
+        # Do nothing here
+        pass
 
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")
@@ -700,7 +700,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             position (th.Tensor): (3,) position of the scene
             orientation (th.Tensor): (4,) orientation of the scene
         """
-        self._scene_prim.set_position_orientation(position, orientation)
+        self._scene_prim.set_position_orientation(position=position, orientation=orientation)
         # Update the cached pose and inverse pose
         self._pose = T.pose2mat(self.get_position_orientation())
         assert self._pose is not None

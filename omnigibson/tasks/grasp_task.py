@@ -59,7 +59,7 @@ class GraspTask(BaseTask):
 
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj.set_position_orientation(obj_pos, obj_orn, frame="scene")
+            obj.set_position_orientation(position=obj_pos, orientation=obj_orn, frame="scene")
 
     def _create_termination_conditions(self):
         terminations = dict()
@@ -89,7 +89,7 @@ class GraspTask(BaseTask):
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
-            robot.set_position_orientation(robot_pos, robot_orn, frame="scene")
+            robot.set_position_orientation(position=robot_pos, orientation=robot_orn, frame="scene")
 
         # Otherwise, reset using the primitive controller.
         else:
@@ -163,7 +163,7 @@ class GraspTask(BaseTask):
             # Set object pose
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj.set_position_orientation(obj_pos, obj_orn, frame="scene")
+            obj.set_position_orientation(position=obj_pos, orientation=obj_orn, frame="scene")
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):

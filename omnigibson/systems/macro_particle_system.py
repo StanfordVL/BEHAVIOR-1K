@@ -913,7 +913,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = T.mat2pose(mat)
         local_pos = local_pos if ignore_scale else local_pos / scale
-        particle.set_position_orientation(local_pos, local_quat, frame="parent")
+        particle.set_position_orientation(position=local_pos, orientation=local_quat, frame="parent")
 
         # Store updated value
         self._particles_local_mat[name] = mat
