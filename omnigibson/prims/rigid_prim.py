@@ -315,9 +315,7 @@ class RigidPrim(XFormPrim):
         """
         return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
 
-    def set_position_orientation(
-        self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"
-    ):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
         Set the position and orientation of XForm Prim.
 
