@@ -1037,7 +1037,7 @@ class EntityPrim(XFormPrim):
 
             # perform the transformation only if the frame is scene and the requirements are met
             if frame == "scene":
-                position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
             # convert to format expected by articulation view
             position = th.asarray(position)[None, :]
@@ -1082,7 +1082,7 @@ class EntityPrim(XFormPrim):
         # If we are in a scene, compute the scene-local transform
         if frame == "scene":
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
+            position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
 
         return position, orientation
 

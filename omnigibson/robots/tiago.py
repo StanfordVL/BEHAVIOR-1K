@@ -748,7 +748,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # convert the position and orientation to world frame
             if frame == "scene":
                 assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene."
-                position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
             elif frame == "parent":
                 # get the parent prim path
                 parent_prim_path = "/".join(self.prim_path.split("/")[:-1])

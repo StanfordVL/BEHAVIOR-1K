@@ -763,6 +763,36 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self._pose_inv
 
+    def convert_world_pose_to_scene_relative(self, position, orientation):
+        """
+        Convert a world pose to a scene-relative pose.
+
+        Args:
+            position (th.Tensor): (3,) position in world frame
+            orientation (th.Tensor): (4,) orientation in world frame
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (3,) position in scene frame
+                - th.Tensor: (4,) orientation in scene frame
+        """
+        return T.mat2pose(self.pose_inv @ T.pose2mat((position, orientation)))
+
+    def convert_scene_relative_pose_to_world(self, position, orientation):
+        """
+        Convert a scene-relative pose to a world pose.
+
+        Args:
+            position (th.Tensor): (3,) position in scene frame
+            orientation (th.Tensor): (4,) orientation in scene frame
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (3,) position in world frame
+                - th.Tensor: (4,) orientation in world frame
+        """
+        return T.mat2pose(self.pose @ T.pose2mat((position, orientation)))
+
     def is_system_active(self, system_name):
         return self.get_system(system_name, force_init=False).initialized
 

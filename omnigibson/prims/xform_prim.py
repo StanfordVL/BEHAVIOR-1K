@@ -194,7 +194,7 @@ class XFormPrim(BasePrim):
         # perform the transformation only if the frame is scene and the requirements are met
         if frame == "scene":
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-            position, orientation = T.mat2pose(self.scene.pose @ T.pose2mat((position, orientation)))
+            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
@@ -269,7 +269,7 @@ class XFormPrim(BasePrim):
             # for legacy compatibility)
             if frame == "scene":
                 assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-                position, orientation = T.mat2pose(self.scene.pose_inv @ T.pose2mat((position, orientation)))
+                position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
             return position, orientation
         else:
             position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
