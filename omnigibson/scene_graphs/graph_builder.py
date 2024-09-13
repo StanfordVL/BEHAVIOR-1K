@@ -2,9 +2,9 @@ import itertools
 
 import networkx as nx
 import torch as th
+import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
-from torchvision.transforms import ToPILImage, ToTensor
 
 from omnigibson import object_states
 from omnigibson.object_states.factory import get_state_name
@@ -289,14 +289,10 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
 
-    pil_transform = ToPILImage()
-    torch_transform = ToTensor()
-
-    # check imgheight and imgwidth; if they are too small, we need to upsample the image to 1280x1280
+    # check imgheight and imgwidth; if they are too small, we need to upsample the image to 640x640
     if imgheight < 640 or imgwidth < 640:
-        robot_view = torch_transform(
-            pil_transform((robot_view.permute(2, 0, 1).cpu())).resize((640, 640), Image.BILINEAR)
-        ).permute(1, 2, 0)
+        # Convert to PIL Image to upsample, then write back to tensor
+        robot_view = th.tensor(np.array(Image.fromarray(robot_view.cpu().numpy()).resize((640, 640), Image.BILINEAR)), dtype=th.uint8)
         imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
