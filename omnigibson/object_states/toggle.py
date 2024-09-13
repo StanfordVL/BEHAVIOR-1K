@@ -8,6 +8,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState, Bool
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh
 
@@ -114,7 +115,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         else:
             # Infer radius from mesh if not specified as an input
             lazy.omni.isaac.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
-            self.scale = th.tensor(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
+            self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
         relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)

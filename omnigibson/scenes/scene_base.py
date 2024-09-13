@@ -298,8 +298,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         The elements to load may include: floor, building, objects, etc.
         """
         # There's nothing to load for the base scene. Subclasses can implement this method.
-        # We simply check that the simulator has a floor plane.
-        assert og.sim.floor_plane, "Simulator must have a floor plane if using an empty Scene!"
+        # Do nothing here
+        pass
 
     def _load_systems(self):
         system_dir = os.path.join(gm.DATASET_PATH, "systems")

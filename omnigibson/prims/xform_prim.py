@@ -76,9 +76,9 @@ class XFormPrim(BasePrim):
             material.add_user(self)
             self._material = material
 
-        # Optionally set the scale and visibility
+        # Optionally set the scale, which is specified with respect to the original scale
         if "scale" in self._load_config and self._load_config["scale"] is not None:
-            self.scale = self._load_config["scale"]
+            self.scale = self._load_config["scale"] * self.original_scale
 
     def remove(self):
         # Remove the material prim if one exists
@@ -196,6 +196,8 @@ class XFormPrim(BasePrim):
         parent_world_transform = PoseAPI.get_world_pose_with_scale(parent_path)
 
         local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ my_world_transform
+        # unscale local transform's rotation
+        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
         assert th.allclose(
             product, th.diag(th.diag(product)), atol=1e-3

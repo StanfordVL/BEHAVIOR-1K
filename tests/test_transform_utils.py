@@ -86,14 +86,14 @@ class TestQuaternionOperations:
             our_mat = quat2mat(q)
             assert_close(our_mat, th.from_numpy(scipy_mat.astype(NumpyTypes.FLOAT32)))
 
-    def test_quat_mul(self):
+    def test_quat_multiply(self):
         for i in range(0, len(RANDOM_QUATERNIONS), 2):
             q1, q2 = RANDOM_QUATERNIONS[i], RANDOM_QUATERNIONS[i + 1]
             q1_scipy = q1.cpu().numpy()
             q2_scipy = q2.cpu().numpy()
             scipy_result = R.from_quat(q1_scipy) * R.from_quat(q2_scipy)
             scipy_quat = scipy_result.as_quat()
-            our_quat = quat_mul(q1, q2)
+            our_quat = quat_multiply(q1, q2)
             assert quaternions_close(our_quat, th.from_numpy(scipy_quat.astype(NumpyTypes.FLOAT32)))
 
     def test_quat_conjugate(self):
@@ -108,14 +108,14 @@ class TestQuaternionOperations:
             scipy_inv = R.from_quat(q.cpu().numpy()).inv().as_quat().astype(NumpyTypes.FLOAT32)
             our_inv = quat_inverse(q)
             assert quaternions_close(our_inv, th.from_numpy(scipy_inv))
-            q_identity = quat_mul(q, our_inv)
+            q_identity = quat_multiply(q, our_inv)
             assert quaternions_close(q_identity, th.tensor([0.0, 0.0, 0.0, 1.0]))
 
     def test_quat_distance(self):
         for i in range(0, len(RANDOM_QUATERNIONS), 2):
             q1, q2 = RANDOM_QUATERNIONS[i], RANDOM_QUATERNIONS[i + 1]
-            dist = quat_distance(q1, q2)
-            assert quaternions_close(quat_mul(dist, q2), q1)
+            dist = quat_distance(q2, q1)
+            assert quaternions_close(quat_multiply(dist, q1), q2)
 
 
 class TestVectorOperations:
