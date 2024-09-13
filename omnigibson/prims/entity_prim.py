@@ -1000,7 +1000,7 @@ class EntityPrim(XFormPrim):
         return T.quat2mat(self.get_position_orientation()[1]).T @ self.get_angular_velocity()
 
     def set_position_orientation(
-        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+        self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"
     ):
         """
         Set the position and orientation of entry prim object.
@@ -1008,54 +1008,58 @@ class EntityPrim(XFormPrim):
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world.
+                scene frame sets position relative to the scene.
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
         # If kinematic only, clear cache for the root link
         if self.kinematic_only:
             self.root_link.clear_kinematic_only_cache()
+
         # If the simulation isn't running, we should set this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
-            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-        # Delegate to RigidPrim if we are not articulated
-        elif self._articulation_view is None:
-            self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
-        # Sim is running and articulation view exists, so use that physx API backend
-        else:
-            # if no position or no orientation are given, get the current position and orientation of the object
-            if position is None or orientation is None:
-                current_position, current_orientation = self.get_position_orientation(frame=frame)
-            position = current_position if position is None else position
-            orientation = current_orientation if orientation is None else orientation
+            return XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
 
-            position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
-            orientation = (
-                orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
-            )
+        # Otherwise, we need to set our pose through PhysX.
+        # If we are not articulated, we can use the RigidPrim API.
+        if self._articulation_view is None:
+            return self.root_link.set_position_orientation(position=position, orientation=orientation, frame=frame)
 
-            # perform the transformation only if the frame is scene and the requirements are met
-            if frame == "scene":
-                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
+        # Otherwise, we use the articulation view.
+        # If no position or no orientation are given, get the current position and orientation of the object
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
 
-            # convert to format expected by articulation view
-            position = th.asarray(position)[None, :]
-            orientation = th.asarray(orientation)[None, [3, 0, 1, 2]]
-            if frame == "world" or frame == "scene":
-                self._articulation_view.set_world_poses(position, orientation)
-            else:
-                self._articulation_view.set_local_poses(position, orientation)
+        # Convert to th.Tensor if necessary
+        position = th.as_tensor(position)
+        orientation = th.as_tensor(orientation)
 
-            PoseAPI.invalidate()
+        # Convert to from scene-relative to world if necessary
+        if frame == "scene":
+            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
-    def get_position_orientation(self, frame: Literal["world", "scene", "parent"] = "world", clone=True):
+        # Assert validity of the orientation
+        assert math.isclose(
+            th.norm(orientation).item(), 1, abs_tol=1e-3
+        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+
+        # Actually set the pose.
+        self._articulation_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
+
+        # Invalidate the pose cache.
+        PoseAPI.invalidate()
+
+    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
+            frame (Literal): frame to get the pose with respect to. Default to world.
+                scene frame get position relative to the scene.
             clone (bool): Whether to clone the underlying tensor buffer or not
 
         Returns:
@@ -1063,23 +1067,27 @@ class EntityPrim(XFormPrim):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
+        
         # Delegate to RigidPrim if we are not articulated
-        elif self._articulation_view is None:
+        if self._articulation_view is None:
             return self.root_link.get_position_orientation(frame=frame, clone=clone)
-        # Sim is running and articulation view exists, so use that physx API backend
-        else:
-            if frame == "world" or frame == "scene":
-                positions, orientations = self._articulation_view.get_world_poses(clone=clone)
-            else:
-                positions, orientations = self._articulation_view.get_local_poses()
 
-        position, orientation = positions[0], orientations[0][[1, 2, 3, 0]]
-        # If we are in a scene, compute the scene-local transform
+        # Otherwise, get the pose from the articulation view and convert to our format
+        positions, orientations = self._articulation_view.get_world_poses(clone=clone)
+        position = positions[0]
+        orientation = orientations[0][[1, 2, 3, 0]]
+
+        # Assert that the orientation is a unit quaternion
+        assert math.isclose(
+            th.norm(orientations).item(), 1, abs_tol=1e-3
+        ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
+
+        # If requested, compute the scene-local transform
         if frame == "scene":
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
