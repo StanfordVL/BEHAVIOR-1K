@@ -999,9 +999,7 @@ class EntityPrim(XFormPrim):
         """
         return T.quat2mat(self.get_position_orientation()[1]).T @ self.get_angular_velocity()
 
-    def set_position_orientation(
-        self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"
-    ):
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
         Set the position and orientation of entry prim object.
 
@@ -1048,7 +1046,9 @@ class EntityPrim(XFormPrim):
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         # Actually set the pose.
-        self._articulation_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
+        self._articulation_view.set_world_poses(
+            positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
+        )
 
         # Invalidate the pose cache.
         PoseAPI.invalidate()
@@ -1072,7 +1072,7 @@ class EntityPrim(XFormPrim):
         # If the simulation isn't running, we should read from this prim's XForm (object-level) properties directly
         if og.sim.is_stopped():
             return XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
-        
+
         # Delegate to RigidPrim if we are not articulated
         if self._articulation_view is None:
             return self.root_link.get_position_orientation(frame=frame, clone=clone)
