@@ -5,7 +5,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Literal, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import torch as th
 

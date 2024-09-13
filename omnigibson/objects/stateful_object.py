@@ -616,8 +616,6 @@ class StatefulObject(BaseObject):
             frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
             set position relative to the object parent. scene frame set position relative to the scene.
         """
-        assert frame in ["world", "parent", "scene"], f"Invalid frame '{frame}'. Must be 'world', 'parent', or 'scene'."
-
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
         self.clear_states_cache()
 
