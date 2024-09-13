@@ -1272,6 +1272,7 @@ class ManipulationRobot(BaseRobot):
             "max_force": max_force,
             "contact_pos": contact_pos,
         }
+        # breakpoint()
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
         for joint in self.finger_joints[arm]:

@@ -8,7 +8,6 @@ grasping_mode: sticky
 rigid_trunk: false
 default_trunk_offset: 0.15
 default_arm_pose: vertical
-default_reset_mode: tuck
 sensor_config:
   VisionSensor:
     sensor_kwargs:

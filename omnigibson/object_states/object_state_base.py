@@ -318,9 +318,9 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         # Compile args and kwargs deterministically
         key = (*args, *tuple(kwargs.values()))
         # We need to see if we need to update our cache -- we do so if and only if one of the following conditions are met:
-        # (a) key is NOT in the cache
+        # (a) key is NOT in the cache and key is NOT none
         # (b) Our cache is not valid
-        if key not in self._cache or not self.cache_is_valid(get_value_args=key):
+        if (key not in self._cache) or not self.cache_is_valid(get_value_args=key):
             # Update the cache
             self.update_cache(get_value_args=key)
 

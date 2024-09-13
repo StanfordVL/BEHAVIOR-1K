@@ -16,7 +16,7 @@ def load_robot_config(robot_name):
     with open(config_filename, "r") as file:
         return yaml.safe_load(file)
 
-def start_env(enable_transition_rule=False, use_gpu_dynamics=True, robot_type="Fetch"):
+def start_env(robot_type="Fetch"):
     if og.sim:
         og.sim.stop()
 
@@ -65,9 +65,8 @@ def start_env(enable_transition_rule=False, use_gpu_dynamics=True, robot_type="F
             },
         ],
     }
-
-    gm.USE_GPU_DYNAMICS = use_gpu_dynamics
-    gm.ENABLE_TRANSITION_RULES = enable_transition_rule
+    gm.USE_GPU_DYNAMICS = True
+    gm.ENABLE_TRANSITION_RULES = True
     env = og.Environment(configs=config)
 
     return env
@@ -82,13 +81,6 @@ def env(shared_env):
     """Reset the environment before each test function."""
     shared_env.scene.reset()
     return shared_env
-
-@pytest.fixture(scope="function")
-def env_with_transition_rules():
-    """Create an environment with transition rules enabled for each test function."""
-    env = start_env(enable_transition_rule=True, use_gpu_dynamics=False)
-    yield env
-    env.scene.reset()
 
 @pytest.fixture
 def robot(env):
@@ -258,19 +250,6 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert not countertop.states[object_states.Covered].get_value(mud_system)
 
-    def test_cut(self, env_with_transition_rules, prim_gen, apple, knife, countertop):
-        # assert not apple.states[object_states.Cut].get_value(knife)
-        # start a new environment to enable transition rules
-        print("Grasping knife")
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
-            env_with_transition_rules.step(action)
-        print("Cutting apple")
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
-            env_with_transition_rules.step(action)
-        print("Putting knife back on countertop")
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
-            env_with_transition_rules.step(action)
-
     def test_persistent_sticky_grasping(self, env, robot, prim_gen, apple):
         assert not robot.states[object_states.IsGrasping].get_value(apple)
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
@@ -287,6 +266,22 @@ class TestSymbolicPrimitives:
 
         assert robot.states[object_states.IsGrasping].get_value(apple)
 
+    def test_cut(self, env, prim_gen, apple, knife, countertop):
+        # assert not apple.states[object_states.Cut].get_value(knife)
+        # start a new environment to enable transition rules
+        print("Grasping knife")
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
+            env.step(action)
+        print("Cutting apple")
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
+            env.step(action)
+        print("Putting knife back on countertop")
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
+            env.step(action)
+
+    # def test_soak_inside():
+    #    pass
+
     # def test_place_near_heating_element():
     #    pass
 
@@ -299,19 +294,20 @@ class TestSymbolicPrimitives:
 
 def main():
     test = TestSymbolicPrimitives()
-    env = start_env(enable_transition_rule=True)
+    env = start_env()
     prim_gen = SymbolicSemanticActionPrimitives(env)
     apple = next(iter(env.scene.object_registry("category", "apple")))
     sponge = next(iter(env.scene.object_registry("category", "sponge")))
     knife = next(iter(env.scene.object_registry("category", "carving_knife")))
     sink = next(iter(env.scene.object_registry("category", "sink")))
     fridge = next(iter(env.scene.object_registry("category", "fridge")))
+    stove = next(iter(env.scene.object_registry("category", "stove")))
+    pan = next(iter(env.scene.object_registry("category", "frying_pan")))
     robot = env.robots[0]
     countertop = next(iter(env.scene.object_registry("category", "countertop")))
 
     try:
-        test.test_open(env, prim_gen, fridge)
-        test.test_close(env, prim_gen, fridge)
+        test.test_place_ontop(env, prim_gen, apple, pan)
     except:
         raise
 
