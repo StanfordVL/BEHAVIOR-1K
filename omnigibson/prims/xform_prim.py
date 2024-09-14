@@ -196,8 +196,8 @@ class XFormPrim(BasePrim):
         orientation = current_orientation if orientation is None else orientation
 
         # Convert to th.Tensor if necessary
-        position = th.as_tensor(position)
-        orientation = th.as_tensor(orientation)
+        position = th.as_tensor(position, dtype=th.float32)
+        orientation = th.as_tensor(orientation, dtype=th.float32)
 
         # Convert to from scene-relative to world if necessary
         if frame == "scene":
