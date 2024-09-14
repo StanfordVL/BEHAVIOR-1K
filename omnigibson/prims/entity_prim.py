@@ -1,9 +1,9 @@
+import math
 from functools import cached_property
 from typing import Literal
 
 import networkx as nx
 import torch as th
-import math
 
 import omnigibson as og
 import omnigibson.lazy as lazy
