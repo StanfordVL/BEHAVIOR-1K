@@ -1,5 +1,5 @@
-import torch as th
 import pytest
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -375,6 +375,7 @@ def test_tiago_setter():
 
     og.clear()
 
+
 @pytest.mark.skip("Behavior getter is currently broken")
 def test_behavior_getter():
     vec_env = setup_multi_environment(2, robot="BehaviorRobot")
@@ -404,6 +405,7 @@ def test_behavior_getter():
 
     # Clean up
     og.clear()
+
 
 @pytest.mark.skip("Behavior setter is currently broken")
 def test_behavior_setter():
