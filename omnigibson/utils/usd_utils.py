@@ -788,7 +788,7 @@ class PoseAPI:
     def convert_world_pose_to_local(cls, prim, position, orientation):
         """Converts a world pose to a local pose under a prim's parent."""
         world_transform = T.pose2mat((position, orientation))
-        parent_prim = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_path = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
         parent_world_transform = cls.get_world_pose_with_scale(parent_path)
 
         local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform

@@ -15,7 +15,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import PoseAPI
 
 # Create module logger
-log = create_module_logger(module_name=__name__)
+logger = create_module_logger(module_name=__name__)
 
 
 class XFormPrim(BasePrim):
