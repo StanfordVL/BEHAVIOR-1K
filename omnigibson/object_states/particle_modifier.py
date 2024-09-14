@@ -419,9 +419,10 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 else self._projection_mesh_params["extents"][2] / 2
             )
 
-            self.projection_mesh.set_local_pose(
+            self.projection_mesh.set_position_orientation(
                 position=th.tensor([0, 0, -z_offset]),
                 orientation=T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32)),
+                frame="parent",
             )
 
             # Generate the function for checking whether points are within the projection mesh
@@ -514,7 +515,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             cond = (
                 lambda obj: (
                     th.dot(
-                        T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ th.tensor([0, 0, 1]),
+                        T.quat2mat(obj.states[self.__class__].link.get_position_orientation()[1])
+                        @ th.tensor([0, 0, 1]),
                         th.tensor([0, 0, 1]),
                     )
                     > 0
@@ -1081,14 +1083,14 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_local_pose(
-                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32))
+            self.projection_source_sphere.set_position_orientation(
+                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32)), frame="parent"
             )
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
             # metalink, and (b) zero relative orientation between the metalink and the projection mesh
-            local_pos, local_quat = self.projection_mesh.get_local_pose()
+            local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
             assert th.all(
                 th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
             ), "Projection mesh tip should align with metalink position!"
@@ -1441,7 +1443,7 @@ class ParticleApplier(ParticleModifier):
         lower_upper = th.cat([lower, upper], dim=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
-        pos = self.link.get_position()
+        pos = self.link.get_position_orientation()[0]
         start_points = th.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = th.rand(n_samples, 3) * (upper - lower) + lower
         sides, axes = th.randint(2, size=(n_samples,)), th.randint(3, size=(n_samples,))

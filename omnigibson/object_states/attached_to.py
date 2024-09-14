@@ -224,10 +224,12 @@ class AttachedTo(
                 if other.states[AttachedTo].children[parent_link_name] is None:
                     if bypass_alignment_checking:
                         return child_link, parent_link
-                    pos_diff = th.norm(child_link.get_position() - parent_link.get_position())
-                    orn_diff = T.get_orientation_diff_in_radian(
-                        child_link.get_orientation(), parent_link.get_orientation()
-                    )
+
+                    child_pos, child_orn = child_link.get_position_orientation()
+                    parent_pos, parent_orn = parent_link.get_position_orientation()
+                    pos_diff = th.norm(child_pos - parent_pos)
+                    orn_diff = T.get_orientation_diff_in_radian(child_orn, parent_orn)
+
                     if pos_diff < pos_thresh and orn_diff < orn_thresh:
                         return child_link, parent_link
 
@@ -301,7 +303,7 @@ class AttachedTo(
             new_child_root_quat = child_root_quat
 
         # Actually move the object and also keep it still for stability purposes.
-        self.obj.set_position_orientation(new_child_root_pos, new_child_root_quat)
+        self.obj.set_position_orientation(position=new_child_root_pos, orientation=new_child_root_quat)
         self.obj.keep_still()
         other.keep_still()
 

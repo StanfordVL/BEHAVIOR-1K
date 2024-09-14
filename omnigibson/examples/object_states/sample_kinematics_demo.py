@@ -128,8 +128,8 @@ def sample_microwave_plates_apples(env):
     og.log.info("Placing cabinet on the floor...")
     cabinet.set_orientation([0, 0, 0, 1.0])
     env.step(th.empty(0))
-    offset = cabinet.get_position()[2] - cabinet.aabb_center[2]
-    cabinet.set_position(th.tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
+    offset = cabinet.get_position_orientation()[0][2] - cabinet.aabb_center[2]
+    cabinet.set_position_orientation(position=th.tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
     env.step(th.empty(0))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
@@ -172,8 +172,8 @@ def sample_boxes_on_shelf(env):
     og.log.info("Placing shelf on the floor...")
     shelf.set_orientation([0, 0, 0, 1.0])
     env.step(th.empty(0))
-    offset = shelf.get_position()[2] - shelf.aabb_center[2]
-    shelf.set_position(th.tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
+    offset = shelf.get_position_orientation()[0][2] - shelf.aabb_center[2]
+    shelf.set_position_orientation(position=th.tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
     env.step(th.empty(0))  # One step is needed for the object to be fully initialized
 
     og.log.info("Shelf placed.")

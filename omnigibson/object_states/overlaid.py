@@ -62,10 +62,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         # Compute the base aligned bounding box of the rigid object.
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
         vertices_local = th.tensor(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
-        vertices = th.tensor(
-            T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn))),
-            dtype=th.float32,
-        )
+        vertices = T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn)))
         rigid_hull = ConvexHull(vertices[:, :2])
 
         # The goal is to find the intersection of the convex hull and the bounding box.

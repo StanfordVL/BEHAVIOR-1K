@@ -140,7 +140,7 @@ def sample_kinematics(
         # Position needs to be set to be very far away because the object's
         # original position might be blocking rays (use_ray_casting_method=True)
         old_pos = th.tensor([100, 100, 10])
-        objA.set_position_orientation(old_pos, orientation)
+        objA.set_position_orientation(position=old_pos, orientation=orientation)
         objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
         og.sim.step_physics()
@@ -186,7 +186,7 @@ def sample_kinematics(
             success = False
         else:
             pos[2] += z_offset
-            objA.set_position_orientation(pos, orientation)
+            objA.set_position_orientation(position=pos, orientation=orientation)
             objA.keep_still()
 
             og.sim.step_physics()
@@ -208,14 +208,14 @@ def sample_kinematics(
         # until it settles
         aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
         aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-        bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
+        bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
         desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
         desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
         pos = desired_bbox_pos + bbox_to_obj
         success = True
 
     if success and not skip_falling:
-        objA.set_position_orientation(pos, orientation)
+        objA.set_position_orientation(position=pos, orientation=orientation)
         objA.keep_still()
 
         # Step until either (a) max steps is reached (total of 0.5 second in sim time) or (b) contact is made, then
@@ -294,7 +294,7 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
         z_lo, z_hi = 0, math.pi * 2
         orn = T.euler2quat(th.tensor([0.0, 0.0, (th.rand(1) * (z_hi - z_lo) + z_lo).item()]))
 
-        obj.set_position_orientation(pos, orn)
+        obj.set_position_orientation(position=pos, orientation=orn)
         obj.root_link.reset()
         obj.keep_still()
 

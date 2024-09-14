@@ -91,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     knife.keep_still()
     knife.set_position_orientation(
-        position=apple.get_position() + th.tensor([-0.15, 0.0, 0.2]),
+        position=apple.get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.2]),
         orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0])),
     )
 
