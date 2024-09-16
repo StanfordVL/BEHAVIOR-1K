@@ -1,7 +1,6 @@
 import itertools
 
 import networkx as nx
-import numpy as np
 import torch as th
 from matplotlib import pyplot as plt
 from PIL import Image
@@ -12,6 +11,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState, Bool
 from omnigibson.robots import BaseRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils import transform_utils as T
+from omnigibson.utils.numpy_utils import pil_to_tensor
 
 
 def _formatted_aabb(obj):
@@ -292,9 +292,7 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     # check imgheight and imgwidth; if they are too small, we need to upsample the image to 640x640
     if imgheight < 640 or imgwidth < 640:
         # Convert to PIL Image to upsample, then write back to tensor
-        robot_view = th.tensor(
-            np.array(Image.fromarray(robot_view.cpu().numpy()).resize((640, 640), Image.BILINEAR)), dtype=th.uint8
-        )
+        robot_view = pil_to_tensor(Image.fromarray(robot_view.cpu().numpy()).resize((640, 640), Image.BILINEAR))
         imgheight, imgwidth, _ = robot_view.shape
 
     figheight = 4.8
