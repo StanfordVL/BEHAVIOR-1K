@@ -3,8 +3,8 @@ from collections import namedtuple
 import networkx as nx
 
 from omnigibson.object_states import *
-from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 
 # states: list of ObjectBaseState
 # requirements: list of ObjectBaseRequirement

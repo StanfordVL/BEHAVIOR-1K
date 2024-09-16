@@ -1,11 +1,13 @@
-import torch as th        # MUST come before importing omni!!!
+from collections.abc import Iterable
+
+import torch as th  # MUST come before importing omni!!!
+
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.utils.control_utils import FKSolver
-from collections.abc import Iterable
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
 th.backends.cudnn.benchmark = True
@@ -38,7 +40,7 @@ def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
     usd_help.stage = og.sim.stage
     world_cfg = lazy.curobo.geom.sdf.world.WorldCollisionConfig.load_from_dict(
         dict(
-            cache={'obb': 10, 'mesh': cache_size},
+            cache={"obb": 10, "mesh": cache_size},
             n_envs=1,
             checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
             max_distance=max_distance,
@@ -84,10 +86,10 @@ def get_obstacles(
 
 
 def get_obstacles_sphere_representation(
-        obstacles,
-        tensor_args,
-        n_spheres=20,
-        sphere_radius=0.001,
+    obstacles,
+    tensor_args,
+    n_spheres=20,
+    sphere_radius=0.001,
 ):
     """
     Gest the collision sphere representation of obstacles @obstacles
@@ -114,7 +116,9 @@ def get_obstacles_sphere_representation(
         sph = obs.get_bounding_spheres(
             n_sph,
             sph_radius,
-            pre_transform_pose=lazy.curobo.types.math.Pose(position=th.zeros(3), quaternion=th.tensor([1.0, 0, 0, 0])).to(tensor_args),
+            pre_transform_pose=lazy.curobo.types.math.Pose(
+                position=th.zeros(3), quaternion=th.tensor([1.0, 0, 0, 0])
+            ).to(tensor_args),
             tensor_args=tensor_args,
             fit_type=lazy.curobo.geom.sphere_fit.SphereFitType.VOXEL_VOLUME_SAMPLE_SURFACE,
             voxelize_method="ray",
@@ -128,6 +132,7 @@ class CuRoboMotionGenerator:
     """
     Class for motion generator using CuRobo backend
     """
+
     def __init__(
         self,
         robot,
@@ -230,23 +235,23 @@ class CuRoboMotionGenerator:
         obstacles = self._usd_help.get_obstacles_from_stage(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
-                self.robot.prim_path,                   # Don't include robot paths
-                "/curobo",                              # Don't include curobo prim
-                "visual",                               # Don't include any visuals
-                *GROUND_PREFIXES,                       # Don't include collisions with any ground-related objects
-                *METALINK_PREFIXES,                     # Don't include any metalinks
-                *ignore_scenes,                         # Don't include any scenes the robot is not in
-                *ignore_visual_only,                    # Don't include any visual-only objects
-                *ignore_paths,                          # Don't include any additional specified paths
+                self.robot.prim_path,  # Don't include robot paths
+                "/curobo",  # Don't include curobo prim
+                "visual",  # Don't include any visuals
+                *GROUND_PREFIXES,  # Don't include collisions with any ground-related objects
+                *METALINK_PREFIXES,  # Don't include any metalinks
+                *ignore_scenes,  # Don't include any scenes the robot is not in
+                *ignore_visual_only,  # Don't include any visual-only objects
+                *ignore_paths,  # Don't include any additional specified paths
             ],
         ).get_collision_check_world()
         self.mg.update_world(obstacles)
         print("Synced CuRobo world from stage.")
 
     def check_collisions(
-            self,
-            q,
-            activation_distance=0.01,
+        self,
+        q,
+        activation_distance=0.01,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -283,11 +288,13 @@ class CuRoboMotionGenerator:
             dist = self.mg.world_coll_checker.get_sphere_collision(
                 robot_spheres,
                 coll_query_buffer,
-                weight=th.tensor([50000.], device=self.tensor_args.device),
+                weight=th.tensor([50000.0], device=self.tensor_args.device),
                 activation_distance=th.tensor([activation_distance], device=self.tensor_args.device),
                 env_query_idx=None,
                 return_loss=False,
-            ).squeeze(dim=1)  # shape (N_samples, n_spheres)
+            ).squeeze(
+                dim=1
+            )  # shape (N_samples, n_spheres)
 
             # Positive distances correspond to a collision detection (or close to a collision, within activation_distance
             # So valid collision-free samples are those where max(n_obs_spheres) == 0 for a given sample
@@ -297,19 +304,19 @@ class CuRoboMotionGenerator:
         return collision_results  # shape (B,)
 
     def compute_trajectories(
-            self,
-            target_pos,
-            target_quat,
-            is_local=False,
-            max_attempts=5,
-            timeout=2.0,
-            enable_graph_attempt=3,
-            ik_fail_return=5,
-            enable_finetune_trajopt=True,
-            finetune_attempts=1,
-            return_full_result=False,
-            success_ratio=None,
-            attached_obj=None,
+        self,
+        target_pos,
+        target_quat,
+        is_local=False,
+        max_attempts=5,
+        timeout=2.0,
+        enable_graph_attempt=3,
+        ik_fail_return=5,
+        enable_finetune_trajopt=True,
+        finetune_attempts=1,
+        return_full_result=False,
+        success_ratio=None,
+        attached_obj=None,
     ):
         """
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
@@ -354,8 +361,9 @@ class CuRoboMotionGenerator:
 
         # Make sure a valid (>1) number of entries were submitted
         for tensor in (target_pos, target_quat):
-            assert len(tensor.shape) == 2 and tensor.shape[0] > 1, \
-                f"Expected inputted target tensors to have shape (N,3) or (N,4), where N>1! Got: {tensor.shape}"
+            assert (
+                len(tensor.shape) == 2 and tensor.shape[0] > 1
+            ), f"Expected inputted target tensors to have shape (N,3) or (N,4), where N>1! Got: {tensor.shape}"
 
         # Define the plan config
         plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
@@ -428,8 +436,8 @@ class CuRoboMotionGenerator:
             using_remainder = (i == n_batches - 1) and remainder > 0
             offset_idx = self.batch_size * i
             end_idx = remainder if using_remainder else self.batch_size
-            batch_target_pos = target_pos[offset_idx: offset_idx + end_idx]
-            batch_target_quat = target_quat[offset_idx: offset_idx + end_idx]
+            batch_target_pos = target_pos[offset_idx : offset_idx + end_idx]
+            batch_target_quat = target_quat[offset_idx : offset_idx + end_idx]
 
             # Pad the goal if we're in our final batch
             if using_remainder:
@@ -518,7 +526,9 @@ class CuRoboMotionGenerator:
 
         # Use forward kinematic solver to compute the EEF link positions
         positions = self._tensor_args.to_device(th.zeros((n, 3)))
-        orientations = self._tensor_args.to_device(th.zeros((n, 4)))     # This will be quat initially but we may convert to aa representation
+        orientations = self._tensor_args.to_device(
+            th.zeros((n, 4))
+        )  # This will be quat initially but we may convert to aa representation
 
         for i, qpos in enumerate(traj):
             pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link])
