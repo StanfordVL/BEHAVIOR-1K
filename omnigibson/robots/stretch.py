@@ -33,11 +33,9 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Stretch does not support discrete actions
         raise ValueError("Stretch does not support discrete actions!")
 
     @property

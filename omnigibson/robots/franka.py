@@ -108,7 +108,7 @@ class FrankaPanda(ManipulationRobot):
             # thumb.proximal, ..., thumb.tip, ..., ring.tip
             self._finger_link_names = [f"link_{i}_0" for i in range(16)]
             self._finger_joint_names = [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]
-            # position where the hand is parallel to the ground
+            # the robot hand at [0.5973, 0.0008, 0.6947] offset from base with palm open and facing downwards.
             self._default_robot_model_joint_pos = th.cat(
                 (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
             )
@@ -121,7 +121,7 @@ class FrankaPanda(ManipulationRobot):
             self._ag_end_points = [
                 GraspingPoint(link_name=f"link_3_0_tip", position=th.tensor([0.012, 0, 0.007])),
                 GraspingPoint(link_name=f"link_7_0_tip", position=th.tensor([0.012, 0, 0.007])),
-                GraspingPoint(link_name=f"link_11_0_tip", position=th.tenesor([0.012, 0, 0.007])),
+                GraspingPoint(link_name=f"link_11_0_tip", position=th.tensor([0.012, 0, 0.007])),
             ]
         elif "leap" in end_effector:
             self._model_name = f"franka_{end_effector}"
@@ -133,7 +133,7 @@ class FrankaPanda(ManipulationRobot):
             self._finger_joint_names = [
                 f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]
             ]
-            # position where the hand is parallel to the ground
+            # the robot hand at [0.4577, 0.0006, 0.7146] offset from base with palm open and facing downwards.
             self._default_robot_model_joint_pos = th.cat(
                 (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
             )
@@ -155,9 +155,9 @@ class FrankaPanda(ManipulationRobot):
             hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
             self._finger_link_names = [f"link{i}" for i in hand_part_names]
             self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
-            # position where the hand is parallel to the ground
+            # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
             self._default_robot_model_joint_pos = th.cat(
-                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(12))
+                (th.tensor([0.652, -0.271, -0.622, -2.736, -0.263, 2.497, 1.045]), th.zeros(12))
             )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             # TODO: add ag support for inspire hand
@@ -208,16 +208,10 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
         raise ValueError("Franka does not support discrete actions!")
-
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params (e.g. damping, stiffess, max_effort) here
 
     @property
     def controller_order(self):
@@ -229,15 +223,6 @@ class FrankaPanda(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-
-    @property
-    def _default_gripper_multi_finger_controller_configs(self):
-        conf = super()._default_gripper_multi_finger_controller_configs
-        # If the end effector is not a gripper, set the mode to independent
-        if self.end_effector != "gripper":
-            conf[self.default_arm]["mode"] = "independent"
-            conf[self.default_arm]["command_input_limits"] = None
-        return conf
 
     @property
     def _default_joint_pos(self):

@@ -232,14 +232,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
 
-    def _create_discrete_action_space(self):
-        # Tiago does not support discrete actions
-        raise ValueError("Fetch does not support discrete actions!")
-
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
+
+    def _create_discrete_action_space(self):
+        raise ValueError("Tiago does not support discrete actions!")
 
     def tuck(self):
         """

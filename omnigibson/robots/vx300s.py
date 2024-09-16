@@ -110,11 +110,9 @@ class VX300S(ManipulationRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
         raise ValueError("VX300S does not support discrete actions!")
 
     @property

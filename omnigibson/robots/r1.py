@@ -143,11 +143,9 @@ class R1(ManipulationRobot, LocomotionRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
         raise ValueError("R1 does not support discrete actions!")
 
     def _initialize(self):

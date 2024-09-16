@@ -1097,6 +1097,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": "default",
                 "mode": "binary",
                 "limit_tolerance": 0.001,
+                "inverted": self._grasping_direction == "upper",
             }
         return dic
 

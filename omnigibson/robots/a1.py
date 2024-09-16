@@ -36,6 +36,7 @@ class A1(ManipulationRobot):
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        end_effector="inspire",
         **kwargs,
     ):
         """
@@ -82,7 +83,34 @@ class A1(ManipulationRobot):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
-        self._hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
+        # store end effector information
+        self.end_effector = end_effector
+        self._model_name = f"a1_{end_effector}"
+        if end_effector == "inspire":
+            self._eef_link_names = "palm_lower"
+            # thumb.proximal, ..., thumb.tip, ..., ring.tip
+            hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
+            self._finger_link_names = [f"link{i}" for i in hand_part_names]
+            self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
+            # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
+            self._default_robot_model_joint_pos = th.cat(
+                [th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571]), th.zeros(12)]
+            )
+            self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
+            self._ag_start_points = [
+                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
+                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
+                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
+            ]
+            self._ag_end_points = [
+                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
+                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
+            ]
+        else:
+            raise ValueError(f"End effector {end_effector} not supported for A1")
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -103,26 +131,23 @@ class A1(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
-            grasping_direction="upper",
+            grasping_direction=(
+                "lower" if end_effector == "gripper" else "upper"
+            ),  # gripper grasps in the opposite direction
             **kwargs,
         )
 
     @property
     def model_name(self):
-        return "a1_inspire"
+        # Override based on specified A1 variant
+        return self._model_name
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
-        raise ValueError("Franka does not support discrete actions!")
-
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params (e.g. damping, stiffess, max_effort) here
+        raise ValueError("A1 does not support discrete actions!")
 
     @property
     def controller_order(self):
@@ -136,19 +161,8 @@ class A1(ManipulationRobot):
         return controllers
 
     @property
-    def _default_gripper_multi_finger_controller_configs(self):
-        conf = super()._default_gripper_multi_finger_controller_configs
-        # Since the end effector is not a gripper, set the mode to independent
-        conf[self.default_arm]["mode"] = "independent"
-        conf[self.default_arm]["command_input_limits"] = None
-        return conf
-
-    @property
     def _default_joint_pos(self):
-        """
-        This will setup the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
-        """
-        return th.cat([th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571]), th.zeros(12)])
+        return self._default_robot_model_joint_pos
 
     @property
     def finger_lengths(self):
@@ -164,27 +178,27 @@ class A1(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "palm_lower"}
+        return {self.default_arm: self._eef_link_names}
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: [f"link{i}" for i in self._hand_part_names]}
+        return {self.default_arm: self._finger_link_names}
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: [f"joint{i}" for i in self._hand_part_names]}
+        return {self.default_arm: self._finger_joint_names}
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/a1_inspire.usd")
+        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/a1_inspire_description.yaml")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_description.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/a1_inspire.urdf")
+        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.urdf")
 
     @property
     def eef_usd_path(self):
@@ -192,30 +206,20 @@ class A1(ManipulationRobot):
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: th.tensor([0, 0, 0.707, 0.707])}
+        return {self.default_arm: self._teleop_rotation_offset}
 
     @property
     def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
-                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
-            ]
-        }
+        return {self.default_arm: self._ag_start_points}
 
     @property
     def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
-                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
-            ]
-        }
+        return {self.default_arm: self._ag_start_points}
 
     @property
     def disabled_collision_pairs(self):
         # some dexhand has self collisions that needs to be filtered out
-        return [["base_link", "link12"]]
+        if self.end_effector == "inspire":
+            return [["base_link", "link12"]]
+        else:
+            return []
