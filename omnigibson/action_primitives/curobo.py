@@ -1,11 +1,10 @@
-# Third Party
 import torch as th        # MUST come before importing omni!!!
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
+from omnigibson.macros import gm, macros
+from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.utils.control_utils import FKSolver
-import numpy as np
 from collections.abc import Iterable
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
@@ -14,28 +13,35 @@ th.backends.cuda.matmul.allow_tf32 = True
 th.backends.cudnn.allow_tf32 = True
 
 
-def create_collision_world(tensor_args):
+# Define floor-like substrings for filtering collisions
+GROUND_PREFIXES = {
+    "ground_plane",
+    "floor",
+    "carpet",
+}
+
+
+def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
     """
     Creates a CuRobo CollisionMeshWorld to use for collision checking
 
     Args:
         tensor_args (TensorDeviceType): Tensor device information
+        cache_size (int): Cache size for number of meshes supported in the collision world
+        max_distance (float): maximum distance when checking collisions (see curobo source code)
 
     Returns:
         MeshCollisionWorld: collision world used to check against for collisions
     """
     # Checks objA inside objB
-    world = lazy.curobo.geom.types.WorldConfig()
     usd_help = lazy.curobo.util.usd_helper.UsdHelper()
     usd_help.stage = og.sim.stage
-    # obstacles = usd_help.get_obstacles_from_stage(only_substring=[objB.prim_path], ignore_substring=[
-    #     "visual"]).get_collision_check_world()  # WorldConfig
     world_cfg = lazy.curobo.geom.sdf.world.WorldCollisionConfig.load_from_dict(
         dict(
-            cache={'obb': 10, 'mesh': 1024},
+            cache={'obb': 10, 'mesh': cache_size},
             n_envs=1,
             checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
-            max_distance=0.1,
+            max_distance=max_distance,
         ),
         # obstacles,
         tensor_args=tensor_args,
@@ -63,7 +69,7 @@ def get_obstacles(
             collision representation
         only_substring (None or list of str): If specified, only include any prim path that includes any of these
             substrings in the resulting collision representation
-        ignore_paths (None or list of str): If specified, exclude any prim path that includes any of these substrings
+        ignore_substring (None or list of str): If specified, exclude any prim path that includes any of these substrings
             from the resulting collision representation
     """
     usd_help = lazy.curobo.util.usd_helper.UsdHelper()
@@ -118,57 +124,6 @@ def get_obstacles_sphere_representation(
     return tensor_args.to_device(th.as_tensor(sph_list))
 
 
-def get_sphere_representation(obj, tensor_args, reference_prim_path=None, n_spheres=100, sphere_radius=0.001, extra_links=None, n_extra_spheres=20):
-    """
-    Gest the collision sphere representation of object @obj as well as any additional links specified by @extra_links
-
-    Args:
-        obj (BaseObject or None): Non-articulated object whose sphere representation will be computed. If None, will
-            not use any object
-        tensor_args (TensorDeviceType): Tensor device information
-        reference_prim_path (None or str): If specified, the reference prim path from which all sphere poses will
-            be computed
-        n_spheres (int): Number of collision spheres for representing @obj
-        sphere_radius (float): Radius of the generated collision spheres
-        extra_links (None or list of RigidPrim): If specified, any additional links which should be included
-            in the sphere representation
-        n_extra_spheres (int): Number of collision spheres for representing each additional link specified in
-            @extra_links
-
-    Returns:
-        th.Tensor: (N, 4)-shaped tensor, where each of the N computed collision spheres are defined by (x,y,z,r),
-            where (x,y,z) is the position and r defines the sphere radius taken wrt obj.prim_path
-    """
-    obstacles = []
-    n_spheres_total = []
-
-    if obj is not None:
-        target_obstacle = get_obstacles(
-            reference_prim_path=reference_prim_path,
-            only_substring=[obj.prim_path],
-            ignore_substring=["collision", "container"],
-        )
-        assert len(target_obstacle.objects) == 1, f"Found multiple target obstacles, but expected 1. Got: {[obj.name for obj in target_obstacle.objects]}"
-        obstacles += [target_obstacle.get_obstacle(next(iter(obj.root_link.visual_meshes.values())).prim_path)]
-        n_spheres_total += [n_spheres]
-
-    if extra_links is not None:
-        extra_coll_paths = [geom.prim_path for link in extra_links for geom in link.collision_meshes.values()]
-        extra_obstacles = get_obstacles(
-            reference_prim_path=reference_prim_path,
-            only_substring=extra_coll_paths,
-        )
-        obstacles += [extra_obstacles.get_obstacle(coll_path) for coll_path in extra_coll_paths]
-        n_spheres_total += [n_extra_spheres] * len(extra_coll_paths)
-
-    return get_obstacles_sphere_representation(
-        obstacles=obstacles,
-        tensor_args=tensor_args,
-        n_spheres=n_spheres_total,
-        sphere_radius=sphere_radius,
-    )
-
-
 class CuRoboMotionGenerator:
     """
     Class for motion generator using CuRobo backend
@@ -180,7 +135,6 @@ class CuRoboMotionGenerator:
         ee_link=None,
         device="cuda:0",
         motion_cfg_kwargs=None,
-        ignore_collision_paths=None,
         batch_size=2,
         debug=False,
     ):
@@ -194,13 +148,11 @@ class CuRoboMotionGenerator:
             device (str): Which device to use for curobo
             motion_cfg_kwargs (None or dict): If specified, keyward arguments to pass to
                 MotionGenConfig.load_from_robot_config(...)
-            ignore_collision_paths (None or list): If specified, prim path(s) to prims that should be ignored
-                during collision checking
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             debug (bool): Whether to debug generation or not
         """
         # Only support one scene for now -- verify that this is the case
-        assert len(og.sim.scenes)
+        assert len(og.sim.scenes) == 1
 
         # Define arguments to pass to motion gen config
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
@@ -224,34 +176,31 @@ class CuRoboMotionGenerator:
             num_batch_ik_seeds=12,
             num_batch_trajopt_seeds=1,
             ik_opt_iters=60,
-            # optimize_dt=False,
-            # num_trajopt_seeds=12,
-            # num_graph_seeds=12,
+            optimize_dt=True,
+            num_trajopt_seeds=4,
+            num_graph_seeds=4,
             interpolation_dt=0.03,
             collision_cache={"obb": 10, "mesh": 1024},
             collision_max_outside_distance=0.05,
             collision_activation_distance=0.025,
             acceleration_scale=1.0,
             self_collision_check=True,
-            # maximum_trajectory_dt=0.25, #2.0, #0.25,
+            maximum_trajectory_dt=None,
             fixed_iters_trajopt=True,
             finetune_trajopt_iters=100,
             finetune_dt_scale=1.05,
-            velocity_scale=[1.0] * robot.n_joints, #[0.25, 1, 1, 1, 1.0, 1.0, 1.0, 1.0, 1.0],
+            velocity_scale=[1.0] * robot.n_joints,
         )
         if motion_cfg_kwargs is not None:
             motion_kwargs.update(motion_cfg_kwargs)
         motion_gen_config = lazy.curobo.wrap.reacher.motion_gen.MotionGenConfig.load_from_robot_config(
             robot_cfg,
-            lazy.curobo.geom.types.WorldConfig(),  # world_cfg,
+            lazy.curobo.geom.types.WorldConfig(),
             self._tensor_args,
             store_trajopt_debug=self.debug,
             **motion_kwargs,
         )
         self.mg = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
-        # print("CuRobo warming up...")
-        # self.mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
-        # print("CuRobo is ready.")
 
         # Store internal variables
         self.robot = robot
@@ -259,50 +208,36 @@ class CuRoboMotionGenerator:
         self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self._usd_help = lazy.curobo.util.usd_helper.UsdHelper()
         self._usd_help.stage = og.sim.stage
-        self._ignore_collision_paths = [] if ignore_collision_paths is None else ignore_collision_paths
         assert batch_size >= 2, f"batch_size must be >= 2! Got: {batch_size}"
         self.batch_size = batch_size
 
-        # Initialize other variables modified at runtime
-        self._ignore_paths = None
-
-    def update_obstacles(self):
+    def update_obstacles(self, ignore_paths=None):
         """
         Updates internal world collision cache representation based on sim state
+
+        Args:
+            ignore_paths (None or list of str): If specified, prim path substrings that should
+                be ignored when updating obstacles
         """
         print("Updating CuRobo world, reading w.r.t.", self.robot.prim_path)
-        # Infer how many collision bodies there are in sim, and add 10 as an additional buffer
-        n_cols = 0
-
-        # Ignore all container metalinks
-        self._ignore_paths = ["container"]
+        ignore_paths = [] if ignore_paths is None else ignore_paths
 
         # Ignore any visual only objects and any objects not part of the robot's current scene
-        for idx, scene in enumerate(og.sim.scenes):
-            if idx == self.robot.scene.idx:
-                for obj in scene.objects:
-                    if obj.visual_only:
-                        self._ignore_paths.append(obj.prim_path)
-                        continue
-                    for link in obj.links.values():
-                        n_cols += len(link.collision_meshes)
-            else:
-                self._ignore_paths.append(scene.prim_path)
-
-        # # TODO: This should be modified dynamically but it breaks )):
-        # assert isinstance(self.mg.world_coll_checker, WorldMeshCollision)
-        # self.mg.world_coll_checker.clear_cache()
-        # self.mg.world_coll_checker.create_collision_cache(mesh_cache=n_cols + 10)
+        ignore_scenes = [scene.prim_path for scene in og.sim.scenes]
+        del ignore_scenes[self.robot.scene.idx]
+        ignore_visual_only = [obj.prim_path for obj in self.robot.scene.objects if obj.visual_only]
 
         obstacles = self._usd_help.get_obstacles_from_stage(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
                 self.robot.prim_path,                   # Don't include robot paths
-                "/World/ground_plane",                  # Don't include collisions with floor
-                "visual",                               # Don't include any visuals
                 "/curobo",                              # Don't include curobo prim
-                *self._ignore_collision_paths,          # Don't include manually-specified collision paths
-                *self._ignore_paths,                    # Don't include any additional specified paths
+                "visual",                               # Don't include any visuals
+                *GROUND_PREFIXES,                       # Don't include collisions with any ground-related objects
+                *METALINK_PREFIXES,                     # Don't include any metalinks
+                *ignore_scenes,                         # Don't include any scenes the robot is not in
+                *ignore_visual_only,                    # Don't include any visual-only objects
+                *ignore_paths,                          # Don't include any additional specified paths
             ],
         ).get_collision_check_world()
         self.mg.update_world(obstacles)
@@ -317,13 +252,13 @@ class CuRoboMotionGenerator:
         Checks collisions between the sphere representation of the robot and the rest of the current scene
 
         Args:
-            q (th.tensor): (B, N)-shaped tensor, representing B-total different joint configurations to check
+            q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
             activation_distance (float): Safety buffer around robot mesh representation which will trigger a
                 collision check
 
         Returns:
-            th.tensor: (B,)-shaped tensor, where each value is True if in collision, else False
+            th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
         """
         # Update obstacles
         self.update_obstacles()
@@ -354,20 +289,24 @@ class CuRoboMotionGenerator:
                 return_loss=False,
             ).squeeze(dim=1)  # shape (N_samples, n_spheres)
 
-            # Non-zero distances correspond to a collision detection (or close to a collision, within activation_distance
+            # Positive distances correspond to a collision detection (or close to a collision, within activation_distance
             # So valid collision-free samples are those where max(n_obs_spheres) == 0 for a given sample
             collision_results = dist.max(dim=-1).values != 0
 
         # Return results
         return collision_results  # shape (B,)
 
-    def compute_trajectory(
+    def compute_trajectories(
             self,
             target_pos,
             target_quat,
             is_local=False,
             max_attempts=5,
+            timeout=2.0,
+            enable_graph_attempt=3,
+            ik_fail_return=5,
             enable_finetune_trajopt=True,
+            finetune_attempts=1,
             return_full_result=False,
             success_ratio=None,
             attached_obj=None,
@@ -376,16 +315,22 @@ class CuRoboMotionGenerator:
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
 
         Args:
-            target_pos ((N,3)-tensor): (N, 3) or (3,)-shaped tensor, where N is expected to be self.batch_size, and each
-                entry is (x,y,z) position to reach. If only a single (3,) array is given but N > 1, it will
-                be broadcast to create the appropriate array.
-            target_quat ((N,4)-tensor): (N, 4) or (4,)-shaped tensor, where N is expected to be self.batch_size, and each
-                entry is (x,y,z,w) quaternion orientation to reach. If only a single (3,) array is given but N > 1,
-                it will be broadcast to create the appropriate array.
+            target_pos ((N,3)-tensor): (N, 3)-shaped tensor, where each entry is an individual (x,y,z)
+                position to reach. A single (3,) array can also be given
+            target_quat ((N,4)-tensor): (N, 4) or (4,)-shaped tensor, where each entry is an individual (x,y,z,w)
+                quaternion orientation to reach. A single (4,) array can also be given
             is_local (bool): Whether @target_pos and @target_quat are specified in the robot's local frame or the world
                 global frame
             max_attempts (int): Maximum number of attempts for trying to compute a valid trajectory
+            timeout (float): Maximum time in seconds allowed to solve the motion generation problem
+            enable_graph_attempt (None or int): Number of failed attempts at which to fallback to a graph planner
+                for obtaining trajectory seeds
+            ik_fail_return (None or int): Number of IK attempts allowed before returning a failure. Set this to a
+                low value (5) to save compute time when an unreachable goal is given
             enable_finetune_trajopt (bool): Whether to enable timing reparameterization for a smoother trajectory
+            finetune_attempts (int): Number of attempts to run finetuning trajectory optimization. Every attempt will
+                increase the `MotionGenPlanConfig.finetune_dt_scale` by `MotionGenPlanConfig.finetune_dt_decay` as a
+                path couldn't be found with the previous smaller dt
             return_full_result (bool): Whether to return the full result or not. If False, will randomly sample a single
                 (successful) trajectory to return
             success_ratio (None or float): If set, specifies the fraction of successes necessary given self.batch_size.
@@ -395,43 +340,37 @@ class CuRoboMotionGenerator:
                 solving for this trajectory
 
         Returns:
-            None or th.tensor or MotionGenResult: If @return_all is set, will return the raw MotionGenResult object
-                computed from the batch trajectory computation. If not set, and there is at least a single successful
-                trajectory, will return a randomly sampled (N, D) tensor representing the interpolated joint trajectory
-                to reach the desired @target_pos, @target_quat configuration, where N is the number of interpolated
-                steps and D is the number of robot joints. If there is no successful trajectory, will return None.
+            2-tuple or list of MotionGenResult: If @return_all is set, will return the raw MotionGenResult
+                object(s) computed from internal batch trajectory computations. If not set, will return 2-tuple
+                (success, results), where success is a (N,)-shaped boolean tensor representing whether each requested
+                target pos / quat successfully generated a motion plan, and results is a (N,)-shaped array of
+                corresponding JointState objects.
         """
-        # TODO: Add sanity check for qpos being near limits -- this seems to autofail solutions
+        # Previously, this would silently fail so we explicitly check for out-of-range joint limits here
+        # This may be fixed in a recent version of CuRobo? See https://github.com/NVlabs/curobo/discussions/288
         if not th.all(th.abs(self.robot.get_joint_positions(normalized=True))[:-2] < 0.99):
             print("Robot is near joint limits! No trajectory will be computed")
             return None
 
+        # Make sure a valid (>1) number of entries were submitted
+        for tensor in (target_pos, target_quat):
+            assert len(tensor.shape) == 2 and tensor.shape[0] > 1, \
+                f"Expected inputted target tensors to have shape (N,3) or (N,4), where N>1! Got: {tensor.shape}"
+
         # Define the plan config
         plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
             enable_graph=False,
-            # enable_graph_attempt=max_attempts,
             max_attempts=max_attempts,
-            timeout=2.0,
-            ik_fail_return=5,
-            # num_ik_seeds=10,
-            # num_trajopt_seeds=10,
+            timeout=timeout,
+            enable_graph_attempt=enable_graph_attempt,
+            ik_fail_return=ik_fail_return,
             enable_finetune_trajopt=enable_finetune_trajopt,
-            finetune_attempts=1,
+            finetune_attempts=finetune_attempts,
             success_ratio=1.0 / self.batch_size if success_ratio is None else success_ratio,
         )
 
         # Refresh the collision state
         self.update_obstacles()
-
-        # self.mg.reset()
-
-        # Check if batch size is greater than 1, and if so, make sure target pos / quat are the appropriate shapes
-        if len(target_pos.shape) == 1:
-            target_pos = th.tile(target_pos.view(1, 3), (self.batch_size, 1))
-        if len(target_quat.shape) == 1:
-            target_quat = th.tile(target_quat.view(1, 4), (self.batch_size, 1))
-        assert target_pos.shape[0] == self.batch_size
-        assert target_quat.shape[0] == self.batch_size
 
         # Make sure the specified target pose is in the robot frame
         robot_pos, robot_quat = self.robot.get_position_orientation()
@@ -451,11 +390,9 @@ class CuRoboMotionGenerator:
         # Map xyzw -> wxyz quat
         target_quat = target_quat[:, [3, 0, 1, 2]]
 
-        # Create IK goal
-        ik_goal_batch = lazy.curobo.types.math.Pose(
-            position=self._tensor_args.to_device(target_pos).contiguous(),
-            quaternion=self._tensor_args.to_device(target_quat).contiguous(),
-        )
+        # Make sure tensors are on device and contiguous
+        target_pos = self._tensor_args.to_device(target_pos).contiguous()
+        target_quat = self._tensor_args.to_device(target_quat).contiguous()
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -475,40 +412,64 @@ class CuRoboMotionGenerator:
         if attached_obj is not None:
             obj_paths = [geom.prim_path for geom in attached_obj.root_link.collision_meshes.values()]
             assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
-            # if len(obj_paths) > 5:
-            #     # Use visual paths instead
-            #     obj_paths = [geom.prim_path for geom in attached_obj.root_link.visual_meshes.values()]
             self.mg.attach_objects_to_robot(
                 joint_state=cu_js_batch,
                 object_names=obj_paths,
             )
 
-        # Run batched planning
-        if self.debug:
-            self.mg.store_debug_in_result = True
+        # Determine how many internal batches we need to run based on submitted size
+        remainder = target_pos.shape[0] % self.batch_size
+        n_batches = int(th.ceil(th.tensor(target_pos.shape[0] / self.batch_size)).item())
 
-        result = self.mg.plan_batch(cu_js_batch, ik_goal_batch, plan_cfg)
+        # Run internal batched calls
+        results, successes, paths = [], self._tensor_args.to_device(th.tensor([], dtype=th.bool)), []
+        for i in range(n_batches):
+            # We're using a remainder if we're on the final batch and our remainder is nonzero
+            using_remainder = (i == n_batches - 1) and remainder > 0
+            offset_idx = self.batch_size * i
+            end_idx = remainder if using_remainder else self.batch_size
+            batch_target_pos = target_pos[offset_idx: offset_idx + end_idx]
+            batch_target_quat = target_quat[offset_idx: offset_idx + end_idx]
 
-        if self.debug:
-            from IPython import embed; embed()
+            # Pad the goal if we're in our final batch
+            if using_remainder:
+                new_batch_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
+                new_batch_target_pos[:end_idx] = batch_target_pos
+                new_batch_target_pos[end_idx:] = batch_target_pos[-1]
+                batch_target_pos = new_batch_target_pos
+                new_batch_target_quat = self._tensor_args.to_device(th.zeros((self.batch_size, 4)))
+                new_batch_target_quat[:end_idx] = batch_target_quat
+                new_batch_target_quat[end_idx:] = batch_target_quat[-1]
+                batch_target_quat = new_batch_target_quat
+
+            # Create IK goal
+            ik_goal_batch = lazy.curobo.types.math.Pose(
+                position=batch_target_pos,
+                quaternion=batch_target_quat,
+            )
+
+            # Run batched planning
+            if self.debug:
+                self.mg.store_debug_in_result = True
+
+            result = self.mg.plan_batch(cu_js_batch, ik_goal_batch, plan_cfg)
+
+            if self.debug:
+                breakpoint()
+
+            # Append results
+            results.append(result)
+            successes = th.concatenate([successes, result.success[:end_idx]])
+            paths += result.get_paths()[:end_idx]
 
         # Detach attached object if it was attached
         if attached_obj is not None:
             self.mg.detach_object_from_robot()
 
         if return_full_result:
-            return result
-
+            return results
         else:
-            succ = th.any(result.success).item()
-            if succ:
-                # Sample random successful path
-                successful_paths = result.get_successful_paths()
-                cmd_plan = successful_paths[np.random.choice(len(successful_paths))]
-                return self.path_to_joint_trajectory(path=cmd_plan, joint_names=sim_js_names)
-
-            else:
-                print("CuRobo plan did not converge to a solution.")
+            return successes, paths
 
     def path_to_joint_trajectory(self, path, joint_names=None):
         """
@@ -520,7 +481,9 @@ class CuRoboMotionGenerator:
                 trajectory. If None, will use all joints.
 
         Returns:
-            torch.tensor: (N, D) joint trajectory tensor
+            torch.tensor: (T, D) tensor representing the interpolated joint trajectory
+                to reach the desired @target_pos, @target_quat configuration, where T is the number of interpolated
+                steps and D is the number of robot joints.
         """
         cmd_plan = self.mg.get_full_js(path)
         # get only joint names that are in both:
@@ -536,17 +499,17 @@ class CuRoboMotionGenerator:
         cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
         return cmd_plan.position
 
-    def convert_q_to_eef_traj(self, traj, return_aa=False):
+    def convert_q_to_eef_traj(self, traj, return_axisangle=False):
         """
         Converts a joint trajectory @traj into an equivalent trajectory defined by end effector poses
 
         Args:
-            traj (np.ndarray): (N, D)-shaped joint trajectory
-            return_aa (bool): Whether to return the interpolated orientations in quaternion or axis-angle representation
+            traj (torch.Tensor): (T, D)-shaped joint trajectory
+            return_axisangle (bool): Whether to return the interpolated orientations in quaternion or axis-angle representation
 
         Returns:
-            np.ndarray: (N, [6, 7])-shaped array where each entry is is the (x,y,z) position and (x,y,z,w)
-                quaternion (if @return_aa is False) or (ax, ay, az) axis-angle orientation, specified in the robot
+            torch.Tensor: (T, [6, 7])-shaped array where each entry is is the (x,y,z) position and (x,y,z,w)
+                quaternion (if @return_axisangle is False) or (ax, ay, az) axis-angle orientation, specified in the robot
                 frame.
         """
         # Prune the relevant joints from the trajectory
@@ -554,8 +517,8 @@ class CuRoboMotionGenerator:
         n = len(traj)
 
         # Use forward kinematic solver to compute the EEF link positions
-        positions = np.zeros((n, 3))
-        orientations = np.zeros((n, 4))     # This will be quat initially but we may convert to aa representation
+        positions = self._tensor_args.to_device(th.zeros((n, 3)))
+        orientations = self._tensor_args.to_device(th.zeros((n, 4)))     # This will be quat initially but we may convert to aa representation
 
         for i, qpos in enumerate(traj):
             pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link])
@@ -563,10 +526,10 @@ class CuRoboMotionGenerator:
             orientations[i] = pose[self.ee_link][1]
 
         # Possibly convert orientations to aa-representation
-        if return_aa:
+        if return_axisangle:
             orientations = T.quat2axisangle(orientations)
 
-        return np.concatenate([positions, orientations], axis=-1)
+        return th.concatenate([positions, orientations], dim=-1)
 
     @property
     def tensor_args(self):
