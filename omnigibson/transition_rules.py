@@ -162,6 +162,7 @@ class TransitionRuleAPI:
             if output is not None:
                 added_obj_attrs += output.add
                 removed_objs += output.remove
+                # breakpoint()
 
         self.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
 
