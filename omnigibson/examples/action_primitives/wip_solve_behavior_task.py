@@ -55,7 +55,7 @@ def main():
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
     # Grasp can of soda
-    grasp_obj = env.task.object_scope['can__of__soda.n.01_2']
+    grasp_obj = env.task.object_scope["can__of__soda.n.01_2"]
     print("Executing controller")
     # TODO: use task scope to get the right object
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
@@ -65,7 +65,7 @@ def main():
     print("Executing controller")
     # TODO: use task scope to get the right object
 
-    trash = env.task.object_scope['ashcan.n.01_1']
+    trash = env.task.object_scope["ashcan.n.01_1"]
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
     print("Finished executing place")
 

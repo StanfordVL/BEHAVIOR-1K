@@ -11,10 +11,12 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
 )
 from omnigibson.macros import gm
 
+
 def load_robot_config(robot_name):
     config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_symbolic_primitives.yaml")
     with open(config_filename, "r") as file:
         return yaml.safe_load(file)
+
 
 def start_env(robot_type="Fetch"):
     if og.sim:
@@ -71,16 +73,19 @@ def start_env(robot_type="Fetch"):
 
     return env
 
+
 @pytest.fixture(scope="module")
 def shared_env():
     """Load the environment just once using module scope."""
     return start_env()
+
 
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
     shared_env.scene.reset()
     return shared_env
+
 
 @pytest.fixture
 def robot(env):
@@ -130,6 +135,7 @@ def sponge(env):
 @pytest.fixture
 def knife(env):
     return next(iter(env.scene.object_registry("category", "carving_knife")))
+
 
 class TestSymbolicPrimitives:
     # def test_in_hand_state(self, env, robot, prim_gen, apple):
@@ -306,9 +312,10 @@ def main():
     countertop = next(iter(env.scene.object_registry("category", "countertop")))
 
     try:
-        test.test_place_ontop(env, prim_gen,apple, pan)
+        test.test_place_ontop(env, prim_gen, apple, pan)
     except:
         raise
+
 
 if __name__ == "__main__":
     main()
