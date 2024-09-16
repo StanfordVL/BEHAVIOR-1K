@@ -17,8 +17,11 @@ from omnigibson.utils.constants import (
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
-from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.ui_utils import create_module_logger, dock_window
 from omnigibson.utils.vision_utils import Remapper
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -378,9 +381,10 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
 
         image_keys = th.unique(img)
-        assert set(image_keys.tolist()).issubset(
-            set(replicator_mapping.keys())
-        ), "Semantic segmentation image does not match the original id_to_labels mapping."
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.warning(
+                "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
@@ -463,7 +467,7 @@ class VisionSensor(BaseSensor):
                     resolution = (self._load_config["image_width"], self._load_config["image_height"])
                     percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
                     if percentage > 2:
-                        og.log.warning(
+                        log.warning(
                             f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
                             f"Percentage of pixels: {percentage}%"
                         )
@@ -474,9 +478,10 @@ class VisionSensor(BaseSensor):
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
 
-        assert set(image_keys.tolist()).issubset(
-            set(replicator_mapping.keys())
-        ), "Instance segmentation image does not match the original id_to_labels mapping."
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.warning(
+                "Some instance IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return remapper.remap(replicator_mapping, registry, img, image_keys)
 
