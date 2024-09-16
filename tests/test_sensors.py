@@ -15,8 +15,10 @@ def test_segmentation_modalities(env):
     dishtowel = env.scene.object_registry("name", "dishtowel")
     robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
-    dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
-    robot.set_position_orientation([0.0, 0.8, 0.0], T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)))
+    dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
+    robot.set_position_orientation(
+        position=[0.0, 0.8, 0.0], orientation=T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32))
+    )
     robot.reset()
 
     modalities_required = ["seg_semantic", "seg_instance", "seg_instance_id"]
@@ -108,8 +110,10 @@ def test_bbox_modalities(env):
     dishtowel = env.scene.object_registry("name", "dishtowel")
     robot = env.scene.robots[0]
     place_obj_on_floor_plane(breakfast_table)
-    dishtowel.set_position_orientation([-0.4, 0.0, 0.55], [0, 0, 0, 1])
-    robot.set_position_orientation([0, 0.8, 0.0], T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)))
+    dishtowel.set_position_orientation(position=[-0.4, 0.0, 0.55], orientation=[0, 0, 0, 1])
+    robot.set_position_orientation(
+        position=[0, 0.8, 0.0], orientation=T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32))
+    )
     robot.reset()
 
     modalities_required = ["bbox_2d_tight", "bbox_2d_loose", "bbox_3d"]
