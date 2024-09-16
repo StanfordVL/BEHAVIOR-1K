@@ -28,17 +28,17 @@ def sample_stable_orientations(obj, n_samples=10, drop_aabb_offset=0.1):
     aabb_extent = obj.aabb_extent
     radius = th.norm(aabb_extent) / 2.0
     drop_pos = th.tensor([0, 0, radius + drop_aabb_offset])
-    center_offset = obj.get_position() - obj.aabb_center
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center
     drop_orientations = T.random_quaternion(n_samples)
     stable_orientations = th.zeros_like(drop_orientations)
     for i, drop_orientation in enumerate(drop_orientations):
         # Sample orientation, drop, wait to stabilize, then record
         pos = drop_pos + T.quat2mat(drop_orientation) @ center_offset
-        obj.set_position_orientation(pos, drop_orientation)
+        obj.set_position_orientation(position=pos, orientation=drop_orientation)
         obj.keep_still()
         for j in range(25):
             og.sim.step()
-        stable_orientations[i] = obj.get_orientation()
+        stable_orientations[i] = obj.get_position_orientation()[1]
 
     return stable_orientations
 
@@ -56,8 +56,8 @@ def compute_bbox_offset(obj):
     """
     og.sim.stop()
     assert th.all(obj.scale == 1.0)
-    obj.set_position_orientation(th.zeros(3), th.tensor([0, 0, 0, 1.0]))
-    return obj.aabb_center - obj.get_position()
+    obj.set_position_orientation(position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]))
+    return obj.aabb_center - obj.get_position_orientation()[0]
 
 
 def compute_native_bbox_extent(obj):
@@ -73,7 +73,7 @@ def compute_native_bbox_extent(obj):
     """
     og.sim.stop()
     assert th.all(obj.scale == 1.0)
-    obj.set_position_orientation(th.zeros(3), th.tensor([0, 0, 0, 1.0]))
+    obj.set_position_orientation(position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]))
     return obj.aabb_extent
 
 
@@ -85,7 +85,7 @@ def compute_base_aligned_bboxes(obj):
             pts_in_link_frame = []
             for mesh_name, mesh in mesh_list.items():
                 pts = mesh.get_attribute("points")
-                local_pos, local_orn = mesh.get_local_pose()
+                local_pos, local_orn = mesh.get_position_orientation(frame="parent")
                 pts_in_link_frame.append(get_particle_positions_from_frame(local_pos, local_orn, mesh.scale, pts))
             pts_in_link_frame = th.cat(pts_in_link_frame, dim=0)
             max_pt = th.max(pts_in_link_frame, dim=0).values
