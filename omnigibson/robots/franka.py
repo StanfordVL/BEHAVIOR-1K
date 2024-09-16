@@ -282,8 +282,9 @@ class FrankaPanda(ManipulationRobot):
     @property
     def curobo_path(self):
         # Only supported for normal franka now
-        assert self._model_name == "franka_panda", \
-            f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        assert (
+            self._model_name == "franka_panda"
+        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
 
     @property
