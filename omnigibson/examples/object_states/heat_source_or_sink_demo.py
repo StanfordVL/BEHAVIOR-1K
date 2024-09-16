@@ -82,7 +82,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Move stove, notify user
     if not short_exec:
         input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(th.tensor([0, 1.0, 0.61]))
+    stove.set_position_orientation(position=th.tensor([0, 1.0, 0.61]))
     for i in range(100):
         env.step(th.empty(0))
 

@@ -11,8 +11,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
 
-# pytestmark = pytest.mark.skip("Skip all primitive tests for multiple-envs PR; will fix in a follow-up")
-
 # Make sure that Omniverse is launched before setting up the tests.
 og.launch()
 
@@ -60,7 +58,7 @@ def execute_controller(ctrl_gen, env):
 def primitive_tester(env, objects, primitives, primitives_args):
     for obj in objects:
         env.scene.add_object(obj["object"])
-        obj["object"].set_position_orientation(obj["position"], obj["orientation"])
+        obj["object"].set_position_orientation(position=obj["position"], orientation=obj["orientation"])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)

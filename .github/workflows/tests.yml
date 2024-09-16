@@ -20,6 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         test_file:
+          - test_controllers
+          - test_data_collection
           - test_dump_load_states
           - test_envs
           - test_multiple_envs

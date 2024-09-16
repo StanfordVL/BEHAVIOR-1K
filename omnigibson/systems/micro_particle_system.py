@@ -15,6 +15,7 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
@@ -347,8 +348,9 @@ class PhysxParticleInstancer(BasePrim):
             local_positions = []
             local_orientations = []
             for global_pos, global_ori in zip(self.particle_positions, self.particle_orientations):
-                local_pos, local_ori = T.relative_pose_transform(
-                    global_pos, global_ori, *self.scene.get_position_orientation()
+                local_pos, local_ori = self.scene.convert_world_pose_to_scene_relative(
+                    global_pos,
+                    global_ori,
                 )
                 local_positions.append(local_pos)
                 local_orientations.append(local_ori)
@@ -385,7 +387,7 @@ class PhysxParticleInstancer(BasePrim):
         else:
             global_positions, global_orientations = zip(
                 *[
-                    T.pose_transform(*self.scene.get_position_orientation(), local_pos, local_ori)
+                    self.scene.convert_scene_relative_pose_to_world(local_pos, local_ori)
                     for local_pos, local_ori in zip(local_positions, local_orientations)
                 ]
             )
@@ -1670,7 +1672,9 @@ class Cloth(MicroParticleSystem):
                 mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
             )
             texcoord = (
-                th.tensor(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32) if has_uv_mapping else None
+                vtarray_to_torch(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32)
+                if has_uv_mapping
+                else None
             )
         else:
             # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
@@ -1718,14 +1722,14 @@ class Cloth(MicroParticleSystem):
                     )
                 else:
                     # Terminate anyways, but don't fail
-                    log.warn("The generated cloth may not have evenly distributed particles.")
+                    log.warning("The generated cloth may not have evenly distributed particles.")
 
                 # Check if we have too many vertices
                 cm = ms.current_mesh()
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
                     particle_distance *= math.sqrt(2)  # halve the number of vertices
-                    log.warn(
+                    log.warning(
                         f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
                     )
                 else:

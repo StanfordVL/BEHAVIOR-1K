@@ -63,7 +63,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         disable_grasp_handling=False,
         # Unique to Fetch
         rigid_trunk=False,
-        default_trunk_offset=0.365,
+        default_trunk_offset=0.2,
         default_reset_mode="untuck",
         default_arm_pose="vertical",
         **kwargs,
@@ -472,9 +472,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def arm_workspace_range(self):
         return {
-            self.default_arm: th.tensor(
-                [th.deg2rad(th.tensor([-45])).item(), th.deg2rad(th.tensor([45])).item()], dtype=th.float32
-            )
+            self.default_arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32))
         }
 
     @property

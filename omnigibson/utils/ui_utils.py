@@ -559,9 +559,10 @@ class CameraMover:
 
                 if command is not None:
                     # Convert to world frame to move the camera
-                    transform = T.quat2mat(self.cam.get_orientation())
+                    pos, orn = self.cam.get_position_orientation()
+                    transform = T.quat2mat(orn)
                     delta_pos_global = transform @ command
-                    self.cam.set_position(self.cam.get_position() + delta_pos_global)
+                    self.cam.set_position_orientation(position=pos + delta_pos_global)
 
         return True
 
@@ -790,7 +791,7 @@ class KeyboardRobotController:
                 )
                 new_arm = self.ik_arms[self.active_arm_idx]
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(self.controller_info[new_arm]))
-                print(f"Now controlling arm {new_arm} with IK")
+                print(f"Now controlling arm {new_arm} EEF")
 
             elif (
                 event.input in {lazy.carb.input.KeyboardInput.KEY_5, lazy.carb.input.KeyboardInput.KEY_6}

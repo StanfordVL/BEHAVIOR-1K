@@ -166,8 +166,8 @@ def plan_base_motion(
 
         return new_path
 
-    pos = robot.get_position()
-    yaw = T.quat2euler(robot.get_orientation())[2]
+    pos, orn = robot.get_position_orientation()
+    yaw = T.quat2euler(orn)[2]
     start_conf = (pos[0], pos[1], yaw)
 
     # create an SE(2) state space
@@ -312,7 +312,7 @@ def plan_arm_motion(
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
-            joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
+            joint_pos = th.tensor([sol_path.getState(i)[j] for j in range(dim)], dtype=th.float32)
             return_path.append(joint_pos)
         return return_path
     return None

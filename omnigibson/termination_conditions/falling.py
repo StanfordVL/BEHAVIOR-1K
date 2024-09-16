@@ -31,14 +31,14 @@ class Falling(FailureCondition):
 
     def _step(self, task, env, action):
         # Terminate if the specified robot is falling out of the scene
-        robot_z = env.scene.robots[self._robot_idn].get_position()[2]
+        robot_z = env.scene.robots[self._robot_idn].get_position_orientation()[0][2]
         if robot_z < (env.scene.get_floor_height() - self._fall_height):
             return True
 
         # Terminate if the robot has toppled over
         if self._topple:
             robot_up = T.quat_apply(
-                env.scene.robots[self._robot_idn].get_orientation(), th.tensor([0, 0, 1], dtype=th.float32)
+                env.scene.robots[self._robot_idn].get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32)
             )
             if robot_up[2] < self._tilt_tolerance:
                 return True

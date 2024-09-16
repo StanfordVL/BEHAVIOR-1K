@@ -55,5 +55,7 @@ class BaseMap:
             xy: 2D location in world reference frame (metric)
         :return: 2D location in map reference frame (image)
         """
-        point_wrt_map = th.tensor(xy, dtype=th.float32) / self.map_resolution + self.map_size / 2.0
+
+        xy = th.as_tensor(xy)
+        point_wrt_map = xy / self.map_resolution + self.map_size / 2.0
         return th.flip(point_wrt_map, dims=tuple(range(point_wrt_map.dim()))).int()

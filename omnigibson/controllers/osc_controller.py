@@ -169,6 +169,12 @@ class OperationalSpaceController(ManipulationController):
         # By default, the input limits are set as 1, so we modify this to have a correct range.
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         assert_valid_key(key=mode, valid_keys=OSC_MODES, name="OSC mode")
+
+        # If mode is absolute pose, make sure command input limits / output limits are None
+        if mode == "absolute_pose":
+            assert command_input_limits is None, "command_input_limits should be None if using absolute_pose mode!"
+            assert command_output_limits is None, "command_output_limits should be None if using absolute_pose mode!"
+
         self.mode = mode
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
@@ -309,8 +315,8 @@ class OperationalSpaceController(ManipulationController):
                         frame to control, computed in its local frame (e.g.: robot base frame)
         """
         # Grab important info from control dict
-        pos_relative = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        quat_relative = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"].clone()
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"].clone()
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -434,14 +440,45 @@ class OperationalSpaceController(ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
-        target_pos = th.tensor(control_dict[f"{self.task_name}_pos_relative"])
-        target_quat = th.tensor(control_dict[f"{self.task_name}_quat_relative"])
+        target_pos = control_dict[f"{self.task_name}_pos_relative"].clone()
+        target_quat = control_dict[f"{self.task_name}_quat_relative"].clone()
 
         # Convert quat into eef ori mat
         return dict(
             target_pos=target_pos,
             target_ori_mat=T.quat2mat(target_quat),
         )
+
+    def _compute_no_op_action(self, control_dict):
+        target_pos = self._goal["target_pos"]
+        target_quat = T.mat2quat(self._goal["target_ori_mat"])
+        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
+        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
+
+        command = th.zeros(6, dtype=th.float32, device=target_pos.device)
+
+        # Handle position
+        if self.mode == "absolute_pose":
+            command[:3] = target_pos
+        else:
+            command[:3] = target_pos - pos_relative
+
+        # Handle orientation
+        if self.mode == "position_fixed_ori" or self.mode == "position_compliant_ori":
+            # For these modes, we don't need to add orientation to the command
+            pass
+        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
+            command[3:] = T.quat2axisangle(target_quat)
+        else:  # pose_delta_ori control
+            current_rot = T.quat2mat(quat_relative)
+            target_rot = T.quat2mat(target_quat)
+            delta_rot = target_rot @ (current_rot.T)
+
+            # Convert delta rotation to axis-angle representation
+            delta_axisangle = T.quat2axisangle(T.mat2quat(delta_rot))
+            command[3:] = delta_axisangle
+
+        return command
 
     def _get_goal_shapes(self):
         return dict(
@@ -491,8 +528,11 @@ def _compute_osc_torques(
     # For angular velocity, this is just the base angular velocity
     # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
     #   due to the base linear velocity
-    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos)
-    vel_err = th.cat((lin_vel_err, base_ang_vel)) - ee_vel
+    # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
+    # properly, not simply "subtraction" as in the linear case
+    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_vel[:3]
+    ang_vel_err = T.quat2axisangle(T.quat_multiply(T.axisangle2quat(-ee_vel[3:]), T.axisangle2quat(base_ang_vel)))
+    vel_err = th.cat((lin_vel_err, ang_vel_err))
 
     # Determine desired wrench
     err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)

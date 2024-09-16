@@ -61,8 +61,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Place the object so it rests on the floor
     obj = env.scene.object_registry("name", "obj")
-    center_offset = obj.get_position() - obj.aabb_center + th.tensor([0, 0, obj.aabb_extent[2] / 2.0])
-    obj.set_position(center_offset)
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + th.tensor([0, 0, obj.aabb_extent[2] / 2.0])
+    obj.set_position_orientation(position=center_offset)
 
     # Step through the environment
     max_steps = 100 if short_exec else 10000

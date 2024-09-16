@@ -1186,7 +1186,7 @@ class BDDLSampler:
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
         self._agent.set_position_orientation(
-            th.tensor([300, 300, 300], dtype=th.float32), th.tensor([0, 0, 0, 1], dtype=th.float32)
+            position=th.tensor([300, 300, 300], dtype=th.float32), orientation=th.tensor([0, 0, 0, 1], dtype=th.float32)
         )
 
         self._sampled_objects = set()
@@ -1283,7 +1283,9 @@ class BDDLSampler:
                 self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
-                simulator_obj.set_position(th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0)
+                simulator_obj.set_position_orientation(
+                    position=th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0
+                )
 
                 self._sampled_objects.add(simulator_obj)
                 self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)

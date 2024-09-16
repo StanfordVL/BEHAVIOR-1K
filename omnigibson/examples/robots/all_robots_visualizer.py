@@ -55,7 +55,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Then apply random actions for a bit
         for _ in range(30):
-            action_lo, action_hi = -1, 1
+            action_lo, action_hi = -0.1, 0.1
             action = th.rand(robot.action_dim) * (action_hi - action_lo) + action_lo
             if robot_name == "Tiago":
                 tiago_lo, tiago_hi = -0.1, 0.1

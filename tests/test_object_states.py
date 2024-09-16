@@ -27,7 +27,7 @@ def test_on_top(env):
 
         assert obj.states[OnTop].get_value(breakfast_table)
 
-        obj.set_position(th.ones(3) * 10 * (i + 1))
+        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[OnTop].get_value(breakfast_table)
@@ -46,8 +46,8 @@ def test_inside(env):
     dishtowel = env.scene.object_registry("name", "dishtowel")
 
     place_obj_on_floor_plane(bottom_cabinet)
-    bowl.set_position([0.0, 0.0, 0.08])
-    dishtowel.set_position([0, 0.0, 0.5])
+    bowl.set_position_orientation(position=[0.0, 0.0, 0.08])
+    dishtowel.set_position_orientation(position=[0, 0.0, 0.5])
 
     for _ in range(5):
         og.sim.step()
@@ -55,8 +55,8 @@ def test_inside(env):
     assert bowl.states[Inside].get_value(bottom_cabinet)
     assert dishtowel.states[Inside].get_value(bottom_cabinet)
 
-    bowl.set_position([10.0, 10.0, 1.0])
-    dishtowel.set_position([20.0, 20.0, 1.0])
+    bowl.set_position_orientation(position=[10.0, 10.0, 1.0])
+    dishtowel.set_position_orientation(position=[20.0, 20.0, 1.0])
 
     for _ in range(5):
         og.sim.step()
@@ -85,7 +85,7 @@ def test_under(env):
 
         assert obj.states[Under].get_value(breakfast_table)
 
-        obj.set_position(th.ones(3) * 10 * (i + 1))
+        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Under].get_value(breakfast_table)
@@ -112,7 +112,7 @@ def test_touching(env):
         assert obj.states[Touching].get_value(breakfast_table)
         assert breakfast_table.states[Touching].get_value(obj)
 
-        obj.set_position(th.ones(3) * 10 * (i + 1))
+        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[Touching].get_value(breakfast_table)
@@ -139,7 +139,7 @@ def test_contact_bodies(env):
             assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
         assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
 
-        obj.set_position(th.ones(3) * 10 * (i + 1))
+        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
@@ -164,7 +164,7 @@ def test_next_to(env):
         assert obj.states[NextTo].get_value(bottom_cabinet)
         assert bottom_cabinet.states[NextTo].get_value(obj)
 
-        obj.set_position(th.ones(3) * 10 * (i + 1))
+        obj.set_position_orientation(position=th.ones(3) * 10 * (i + 1))
         og.sim.step()
 
         assert not obj.states[NextTo].get_value(bottom_cabinet)
@@ -187,7 +187,7 @@ def test_overlaid(env):
 
     assert carpet.states[Overlaid].get_value(breakfast_table)
 
-    carpet.set_position(th.ones(3) * 20.0)
+    carpet.set_position_orientation(position=th.ones(3) * 20.0)
     og.sim.step()
 
     assert not carpet.states[Overlaid].get_value(breakfast_table)
@@ -204,10 +204,10 @@ def test_pose(env):
     dishtowel = env.scene.object_registry("name", "dishtowel")
 
     pos1, orn1 = get_random_pose()
-    breakfast_table.set_position_orientation(pos1, orn1)
+    breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
     pos2, orn2 = get_random_pose()
-    dishtowel.set_position_orientation(pos2, orn2)
+    dishtowel.set_position_orientation(position=pos2, orientation=orn2)
 
     assert th.allclose(breakfast_table.states[Pose].get_value()[0], pos1)
     assert th.allclose(breakfast_table.states[Pose].get_value()[1], orn1) or th.allclose(
@@ -228,10 +228,10 @@ def test_aabb(env):
     dishtowel = env.scene.object_registry("name", "dishtowel")
 
     pos1, orn1 = get_random_pose()
-    breakfast_table.set_position_orientation(pos1, orn1)
+    breakfast_table.set_position_orientation(position=pos1, orientation=orn1)
 
     pos2, orn2 = get_random_pose()
-    dishtowel.set_position_orientation(pos2, orn2)
+    dishtowel.set_position_orientation(position=pos2, orientation=orn2)
 
     # Need to take one sim step
     og.sim.step()
@@ -274,8 +274,8 @@ def test_adjacency(env):
             )
         )
 
-    bowl.set_position([0.0, 0.0, 1.0])
-    dishtowel.set_position([0.0, 0.0, 2.0])
+    bowl.set_position_orientation(position=[0.0, 0.0, 1.0])
+    dishtowel.set_position_orientation(position=[0.0, 0.0, 2.0])
 
     # Need to take one sim step
     og.sim.step()
@@ -323,8 +323,8 @@ def test_temperature(env):
     microwave.joints["j_link_0"].set_pos(math.pi / 2)
 
     # Set the objects to be inside the microwave
-    bagel.set_position_orientation([0, 0, 0.11], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([-0.15, 0, 0.11], [0, 0, 0, 1])
+    bagel.set_position_orientation(position=[0, 0, 0.11], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[-0.15, 0, 0.11], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -370,8 +370,8 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     # Set the objects to be on top of the stove
-    bagel.set_position_orientation([0.71, 0.11, 0.88], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([0.84, 0.11, 0.88], [0, 0, 0, 1])
+    bagel.set_position_orientation(position=[0.71, 0.11, 0.88], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[0.84, 0.11, 0.88], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -394,8 +394,8 @@ def test_temperature(env):
     assert dishtowel.states[Temperature].set_value(m.object_states.temperature.DEFAULT_TEMPERATURE)
 
     # Set the objects to be inside the fridge
-    bagel.set_position_orientation([1.9, 0, 0.89], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([2.1, 0, 0.89], [0, 0, 0, 1])
+    bagel.set_position_orientation(position=[1.9, 0, 0.89], orientation=[0, 0, 0, 1])
+    dishtowel.set_position_orientation(position=[2.1, 0, 0.89], orientation=[0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -650,7 +650,7 @@ def test_toggled_on(env):
     stove.set_position_orientation(
         [1.48, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, -math.pi / 2.0], dtype=th.float32))
     )
-    robot.set_position_orientation([0.0, 0.38, 0.0], [0, 0, 0, 1])
+    robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
@@ -675,11 +675,16 @@ def test_toggled_on(env):
     # End-effector not close to the button, stays False
     assert not stove.states[ToggledOn].get_value()
 
+    # Settle robot
+    for _ in range(10):
+        og.sim.step()
+
     q[jnt_idxs["shoulder_pan_joint"]] = 0.0
     robot.set_joint_positions(q, drive=False)
 
     for _ in range(steps - 1):
         og.sim.step()
+        robot.keep_still()
 
     # End-effector close to the button, but not enough time has passed, still False
     assert not stove.states[ToggledOn].get_value()
@@ -701,9 +706,9 @@ def test_attached_to(env):
     shelf_shelf = env.scene.object_registry("name", "shelf_shelf")
     shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
 
-    shelf_back_panel.set_position_orientation([0, 0, 0.01], [0, 0, 0, 1])
+    shelf_back_panel.set_position_orientation(position=[0, 0, 0.01], orientation=[0, 0, 0, 1])
     shelf_back_panel.keep_still()
-    shelf_shelf.set_position_orientation([0, 0.03, 0.17], [0, 0, 0, 1])
+    shelf_shelf.set_position_orientation(position=[0, 0.03, 0.17], orientation=[0, 0, 0, 1])
     shelf_shelf.keep_still()
 
     # The shelf should not be attached to the back panel (no contact yet)
@@ -731,17 +736,17 @@ def test_attached_to(env):
     force_dir = th.tensor([0, 0, 1])
     # A small force will not break the attachment
     force_mag = 10
-    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
+    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position_orientation()[0])
     og.sim.step()
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
     # A large force will break the attachment
     force_mag = 1000
-    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
+    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position_orientation()[0])
     og.sim.step()
     assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
-    shelf_shelf.set_position_orientation([0, 0, 10], [0, 0, 0, 1])
+    shelf_shelf.set_position_orientation(position=[0, 0, 10], orientation=[0, 0, 0, 1])
     assert not shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
     # The shelf should not be attached to the back panel because the alignment is wrong
     assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
@@ -751,7 +756,7 @@ def test_attached_to(env):
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
     # The shelf baseboard should NOT be attached because the attachment has the wrong type
-    shelf_baseboard.set_position_orientation([0.37, -0.93, 0.03], [0, 0, 0, 1])
+    shelf_baseboard.set_position_orientation(position=[0.37, -0.93, 0.03], orientation=[0, 0, 0, 1])
     assert not shelf_baseboard.states[AttachedTo].set_value(shelf_back_panel, True, bypass_alignment_checking=True)
     assert not shelf_baseboard.states[AttachedTo].get_value(shelf_back_panel)
 
@@ -795,7 +800,7 @@ def test_particle_sink(env):
     # There should be no water particles.
     assert water_system.n_particles == 0
 
-    sink_pos = sink.states[ParticleSink].link.get_position()
+    sink_pos = sink.states[ParticleSink].link.get_position_orientation()[0]
     water_system.generate_particles(positions=[(sink_pos + th.tensor([0, 0, 0.05])).tolist()])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
@@ -913,7 +918,7 @@ def test_particle_remover(env):
 
     # Test adjacency
 
-    vacuum.set_position(th.ones(3) * 50.0)
+    vacuum.set_position_orientation(position=th.ones(3) * 50.0)
     place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
     og.sim.step()
     # Place single particle of water on middle of table
@@ -1086,7 +1091,7 @@ def test_draped(env):
 
     assert carpet.states[Draped].get_value(breakfast_table)
 
-    carpet.set_position([20.0, 20.0, 1.0])
+    carpet.set_position_orientation(position=[20.0, 20.0, 1.0])
 
     for _ in range(5):
         og.sim.step()

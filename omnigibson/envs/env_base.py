@@ -270,6 +270,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
 
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
+                if position is not None:
+                    position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+                if orientation is not None:
+                    orientation = (
+                        orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+                    )
+
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -279,8 +286,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 )
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
-                # TODO: Fix this after scene_local_position_orientation API is fixed
-                robot.set_local_pose(position=position, orientation=orientation)
+                robot.set_position_orientation(position=position, orientation=orientation, frame="scene")
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -304,7 +310,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             )
             # Import the robot into the simulator and set the pose
             self.scene.add_object(obj)
-            obj.set_local_pose(position=position, orientation=orientation)
+            obj.set_position_orientation(position=position, orientation=orientation, frame="scene")
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
@@ -335,7 +341,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Load an initialize this sensor
                 sensor.load(self.scene)
                 sensor.initialize()
-                sensor.set_local_pose(local_position, local_orientation)
+                sensor.set_position_orientation(position=local_position, orientation=local_orientation, frame="scene")
                 self._external_sensors[sensor.name] = sensor
                 self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 
@@ -825,7 +831,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "action_frequency": gm.DEFAULT_RENDERING_FREQ,
+                "action_frequency": gm.DEFAULT_SIM_STEP_FREQ,
                 "rendering_frequency": gm.DEFAULT_RENDERING_FREQ,
                 "physics_frequency": gm.DEFAULT_PHYSICS_FREQ,
                 "device": None,

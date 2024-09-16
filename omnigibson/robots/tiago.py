@@ -1,5 +1,6 @@
 import math
 import os
+from typing import Literal
 
 import torch as th
 
@@ -11,7 +12,7 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -72,9 +73,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Unique to Tiago
         variant="default",
         rigid_trunk=False,
-        default_trunk_offset=0.365,
+        default_trunk_offset=0.2,
         default_reset_mode="untuck",
-        default_arm_pose="vertical",
+        default_arm_pose="diagonal15",
         **kwargs,
     ):
         """
@@ -214,15 +215,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 )
             elif self.default_arm_pose == "diagonal15":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, 2.05251]
+                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]
                 )
             elif self.default_arm_pose == "diagonal30":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, 2.03113]
+                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, -1.11046]
                 )
             elif self.default_arm_pose == "diagonal45":
                 pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, 1.81302]
+                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, -1.32857]
                 )
             elif self.default_arm_pose == "horizontal":
                 pos[self.arm_control_idx[arm]] = th.tensor(
@@ -291,8 +292,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = self.base_footprint_link.get_orientation()
-        root_link_orn = self.root_link.get_orientation()
+        base_orn = self.base_footprint_link.get_position_orientation()[1]
+        root_link_orn = self.root_link.get_position_orientation()[1]
 
         cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
 
@@ -336,18 +337,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         limits["velocity"][0][self.base_idx[3:]] = -m.MAX_ANGULAR_VELOCITY
         limits["velocity"][1][self.base_idx[3:]] = m.MAX_ANGULAR_VELOCITY
         return limits
-
-    def get_control_dict(self):
-        # Modify the right hand's pos_relative in the z-direction based on the trunk's value
-        # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
-        # hand, which does not control the trunk
-        fcns = super().get_control_dict()
-        native_fcn = fcns.get_fcn("eef_right_pos_relative")
-        fcns["eef_right_pos_relative"] = lambda: (
-            native_fcn() + th.tensor([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
-        )
-
-        return fcns
 
     @property
     def default_proprio_obs(self):
@@ -469,12 +458,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Add combined entry
         idxs = super().arm_control_idx
         # Concatenate all values and sort them
-        combined_tensor = th.cat([val for val in idxs.values()])
-        sorted_tensor, _ = th.sort(combined_tensor)
-        
-        # Add the sorted tensor as the "combined" entry
-        idxs["combined"] = sorted_tensor
-        
+        idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
 
     @property
@@ -679,24 +663,54 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def arm_workspace_range(self):
         return {
-            "left": th.tensor([th.deg2rad(th.tensor([15])).item(), th.deg2rad(th.tensor([75])).item()], dtype=th.float32),
-            "right": th.tensor([th.deg2rad(th.tensor([-75])).item(), th.deg2rad(th.tensor([-15])).item()], dtype=th.float32),
+            "left": th.deg2rad(th.tensor([15, 75], dtype=th.float32)),
+            "right": th.deg2rad(th.tensor([-75, -15], dtype=th.float32))
         }
 
-    def get_position_orientation(self, clone=True):
-        # TODO: Investigate the need for this custom behavior.
-        return self.base_footprint_link.get_position_orientation(clone=clone)
+    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
+        """
+        Gets tiago's pose with respect to the specified frame.
 
-    def set_position_orientation(self, position=None, orientation=None):
-        current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
-        position, orientation = th.tensor(position), th.tensor(orientation)
-        assert math.isclose(
-            th.norm(orientation), 1, abs_tol=1e-3
-        ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
+        Args:
+            frame (Literal): frame to get the pose with respect to. Default to world.
+                scene frame gets position relative to the scene.
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (x,y,z) position in the specified frame
+                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
+        """
+        return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
+
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
+        """
+        Sets tiago's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
+                scene frame sets position relative to the scene.
+        """
+        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
+
+        # If no position or no orientation are given, get the current position and orientation of the object
+        if position is None or orientation is None:
+            current_position, current_orientation = self.get_position_orientation(frame=frame)
+        position = current_position if position is None else position
+        orientation = current_orientation if orientation is None else orientation
+
+        # Convert to th.Tensor if necessary
+        position = th.as_tensor(position, dtype=th.float32)
+        orientation = th.as_tensor(orientation, dtype=th.float32)
+
+        # Convert to from scene-relative to world if necessary
+        if frame == "scene":
+            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
         # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
@@ -731,7 +745,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = self.root_link.get_orientation()
+        orn = self.root_link.get_position_orientation()[1]
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
         self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
@@ -743,7 +757,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def set_angular_velocity(self, velocity: th.tensor) -> None:
         # See comments of self.set_linear_velocity
-        orn = self.root_link.get_orientation()
+        orn = self.root_link.get_position_orientation()[1]
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
         self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)

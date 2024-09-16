@@ -59,8 +59,7 @@ class GraspTask(BaseTask):
 
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj_pos, obj_orn = T.pose_transform(*env.scene.get_position_orientation(), obj_pos, obj_orn)
-            obj.set_position_orientation(obj_pos, obj_orn)
+            obj.set_position_orientation(position=obj_pos, orientation=obj_orn, frame="scene")
 
     def _create_termination_conditions(self):
         terminations = dict()
@@ -90,9 +89,7 @@ class GraspTask(BaseTask):
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
-            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
-            robot_pos, robot_orn = T.pose_transform(*robot.scene.get_position_orientation(), robot_pos, robot_orn)
-            robot.set_position_orientation(robot_pos, robot_orn)
+            robot.set_position_orientation(position=robot_pos, orientation=robot_orn, frame="scene")
 
         # Otherwise, reset using the primitive controller.
         else:
@@ -147,7 +144,7 @@ class GraspTask(BaseTask):
                 raise ValueError("Robot could not settle")
 
             # Check if the robot has toppled
-            robot_up = T.quat_apply(robot.get_orientation(), th.tensor([0, 0, 1], dtype=th.float32))
+            robot_up = T.quat_apply(robot.get_position_orientation()[1], th.tensor([0, 0, 1], dtype=th.float32))
             if robot_up[2] < 0.75:
                 raise ValueError("Robot has toppled over")
 
@@ -166,8 +163,7 @@ class GraspTask(BaseTask):
             # Set object pose
             obj_pos = [0.0, 0.0, 0.0] if "position" not in obj_config else obj_config["position"]
             obj_orn = [0.0, 0.0, 0.0, 1.0] if "orientation" not in obj_config else obj_config["orientation"]
-            obj_pos, obj_orn = T.pose_transform(*env.scene.get_position_orientation(), obj_pos, obj_orn)
-            obj.set_position_orientation(obj_pos, obj_orn)
+            obj.set_position_orientation(position=obj_pos, orientation=obj_orn, frame="scene")
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):
@@ -200,7 +196,7 @@ class GraspTask(BaseTask):
     def _get_random_joint_position(self, robot):
         joint_positions = []
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        joints = th.tensor([joint for joint in robot.joints.values()], dtype=th.float32)
+        joints = th.tensor([joint for joint in robot.joints.values()])
         arm_joints = joints[joint_control_idx]
         for i, joint in enumerate(arm_joints):
             val = random.uniform(joint.lower_limit, joint.upper_limit)

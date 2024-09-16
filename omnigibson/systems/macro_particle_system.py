@@ -642,7 +642,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position, normal, quaternion, hit_link, reasons = result
                 if position is not None:
                     positions.append(position)
-                    orientations.append(th.tensor(quaternion))
+                    orientations.append(quaternion)
                     particle_scales.append(scale)
                     link_prim_paths.append(hit_link)
             scales = particle_scales
@@ -684,7 +684,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if local:
             poses = th.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
-                poses[i] = T.pose2mat(self.particles[name].get_local_pose())
+                poses[i] = T.pose2mat(self.particles[name].get_position_orientation(frame="parent"))
         else:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
@@ -697,9 +697,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                     if obj not in link_tfs:
                         # We want World --> obj transform, NOT the World --> root_link transform, since these particles
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
-                        # get the transform, and not obj.get_local_pose() which will give us the local pose of the
+                        # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_local_pose(obj))
+                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
                     link = obj
                 else:
                     link = self._particles_info[name]["link"]
@@ -734,7 +734,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         local_mat = self._particles_local_mat[name]
         link_tf = (
-            T.pose2mat(XFormPrim.get_local_pose(parent_obj))
+            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
             if is_cloth
             else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
         )
@@ -744,7 +744,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
     def get_particle_local_pose(self, idx):
         name = list(self.particles.keys())[idx]
-        return self.particles[name].get_local_pose()
+        return self.particles[name].get_position_orientation(frame="parent")
 
     def _modify_batch_particles_position_orientation(self, particles, positions=None, orientations=None, local=False):
         """
@@ -788,9 +788,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                     if obj not in link_tfs:
                         # We want World --> obj transform, NOT the World --> root_link transform, since these particles
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
-                        # get the transform, and not obj.get_local_pose() which will give us the local pose of the
+                        # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_local_pose(obj))
+                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
                     link_tf = link_tfs[obj]
                 else:
                     link = self._particles_info[name]["link"]
@@ -831,6 +831,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             position = pos if position is None else position
             orientation = ori if orientation is None else orientation
 
+        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
+
         name = list(self.particles.keys())[idx]
         global_mat = th.zeros((4, 4))
         global_mat[-1, -1] = 1.0
@@ -840,7 +843,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         link_tf = (
-            T.pose2mat(XFormPrim.get_local_pose(parent_obj))
+            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
             if is_cloth
             else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
         )
@@ -853,6 +856,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             pos, ori = self.get_particle_local_pose(idx=idx)
             position = pos if position is None else position
             orientation = ori if orientation is None else orientation
+
+        position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
+        orientation = orientation if isinstance(orientation, th.Tensor) else th.tensor(orientation, dtype=th.float32)
 
         name = list(self.particles.keys())[idx]
         local_mat = th.zeros((4, 4))
@@ -888,7 +894,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
-        local_pos, local_quat = particle.get_local_pose()
+        local_pos, local_quat = particle.get_position_orientation(frame="parent")
         local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
 
@@ -907,7 +913,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = T.mat2pose(mat)
         local_pos = local_pos if ignore_scale else local_pos / scale
-        particle.set_local_pose(local_pos, local_quat)
+        particle.set_position_orientation(position=local_pos, orientation=local_quat, frame="parent")
 
         # Store updated value
         self._particles_local_mat[name] = mat
@@ -1287,7 +1293,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
     def get_particles_position_orientation(self):
         # Note: This gets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if self.n_particles > 0:
-            tfs = th.tensor(self.particles_view.get_transforms())
+            tfs = self.particles_view.get_transforms()
             pos, ori = tfs[:, :3], tfs[:, 3:]
             pos = pos + T.quat2mat(ori) @ self._particle_offset
         else:
@@ -1344,7 +1350,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 - (n, 3)-array: per-particle (ax, ay, az) angular velocities in the world frame
         """
         if self.n_particles > 0:
-            vels = th.tensor(self.particles_view.get_velocities())
+            vels = self.particles_view.get_velocities()
             lin_vel, ang_vel = vels[:, :3], vels[:, 3:]
         else:
             lin_vel, ang_vel = th.empty(0).reshape(0, 3), th.empty(0).reshape(0, 3)
