@@ -1,6 +1,7 @@
 import os
-import yaml
+
 import pytest
+import yaml
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -14,10 +15,12 @@ from omnigibson.objects.dataset_object import DatasetObject
 # Make sure that Omniverse is launched before setting up the tests.
 og.launch()
 
+
 def load_robot_config(robot_name):
     config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_config.yaml")
     with open(config_filename, "r") as file:
         return yaml.safe_load(file)
+
 
 def setup_environment(load_object_categories, robot="Fetch"):
     if robot not in ["Fetch", "Tiago"]:
@@ -74,6 +77,8 @@ def primitive_tester(env, objects, primitives, primitives_args):
         og.clear()
 
     return True
+
+
 @pytest.mark.flaky(reruns=3)
 @pytest.mark.parametrize("robot", ["Fetch", "Tiago"])
 class TestPrimitives:

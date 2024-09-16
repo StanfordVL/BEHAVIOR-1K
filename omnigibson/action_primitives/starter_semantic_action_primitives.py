@@ -1091,7 +1091,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             # check if the eef stayed in the same pose for sufficiently long
-            if og.sim.get_sim_step_dt() * i > m.TIME_WITHOUT_CHECKING and th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001:
+            if (
+                og.sim.get_sim_step_dt() * i > m.TIME_WITHOUT_CHECKING
+                and th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001
+            ):
                 # We're stuck!
                 break
 
@@ -1432,7 +1435,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
         """
-        
+
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             action_idx = self.robot.controller_action_idx[name]

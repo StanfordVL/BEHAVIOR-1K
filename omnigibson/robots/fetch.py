@@ -471,9 +471,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def arm_workspace_range(self):
-        return {
-            self.default_arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32))
-        }
+        return {self.default_arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32))}
 
     @property
     def eef_usd_path(self):
