@@ -136,13 +136,13 @@ class HolonomicBaseRobot(LocomotionRobot):
     def _initialize(self):
         super()._initialize()
 
-        # Set the max velocity for the base joints
-        self.joints["base_footprint_x_joint"].max_velocity = m.MAX_LINEAR_VELOCITY
-        self.joints["base_footprint_y_joint"].max_velocity = m.MAX_LINEAR_VELOCITY
-        self.joints["base_footprint_z_joint"].max_velocity = m.MAX_LINEAR_VELOCITY
-        self.joints["base_footprint_rx_joint"].max_velocity = m.MAX_ANGULAR_VELOCITY
-        self.joints["base_footprint_ry_joint"].max_velocity = m.MAX_ANGULAR_VELOCITY
-        self.joints["base_footprint_rz_joint"].max_velocity = m.MAX_ANGULAR_VELOCITY
+        for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
+            joint_name = f"base_footprint_{component}_joint"
+            assert joint_name in self.joints, f"Missing base joint: {joint_name}"
+            if i < 3:
+                self.joints[joint_name].max_velocity = m.MAX_LINEAR_VELOCITY
+            else:
+                self.joints[joint_name].max_velocity = m.MAX_ANGULAR_VELOCITY
 
         # Force the recomputation of this cached property
         del self.control_limits
