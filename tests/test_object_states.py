@@ -223,6 +223,23 @@ def test_pose(env):
 
 
 @og_test
+def test_joint(env):
+    breakfast_table = env.scene.object_registry("name", "breakfast_table")
+    bottom_cabinet = env.scene.object_registry("name", "bottom_cabinet")
+
+    lo = bottom_cabinet.joint_lower_limits
+    hi = bottom_cabinet.joint_upper_limits
+    q_rand = lo + (hi - lo) * th.rand(bottom_cabinet.n_joints)
+    bottom_cabinet.set_joint_positions(q_rand)
+
+    assert th.allclose(bottom_cabinet.states[Joint].get_value(), q_rand)
+    assert len(breakfast_table.states[Joint].get_value()) == 0
+
+    with pytest.raises(NotImplementedError):
+        bottom_cabinet.states[Joint].set_value(None)
+
+
+@og_test
 def test_aabb(env):
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
     dishtowel = env.scene.object_registry("name", "dishtowel")
