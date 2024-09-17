@@ -252,6 +252,7 @@ class CuRoboMotionGenerator:
         self,
         q,
         activation_distance=0.01,
+        weight=50000.0,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -261,6 +262,7 @@ class CuRoboMotionGenerator:
                 collisions against the world
             activation_distance (float): Safety buffer around robot mesh representation which will trigger a
                 collision check
+            weight (float): Loss weighting to apply during collision check optimization
 
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
@@ -288,7 +290,7 @@ class CuRoboMotionGenerator:
             dist = self.mg.world_coll_checker.get_sphere_collision(
                 robot_spheres,
                 coll_query_buffer,
-                weight=th.tensor([50000.0], device=self.tensor_args.device),
+                weight=th.tensor([weight], device=self.tensor_args.device),
                 activation_distance=th.tensor([activation_distance], device=self.tensor_args.device),
                 env_query_idx=None,
                 return_loss=False,
@@ -409,8 +411,8 @@ class CuRoboMotionGenerator:
         sim_js_names = list(self.robot.joints.keys())
         cu_js_batch = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
+            # TODO: Ideally these should be nonzero, but curobo fails to compute a solution if so
             velocity=self._tensor_args.to_device(q_vel) * 0.0,
-            # TODO: Ideally this should be nonzero, but curobo fails to compute a solution if so
             acceleration=self._tensor_args.to_device(q_eff) * 0.0,
             jerk=self._tensor_args.to_device(q_eff) * 0.0,
             joint_names=sim_js_names,
