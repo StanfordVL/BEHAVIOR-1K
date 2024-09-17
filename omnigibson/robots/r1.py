@@ -6,18 +6,15 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint
+from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
-RESET_JOINT_OPTIONS = {
-    "tuck",
-    "untuck",
-}
 
-
-class R1(ManipulationRobot, HolonomicBaseRobot):
+class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     """
     R1 Robot
     """
@@ -27,7 +24,6 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -48,18 +44,16 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-        # Unique to r1
-        default_reset_mode="untuck",
+        # Unique to ArticulatedTrunkRobot
         rigid_trunk=False,
+        # Unique to MobileManipulationRobot
+        default_reset_mode="untuck",
         **kwargs,
     ):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -98,17 +92,12 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
-            rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
-        # Store args
-        self.rigid_trunk = rigid_trunk
-        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
-        self.default_reset_mode = default_reset_mode
-
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -131,6 +120,9 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
+            rigid_trunk=rigid_trunk,
+            default_trunk_offset=0.0,  # not applicable for R1
+            default_reset_mode=default_reset_mode,
             **kwargs,
         )
 
@@ -146,22 +138,6 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
 
     def _create_discrete_action_space(self):
         raise ValueError("R1 does not support discrete actions!")
-
-    def _get_proprioception_dict(self):
-        dic = super()._get_proprioception_dict()
-
-        # Add trunk info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
-        dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
-        dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
-
-        return dic
-
-    @property
-    def default_proprio_obs(self):
-        obs_keys = super().default_proprio_obs
-        return obs_keys + ["trunk_qpos"]
 
     @property
     def controller_order(self):
@@ -182,44 +158,6 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
         return controllers
 
     @property
-    def _default_controller_config(self):
-        # Grab defaults from super method first
-        cfg = super()._default_controller_config
-
-        for arm in self.arm_names:
-            for arm_cfg in cfg["arm_{}".format(arm)].values():
-
-                if arm == "left":
-                    # Need to override joint idx being controlled to include trunk in default arm controller configs
-                    arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[arm]])
-                    arm_cfg["dof_idx"] = arm_control_idx
-
-                    # Need to modify the default joint positions also if this is a null joint controller
-                    if arm_cfg["name"] == "NullJointController":
-                        arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
-
-                # If using rigid trunk, we also clamp its limits
-                # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving
-                # via the left arm??
-                if self.rigid_trunk:
-                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = th.zeros(4)
-                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = th.zeros(4)
-
-        return cfg
-
-    def tuck(self):
-        """
-        Immediately set this robot's configuration to be in tucked mode
-        """
-        self.set_joint_positions(self.tucked_default_joint_pos)
-
-    def untuck(self):
-        """
-        Immediately set this robot's configuration to be in untucked mode
-        """
-        self.set_joint_positions(self.untucked_default_joint_pos)
-
-    @property
     def tucked_default_joint_pos(self):
         pos = th.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
@@ -236,12 +174,8 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
         return pos
 
     @property
-    def _default_joint_pos(self):
-        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
-
-    @property
     def finger_lengths(self):
-        return {self.default_arm: 0.1}
+        return {self.default_arm: 0.087}
 
     @property
     def assisted_grasp_start_points(self):
@@ -262,14 +196,6 @@ class R1(ManipulationRobot, HolonomicBaseRobot):
             ]
             for arm in self.arm_names
         }
-
-    @property
-    def trunk_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joints.
-        """
-        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def trunk_joint_names(self):

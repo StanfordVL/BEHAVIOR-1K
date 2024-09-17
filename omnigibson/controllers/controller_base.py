@@ -133,8 +133,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         )
         command_output_limits = (
             (
-                th.tensor(self._control_limits[self.control_type][0])[self.dof_idx],
-                th.tensor(self._control_limits[self.control_type][1])[self.dof_idx],
+                self._control_limits[self.control_type][0][self.dof_idx],
+                self._control_limits[self.control_type][1][self.dof_idx],
             )
             if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits

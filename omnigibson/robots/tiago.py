@@ -8,33 +8,18 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint
+from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
-DEFAULT_ARM_POSES = {
-    "vertical",
-    "diagonal15",
-    "diagonal30",
-    "diagonal45",
-    "horizontal",
-}
 
-RESET_JOINT_OPTIONS = {
-    "tuck",
-    "untuck",
-}
-
-
-class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
+class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCameraRobot):
     """
     Tiago Robot
     Reference: https://pal-robotics.com/robots/tiago/
-
-    NOTE: If using IK Control for both the right and left arms, note that the left arm dictates control of the trunk,
-    and the right arm passively must follow. That is, sending desired delta position commands to the right end effector
-    will be computed independently from any trunk motion occurring during that timestep.
     """
 
     def __init__(
@@ -62,34 +47,34 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-        # Unique to Tiago
-        variant="default",
+        # Unique to ArticulatedTrunkRobot
         rigid_trunk=False,
         default_trunk_offset=0.2,
+        # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
-        default_arm_pose="diagonal15",
+        # Unique to UntuckedArmPoseRobot
+        default_arm_pose="vertical",
+        # Unique to Tiago
+        variant="default",
         **kwargs,
     ):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
-            category (str): Category for the object. Defaults to "object".
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
-            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                we will automatically set the control frequency to be the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -115,27 +100,21 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
-            variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
-            rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
-            default_trunk_offset (float): sets the default height of the robot's trunk
+            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
+            default_trunk_offset (float): The default height of the robot's trunk
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
                 {"vertical", "diagonal15", "diagonal30", "diagonal45", "horizontal"}
                 If either reset_joint_pos is not None or default_reset_mode is "tuck", this will be ignored.
                 Otherwise the reset_joint_pos will be initialized to the precomputed joint positions that represents default_arm_pose.
+            variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store args
         assert variant in ("default", "wrist_cam"), f"Invalid Tiago variant specified {variant}!"
         self._variant = variant
-        self.rigid_trunk = rigid_trunk
-        self.default_trunk_offset = default_trunk_offset
-        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
-        self.default_reset_mode = default_reset_mode
-        assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
-        self.default_arm_pose = default_arm_pose
 
         # Run super init
         super().__init__(
@@ -158,6 +137,10 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
+            rigid_trunk=rigid_trunk,
+            default_trunk_offset=default_trunk_offset,
+            default_reset_mode=default_reset_mode,
+            default_arm_pose=default_arm_pose,
             **kwargs,
         )
 
@@ -190,37 +173,24 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
 
     @property
     def untucked_default_joint_pos(self):
-        pos = th.zeros(self.n_dof)
+        pos = super().untucked_default_joint_pos
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
         pos[self.camera_control_idx] = th.tensor([0.0, -0.45])
-        # Choose arm joint pos based on setting
         for arm in self.arm_names:
             pos[self.gripper_control_idx[arm]] = th.tensor([0.045, 0.045])  # open gripper
-            if self.default_arm_pose == "vertical":
-                pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
-                )
-            elif self.default_arm_pose == "diagonal15":
-                pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]
-                )
-            elif self.default_arm_pose == "diagonal30":
-                pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, -1.11046]
-                )
-            elif self.default_arm_pose == "diagonal45":
-                pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, -1.32857]
-                )
-            elif self.default_arm_pose == "horizontal":
-                pos[self.arm_control_idx[arm]] = th.tensor(
-                    [0.61511, 0.49229, 1.46306, 1.24919, 1.08282, -1.28865, 1.50910]
-                )
-            else:
-                raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
+
+    @property
+    def default_arm_poses(self):
+        return {
+            "vertical": th.tensor([0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]),
+            "diagonal15": th.tensor([0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]),
+            "diagonal30": th.tensor([0.71883, -0.02787, 1.86002, 1.52897, 0.52204, -0.99741, -1.11046]),
+            "diagonal45": th.tensor([0.66058, -0.14251, 1.77547, 1.43345, 0.65988, -1.02741, -1.32857]),
+            "horizontal": th.tensor([0.61511, 0.49229, 1.46306, 1.24919, 1.08282, -1.28865, 1.50910]),
+        }
 
     @property
     def discrete_action_list(self):
@@ -228,18 +198,6 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
 
     def _create_discrete_action_space(self):
         raise ValueError("Tiago does not support discrete actions!")
-
-    def tuck(self):
-        """
-        Immediately set this robot's configuration to be in tucked mode
-        """
-        self.set_joint_positions(self.tucked_default_joint_pos)
-
-    def untuck(self):
-        """
-        Immediately set this robot's configuration to be in untucked mode
-        """
-        self.set_joint_positions(self.untucked_default_joint_pos)
 
     def _post_load(self):
         super()._post_load()
@@ -254,22 +212,6 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
     @property
     def base_footprint_link_name(self):
         return "base_footprint"
-
-    def _get_proprioception_dict(self):
-        dic = super()._get_proprioception_dict()
-
-        # Add trunk info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
-        dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
-        dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
-
-        return dic
-
-    @property
-    def default_proprio_obs(self):
-        obs_keys = super().default_proprio_obs
-        return obs_keys + ["trunk_qpos"]
 
     @property
     def controller_order(self):
@@ -291,40 +233,6 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
             controllers["arm_{}".format(arm)] = "InverseKinematicsController"
             controllers["gripper_{}".format(arm)] = "MultiFingerGripperController"
         return controllers
-
-    @property
-    def _default_controller_config(self):
-        # Grab defaults from super method first
-        cfg = super()._default_controller_config
-
-        for arm in self.arm_names:
-            for arm_cfg in cfg["arm_{}".format(arm)].values():
-
-                if arm == "left":
-                    # Need to override joint idx being controlled to include trunk in default arm controller configs
-                    arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[arm]])
-                    arm_cfg["dof_idx"] = arm_control_idx
-
-                    # Need to modify the default joint positions also if this is a null joint controller
-                    if arm_cfg["name"] == "NullJointController":
-                        arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
-
-                # If using rigid trunk, we also clamp its limits
-                # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving
-                # via the left arm??
-                if self.rigid_trunk:
-                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = self.untucked_default_joint_pos[
-                        self.trunk_control_idx
-                    ]
-                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = self.untucked_default_joint_pos[
-                        self.trunk_control_idx
-                    ]
-
-        return cfg
-
-    @property
-    def _default_joint_pos(self):
-        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     def assisted_grasp_start_points(self):
@@ -353,14 +261,6 @@ class Tiago(ManipulationRobot, HolonomicBaseRobot, ActiveCameraRobot):
             ]
             for arm in self.arm_names
         }
-
-    @property
-    def trunk_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to trunk joints.
-        """
-        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
     def arm_control_idx(self):
