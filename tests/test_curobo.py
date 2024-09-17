@@ -1,9 +1,10 @@
 import pytest
-import omnigibson as og
-from omnigibson.macros import gm
-from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
-from omnigibson.object_states import Touching
 import torch as th
+
+import omnigibson as og
+from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
+from omnigibson.macros import gm
+from omnigibson.object_states import Touching
 
 
 def test_curobo():
