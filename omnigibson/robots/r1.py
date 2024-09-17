@@ -45,7 +45,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         grasping_mode="physical",
         disable_grasp_handling=False,
         # Unique to ArticulatedTrunkRobot
-        rigid_trunk=False,
+        rigid_trunk=True,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         **kwargs,

@@ -24,7 +24,6 @@ def test_arm_control():
             },
             {
                 "type": "Fetch",
-                "default_trunk_offset": 0.2,
                 "obs_modalities": "rgb",
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
@@ -34,6 +33,20 @@ def test_arm_control():
                 "type": "Tiago",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 110],
+                "orientation": [0, 0, 0, 1],
+                "action_normalize": False,
+            },
+            {
+                "type": "A1",
+                "obs_modalities": "rgb",
+                "position": [150, 150, 115],
+                "orientation": [0, 0, 0, 1],
+                "action_normalize": False,
+            },
+            {
+                "type": "R1",
+                "obs_modalities": "rgb",
+                "position": [150, 150, 120],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
             },
