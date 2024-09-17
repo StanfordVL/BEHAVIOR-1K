@@ -1,7 +1,7 @@
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.object_states.joint_state import Joint
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.object_states.pose import Pose
 from omnigibson.utils.python_utils import classproperty
 
