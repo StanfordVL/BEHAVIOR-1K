@@ -18,6 +18,7 @@ while [[ ! -n $(find "${ISAAC_SIM_PATH}" -maxdepth 1 -name "isaac*.sh" 2>/dev/nu
   echo "isaac*.sh not found in [4m$ISAAC_SIM_PATH[0m."
   read -p "Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
 done
+echo -e "\nUsing Isaac Sim at [4m$ISAAC_SIM_PATH[0m\n"
 
 
 # Choose venv name 
