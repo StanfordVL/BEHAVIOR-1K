@@ -54,7 +54,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         # Unique to UntuckedArmPoseRobot
-        default_arm_pose="vertical",
+        default_arm_pose="diagonal15",
         # Unique to Tiago
         variant="default",
         **kwargs,

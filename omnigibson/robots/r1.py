@@ -102,7 +102,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=True,
