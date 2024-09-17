@@ -6,15 +6,10 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
-
-m = create_module_macros(module_path=__file__)
-m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
-m.MAX_ANGULAR_VELOCITY = th.pi  # angular velocity in radians/second
-
 
 RESET_JOINT_OPTIONS = {
     "tuck",
@@ -22,7 +17,7 @@ RESET_JOINT_OPTIONS = {
 }
 
 
-class R1(ManipulationRobot, LocomotionRobot):
+class R1(ManipulationRobot, HolonomicBaseRobot):
     """
     R1 Robot
     """
@@ -113,8 +108,6 @@ class R1(ManipulationRobot, LocomotionRobot):
         self.rigid_trunk = rigid_trunk
         assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
         self.default_reset_mode = default_reset_mode
-        # Other args that will be created at runtime
-        self._world_base_fixed_joint_prim = None
 
         # Run super init
         super().__init__(
@@ -141,66 +134,18 @@ class R1(ManipulationRobot, LocomotionRobot):
             **kwargs,
         )
 
-    @property
-    def discrete_action_list(self):
-        raise NotImplementedError()
-
-    def _create_discrete_action_space(self):
-        raise ValueError("R1 does not support discrete actions!")
-
-    def _initialize(self):
-        # Run super method first
-        super()._initialize()
-
-    def reset(self):
-        """
-        Reset should not change the robot base pose.
-        We need to cache and restore the base joints to the world.
-        """
-        base_joint_positions = self.get_joint_positions()[self.base_idx]
-        super().reset()
-        self.set_joint_positions(base_joint_positions, indices=self.base_idx)
-
-    def _post_load(self):
-        super()._post_load()
-        # The eef gripper links should be visual-only. They only contain a "ghost" box volume for detecting objects
-        # inside the gripper, in order to activate attachments (AG for Cloths).
-        for arm in self.arm_names:
-            self.eef_links[arm].visual_only = True
-            self.eef_links[arm].visible = False
-
-        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
-            f"{self.prim_path}/rootJoint"
-        )
-        position, orientation = self.get_position_orientation()
-        # Set the world-to-base fixed joint to be at the robot's current pose
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-        )
-
     # Name of the actual root link that we are interested in. Note that this is different from self.root_link_name,
     # which is "base_footprint_x", corresponding to the first of the 6 1DoF joints to control the base.
     @property
     def base_footprint_link_name(self):
         return "base_link"
 
-    def _postprocess_control(self, control, control_type):
-        # Run super method first
-        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
+    @property
+    def discrete_action_list(self):
+        raise NotImplementedError()
 
-        # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = self.base_footprint_link.get_orientation()
-        root_link_orn = self.root_link.get_orientation()
-
-        cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
-
-        # Rotate the linear and angular velocity to the desired frame
-        lin_vel_global, _ = T.pose_transform(th.zeros(3), cur_orn, u_vec[self.base_idx[:3]], th.tensor([0, 0, 0, 1]))
-        ang_vel_global, _ = T.pose_transform(th.zeros(3), cur_orn, u_vec[self.base_idx[3:]], th.tensor([0, 0, 0, 1]))
-
-        u_vec[self.base_control_idx] = th.tensor([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
-        return u_vec, u_type_vec
+    def _create_discrete_action_space(self):
+        raise ValueError("R1 does not support discrete actions!")
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
@@ -212,31 +157,6 @@ class R1(ManipulationRobot, LocomotionRobot):
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
         return dic
-
-    @property
-    def control_limits(self):
-        # Overwrite the control limits with the maximum linear and angular velocities for the purpose of clip_control
-        # Note that when clip_control happens, the control is still in the base_footprint_link ("base_footprint") frame
-        # Omniverse still thinks these joints have no limits because when the control is transformed to the root_link
-        # ("base_footprint_x") frame, it can go above this limit.
-        limits = super().control_limits
-        limits["velocity"][0][self.base_idx[:3]] = -m.MAX_LINEAR_VELOCITY
-        limits["velocity"][1][self.base_idx[:3]] = m.MAX_LINEAR_VELOCITY
-        limits["velocity"][0][self.base_idx[3:]] = -m.MAX_ANGULAR_VELOCITY
-        limits["velocity"][1][self.base_idx[3:]] = m.MAX_ANGULAR_VELOCITY
-        return limits
-
-    def get_control_dict(self):
-        # Modify the right hand's pos_relative in the z-direction based on the trunk's value
-        # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
-        # hand, which does not control the trunk
-        fcns = super().get_control_dict()
-        native_fcn = fcns.get_fcn("eef_right_pos_relative")
-        fcns["eef_right_pos_relative"] = lambda: (
-            native_fcn() + th.tensor([0, 0, -self.get_joint_positions()[self.trunk_control_idx[0]]])
-        )
-
-        return fcns
 
     @property
     def default_proprio_obs(self):
@@ -253,6 +173,7 @@ class R1(ManipulationRobot, LocomotionRobot):
     @property
     def _default_controllers(self):
         controllers = super()._default_controllers
+        # We use joint controllers for base as default
         controllers["base"] = "JointController"
         # We use IK and multi finger gripper controllers as default
         for arm in self.arm_names:
@@ -261,25 +182,9 @@ class R1(ManipulationRobot, LocomotionRobot):
         return controllers
 
     @property
-    def _default_base_controller_configs(self):
-        dic = {
-            "name": "JointController",
-            "control_freq": self._control_freq,
-            "control_limits": self.control_limits,
-            "use_delta_commands": False,
-            "use_impedances": False,
-            "motor_type": "velocity",
-            "dof_idx": self.base_control_idx,
-        }
-        return dic
-
-    @property
     def _default_controller_config(self):
         # Grab defaults from super method first
         cfg = super()._default_controller_config
-
-        # Get default base controller for omnidirectional Tiago
-        cfg["base"] = {"JointController": self._default_base_controller_configs}
 
         for arm in self.arm_names:
             for arm_cfg in cfg["arm_{}".format(arm)].values():
@@ -359,17 +264,6 @@ class R1(ManipulationRobot, LocomotionRobot):
         }
 
     @property
-    def base_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to the six 1DoF base joints
-        """
-        joints = list(self.joints.keys())
-        return th.tensor(
-            [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
-        )
-
-    @property
     def trunk_control_idx(self):
         """
         Returns:
@@ -392,10 +286,6 @@ class R1(ManipulationRobot, LocomotionRobot):
     @property
     def arm_link_names(self):
         return {arm: [f"{arm}_arm_link{i}" for i in range(1, 3)] for arm in self.arm_names}
-
-    @property
-    def base_joint_names(self):
-        return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
 
     @property
     def arm_joint_names(self):
@@ -433,76 +323,6 @@ class R1(ManipulationRobot, LocomotionRobot):
     def eef_usd_path(self):
         return {arm: os.path.join(gm.ASSET_PATH, "models/r1/r1_eef.usd") for arm in self.arm_names}
 
-    def get_position_orientation(self):
-        # TODO: Investigate the need for this custom behavior.
-        return self.base_footprint_link.get_position_orientation()
-
-    def set_position_orientation(self, position=None, orientation=None):
-        current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
-        position, orientation = th.tensor(position), th.tensor(orientation)
-        assert th.isclose(
-            th.linalg.norm(orientation), th.ones(1), atol=1e-3
-        ), f"{self.name} desired orientation {orientation} is not a unit quaternion."
-
-        # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
-        # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
-        if og.sim.is_playing() and self.initialized:
-            # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
-            # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
-            # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
-            joint_pos, joint_orn = self.root_link.get_position_orientation()
-            inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
-
-            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
-            relative_rpy = T.quat2euler(relative_orn)
-            self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
-            self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
-            self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
-            self.joints["base_footprint_rx_joint"].set_pos(relative_rpy[0], drive=False)
-            self.joints["base_footprint_ry_joint"].set_pos(relative_rpy[1], drive=False)
-            self.joints["base_footprint_rz_joint"].set_pos(relative_rpy[2], drive=False)
-
-        # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
-        else:
-            # Call the super() method to move the robot frame first
-            super().set_position_orientation(position, orientation)
-            # Move the joint frame for the world_base_joint
-            if self._world_base_fixed_joint_prim is not None:
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
-                    lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
-                )
-
-    def set_linear_velocity(self, velocity: th.Tensor):
-        # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
-        # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
-        # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = self.root_link.get_orientation()
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
-        self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
-        self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
-        self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
-
-    def get_linear_velocity(self) -> th.Tensor:
-        # Note that the link we are interested in is self.base_footprint_link, not self.root_link
-        return self.base_footprint_link.get_linear_velocity()
-
-    def set_angular_velocity(self, velocity: th.Tensor) -> None:
-        # See comments of self.set_linear_velocity
-        orn = self.root_link.get_orientation()
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
-        self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
-        self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
-        self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
-
-    def get_angular_velocity(self) -> th.Tensor:
-        # Note that the link we are interested in is self.base_footprint_link, not self.root_link
-        return self.base_footprint_link.get_angular_velocity()
-
     @property
     def disabled_collision_pairs(self):
         # badly modeled gripper collision meshes
@@ -510,8 +330,3 @@ class R1(ManipulationRobot, LocomotionRobot):
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
         ]
-
-    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
-        action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
-        return action
