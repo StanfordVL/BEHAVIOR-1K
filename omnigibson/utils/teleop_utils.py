@@ -95,7 +95,7 @@ class TeleopSystem(TeleopPolicy):
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 base_pos, base_orn = self.robot.get_position_orientation()
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
-                self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
+                self.control_markers[arm_name].set_position_orientation(position=target_pos, orientation=target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
 
     def reset(self) -> None:
@@ -336,8 +336,10 @@ class OVXRSystem(TeleopSystem):
         Args:
             arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
-        robot_base_orn = self.robot.get_orientation()
-        robot_eef_pos = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position()
+        robot_base_orn = self.robot.get_position_orientation()[1]
+        robot_eef_pos = self.robot.eef_links[
+            self.robot.arm_names[self.robot_arms.index(arm)]
+        ].get_position_orientation()[0]
         target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
             target_transform, self.controllers[arm]

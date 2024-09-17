@@ -1,5 +1,6 @@
 import math
 import os
+from typing import Literal
 
 import torch as th
 
@@ -13,7 +14,7 @@ from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCameraRobot):

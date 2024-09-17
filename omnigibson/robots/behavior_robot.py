@@ -3,7 +3,7 @@ import math
 import os
 from abc import ABC
 from collections import OrderedDict
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Literal, Tuple
 
 import torch as th
 
@@ -359,11 +359,37 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         return "base"
 
-    def get_position_orientation(self, clone=True):
-        return self.base_footprint_link.get_position_orientation(clone=clone)
+    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
+        """
+        Gets robot's pose with respect to the specified frame.
 
-    def set_position_orientation(self, position=None, orientation=None):
-        super().set_position_orientation(position, orientation)
+        Args:
+            frame (Literal): frame to get the pose with respect to. Default to world.
+                scene frame get position relative to the scene.
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (x,y,z) position in the specified frame
+                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
+        """
+        return self.base_footprint_link.get_position_orientation(frame=frame, clone=clone)
+
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
+        """
+        Sets behavior robot's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
+                scene frame set position relative to the scene.
+        """
+        super().set_position_orientation(position, orientation, frame=frame)
         # Move the joint frame for the world_base_joint
         if self._world_base_fixed_joint_prim is not None:
             if position is not None:
@@ -474,7 +500,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action[self.controller_action_idx[controller_name]] = th.cat((des_local_part_pos, des_part_rpy))
             # If we reset, teleop the robot parts to the desired pose
             if part_name in self.arm_names and teleop_action.reset[part_name]:
-                self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
+                self.parts[part_name].set_position_orientation(position=des_local_part_pos, orientation=des_part_rpy)
         return action
 
 
@@ -561,7 +587,7 @@ class BRPart(ABC):
         """
         assert self.eef_type == "hand", "ghost hand is only valid for BR hand!"
         # Ghost hand tracks real hand whether it is hidden or not
-        self.ghost_hand.set_position_orientation(pos, orn)
+        self.ghost_hand.set_position_orientation(position=pos, orientation=orn)
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears

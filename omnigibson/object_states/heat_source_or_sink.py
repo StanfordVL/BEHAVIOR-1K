@@ -235,7 +235,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 if n_cloth_objs > 0:
                     cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
-                        cloth_positions[i] = obj.get_position()
+                        cloth_positions[i] = obj.get_position_orientation()[0]
                     for idx in th.where(
                         th.all(
                             (aabb_lower.reshape(1, 3) < cloth_positions) & (cloth_positions < aabb_upper.reshape(1, 3)),
@@ -253,7 +253,11 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
             else:
                 # Position is either the AABB center of the default link or the metalink position itself
-                heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
+                heat_source_pos = (
+                    self.link.aabb_center
+                    if self.link == self._default_link
+                    else self.link.get_position_orientation()[0]
+                )
 
                 # Use overlap_sphere check!
                 og.sim.psqi.overlap_sphere(
@@ -268,7 +272,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 if n_cloth_objs > 0:
                     cloth_positions = th.zeros((n_cloth_objs, 3))
                     for i, obj in enumerate(cloth_objs):
-                        cloth_positions[i] = obj.get_position()
+                        cloth_positions[i] = obj.get_position_orientation()[0]
                     for idx in th.where(
                         th.norm(heat_source_pos.reshape(1, 3) - cloth_positions, dim=-1) <= self.distance_threshold
                     )[0]:

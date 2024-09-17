@@ -1,5 +1,6 @@
 import sys
 from collections import defaultdict
+from typing import Literal
 
 import torch as th
 from bddl.object_taxonomy import ObjectTaxonomy
@@ -603,8 +604,19 @@ class StatefulObject(BaseObject):
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
 
-    def set_position_orientation(self, position=None, orientation=None):
-        super().set_position_orientation(position=position, orientation=orientation)
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
+        """
+        Set the position and orientation of stateful object.
+
+        Args:
+            position (None or 3-array): The position to set the object to. If None, the position is not changed.
+            orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
+        """
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
         self.clear_states_cache()
 
     @classproperty

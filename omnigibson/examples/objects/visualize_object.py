@@ -111,8 +111,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.step(th.empty(0))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = obj.get_position() - obj.aabb_center + th.tensor([0, 0, 1.0])
-    obj.set_position(center_offset)
+    center_offset = obj.get_position_orientation()[0] - obj.aabb_center + th.tensor([0, 0, 1.0])
+    obj.set_position_orientation(position=center_offset)
 
     # Allow the user to easily move the camera around
     og.sim.enable_viewer_camera_teleoperation()
