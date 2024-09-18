@@ -1374,7 +1374,6 @@ class EntityPrim(XFormPrim):
         Returns:
             bool: Whether self-collisions are enabled for this prim or not
         """
-        assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
         return lazy.omni.isaac.core.utils.prims.get_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
         )
@@ -1387,7 +1386,6 @@ class EntityPrim(XFormPrim):
         Args:
             flag (bool): Whether self collisions are enabled for this prim or not
         """
-        assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
         lazy.omni.isaac.core.utils.prims.set_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )
