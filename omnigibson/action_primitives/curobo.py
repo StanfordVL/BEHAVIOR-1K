@@ -7,20 +7,13 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
+from omnigibson.utils.constants import GROUND_CATEGORIES
 from omnigibson.utils.control_utils import FKSolver
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
 th.backends.cudnn.benchmark = True
 th.backends.cuda.matmul.allow_tf32 = True
 th.backends.cudnn.allow_tf32 = True
-
-
-# Define floor-like substrings for filtering collisions
-GROUND_PREFIXES = {
-    "ground_plane",
-    "floor",
-    "carpet",
-}
 
 
 def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
@@ -232,17 +225,21 @@ class CuRoboMotionGenerator:
         del ignore_scenes[self.robot.scene.idx]
         ignore_visual_only = [obj.prim_path for obj in self.robot.scene.objects if obj.visual_only]
 
+        # Filter out any objects corresponding to ground
+        ground_paths = {obj.prim_path for obj in self.robot.scene.objects if obj.category in GROUND_CATEGORIES}
+
         obstacles = self._usd_help.get_obstacles_from_stage(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
-                self.robot.prim_path,  # Don't include robot paths
-                "/curobo",  # Don't include curobo prim
-                "visual",  # Don't include any visuals
-                *GROUND_PREFIXES,  # Don't include collisions with any ground-related objects
-                *METALINK_PREFIXES,  # Don't include any metalinks
-                *ignore_scenes,  # Don't include any scenes the robot is not in
-                *ignore_visual_only,  # Don't include any visual-only objects
-                *ignore_paths,  # Don't include any additional specified paths
+                self.robot.prim_path,       # Don't include robot paths
+                "/curobo",                  # Don't include curobo prim
+                "visual",                   # Don't include any visuals
+                "ground_plane",             # Don't include ground plane
+                *ground_paths,              # Don't include collisions with any ground-related objects
+                *METALINK_PREFIXES,         # Don't include any metalinks
+                *ignore_scenes,             # Don't include any scenes the robot is not in
+                *ignore_visual_only,        # Don't include any visual-only objects
+                *ignore_paths,              # Don't include any additional specified paths
             ],
         ).get_collision_check_world()
         self.mg.update_world(obstacles)
