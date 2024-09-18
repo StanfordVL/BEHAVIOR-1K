@@ -9,7 +9,6 @@ from datetime import datetime
 from os.path import exists
 from pathlib import Path
 
-import numpy as np
 import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -19,13 +18,13 @@ from omnigibson.scenes import Scene
 from omnigibson.utils.usd_utils import create_primitive_mesh
 import omnigibson.utils.transform_utils as T
 
-LIGHT_MAPPING = {
+_LIGHT_MAPPING = {
     0: "Rect",
     2: "Sphere",
     4: "Disk",
 }
 
-OBJECT_STATE_TEXTURES = {
+_OBJECT_STATE_TEXTURES = {
     "burnt",
     "cooked",
     "frozen",
@@ -33,7 +32,7 @@ OBJECT_STATE_TEXTURES = {
     "toggledon",
 }
 
-MTL_MAP_TYPE_MAPPINGS = {
+_MTL_MAP_TYPE_MAPPINGS = {
     "map_kd": "albedo",
     "map_bump": "normal",
     "map_pr": "roughness",
@@ -44,15 +43,15 @@ MTL_MAP_TYPE_MAPPINGS = {
     "map_": "metalness",
 }
 
-SPLIT_COLLISION_MESHES = False
+_SPLIT_COLLISION_MESHES = False
 
-META_LINK_RENAME_MAPPING = {
+_META_LINK_RENAME_MAPPING = {
     "fillable": "container",
     "fluidsink": "particlesink",
     "fluidsource": "particlesource",
 }
 
-ALLOWED_META_TYPES = {
+_ALLOWED_META_TYPES = {
     "particlesource": "dimensionless",
     "togglebutton": "primitive",
     "attachment": "dimensionless",
@@ -67,42 +66,42 @@ ALLOWED_META_TYPES = {
 }
 
 
-class NumpyEncoder(json.JSONEncoder):
+class _TorchEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, np.ndarray):
+        if isinstance(o, th.Tensor):
             return o.tolist()
         return json.JSONEncoder.default(self, o)
 
 
-def string_to_array(string):
+def _space_string_to_tensor(string):
     """
-    Converts a array string in mujoco xml to np.array.
+    Converts a array string in mujoco xml to th.Tensor.
     Examples:
         "0 1 2" => [0, 1, 2]
     Args:
         string (str): String to convert to an array
     Returns:
-        np.array: Numerical array equivalent of @string
+        th.Tensor: Numerical array equivalent of @string
     """
-    return np.array([float(x) for x in string.split(" ")])
+    return th.tensor([float(x) for x in string.split(" ")])
 
 
-def array_to_string(array):
+def _tensor_to_space_script(array):
     """
     Converts a numeric array into the string format in mujoco.
     Examples:
         [0, 1, 2] => "0 1 2"
     Args:
-        array (n-array): Array to convert to a string
+        array (th.Tensor): Array to convert to a string
     Returns:
         str: String equivalent of @array
     """
-    return " ".join(["{}".format(x) for x in array])
+    return " ".join(["{}".format(x) for x in array.tolist()])
 
 
-def split_obj_file(obj_fpath):
+def _split_obj_file_into_connected_components(obj_fpath):
     """
-    Splits obj file at @obj_fpath into individual obj files
+    Splits obj file at @obj_fpath into individual obj files that each contain a single connected mesh.
     """
     # Open file in trimesh
     obj = trimesh.load(obj_fpath, file_type="obj", force="mesh")
@@ -122,9 +121,9 @@ def split_obj_file(obj_fpath):
     return len(obj_bodies)
 
 
-def split_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
+def _split_all_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
     """
-    Splits the obj reference in its urdf
+    Splits the obj references in the given URDF
     """
     tree = ET.parse(urdf_fpath)
     root = tree.getroot()
@@ -160,7 +159,7 @@ def split_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
         parent.remove(col)
         # Create new objs first so we know how many we need to create in the URDF
         obj_fpath = col_copy.find("./geometry/mesh").attrib["filename"]
-        n_new_objs = split_obj_file(obj_fpath=f"{urdf_dir}/{mesh_fpath_offset}/{obj_fpath}")
+        n_new_objs = _split_obj_file_into_connected_components(obj_fpath=f"{urdf_dir}/{mesh_fpath_offset}/{obj_fpath}")
         # Create the new objs in the URDF
         for i in range(n_new_objs):
             # Copy collision again
@@ -180,7 +179,7 @@ def split_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
     return urdf_out_path
 
 
-def set_mtl_albedo(mtl_prim, texture):
+def _set_mtl_albedo(mtl_prim, texture):
     mtl = "diffuse_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -188,7 +187,7 @@ def set_mtl_albedo(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_normal(mtl_prim, texture):
+def _set_mtl_normal(mtl_prim, texture):
     mtl = "normalmap_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -196,7 +195,7 @@ def set_mtl_normal(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_ao(mtl_prim, texture):
+def _set_mtl_ao(mtl_prim, texture):
     mtl = "ao_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -204,7 +203,7 @@ def set_mtl_ao(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_roughness(mtl_prim, texture):
+def _set_mtl_roughness(mtl_prim, texture):
     mtl = "reflectionroughness_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(
@@ -218,7 +217,7 @@ def set_mtl_roughness(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_metalness(mtl_prim, texture):
+def _set_mtl_metalness(mtl_prim, texture):
     mtl = "metallic_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "metallic_texture_influence", 1.0, lazy.pxr.Sdf.ValueTypeNames.Float)
@@ -227,8 +226,7 @@ def set_mtl_metalness(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_opacity(mtl_prim, texture):
-    return
+def _set_mtl_opacity(mtl_prim, texture):
     mtl = "opacity_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
@@ -238,7 +236,7 @@ def set_mtl_opacity(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def set_mtl_emission(mtl_prim, texture):
+def _set_mtl_emission(mtl_prim, texture):
     mtl = "emissive_color_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_emission", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
@@ -247,26 +245,14 @@ def set_mtl_emission(mtl_prim, texture):
     print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-RENDERING_CHANNEL_MAPPINGS = {
-    "diffuse": set_mtl_albedo,
-    "albedo": set_mtl_albedo,
-    "normal": set_mtl_normal,
-    "ao": set_mtl_ao,
-    "roughness": set_mtl_roughness,
-    "metalness": set_mtl_metalness,
-    "opacity": set_mtl_opacity,
-    "emission": set_mtl_emission,
-}
-
-
-def rename_prim(prim, name):
+def _rename_prim(prim, name):
     path_from = prim.GetPrimPath().pathString
     path_to = f"{'/'.join(path_from.split('/')[:-1])}/{name}"
     lazy.omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
     return lazy.omni.isaac.core.utils.prims.get_prim_at_path(path_to)
 
 
-def get_visual_objs_from_urdf(urdf_path):
+def _get_visual_objs_from_urdf(urdf_path):
     # Will return a dictionary mapping link name (e.g.: base_link) to dictionary of owned visual meshes mapping mesh
     # name to visual obj file for that mesh
     visual_objs = OrderedDict()
@@ -288,13 +274,13 @@ def get_visual_objs_from_urdf(urdf_path):
     return visual_objs
 
 
-def copy_object_state_textures(obj_category, obj_model, dataset_root):
+def _copy_object_state_textures(obj_category, obj_model, dataset_root):
     obj_root_dir = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     old_mat_fpath = f"{obj_root_dir}/material"
     new_mat_fpath = f"{obj_root_dir}/usd/materials"
     for mat_file in os.listdir(old_mat_fpath):
         should_copy = False
-        for object_state in OBJECT_STATE_TEXTURES:
+        for object_state in _OBJECT_STATE_TEXTURES:
             if object_state in mat_file.lower():
                 should_copy = True
                 break
@@ -302,7 +288,7 @@ def copy_object_state_textures(obj_category, obj_model, dataset_root):
             shutil.copy(f"{old_mat_fpath}/{mat_file}", new_mat_fpath)
 
 
-def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
+def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
     usd_dir = os.path.dirname(usd_path)
     # # mat_dir = f"{model_root_path}/material/{obj_category}" if \
     # #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
@@ -348,7 +334,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
 
     # Grab all visual objs for this object
     urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/{obj_model}_with_metalinks.urdf"
-    visual_objs = get_visual_objs_from_urdf(urdf_path)
+    visual_objs = _get_visual_objs_from_urdf(urdf_path)
 
     # Extract absolute paths to mtl files for each link
     link_mtl_files = OrderedDict()  # maps link name to dictionary mapping mesh name to mtl file
@@ -390,12 +376,22 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
                                 map_filename = os.path.basename(map_file)
                                 mat_files[mtl_name].append(map_filename)
                                 mat_old_paths[mtl_name].append(map_file)
-                                mtl_infos[mtl_name][MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
+                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
 
     # Next, for each material information, we create a new material and port the material files to the USD directory
     mat_new_fpath = os.path.join(usd_dir, "materials")
     Path(mat_new_fpath).mkdir(parents=True, exist_ok=True)
     shaders = OrderedDict()  # maps mtl name to shader prim
+    rendering_channel_mappings = {
+        "diffuse": _set_mtl_albedo,
+        "albedo": _set_mtl_albedo,
+        "normal": _set_mtl_normal,
+        "ao": _set_mtl_ao,
+        "roughness": _set_mtl_roughness,
+        "metalness": _set_mtl_metalness,
+        "opacity": _set_mtl_opacity,
+        "emission": _set_mtl_emission,
+    }
     for mtl_name, mtl_info in mtl_infos.items():
         for mat_old_path in mat_old_paths[mtl_name]:
             shutil.copy(os.path.join(mtl_old_dirs[mtl_name], mat_old_path), mat_new_fpath)
@@ -412,7 +408,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
-            render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+            render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
                 render_channel_fcn(mat, os.path.join("materials", mat_file))
             else:
@@ -420,7 +416,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
                 print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
 
         # Rename material
-        mat = rename_prim(prim=mat, name=mtl_name)
+        mat = _rename_prim(prim=mat, name=mtl_name)
         shade = lazy.pxr.UsdShade.Material(mat)
         shaders[mtl_name] = shade
         print(f"Created material {mtl_name}:", mtl_created_list[0])
@@ -456,7 +452,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
             )
 
     # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
-    copy_object_state_textures(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
+    _copy_object_state_textures(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
 
     # ###################################
     #
@@ -510,7 +506,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
     #                     # Check if any valid rendering channel
     #                     mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
     #                     # Apply the material if it exists
-    #                     render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+    #                     render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
     #                     if render_channel_fcn is not None:
     #                         render_channel_fcn(mat, os.path.join("materials", link_mat_file))
     #                     else:
@@ -531,7 +527,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
     #     # Check if any valid rendering channel
     #     mat_type = mat_file.split("_")[-1].split(".")[0].lower()
     #     # Apply the material if it exists
-    #     render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+    #     render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
     #     if render_channel_fcn is not None:
     #         render_channel_fcn(default_mat, os.path.join("materials", mat_file))
     #         default_mat_is_used = True
@@ -544,7 +540,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
     #     stage.RemovePrim(default_mat.GetPrimPath())
 
 
-def add_xform_properties(prim):
+def _add_xform_properties(prim):
     properties_to_remove = [
         "xformOp:rotateX",
         "xformOp:rotateXZY",
@@ -594,7 +590,7 @@ def add_xform_properties(prim):
     xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
 
-def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
+def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
     """
     Process a meta link by creating visual meshes or lights below it
     """
@@ -603,11 +599,11 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
     if meta_link_type in ["container"]:
         return
 
-    assert meta_link_type in ALLOWED_META_TYPES
-    if ALLOWED_META_TYPES[meta_link_type] not in ["primitive", "light"] and meta_link_type != "particlesource":
+    assert meta_link_type in _ALLOWED_META_TYPES
+    if _ALLOWED_META_TYPES[meta_link_type] not in ["primitive", "light"] and meta_link_type != "particlesource":
         return
 
-    is_light = ALLOWED_META_TYPES[meta_link_type] == "light"
+    is_light = _ALLOWED_META_TYPES[meta_link_type] == "light"
 
     for link_id, mesh_info_list in meta_link_infos.items():
         if len(mesh_info_list) == 0:
@@ -638,13 +634,15 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
         # because the cone is pointing in the wrong direction. This is already done in update_obj_urdf_with_metalinks;
         # we just need to make sure meta_link_in_parent_link_orn is updated correctly.
         if meta_link_type == "particleapplier" and mesh_info_list[0]["type"] == "cone":
-            meta_link_in_parent_link_orn = T.quat_multiply(meta_link_in_parent_link_orn, T.axisangle2quat(th.tensor([math.pi, 0., 0.])))
+            meta_link_in_parent_link_orn = T.quat_multiply(
+                meta_link_in_parent_link_orn, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0]))
+            )
 
         for i, mesh_info in enumerate(mesh_info_list):
             is_mesh = False
             if is_light:
                 # Create a light
-                light_type = LIGHT_MAPPING[mesh_info["type"]]
+                light_type = _LIGHT_MAPPING[mesh_info["type"]]
                 prim_path = f"/{obj_model}/lights_{link_id}_0_link/light_{i}"
                 prim = getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(stage, prim_path).GetPrim()
                 lazy.pxr.UsdLux.ShapingAPI.Apply(prim).GetShapingConeAngleAttr().Set(180.0)
@@ -671,23 +669,23 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                     else getattr(lazy.pxr.UsdGeom, mesh_type).Define(stage, prim_path).GetPrim()
                 )
 
-            add_xform_properties(prim=prim)
+            _add_xform_properties(prim=prim)
             # Make sure mesh_prim has XForm properties
             xform_prim = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
-            mesh_in_parent_link_pos, mesh_in_parent_link_orn = np.array(mesh_info["position"]), np.array(
+            mesh_in_parent_link_pos, mesh_in_parent_link_orn = th.tensor(mesh_info["position"]), th.tensor(
                 mesh_info["orientation"]
             )
 
             # Get the mesh/light pose in the meta link frame
-            mesh_in_parent_link_tf = np.eye(4)
+            mesh_in_parent_link_tf = th.eye(4)
             mesh_in_parent_link_tf[:3, :3] = T.quat2mat(mesh_in_parent_link_orn)
             mesh_in_parent_link_tf[:3, 3] = mesh_in_parent_link_pos
-            meta_link_in_parent_link_tf = np.eye(4)
+            meta_link_in_parent_link_tf = th.eye(4)
             meta_link_in_parent_link_tf[:3, :3] = T.quat2mat(meta_link_in_parent_link_orn)
             meta_link_in_parent_link_tf[:3, 3] = meta_link_in_parent_link_pos
-            mesh_in_meta_link_tf = np.linalg.inv(meta_link_in_parent_link_tf) @ mesh_in_parent_link_tf
+            mesh_in_meta_link_tf = th.linalg.inv(meta_link_in_parent_link_tf) @ mesh_in_parent_link_tf
             mesh_in_meta_link_pos, mesh_in_meta_link_orn = (
                 mesh_in_meta_link_tf[:3, 3],
                 T.mat2quat(mesh_in_meta_link_tf[:3, :3]),
@@ -695,7 +693,7 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
 
             if is_light:
                 xform_prim.prim.GetAttribute("inputs:color").Set(
-                    lazy.pxr.Gf.Vec3f(*np.array(mesh_info["color"]) / 255.0)
+                    lazy.pxr.Gf.Vec3f(*(th.tensor(mesh_info["color"]) / 255.0).tolist())
                 )
                 xform_prim.prim.GetAttribute("inputs:intensity").Set(mesh_info["intensity"])
                 if light_type == "Rect":
@@ -724,7 +722,7 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Offset the position by half the height because in 3dsmax the origin of the cylinder is at the center of the base
-                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, np.array([0.0, 0.0, height_offset]))
+                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cone":
                     if not is_mesh:
                         xform_prim.prim.GetAttribute("radius").Set(0.5)
@@ -736,16 +734,17 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                         lazy.pxr.Gf.Vec3f(desired_radius * 2, desired_radius * 2, desired_height)
                     )
                     # Flip the orientation of the z-axis because in 3dsmax the cone is pointing in the opposite direction
-                    mesh_in_meta_link_orn = T.quat_multiply(mesh_in_meta_link_orn, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0])))
+                    mesh_in_meta_link_orn = T.quat_multiply(
+                        mesh_in_meta_link_orn, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0]))
+                    )
                     # Offset the position by half the height because in 3dsmax the origin of the cone is at the center of the base
-                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, np.array([0.0, 0.0, height_offset]))
+                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Cube":
                     if not is_mesh:
                         xform_prim.prim.GetAttribute("size").Set(1.0)
                     xform_prim.prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3f(*mesh_info["size"]))
                     height_offset = mesh_info["size"][2] / 2.0
-                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, np.array([0.0, 0.0, height_offset]))
-                    )
+                    mesh_in_meta_link_pos += T.quat_apply(mesh_in_meta_link_orn, th.tensor([0.0, 0.0, height_offset]))
                 elif mesh_type == "Sphere":
                     if not is_mesh:
                         xform_prim.prim.GetAttribute("radius").Set(0.5)
@@ -765,7 +764,7 @@ def process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             )
 
 
-def process_glass_link(prim):
+def _process_glass_link(prim):
     # Update any glass parts to use the glass material instead
     glass_prim_paths = []
     for gchild in prim.GetChildren():
@@ -804,8 +803,6 @@ def process_glass_link(prim):
         )
 
 
-# TODO: Handle metalinks
-# TODO: Import heights per link folder into USD folder
 def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_channels=False):
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
@@ -858,7 +855,7 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     # TODO: Use parent link name
     for link_name, link_metadata in meta_links.items():
         for meta_link_type, meta_link_infos in link_metadata.items():
-            process_meta_link(stage, obj_model, meta_link_type, meta_link_infos)
+            _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos)
 
     # Apply temporary fillable meshes.
     # TODo: Disable after fillable meshes are backported into 3ds Max.
@@ -869,40 +866,8 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
 
     print("Done processing meta links")
 
-    # # Update metalink info
-    # if "meta_links" in data["metadata"]:
-    #     meta_links = data["metadata"].pop("meta_links")
-    #     print("meta_links:", meta_links)
-    #     # TODO: Use parent link name
-    #     for parent_link_name, child_link_attrs in meta_links.items():
-    #         for meta_link_name, ml_attrs in child_link_attrs.items():
-    #             for ml_id, attrs_list in ml_attrs.items():
-    #                 for i, attrs in enumerate(attrs_list):
-    #                     # # Create new Xform prim that will contain info
-    #                     ml_prim_path = (
-    #                         f"{prim.GetPath()}/{meta_link_name}_{ml_id}_{i}_link"
-    #                     )
-    #                     link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(ml_prim_path)
-    #                     assert (
-    #                         link_prim
-    #                     ), f"Should have found valid metalink prim at prim path: {ml_prim_path}"
-    #
-    #                     link_prim.CreateAttribute("ig:is_metalink", lazy.pxr.Sdf.ValueTypeNames.Bool)
-    #                     link_prim.GetAttribute("ig:is_metalink").Set(True)
-    #
-    #                     # TODO! Validate that this works
-    #                     # test on water sink 02: water sink location is 0.1, 0.048, 0.32
-    #                     # water source location is -0.03724, 0.008, 0.43223
-    #                     add_xform_properties(prim=link_prim)
-    #                     link_prim.GetAttribute("xformOp:translate").Set(lazy.pxr.Gf.Vec3f(*atrr["xyz"]))
-    #                     if atrr["rpy"] is not None:
-    #                         link_prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatf(*(T.euler2quat(atrr["rpy"])[[3, 0, 1, 2]].tolist())))
-    #
-    #                     link_prim.CreateAttribute("ig:orientation", lazy.pxr.Sdf.ValueTypeNames.Quatf)
-    #                     link_prim.GetAttribute("ig:orientation").Set(lazy.pxr.Gf.Quatf(*atrr["rpy"]))
-
     # Iterate over dict and replace any lists of dicts as dicts of dicts (with each dict being indexed by an integer)
-    data = recursively_replace_list_of_dict(data)
+    data = _recursively_replace_list_of_dict(data)
 
     print("Done recursively replacing")
 
@@ -920,18 +885,6 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
 
     # Store remaining data as metadata
     prim.SetCustomData(data)
-    # for k, v in data.items():
-    #     print(f"setting custom data {k}")
-    #     print(v)
-    #     print()
-    #     prim.SetCustomDataByKey(k, v)
-    #     # if k == "metadata":
-    #     #     print(v)
-    #     #     print()
-    #     #     prim.SetCustomDataByKey(k, v["link_bounding_boxes"]["base_link"]["collision"]["axis_aligned"]["transform"])
-    #     #     input("succeeded!")
-    #     # else:
-    #     #     prim.SetCustomDataByKey(k, v)
 
     # Add material channels
     # print(f"prim children: {prim.GetChildren()}")
@@ -941,9 +894,8 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     # mat_prim = looks_prim.GetChildren()[0] #lazy.omni.isaac.core.utils.prims.get_prim_at_path(mat_prim_path)
     # print(f"looks children: {looks_prim.GetChildren()}")
     # print(f"mat prim: {mat_prim}")
-    print("irc")
     if import_render_channels:
-        import_rendering_channels(
+        _import_rendering_channels(
             obj_prim=prim,
             obj_category=obj_category,
             obj_model=obj_model,
@@ -951,22 +903,18 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
             usd_path=usd_path,
             dataset_root=dataset_root,
         )
-    print("done irc")
     for link, link_tags in data["metadata"]["link_tags"].items():
         if "glass" in link_tags:
-            process_glass_link(prim.GetChild(link))
+            _process_glass_link(prim.GetChild(link))
 
-    print("done glass")
     # Save stage
     stage.Save()
-
-    print("done save")
 
     # Delete stage reference and clear the sim stage variable, opening the dummy stage along the way
     del stage
 
 
-def recursively_replace_list_of_dict(dic):
+def _recursively_replace_list_of_dict(dic):
     for k, v in dic.items():
         print(f"k: {k}")
         if v is None:
@@ -1029,72 +977,12 @@ def recursively_replace_list_of_dict(dic):
                         v[i] = lazy.pxr.lazy.pxr.UsdGeom.Tokens.none
         if isinstance(v, dict):
             # Iterate through nested dictionaries
-            dic[k] = recursively_replace_list_of_dict(v)
+            dic[k] = _recursively_replace_list_of_dict(v)
 
     return dic
 
 
-def import_fillable_mesh(stage, obj_model, mesh):
-    def _create_mesh(prim_path):
-        stage.DefinePrim(prim_path, "Mesh")
-        mesh = lazy.pxr.UsdGeom.Mesh.Define(stage, prim_path)
-        return mesh
-
-    def _create_fixed_joint(prim_path, body0, body1):
-        # Create the joint
-        joint = lazy.pxr.UsdPhysics.FixedJoint.Define(stage, prim_path)
-
-        # Possibly add body0, body1 targets
-        if body0 is not None:
-            assert stage.GetPrimAtPath(body0).IsValid(), f"Invalid body0 path specified: {body0}"
-            joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
-        if body1 is not None:
-            assert stage.GetPrimAtPath(body1).IsValid(), f"Invalid body1 path specified: {body1}"
-            joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
-
-        # Get the prim pointed to at this path
-        joint_prim = stage.GetPrimAtPath(prim_path)
-
-        # Apply joint API interface
-        lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
-
-        # Possibly (un-/)enable this joint
-        joint_prim.GetAttribute("physics:jointEnabled").Set(True)
-
-        # Return this joint
-        return joint_prim
-
-    container_link_path = f"/{obj_model}/container_0_0_link"
-    container_link = stage.DefinePrim(container_link_path, "Xform")
-
-    for i, submesh in enumerate(mesh.split()):
-        mesh_prim = _create_mesh(prim_path=f"{container_link_path}/mesh_{i}").GetPrim()
-
-        # Write mesh data
-        mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(submesh.vertices))
-        mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(submesh.vertex_normals))
-        face_indices = []
-        face_vertex_counts = []
-        for face_idx, face_vertices in enumerate(submesh.faces):
-            face_indices.extend(face_vertices)
-            face_vertex_counts.append(len(face_vertices))
-        mesh_prim.GetAttribute("faceVertexCounts").Set(np.array(face_vertex_counts, dtype=int))
-        mesh_prim.GetAttribute("faceVertexIndices").Set(np.array(face_indices, dtype=int))
-        # mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(np.zeros((len(submesh.vertices), 2))))
-
-        # Make invisible
-        lazy.pxr.UsdGeom.Imageable(mesh_prim).MakeInvisible()
-
-        # Create fixed joint
-        obj_root_path = f"/{obj_model}/base_link"
-        _create_fixed_joint(
-            prim_path=f"{obj_root_path}/container_0_{i}_joint",
-            body0=f"{obj_root_path}",
-            body1=f"{container_link_path}",
-        )
-
-
-def create_import_config():
+def _create_urdf_import_config():
     # Set up import configuration
     _, import_config = lazy.omni.kit.commands.execute("URDFCreateImportConfig")
     drive_mode = (
@@ -1119,17 +1007,17 @@ def create_import_config():
 
 def import_obj_urdf(obj_category, obj_model, dataset_root, skip_if_exist=False):
     # Preprocess input URDF to account for metalinks
-    urdf_path = update_obj_urdf_with_metalinks(
+    urdf_path = _add_metalinks_to_urdf(
         obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
     # Import URDF
-    cfg = create_import_config()
+    cfg = _create_urdf_import_config()
     # Check if filepath exists
     usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if not (skip_if_exist and exists(usd_path)):
-        if SPLIT_COLLISION_MESHES:
+        if _SPLIT_COLLISION_MESHES:
             print(f"Converting collision meshes from {obj_category}, {obj_model}...")
-            urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
+            urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
         print(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
         # Only import if it doesn't exist
         lazy.omni.kit.commands.execute(
@@ -1141,10 +1029,10 @@ def import_obj_urdf(obj_category, obj_model, dataset_root, skip_if_exist=False):
         print(f"Imported {obj_category}, {obj_model}")
 
 
-def pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
+def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
     space = "\t" if use_tabs else " " * 4
     for i, node in enumerate(current):
-        pretty_print_xml(node, current, i, depth + 1)
+        _pretty_print_xml(node, current, i, depth + 1)
     if parent is not None:
         if index == 0:
             parent.text = "\n" + (space * depth)
@@ -1154,26 +1042,26 @@ def pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
             current.tail = "\n" + (space * (depth - 1))
 
 
-def convert_to_string(inp):
+def _convert_to_xml_string(inp):
     """
-    Converts any type of {bool, int, float, list, tuple, array, string, np.str_} into an mujoco-xml compatible string.
-        Note that an input string / np.str_ results in a no-op action.
+    Converts any type of {bool, int, float, list, tuple, array, string, th.Tensor} into an mujoco-xml compatible string.
+        Note that an input string / th.Tensor results in a no-op action.
     Args:
         inp: Input to convert to string
     Returns:
         str: String equivalent of @inp
     """
-    if type(inp) in {list, tuple, np.ndarray}:
-        return array_to_string(inp)
-    elif type(inp) in {int, float, bool, np.float32, np.float64, np.int32, np.int64}:
+    if type(inp) in {list, tuple, th.Tensor}:
+        return _tensor_to_space_script(inp)
+    elif type(inp) in {int, float, bool, th.float32, th.float64, th.int32, th.int64}:
         return str(inp).lower()
-    elif type(inp) in {str, np.str_}:
+    elif type(inp) in {str}:
         return inp
     else:
         raise ValueError("Unsupported type received: got {}".format(type(inp)))
 
 
-def create_joint(
+def _create_urdf_joint(
     name,
     parent,
     child,
@@ -1191,8 +1079,8 @@ def create_joint(
         name (str): Name of this joint
         parent (str or ET.Element): Name of parent link or parent link element itself for this joint
         child (str or ET.Element): Name of child link or child link itself for this joint
-        pos (list or tuple or array): (x,y,z) offset pos values when creating the collision body
-        rpy (list or tuple or array): (r,p,y) offset rot values when creating the joint
+        pos (list or tuple or th.Tensor): (x,y,z) offset pos values when creating the collision body
+        rpy (list or tuple or th.Tensor): (r,p,y) offset rot values when creating the joint
         joint_type (str): What type of joint to create. Must be one of {fixed, revolute, prismatic}
         axis (None or 3-tuple): If specified, should be (x,y,z) axis corresponding to DOF
         damping (None or float): If specified, should be damping value to apply to joint
@@ -1207,7 +1095,7 @@ def create_joint(
     origin = ET.SubElement(
         jnt,
         "origin",
-        attrib={"rpy": convert_to_string(rpy), "xyz": convert_to_string(pos)},
+        attrib={"rpy": _convert_to_xml_string(rpy), "xyz": _convert_to_xml_string(pos)},
     )
     # Make sure parent and child are both names (str) -- if they're not str already, we assume it's the element ref
     if not isinstance(parent, str):
@@ -1219,12 +1107,12 @@ def create_joint(
     child = ET.SubElement(jnt, "child", link=child)
     # Add additional parameters if specified
     if axis is not None:
-        ax = ET.SubElement(jnt, "axis", xyz=convert_to_string(axis))
+        ax = ET.SubElement(jnt, "axis", xyz=_convert_to_xml_string(axis))
     dynamic_params = {}
     if damping is not None:
-        dynamic_params["damping"] = convert_to_string(damping)
+        dynamic_params["damping"] = _convert_to_xml_string(damping)
     if friction is not None:
-        dynamic_params["friction"] = convert_to_string(friction)
+        dynamic_params["friction"] = _convert_to_xml_string(friction)
     if dynamic_params:
         dp = ET.SubElement(jnt, "dynamics", **dynamic_params)
     if limits is not None:
@@ -1234,7 +1122,7 @@ def create_joint(
     return jnt
 
 
-def create_link(name, subelements=None, mass=None, inertia=None):
+def _create_urdf_link(name, subelements=None, mass=None, inertia=None):
     """
     Generates XML link element
     Args:
@@ -1257,7 +1145,7 @@ def create_link(name, subelements=None, mass=None, inertia=None):
     if mass is not None or inertia is not None:
         inertial = ET.SubElement(link, "inertial")
     if mass is not None:
-        ET.SubElement(inertial, "mass", value=convert_to_string(mass))
+        ET.SubElement(inertial, "mass", value=_convert_to_xml_string(mass))
     if inertia is not None:
         axes = ["ixx", "iyy", "izz", "ixy", "ixz", "iyz"]
         inertia_vals = {ax: str(i) for ax, i in zip(axes, inertia)}
@@ -1267,7 +1155,7 @@ def create_link(name, subelements=None, mass=None, inertia=None):
     return link
 
 
-def create_metalink(
+def _create_urdf_metalink(
     root_element,
     metalink_name,
     parent_link_name="base_link",
@@ -1275,7 +1163,7 @@ def create_metalink(
     rpy=(0, 0, 0),
 ):
     # Create joint
-    jnt = create_joint(
+    jnt = _create_urdf_joint(
         name=f"{metalink_name}_joint",
         parent=parent_link_name,
         child=f"{metalink_name}_link",
@@ -1284,7 +1172,7 @@ def create_metalink(
         joint_type="fixed",
     )
     # Create child link
-    link = create_link(
+    link = _create_urdf_link(
         name=f"{metalink_name}_link",
         mass=0.0001,
         inertia=[0.00001, 0.00001, 0.00001, 0, 0, 0],
@@ -1295,7 +1183,7 @@ def create_metalink(
     root_element.append(link)
 
 
-def generate_urdf_from_xmltree(root_element, name, dirpath, unique_urdf=False):
+def _save_xmltree_as_urdf(root_element, name, dirpath, unique_urdf=False):
     """
     Generates a URDF file corresponding to @xmltree at @dirpath with name @name.urdf.
     Args:
@@ -1316,7 +1204,7 @@ def generate_urdf_from_xmltree(root_element, name, dirpath, unique_urdf=False):
         # Write top level header line first
         f.write('<?xml version="1.0" ?>\n')
         # Convert xml to string form and write to file
-        pretty_print_xml(current=root_element)
+        _pretty_print_xml(current=root_element)
         xml_str = ET.tostring(root_element, encoding="unicode")
         f.write(xml_str)
 
@@ -1324,7 +1212,7 @@ def generate_urdf_from_xmltree(root_element, name, dirpath, unique_urdf=False):
     return fpath
 
 
-def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
+def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     urdf_path = f"{model_root_path}/{obj_model}.urdf"
@@ -1348,8 +1236,8 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
         for link, meta_link in metadata["meta_links"].items():
             for meta_link_name in list(meta_link.keys()):
                 meta_link_attrs = meta_link[meta_link_name]
-                if meta_link_name in META_LINK_RENAME_MAPPING:
-                    metadata["meta_links"][link][META_LINK_RENAME_MAPPING[meta_link_name]] = meta_link_attrs
+                if meta_link_name in _META_LINK_RENAME_MAPPING:
+                    metadata["meta_links"][link][_META_LINK_RENAME_MAPPING[meta_link_name]] = meta_link_attrs
                     del metadata["meta_links"][link][meta_link_name]
 
         with open(metadata_fpath, "w") as f:
@@ -1360,8 +1248,8 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
         for parent_link_name, child_link_attrs in meta_links.items():
             for meta_link_name, ml_attrs in child_link_attrs.items():
                 assert (
-                    meta_link_name in ALLOWED_META_TYPES
-                ), f"meta_link_name {meta_link_name} not in {ALLOWED_META_TYPES}"
+                    meta_link_name in _ALLOWED_META_TYPES
+                ), f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
 
                 # TODO: Reenable after fillable meshes are backported into 3ds Max.
                 # Temporarily disable importing of fillable meshes.
@@ -1370,7 +1258,7 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
 
                 for ml_id, attrs_list in ml_attrs.items():
                     if len(attrs_list) > 0:
-                        if ALLOWED_META_TYPES[meta_link_name] != "dimensionless":
+                        if _ALLOWED_META_TYPES[meta_link_name] != "dimensionless":
                             # If not dimensionless, we create one meta link for a list of meshes below it
                             attrs_list = [attrs_list[0]]
                         else:
@@ -1402,7 +1290,7 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
                                 quat = T.quat_multiply(quat, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0])))
 
                             # Create metalink
-                            create_metalink(
+                            _create_urdf_metalink(
                                 root_element=root,
                                 metalink_name=f"{meta_link_name}_{ml_id}_{i}",
                                 parent_link_name=parent_link_name,
@@ -1411,7 +1299,7 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
                             )
 
     # Export this URDF
-    return generate_urdf_from_xmltree(
+    return _save_xmltree_as_urdf(
         root_element=root,
         name=f"{obj_model}_with_metalinks",
         dirpath=model_root_path,
@@ -1421,7 +1309,7 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model, dataset_root):
 
 def convert_scene_urdf_to_json(urdf, json_path):
     # First, load the requested objects from the URDF into OG
-    load_scene_from_urdf(urdf=urdf)
+    _load_scene_from_urdf(urdf=urdf)
 
     # Play the simulator, then save
     og.sim.play()
@@ -1435,12 +1323,12 @@ def convert_scene_urdf_to_json(urdf, json_path):
     scene_info.pop("init_info")
 
     with open(json_path, "w+") as f:
-        json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
+        json.dump(scene_info, f, cls=_TorchEncoder, indent=4)
 
 
-def load_scene_from_urdf(urdf):
+def _load_scene_from_urdf(urdf):
     # First, grab object info from the urdf
-    objs_info = get_objects_config_from_scene_urdf(urdf=urdf)
+    objs_info = _get_objects_config_from_scene_urdf(urdf=urdf)
 
     # Load all the objects manually into a scene
     scene = Scene(use_floor_plane=False)
@@ -1468,19 +1356,19 @@ def load_scene_from_urdf(urdf):
     og.sim.step()
 
 
-def get_objects_config_from_scene_urdf(urdf):
+def _get_objects_config_from_scene_urdf(urdf):
     tree = ET.parse(urdf)
     root = tree.getroot()
     objects_cfg = dict()
-    get_objects_config_from_element(root, model_pose_info=objects_cfg)
+    _get_objects_config_from_element(root, model_pose_info=objects_cfg)
     return objects_cfg
 
 
-def get_objects_config_from_element(element, model_pose_info):
+def _get_objects_config_from_element(element, model_pose_info):
     # First pass through, populate the joint pose info
     for ele in element:
         if ele.tag == "joint":
-            name, pos, quat, fixed_jnt = get_joint_info(ele)
+            name, pos, quat, fixed_jnt = _get_joint_info(ele)
             name = name.replace("-", "_")
             model_pose_info[name] = {
                 "bbox_pos": pos,
@@ -1504,29 +1392,29 @@ def get_objects_config_from_element(element, model_pose_info):
                 model_pose_info[name]["cfg"]["category"] = ele.get("category")
                 model_pose_info[name]["cfg"]["model"] = ele.get("model")
                 model_pose_info[name]["cfg"]["bounding_box"] = (
-                    string_to_array(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
+                    _space_string_to_tensor(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
                 )
                 in_rooms = ele.get("rooms", "")
                 if in_rooms:
                     in_rooms = in_rooms.split(",")
                 model_pose_info[name]["cfg"]["in_rooms"] = in_rooms
                 model_pose_info[name]["cfg"]["scale"] = (
-                    string_to_array(ele.get("scale")) if "scale" in ele.keys() else None
+                    _space_string_to_tensor(ele.get("scale")) if "scale" in ele.keys() else None
                 )
                 model_pose_info[name]["cfg"]["bddl_object_scope"] = ele.get("object_scope", None)
 
         # If there's children nodes, we iterate over those
         for child in ele:
-            get_objects_config_from_element(child, model_pose_info=model_pose_info)
+            _get_objects_config_from_element(child, model_pose_info=model_pose_info)
 
 
-def get_joint_info(joint_element):
+def _get_joint_info(joint_element):
     child, pos, quat, fixed_jnt = None, None, None, None
     fixed_jnt = joint_element.get("type") == "fixed"
     for ele in joint_element:
         if ele.tag == "origin":
-            quat = T.euler2quat(string_to_array(ele.get("rpy")))
-            pos = string_to_array(ele.get("xyz"))
+            quat = T.euler2quat(_space_string_to_tensor(ele.get("rpy")))
+            pos = _space_string_to_tensor(ele.get("xyz"))
         elif ele.tag == "child":
             child = ele.get("link")
     return child, pos, quat, fixed_jnt
