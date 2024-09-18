@@ -79,7 +79,7 @@ def test_scene_graph():
     breakfast_table = scene.object_registry("name", "breakfast_table")
     bowl = scene.object_registry("name", "bowl")
     place_obj_on_floor_plane(breakfast_table)
-    bowl.set_position_orientation([0.0, -0.8, 0.1], [0, 0, 0, 1])
+    bowl.set_position_orientation(position=[0.0, -0.8, 0.1], orientation=[0, 0, 0, 1])
 
     # Test single robot scene graph
     scene_graph_builder_single = SceneGraphBuilder(

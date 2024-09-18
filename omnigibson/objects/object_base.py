@@ -393,7 +393,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             desired_frame_to_world = xy_aligned_base_com_to_world
         else:
             # Default desired frame is base CoM frame.
-            desired_frame_to_world = th.tensor(base_frame_to_world, dtype=th.float32)
+            desired_frame_to_world = base_frame_to_world
 
         # Compute the world-to-base frame transform.
         world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse

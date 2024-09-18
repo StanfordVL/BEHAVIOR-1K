@@ -312,7 +312,7 @@ class DatasetObject(USDObject):
                 None means it will not be changed
         """
         if orientation is None:
-            orientation = self.get_orientation()
+            orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
                 th.tensor([0, 0, 0], dtype=th.float32),
@@ -321,7 +321,7 @@ class DatasetObject(USDObject):
                 th.tensor([0, 0, 0, 1], dtype=th.float32),
             )[0]
             position = position + rotated_offset
-        self.set_position_orientation(position, orientation)
+        self.set_position_orientation(position=position, orientation=orientation)
 
     @property
     def model(self):

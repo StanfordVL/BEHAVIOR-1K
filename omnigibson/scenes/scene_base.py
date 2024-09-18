@@ -354,14 +354,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
         # Position the scene prim initially at a z offset to avoid collision
-        self._scene_prim.set_position(th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0]))
+        self._scene_prim.set_position_orientation(
+            position=th.tensor([0, 0, initial_scene_prim_z_offset if self.idx != 0 else 0])
+        )
 
         # Now load the objects with their own logic
         for obj_name, obj in self._init_objs.items():
             # Import into the simulator
             self.add_object(obj)
             # Set the init pose accordingly
-            obj.set_local_pose(
+            obj.set_position_orientation(
                 position=self._init_state[obj_name]["root_link"]["pos"],
                 orientation=self._init_state[obj_name]["root_link"]["ori"],
             )
@@ -370,7 +372,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if self.idx != 0:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
             left_edge_to_center = -aabb_min[0]
-            self._scene_prim.set_position([last_scene_edge + scene_margin + left_edge_to_center, 0, 0])
+            self._scene_prim.set_position_orientation(
+                position=[last_scene_edge + scene_margin + left_edge_to_center, 0, 0]
+            )
             new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
             aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(scene_absolute_path)
@@ -448,6 +452,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Cache this scene's pose
         self._pose = T.pose2mat(self._scene_prim.get_position_orientation())
+        assert self._pose is not None
         self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
         if gm.ENABLE_TRANSITION_RULES:
@@ -697,9 +702,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             position (th.Tensor): (3,) position of the scene
             orientation (th.Tensor): (4,) orientation of the scene
         """
-        self._scene_prim.set_position_orientation(position, orientation)
+        self._scene_prim.set_position_orientation(position=position, orientation=orientation)
         # Update the cached pose and inverse pose
         self._pose = T.pose2mat(self.get_position_orientation())
+        assert self._pose is not None
         self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
     @property
@@ -756,6 +762,36 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
         """
         return self._pose_inv
+
+    def convert_world_pose_to_scene_relative(self, position, orientation):
+        """
+        Convert a world pose to a scene-relative pose.
+
+        Args:
+            position (th.Tensor): (3,) position in world frame
+            orientation (th.Tensor): (4,) orientation in world frame
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (3,) position in scene frame
+                - th.Tensor: (4,) orientation in scene frame
+        """
+        return T.mat2pose(self.pose_inv @ T.pose2mat((position, orientation)))
+
+    def convert_scene_relative_pose_to_world(self, position, orientation):
+        """
+        Convert a scene-relative pose to a world pose.
+
+        Args:
+            position (th.Tensor): (3,) position in scene frame
+            orientation (th.Tensor): (4,) orientation in scene frame
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (3,) position in world frame
+                - th.Tensor: (4,) orientation in world frame
+        """
+        return T.mat2pose(self.pose @ T.pose2mat((position, orientation)))
 
     def is_system_active(self, system_name):
         return self.get_system(system_name, force_init=False).initialized

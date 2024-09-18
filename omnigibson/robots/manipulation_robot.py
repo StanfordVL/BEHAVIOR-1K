@@ -1,6 +1,7 @@
 import math
 from abc import abstractmethod
 from collections import namedtuple
+from typing import Literal
 
 import networkx as nx
 import torch as th
@@ -92,8 +93,7 @@ class ManipulationRobot(BaseRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -305,14 +305,28 @@ class ManipulationRobot(BaseRobot):
 
         return contact_data, robot_contact_links
 
-    def set_position_orientation(self, position=None, orientation=None):
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
+        """
+        Sets manipulation robot's pose with respect to the specified frame
+
+        Args:
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
+        """
+
         # Store the original EEF poses.
         original_poses = {}
         for arm in self.arm_names:
             original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
 
         # Run the super method
-        super().set_position_orientation(position=position, orientation=orientation)
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
 
         # Now for each hand, if it was holding an AG object, teleport it.
         for arm in self.arm_names:
@@ -728,7 +742,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_position()
+        return self._links[self.eef_link_names[arm]].get_position_orientation()[0]
 
     def get_eef_orientation(self, arm="default"):
         """
@@ -741,7 +755,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_orientation()
+        return self._links[self.eef_link_names[arm]].get_position_orientation()[1]
 
     def get_relative_eef_pose(self, arm="default", mat=False):
         """
@@ -796,7 +810,7 @@ class ManipulationRobot(BaseRobot):
             3-array: (x,y,z) Linear velocity of end-effector relative to robot base frame
         """
         arm = self.default_arm if arm == "default" else arm
-        base_link_quat = self.get_orientation()
+        base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_linear_velocity()
 
     def get_relative_eef_ang_vel(self, arm="default"):
@@ -809,7 +823,7 @@ class ManipulationRobot(BaseRobot):
             3-array: (ax,ay,az) angular velocity of end-effector relative to robot base frame
         """
         arm = self.default_arm if arm == "default" else arm
-        base_link_quat = self.get_orientation()
+        base_link_quat = self.get_position_orientation()[1]
         return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_angular_velocity()
 
     def _calculate_in_hand_object_rigid(self, arm="default"):
@@ -843,7 +857,7 @@ class ManipulationRobot(BaseRobot):
             return None
 
         # Find the closest object to the gripper center
-        gripper_center_pos = self.eef_links[arm].get_position()
+        gripper_center_pos = self.eef_links[arm].get_position_orientation()[0]
 
         candidate_data = []
         for prim_path in candidates_set:
@@ -853,7 +867,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = th.norm(th.tensor(candidate_link.get_position()) - th.tensor(gripper_center_pos))
+            dist = th.norm(th.tensor(candidate_link.get_position_orientation()[0]) - th.tensor(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1097,6 +1111,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": "default",
                 "mode": "binary",
                 "limit_tolerance": 0.001,
+                "inverted": self._grasping_direction == "upper",
             }
         return dic
 
@@ -1382,7 +1397,7 @@ class ManipulationRobot(BaseRobot):
         # TODO (eric): Only AG one cloth at any given moment.
         # Returns the first cloth that overlaps with the "ghost" box volume
         for cloth_obj in cloth_objs:
-            attachment_point_pos = cloth_obj.links["attachment_point"].get_position()
+            attachment_point_pos = cloth_obj.links["attachment_point"].get_position_orientation()[0]
             particles_in_volume = self._ag_check_in_volume[arm]([attachment_point_pos])
             if particles_in_volume.sum() > 0:
                 return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos
@@ -1471,11 +1486,11 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         ag_params = self._ag_obj_constraint_params.copy()
         for arm in ag_params.keys():
-            if len(ag_params[arm]) > 0 and self.scene is not None:
-                ag_params[arm]["contact_pos"], _ = T.relative_pose_transform(
+            if len(ag_params[arm]) > 0:
+                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+                ag_params[arm]["contact_pos"], _ = self.scene.convert_world_pose_to_scene_relative(
                     ag_params[arm]["contact_pos"],
                     th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    *self.scene.get_position_orientation(),
                 )
         state["ag_obj_constraint_params"] = ag_params
         return state
@@ -1499,12 +1514,11 @@ class ManipulationRobot(BaseRobot):
                 obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 contact_pos_global = data["contact_pos"]
-                if self.scene is not None:
-                    contact_pos_global, _ = T.pose_transform(
-                        *self.scene.get_position_orientation(),
-                        contact_pos_global,
-                        th.tensor([0, 0, 0, 1], dtype=th.float32),
-                    )
+                assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene"
+                contact_pos_global, _ = self.scene.convert_scene_relative_pose_to_world(
+                    contact_pos_global,
+                    th.tensor([0, 0, 0, 1], dtype=th.float32),
+                )
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
     def serialize(self, state):
@@ -1566,7 +1580,7 @@ class ManipulationRobot(BaseRobot):
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            arm_action = teleop_action[hand]
+            arm_action = th.tensor(teleop_action[hand]).float()
             # arm action
             assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
                 self._controllers[f"arm_{arm_name}"], OperationalSpaceController

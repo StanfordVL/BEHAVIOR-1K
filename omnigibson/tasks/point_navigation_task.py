@@ -344,8 +344,8 @@ class PointNavigationTask(BaseTask):
 
         # Update visuals if requested
         if self._visualize_goal:
-            self._initial_pos_marker.set_position(self._initial_pos)
-            self._goal_pos_marker.set_position(self._goal_pos)
+            self._initial_pos_marker.set_position_orientation(position=self._initial_pos)
+            self._goal_pos_marker.set_position_orientation(position=self._goal_pos)
 
     def _reset_variables(self, env):
         # Run super first
@@ -376,10 +376,10 @@ class PointNavigationTask(BaseTask):
 
         Args:
             env (TraversableEnv): Environment instance
-            pos (3-array): global (x,y,z) position
+            pos (th.Tensor): global (x,y,z) position
 
         Returns:
-            3-array: (x,y,z) position in self._robot_idn agent's local frame
+            th.Tensor: (x,y,z) position in self._robot_idn agent's local frame
         """
         delta_pos_global = pos - env.robots[self._robot_idn].states[Pose].get_value()[0]
         return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
@@ -458,11 +458,11 @@ class PointNavigationTask(BaseTask):
             floor_height = env.scene.get_floor_height(self._floor)
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
-                self._waypoint_markers[i].set_position(
+                self._waypoint_markers[i].set_position_orientation(
                     position=th.tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
                 )
             for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position(position=th.tensor([0.0, 0.0, 100.0]))
+                self._waypoint_markers[i].set_position_orientation(position=th.tensor([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first

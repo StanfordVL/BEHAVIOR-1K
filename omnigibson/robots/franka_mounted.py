@@ -50,7 +50,7 @@ class FrankaMounted(FrankaPanda):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
+                GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
             ]
         }
 
@@ -58,6 +58,6 @@ class FrankaMounted(FrankaPanda):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
+                GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),
             ]
         }

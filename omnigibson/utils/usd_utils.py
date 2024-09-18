@@ -634,10 +634,10 @@ class FlatcacheAPI:
             from omnigibson.prims.xform_prim import XFormPrim
 
             # 1. For every link, update its xformOp properties based on the delta_tf between object frame and link frame
-            obj_pos, obj_quat = XFormPrim.get_local_pose(prim)
+            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame="parent")
             for link in prim.links.values():
                 rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_local_pose(link, rel_pos, rel_quat)
+                XFormPrim.set_position_orientation(link, position=rel_pos, orientation=rel_quat, frame="parent")
             # 2. For every joint, update its linear / angular joint state
             if prim.n_joints > 0:
                 joints_pos = prim.get_joint_positions()
@@ -681,7 +681,9 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_local_pose(link, th.zeros(3), th.tensor([0, 0, 0, 1.0]))
+                XFormPrim.set_position_orientation(
+                    link, position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]), frame="parent"
+                )
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -746,6 +748,15 @@ class PoseAPI:
 
     @classmethod
     def get_world_pose(cls, prim_path):
+        """
+        Gets pose of the prim object with respect to the world frame
+        Args:
+            Prim_path: the path of the prim object
+        Returns:
+            2-tuple:
+                - torch.Tensor: (x,y,z) position in the world frame
+                - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
+        """
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
@@ -773,6 +784,25 @@ class PoseAPI:
         from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
 
         return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
+
+    @classmethod
+    def convert_world_pose_to_local(cls, prim, position, orientation):
+        """Converts a world pose to a local pose under a prim's parent."""
+        world_transform = T.pose2mat((position, orientation))
+        parent_path = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_world_transform = cls.get_world_pose_with_scale(parent_path)
+
+        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
+        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
+
+        # Check that the local transform consists only of a position, scale and rotation
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        assert th.allclose(
+            product, th.diag(th.diag(product)), atol=1e-3
+        ), f"{prim.GetPath()} local transform is not orthogonal."
+
+        # Return the local pose
+        return T.mat2pose(local_transform)
 
 
 class BatchControlViewAPIImpl:
