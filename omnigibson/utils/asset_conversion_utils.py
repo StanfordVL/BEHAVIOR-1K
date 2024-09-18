@@ -67,6 +67,15 @@ _ALLOWED_META_TYPES = {
 
 
 class _TorchEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder for PyTorch tensors.
+
+    This encoder converts PyTorch tensors to lists, making them JSON serializable.
+
+    Methods:
+        default(o): Overrides the default method to handle PyTorch tensors.
+    """
+
     def default(self, o):
         if isinstance(o, th.Tensor):
             return o.tolist()
@@ -75,13 +84,16 @@ class _TorchEncoder(json.JSONEncoder):
 
 def _space_string_to_tensor(string):
     """
-    Converts a array string in mujoco xml to th.Tensor.
+    Converts a space-separated string of numbers into a PyTorch tensor.
+
     Examples:
-        "0 1 2" => [0, 1, 2]
+        "0 1 2" => tensor([0., 1., 2.])
+
     Args:
-        string (str): String to convert to an array
+        string (str): Space-separated string of numbers to convert.
+
     Returns:
-        th.Tensor: Numerical array equivalent of @string
+        torch.Tensor: Tensor containing the numerical values from the input string.
     """
     return th.tensor([float(x) for x in string.split(" ")])
 
@@ -89,10 +101,13 @@ def _space_string_to_tensor(string):
 def _tensor_to_space_script(array):
     """
     Converts a numeric array into the string format in mujoco.
+
     Examples:
         [0, 1, 2] => "0 1 2"
+
     Args:
         array (th.Tensor): Array to convert to a string
+
     Returns:
         str: String equivalent of @array
     """
@@ -101,7 +116,18 @@ def _tensor_to_space_script(array):
 
 def _split_obj_file_into_connected_components(obj_fpath):
     """
-    Splits obj file at @obj_fpath into individual obj files that each contain a single connected mesh.
+    Splits an OBJ file into individual OBJ files, each containing a single connected mesh.
+
+    Args:
+        obj_fpath (str): The file path to the input OBJ file.
+
+    Returns:
+        int: The number of individual connected mesh files created.
+
+    The function performs the following steps:
+    1. Loads the OBJ file using trimesh.
+    2. Splits the loaded mesh into individual connected components.
+    3. Saves each connected component as a separate OBJ file in the same directory as the input file.
     """
     # Open file in trimesh
     obj = trimesh.load(obj_fpath, file_type="obj", force="mesh")
@@ -123,7 +149,19 @@ def _split_obj_file_into_connected_components(obj_fpath):
 
 def _split_all_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
     """
-    Splits the obj references in the given URDF
+    Splits the OBJ references in the given URDF file into separate files for each connected component.
+
+    This function parses a URDF file, finds all collision mesh references, splits the referenced OBJ files into
+    connected components, and updates the URDF file to reference these new OBJ files. The updated URDF file is
+    saved with a new name.
+
+    Args:
+        urdf_fpath (str): The file path to the URDF file to be processed.
+        name_suffix (str, optional): Suffix to append to the output URDF file name. Defaults to "split".
+        mesh_fpath_offset (str, optional): Offset path to the directory containing the mesh files. Defaults to ".".
+
+    Returns:
+        str: The file path to the newly created URDF file with split OBJ references.
     """
     tree = ET.parse(urdf_fpath)
     root = tree.getroot()
@@ -246,6 +284,16 @@ def _set_mtl_emission(mtl_prim, texture):
 
 
 def _rename_prim(prim, name):
+    """
+    Renames a given prim to a new name.
+
+    Args:
+        prim (Usd.Prim): The prim to be renamed.
+        name (str): The new name for the prim.
+
+    Returns:
+        Usd.Prim: The renamed prim at the new path.
+    """
     path_from = prim.GetPrimPath().pathString
     path_to = f"{'/'.join(path_from.split('/')[:-1])}/{name}"
     lazy.omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
@@ -253,8 +301,17 @@ def _rename_prim(prim, name):
 
 
 def _get_visual_objs_from_urdf(urdf_path):
-    # Will return a dictionary mapping link name (e.g.: base_link) to dictionary of owned visual meshes mapping mesh
-    # name to visual obj file for that mesh
+    """
+    Extracts visual objects from a URDF file.
+
+    Args:
+        urdf_path (str): Path to the URDF file.
+
+    Returns:
+        OrderedDict: A dictionary mapping link names to dictionaries of visual meshes. Each link name (e.g., 'base_link')
+                     maps to another dictionary where the keys are visual mesh names and the values are the corresponding
+                     visual object file paths. If no visual object file is found for a mesh, the value will be None.
+    """
     visual_objs = OrderedDict()
     # Parse URDF
     tree = ET.parse(urdf_path)
@@ -275,6 +332,17 @@ def _get_visual_objs_from_urdf(urdf_path):
 
 
 def _copy_object_state_textures(obj_category, obj_model, dataset_root):
+    """
+    Copies specific object state texture files from the old material directory to the new material directory.
+
+    Args:
+        obj_category (str): The category of the object.
+        obj_model (str): The model of the object.
+        dataset_root (str): The root directory of the dataset.
+
+    Returns:
+        None
+    """
     obj_root_dir = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     old_mat_fpath = f"{obj_root_dir}/material"
     new_mat_fpath = f"{obj_root_dir}/usd/materials"
@@ -289,6 +357,29 @@ def _copy_object_state_textures(obj_category, obj_model, dataset_root):
 
 
 def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
+    """
+    Imports and binds rendering channels for a given object in an Omniverse USD stage.
+
+    This function performs the following steps:
+    1. Removes existing material prims from the object.
+    2. Extracts visual objects and their associated material files from the object's URDF file.
+    3. Copies material files to the USD directory and creates new materials.
+    4. Applies rendering channels to the new materials.
+    5. Binds the new materials to the visual meshes of the object.
+    6. Copies state-conditioned texture maps (e.g., cooked, soaked) for the object.
+
+    Args:
+        obj_prim (Usd.Prim): The USD prim representing the object.
+        obj_category (str): The category of the object (e.g., "ceilings", "walls").
+        obj_model (str): The model name of the object.
+        model_root_path (str): The root path of the model files.
+        usd_path (str): The path to the USD file.
+        dataset_root (str): The root path of the dataset containing the object files.
+
+    Raises:
+        AssertionError: If more than one material file is found in an OBJ file.
+        AssertionError: If a valid visual prim is not found for a mesh.
+    """
     usd_dir = os.path.dirname(usd_path)
     # # mat_dir = f"{model_root_path}/material/{obj_category}" if \
     # #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
@@ -541,6 +632,25 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
 
 
 def _add_xform_properties(prim):
+    """
+    Adds and configures transformation properties for a given USD prim.
+
+    This function ensures that the specified USD prim has the necessary transformation
+    properties (scale, translate, and orient) and removes any unwanted transformation
+    properties. It also sets the order of the transformation operations.
+
+    Args:
+        prim (pxr.Usd.Prim): The USD prim to which the transformation properties will be added.
+
+    Notes:
+        - The function removes the following properties if they exist:
+            "xformOp:rotateX", "xformOp:rotateXZY", "xformOp:rotateY", "xformOp:rotateYXZ",
+            "xformOp:rotateYZX", "xformOp:rotateZ", "xformOp:rotateZYX", "xformOp:rotateZXY",
+            "xformOp:rotateXYZ", "xformOp:transform".
+        - If the prim does not have "xformOp:scale", "xformOp:translate", or "xformOp:orient",
+          these properties are added with default values.
+        - The order of the transformation operations is set to translate, orient, and scale.
+    """
     properties_to_remove = [
         "xformOp:rotateX",
         "xformOp:rotateXZY",
@@ -592,7 +702,28 @@ def _add_xform_properties(prim):
 
 def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
     """
-    Process a meta link by creating visual meshes or lights below it
+    Process a meta link by creating visual meshes or lights below it.
+
+    Args:
+        stage (pxr.Usd.Stage): The USD stage where the meta link will be processed.
+        obj_model (str): The object model name.
+        meta_link_type (str): The type of the meta link. Must be one of the allowed meta types.
+        meta_link_infos (dict): A dictionary containing meta link information. The keys are link IDs and the values are lists of mesh information dictionaries.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the meta_link_type is not in the allowed meta types or if the mesh_info_list has unexpected keys or invalid number of meshes.
+        ValueError: If an invalid light type or mesh type is encountered.
+
+    Notes:
+        - Temporarily disables importing of fillable meshes for "container" meta link type.
+        - Handles specific meta link types such as "togglebutton", "particleapplier", "particleremover", "particlesink", and "particlesource".
+        - For "particleapplier" meta link type, adjusts the orientation if the mesh type is "cone".
+        - Creates lights or primitive shapes based on the meta link type and mesh information.
+        - Sets various attributes for lights and meshes, including color, intensity, size, and scale.
+        - Makes meshes invisible and sets their local pose.
     """
     # TODO: Reenable after fillable meshes are backported into 3ds Max.
     # Temporarily disable importing of fillable meshes.
@@ -765,6 +896,19 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
 
 
 def _process_glass_link(prim):
+    """
+    Processes the given USD prim to update any glass parts to use the glass material.
+
+    This function traverses the children of the given prim to find any Mesh-type prims
+    that do not have a CollisionAPI, indicating they are visual elements. It collects
+    the paths of these prims and ensures they are bound to a glass material.
+
+    Args:
+        prim (pxr.Usd.Prim): The USD prim to process.
+
+    Raises:
+        AssertionError: If no glass prim paths are found.
+    """
     # Update any glass parts to use the glass material instead
     glass_prim_paths = []
     for gchild in prim.GetChildren():
@@ -804,6 +948,23 @@ def _process_glass_link(prim):
 
 
 def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_channels=False):
+    """
+    Imports metadata for a given object model from the dataset. This metadata consist of information
+    that is NOT included in the URDF file and instead included in the various JSON files shipped in
+    iGibson and OmniGibson datasets.
+
+    Args:
+        obj_category (str): The category of the object.
+        obj_model (str): The model name of the object.
+        dataset_root (str): The root directory of the dataset.
+        import_render_channels (bool, optional): Flag to import rendering channels. Defaults to False.
+
+    Raises:
+        ValueError: If the bounding box size is not found in the metadata.
+
+    Returns:
+        None
+    """
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
@@ -915,6 +1076,29 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
 
 
 def _recursively_replace_list_of_dict(dic):
+    """
+    Recursively processes a dictionary to replace specific values and structures that can be stored
+    in USD.
+
+    This function performs the following transformations:
+    - Replaces `None` values with `lazy.pxr.lazy.pxr.UsdGeom.Tokens.none`.
+    - Converts empty lists or tuples to `lazy.pxr.Vt.Vec3fArray()`.
+    - Converts lists of dictionaries to a dictionary with string keys.
+    - Converts nested lists or tuples to specific `lazy.pxr.Vt` array types based on their length:
+        - Length 2: `lazy.pxr.Vt.Vec2fArray`
+        - Length 3: `lazy.pxr.Vt.Vec3fArray`
+        - Length 4: `lazy.pxr.Vt.Vec4fArray`
+    - Converts lists of integers to `lazy.pxr.Vt.IntArray`.
+    - Converts lists of floats to `lazy.pxr.Vt.FloatArray`.
+    - Replaces `None` values within lists with `lazy.pxr.lazy.pxr.UsdGeom.Tokens.none`.
+    - Recursively processes nested dictionaries.
+
+    Args:
+        dic (dict): The dictionary to process.
+
+    Returns:
+        dict: The processed dictionary with the specified transformations applied.
+    """
     for k, v in dic.items():
         print(f"k: {k}")
         if v is None:
@@ -945,31 +1129,9 @@ def _recursively_replace_list_of_dict(dic):
                 else:
                     raise ValueError(f"No support for storing matrices of length {len(v[0])}!")
             elif isinstance(v[0], int):
-                # if len(v) == 1:
-                #     # Do nothing
-                #     pass
-                # elif len(v) == 2:
-                #     dic[k] = lazy.pxr.Gf.Vec2i(v)
-                # elif len(v) == 3:
-                #     dic[k] = lazy.pxr.Gf.Vec3i(v)
-                # elif len(v) == 4:
-                #     dic[k] = lazy.pxr.Gf.Vec4i(v)
-                # else:
                 dic[k] = lazy.pxr.Vt.IntArray(v)
-                # raise ValueError(f"No support for storing numeric arrays of length {len(v)}! Array: {v}")
             elif isinstance(v[0], float):
-                # if len(v) == 1:
-                #     # Do nothing
-                #     pass
-                # elif len(v) == 2:
-                #     dic[k] = lazy.pxr.Gf.Vec2f(v)
-                # elif len(v) == 3:
-                #     dic[k] = lazy.pxr.Gf.Vec3f(v)
-                # elif len(v) == 4:
-                #     dic[k] = lazy.pxr.Gf.Vec4f(v)
-                # else:
                 dic[k] = lazy.pxr.Vt.FloatArray(v)
-                # raise ValueError(f"No support for storing numeric arrays of length {len(v)}! Array: {v}")
             else:
                 # Replace any Nones
                 for i, ele in enumerate(v):
@@ -983,6 +1145,18 @@ def _recursively_replace_list_of_dict(dic):
 
 
 def _create_urdf_import_config():
+    """
+    Creates and configures a URDF import configuration.
+
+    This function sets up the import configuration for URDF files by executing the
+    "URDFCreateImportConfig" command and adjusting various settings such as drive type,
+    joint merging, convex decomposition, base fixing, inertia tensor import, distance scale,
+    density, drive strength, position drive damping, self-collision, up vector, default prim
+    creation, and physics scene creation.
+
+    Returns:
+        import_config: The configured URDF import configuration object.
+    """
     # Set up import configuration
     _, import_config = lazy.omni.kit.commands.execute("URDFCreateImportConfig")
     drive_mode = (
@@ -1005,31 +1179,52 @@ def _create_urdf_import_config():
     return import_config
 
 
-def import_obj_urdf(obj_category, obj_model, dataset_root, skip_if_exist=False):
+def import_obj_urdf(obj_category, obj_model, dataset_root):
+    """
+    Imports an object from a URDF file into the current stage.
+
+    Args:
+        obj_category (str): The category of the object.
+        obj_model (str): The model name of the object.
+        dataset_root (str): The root directory of the dataset.
+
+    Returns:
+        None
+    """
     # Preprocess input URDF to account for metalinks
-    urdf_path = _add_metalinks_to_urdf(
-        obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
-    )
+    urdf_path = _add_metalinks_to_urdf(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
     # Import URDF
     cfg = _create_urdf_import_config()
     # Check if filepath exists
     usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
-    if not (skip_if_exist and exists(usd_path)):
-        if _SPLIT_COLLISION_MESHES:
-            print(f"Converting collision meshes from {obj_category}, {obj_model}...")
-            urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
-        print(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
-        # Only import if it doesn't exist
-        lazy.omni.kit.commands.execute(
-            "URDFParseAndImportFile",
-            urdf_path=urdf_path,
-            import_config=cfg,
-            dest_path=usd_path,
-        )
-        print(f"Imported {obj_category}, {obj_model}")
+    if _SPLIT_COLLISION_MESHES:
+        print(f"Converting collision meshes from {obj_category}, {obj_model}...")
+        urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
+    print(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
+    # Only import if it doesn't exist
+    lazy.omni.kit.commands.execute(
+        "URDFParseAndImportFile",
+        urdf_path=urdf_path,
+        import_config=cfg,
+        dest_path=usd_path,
+    )
+    print(f"Imported {obj_category}, {obj_model}")
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
+    """
+    Recursively formats an XML element tree to be pretty-printed with indentation.
+
+    Args:
+        current (xml.etree.ElementTree.Element): The current XML element to format.
+        parent (xml.etree.ElementTree.Element, optional): The parent XML element. Defaults to None.
+        index (int, optional): The index of the current element in the parent's children. Defaults to -1.
+        depth (int, optional): The current depth in the XML tree, used for indentation. Defaults to 0.
+        use_tabs (bool, optional): If True, use tabs for indentation; otherwise, use spaces. Defaults to False.
+
+    Returns:
+        None
+    """
     space = "\t" if use_tabs else " " * 4
     for i, node in enumerate(current):
         _pretty_print_xml(node, current, i, depth + 1)
@@ -1044,12 +1239,17 @@ def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
 
 def _convert_to_xml_string(inp):
     """
-    Converts any type of {bool, int, float, list, tuple, array, string, th.Tensor} into an mujoco-xml compatible string.
-        Note that an input string / th.Tensor results in a no-op action.
+    Converts any type of {bool, int, float, list, tuple, array, string, th.Tensor} into a URDF-compatible string.
+    Note that an input string / th.Tensor results in a no-op action.
+
     Args:
         inp: Input to convert to string
+
     Returns:
         str: String equivalent of @inp
+
+    Raises:
+        ValueError: If the input type is unsupported.
     """
     if type(inp) in {list, tuple, th.Tensor}:
         return _tensor_to_space_script(inp)
@@ -1074,7 +1274,7 @@ def _create_urdf_joint(
     limits=None,
 ):
     """
-    Generates XML joint
+    Generates URDF joint
     Args:
         name (str): Name of this joint
         parent (str or ET.Element): Name of parent link or parent link element itself for this joint
@@ -1124,7 +1324,7 @@ def _create_urdf_joint(
 
 def _create_urdf_link(name, subelements=None, mass=None, inertia=None):
     """
-    Generates XML link element
+    Generates URDF link element
     Args:
         name (str): Name of this link
         subelements (None or list): If specified, specifies all nested elements that should belong to this link
@@ -1162,6 +1362,19 @@ def _create_urdf_metalink(
     pos=(0, 0, 0),
     rpy=(0, 0, 0),
 ):
+    """
+    Creates the appropriate URDF joint and link for a meta link and appends it to the root element.
+
+    Args:
+        root_element (Element): The root XML element to which the metalink will be appended.
+        metalink_name (str): The name of the metalink to be created.
+        parent_link_name (str, optional): The name of the parent link. Defaults to "base_link".
+        pos (tuple, optional): The position of the joint in the form (x, y, z). Defaults to (0, 0, 0).
+        rpy (tuple, optional): The roll, pitch, and yaw of the joint in the form (r, p, y). Defaults to (0, 0, 0).
+
+    Returns:
+        None
+    """
     # Create joint
     jnt = _create_urdf_joint(
         name=f"{metalink_name}_joint",
@@ -1213,6 +1426,20 @@ def _save_xmltree_as_urdf(root_element, name, dirpath, unique_urdf=False):
 
 
 def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
+    """
+    Adds meta links to a URDF file based on metadata.
+
+    This function reads a URDF file and corresponding metadata, processes the metadata to add meta links, and then
+    saves an updated version of the URDF file with these meta links.
+
+    Args:
+        obj_category (str): The category of the object.
+        obj_model (str): The model name of the object.
+        dataset_root (str): The root directory of the dataset.
+
+    Returns:
+        str: The path to the updated URDF file.
+    """
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     urdf_path = f"{model_root_path}/{obj_model}.urdf"
@@ -1308,6 +1535,17 @@ def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
 
 
 def convert_scene_urdf_to_json(urdf, json_path):
+    """
+    Converts a scene from a URDF file to a JSON file.
+
+    This function loads the scene described by the URDF file into the OmniGibson simulator,
+    plays the simulation, and saves the scene to a JSON file. After saving, it removes the
+    "init_info" from the JSON file and saves it again.
+
+    Args:
+        urdf (str): The file path to the URDF file describing the scene.
+        json_path (str): The file path where the JSON file will be saved.
+    """
     # First, load the requested objects from the URDF into OG
     _load_scene_from_urdf(urdf=urdf)
 
@@ -1327,6 +1565,24 @@ def convert_scene_urdf_to_json(urdf, json_path):
 
 
 def _load_scene_from_urdf(urdf):
+    """
+    Loads a scene from a URDF file.
+
+    Args:
+        urdf (str): Path to the URDF file.
+
+    Raises:
+        ValueError: If an object fails to load.
+
+    This function performs the following steps:
+    1. Extracts object configuration information from the URDF file.
+    2. Creates a new scene without a floor plane and imports it into the simulator.
+    3. Iterates over the objects' information and attempts to load each object into the scene.
+       - If the USD file for an object does not exist, it prints a message and skips the object.
+       - If an object fails to load, it raises a ValueError with the object's name.
+    4. Sets the bounding box center position and orientation for each loaded object.
+    5. Takes a simulation step to finalize the scene setup.
+    """
     # First, grab object info from the urdf
     objs_info = _get_objects_config_from_scene_urdf(urdf=urdf)
 
@@ -1357,6 +1613,15 @@ def _load_scene_from_urdf(urdf):
 
 
 def _get_objects_config_from_scene_urdf(urdf):
+    """
+    Parses a URDF file to extract object configuration information.
+
+    Args:
+        urdf (str): Path to the URDF file.
+
+    Returns:
+        dict: A dictionary containing the configuration of objects extracted from the URDF file.
+    """
     tree = ET.parse(urdf)
     root = tree.getroot()
     objects_cfg = dict()
@@ -1365,6 +1630,27 @@ def _get_objects_config_from_scene_urdf(urdf):
 
 
 def _get_objects_config_from_element(element, model_pose_info):
+    """
+    Extracts and populates object configuration information from an URDF element.
+
+    This function processes an URDF element to extract joint and link information,
+    populating the provided `model_pose_info` dictionary with the relevant data.
+
+    Args:
+        element (xml.etree.ElementTree.Element): The URDF element containing object configuration data.
+        model_pose_info (dict): A dictionary to be populated with the extracted configuration information.
+
+    The function performs two passes through the URDF element:
+    1. In the first pass, it extracts joint information and populates `model_pose_info` with joint pose data.
+    2. In the second pass, it extracts link information, imports object models, and updates `model_pose_info` with
+       additional configuration details such as category, model, bounding box, rooms, scale, and object scope.
+
+    The function also handles nested elements by recursively calling itself for child elements.
+
+    Note:
+        - Joint names with hyphens are replaced with underscores.
+        - The function asserts that each link name (except "world") is present in `model_pose_info` after the first pass.
+    """
     # First pass through, populate the joint pose info
     for ele in element:
         if ele.tag == "joint":
@@ -1409,6 +1695,19 @@ def _get_objects_config_from_element(element, model_pose_info):
 
 
 def _get_joint_info(joint_element):
+    """
+    Extracts joint information from an URDF element.
+
+    Args:
+        joint_element (xml.etree.ElementTree.Element): The URDF element containing joint information.
+
+    Returns:
+        tuple: A tuple containing:
+            - child (str or None): The name of the child link, or None if not specified.
+            - pos (numpy.ndarray or None): The position as a tensor, or None if not specified.
+            - quat (numpy.ndarray or None): The orientation as a quaternion, or None if not specified.
+            - fixed_jnt (bool): True if the joint is fixed, False otherwise.
+    """
     child, pos, quat, fixed_jnt = None, None, None, None
     fixed_jnt = joint_element.get("type") == "fixed"
     for ele in joint_element:
