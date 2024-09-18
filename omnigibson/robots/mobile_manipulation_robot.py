@@ -1,17 +1,28 @@
-import math
-import os
+from abc import abstractmethod
 
 import torch as th
 
-from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
+from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
+
+RESET_JOINT_OPTIONS = {
+    "tuck",
+    "untuck",
+}
 
 
-class VX300S(ManipulationRobot):
+class MobileManipulationRobot(ManipulationRobot):
     """
-    The VX300-6DOF arm from Trossen Robotics
-    (https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html)
+    ManipulationRobot that has a mobile base.
+    Implements the logic of default_reset_mode {"tuck", "untuck"}
+
+    NOTE: controller_config should, at the minimum, contain:
+        base: controller specifications for the controller to control this robot's base (locomotion).
+            Should include:
+
+            - name: Controller to create
+            - <other kwargs> relevant to the controller being created. Note that all values will have default
+                values specified, but setting these individual kwargs will override them
     """
 
     def __init__(
@@ -22,9 +33,9 @@ class VX300S(ManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=True,
+        self_collisions=False,
         load_config=None,
-        fixed_base=True,
+        fixed_base=False,
         # Unique to USDObject hierarchy
         abilities=None,
         # Unique to ControllableObject hierarchy
@@ -39,6 +50,9 @@ class VX300S(ManipulationRobot):
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
+        # Unique to MobileManipulationRobot
+        default_reset_mode="untuck",
         **kwargs,
     ):
         """
@@ -81,9 +95,16 @@ class VX300S(ManipulationRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
+                If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+        assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+        self.default_reset_mode = default_reset_mode
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -104,116 +125,37 @@ class VX300S(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 
     @property
-    def discrete_action_list(self):
-        raise NotImplementedError()
-
-    def _create_discrete_action_space(self):
-        raise ValueError("VX300S does not support discrete actions!")
+    def tucked_default_joint_pos(self):
+        raise NotImplementedError("tucked_default_joint_pos must be implemented in subclasses")
 
     @property
-    def controller_order(self):
-        return [f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
+    def untucked_default_joint_pos(self):
+        raise NotImplementedError("untucked_default_joint_pos must be implemented in subclasses")
 
-    @property
-    def _default_controllers(self):
-        controllers = super()._default_controllers
-        controllers[f"arm_{self.default_arm}"] = "InverseKinematicsController"
-        controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
-        return controllers
+    def tuck(self):
+        """
+        Immediately set this robot's configuration to be in tucked mode
+        """
+        self.set_joint_positions(self.tucked_default_joint_pos)
+
+    def untuck(self):
+        """
+        Immediately set this robot's configuration to be in untucked mode
+        """
+        self.set_joint_positions(self.untucked_default_joint_pos)
 
     @property
     def _default_joint_pos(self):
-        return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+        return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["gripper_bar_link", "left_finger_link"],
-            ["gripper_bar_link", "right_finger_link"],
-            ["gripper_bar_link", "gripper_link"],
-        ]
-
-    @property
-    def arm_link_names(self):
-        return {
-            self.default_arm: [
-                "base_link",
-                "shoulder_link",
-                "upper_arm_link",
-                "upper_forearm_link",
-                "lower_forearm_link",
-                "wrist_link",
-                "gripper_link",
-                "gripper_bar_link",
-            ]
-        }
-
-    @property
-    def arm_joint_names(self):
-        return {
-            self.default_arm: [
-                "waist",
-                "shoulder",
-                "elbow",
-                "forearm_roll",
-                "wrist_angle",
-                "wrist_rotate",
-            ]
-        }
-
-    @property
-    def eef_link_names(self):
-        return {self.default_arm: "ee_gripper_link"}
-
-    @property
-    def finger_link_names(self):
-        return {self.default_arm: ["left_finger_link", "right_finger_link"]}
-
-    @property
-    def finger_joint_names(self):
-        return {self.default_arm: ["left_finger", "right_finger"]}
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s/vx300s.usd")
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description.yaml")}
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
-
-    @property
-    def eef_usd_path(self):
-        # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
-        raise NotImplementedError
-
-    @property
-    def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-math.pi, 0, 0])}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("MobileManipulationRobot")
+        return classes
