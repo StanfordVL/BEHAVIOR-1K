@@ -231,15 +231,15 @@ class CuRoboMotionGenerator:
         obstacles = self._usd_help.get_obstacles_from_stage(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
-                self.robot.prim_path,       # Don't include robot paths
-                "/curobo",                  # Don't include curobo prim
-                "visual",                   # Don't include any visuals
-                "ground_plane",             # Don't include ground plane
-                *ground_paths,              # Don't include collisions with any ground-related objects
-                *METALINK_PREFIXES,         # Don't include any metalinks
-                *ignore_scenes,             # Don't include any scenes the robot is not in
-                *ignore_visual_only,        # Don't include any visual-only objects
-                *ignore_paths,              # Don't include any additional specified paths
+                self.robot.prim_path,  # Don't include robot paths
+                "/curobo",  # Don't include curobo prim
+                "visual",  # Don't include any visuals
+                "ground_plane",  # Don't include ground plane
+                *ground_paths,  # Don't include collisions with any ground-related objects
+                *METALINK_PREFIXES,  # Don't include any metalinks
+                *ignore_scenes,  # Don't include any scenes the robot is not in
+                *ignore_visual_only,  # Don't include any visual-only objects
+                *ignore_paths,  # Don't include any additional specified paths
             ],
         ).get_collision_check_world()
         self.mg.update_world(obstacles)
