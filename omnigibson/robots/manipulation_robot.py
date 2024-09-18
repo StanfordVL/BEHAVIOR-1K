@@ -93,8 +93,7 @@ class ManipulationRobot(BaseRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -1112,6 +1111,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": "default",
                 "mode": "binary",
                 "limit_tolerance": 0.001,
+                "inverted": self._grasping_direction == "upper",
             }
         return dic
 
@@ -1580,7 +1580,7 @@ class ManipulationRobot(BaseRobot):
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            arm_action = teleop_action[hand]
+            arm_action = th.tensor(teleop_action[hand]).float()
             # arm action
             assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
                 self._controllers[f"arm_{arm_name}"], OperationalSpaceController

@@ -1,17 +1,29 @@
-import math
-import os
+from abc import abstractmethod
 
 import torch as th
 
-from omnigibson.macros import gm
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
+from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
-class VX300S(ManipulationRobot):
+class ArticulatedTrunkRobot(ManipulationRobot):
     """
-    The VX300-6DOF arm from Trossen Robotics
-    (https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html)
+    ManipulationRobot that is is equipped with an articulated trunk.
+    If rigid_trunk is True, the trunk will be rigid and not articulated.
+    Otherwise, it will belong to the kinematic chain of the default arm.
+
+    NOTE: If using IK Control for both the right and left arms, note that the left arm dictates control of the trunk,
+    and the right arm passively must follow. That is, sending desired delta position commands to the right end effector
+    will be computed independently from any trunk motion occurring during that timestep.
+
+    NOTE: controller_config should, at the minimum, contain:
+    base: controller specifications for the controller to control this robot's base (locomotion).
+        Should include:
+
+        - name: Controller to create
+        - <other kwargs> relevant to the controller being created. Note that all values will have default
+            values specified, but setting these individual kwargs will override them
     """
 
     def __init__(
@@ -22,9 +34,9 @@ class VX300S(ManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=True,
+        self_collisions=False,
         load_config=None,
-        fixed_base=True,
+        fixed_base=False,
         # Unique to USDObject hierarchy
         abilities=None,
         # Unique to ControllableObject hierarchy
@@ -39,6 +51,10 @@ class VX300S(ManipulationRobot):
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
+        # Unique to ArticulatedTrunkRobot
+        rigid_trunk=False,
+        default_trunk_offset=0.2,
         **kwargs,
     ):
         """
@@ -81,9 +97,16 @@ class VX300S(ManipulationRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
+            default_trunk_offset (float): The default height of the robot's trunk
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+        self.rigid_trunk = rigid_trunk
+        self.default_trunk_offset = default_trunk_offset
+
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -104,116 +127,59 @@ class VX300S(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 
     @property
-    def discrete_action_list(self):
-        raise NotImplementedError()
-
-    def _create_discrete_action_space(self):
-        raise ValueError("VX300S does not support discrete actions!")
+    def trunk_joint_names(self):
+        raise NotImplementedError("trunk_joint_names must be implemented in subclass")
 
     @property
-    def controller_order(self):
-        return [f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
+    def trunk_control_idx(self):
+        """
+        Returns:
+            n-array: Indices in low-level control vector corresponding to trunk joints.
+        """
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
-    def _default_controllers(self):
-        controllers = super()._default_controllers
-        controllers[f"arm_{self.default_arm}"] = "InverseKinematicsController"
-        controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
-        return controllers
+    def _default_controller_config(self):
+        # Grab defaults from super method first
+        cfg = super()._default_controller_config
+        if self.rigid_trunk:
+            return cfg
+
+        # Need to override joint idx being controlled to include trunk in default arm controller configs
+        for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
+            arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
+            arm_cfg["dof_idx"] = arm_control_idx
+
+            # Need to modify the default joint positions also if this is a null joint controller
+            if arm_cfg["name"] == "NullJointController":
+                arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
+
+        return cfg
+
+    def _get_proprioception_dict(self):
+        dic = super()._get_proprioception_dict()
+
+        # Add trunk info
+        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
+        dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
+
+        return dic
 
     @property
-    def _default_joint_pos(self):
-        return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+    def default_proprio_obs(self):
+        obs_keys = super().default_proprio_obs
+        return obs_keys + ["trunk_qpos", "trunk_qvel"]
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["gripper_bar_link", "left_finger_link"],
-            ["gripper_bar_link", "right_finger_link"],
-            ["gripper_bar_link", "gripper_link"],
-        ]
-
-    @property
-    def arm_link_names(self):
-        return {
-            self.default_arm: [
-                "base_link",
-                "shoulder_link",
-                "upper_arm_link",
-                "upper_forearm_link",
-                "lower_forearm_link",
-                "wrist_link",
-                "gripper_link",
-                "gripper_bar_link",
-            ]
-        }
-
-    @property
-    def arm_joint_names(self):
-        return {
-            self.default_arm: [
-                "waist",
-                "shoulder",
-                "elbow",
-                "forearm_roll",
-                "wrist_angle",
-                "wrist_rotate",
-            ]
-        }
-
-    @property
-    def eef_link_names(self):
-        return {self.default_arm: "ee_gripper_link"}
-
-    @property
-    def finger_link_names(self):
-        return {self.default_arm: ["left_finger_link", "right_finger_link"]}
-
-    @property
-    def finger_joint_names(self):
-        return {self.default_arm: ["left_finger", "right_finger"]}
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s/vx300s.usd")
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description.yaml")}
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
-
-    @property
-    def eef_usd_path(self):
-        # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
-        raise NotImplementedError
-
-    @property
-    def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-math.pi, 0, 0])}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ArticulatedTrunkRobot")
+        return classes
