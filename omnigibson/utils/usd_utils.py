@@ -361,7 +361,7 @@ class RigidContactAPIImpl:
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
         ]
-        interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+        interesting_columns = [list(self.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
 
         # Get the interesting-columns from the impulse matrix
         interesting_impulse_columns = impulses[:, interesting_columns]
@@ -369,9 +369,7 @@ class RigidContactAPIImpl:
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
         interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1)).flatten()
-        interesting_row_paths = [
-            GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
-        ]
+        interesting_row_paths = [self.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
         # Filter out idxes by whether or not the row path is in the row prim paths list
         if row_prim_paths is not None:
