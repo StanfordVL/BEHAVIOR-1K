@@ -11,7 +11,11 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import GripperRigidContactAPI
+
+# Create module logger
+logger = create_module_logger(module_name=__name__)
 
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
@@ -120,17 +124,17 @@ def plan_base_motion(
         state().setYaw(_wrap_angle(yaw))
         return state
 
-    def state_valid_fn(q, sample=True):
+    def state_valid_fn(q, verbose=True):
         """
         returns if the input pose is in collision with any objects within the context
-        sample (bool): Whether the action primitive is testing the sampling point (default to true), or the pose is used for navigation (false)
+        verbose (bool): Whether the action primitive is testing the sampling point (default to true), or the pose is used for navigation (false)
         """
 
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
         pose = (th.tensor([x, y, 0.0], dtype=th.float32), T.euler2quat(th.tensor([0, 0, yaw], dtype=th.float32)))
-        return not set_base_and_detect_collision(context, pose, sample=sample)
+        return not set_base_and_detect_collision(context, pose, verbose=verbose)
 
     def remove_unnecessary_rotations(path):
         """
@@ -195,13 +199,10 @@ def plan_base_motion(
     ss.setPlanner(planner)
 
     start = create_state(space, start_conf[0], start_conf[1], start_conf[2])
-    print("start pose", start)
-
     goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
-    print("goal pose", goal)
 
     ss.setStartAndGoalStates(start, goal)
-    if not state_valid_fn(start(), sample=False) or not state_valid_fn(goal(), sample=False):
+    if not state_valid_fn(start(), verbose=False) or not state_valid_fn(goal(), verbose=False):
         return
 
     solved = ss.solve(planning_time)
@@ -258,10 +259,10 @@ def plan_arm_motion(
             initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
 
-    def state_valid_fn(q, sample=True):
+    def state_valid_fn(q, verbose=True):
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = th.tensor([q[i] for i in range(dim)])
-        return not set_arm_and_detect_collision(context, joint_pos, sample=sample)
+        return not set_arm_and_detect_collision(context, joint_pos, verbose=verbose)
 
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
@@ -298,7 +299,7 @@ def plan_arm_motion(
     ss.setStartAndGoalStates(start, goal)
 
     # if the start pose or the goal pose collides, abort
-    if not state_valid_fn(start, sample=False) or not state_valid_fn(goal, sample=False):
+    if not state_valid_fn(start, verbose=False) or not state_valid_fn(goal, verbose=False):
         return
 
     # this will automatically choose a default planner with
@@ -335,7 +336,7 @@ def plan_arm_motion_ik(
         planning_time (float): Time to plan for
 
     Returns:
-        Th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
+        th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
@@ -367,7 +368,7 @@ def plan_arm_motion_ik(
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
-    def state_valid_fn(q, sample=True):
+    def state_valid_fn(q, verbose=True):
         joint_pos = initial_joint_pos
         eef_pose = th.tensor([q[i] for i in range(6)], dtype=th.float32)
         control_joint_pos = ik_solver.solve(
@@ -379,7 +380,7 @@ def plan_arm_motion_ik(
         if control_joint_pos is None:
             return False
         joint_pos[control_idx_in_joint_pos] = control_joint_pos
-        return not set_arm_and_detect_collision(context, joint_pos, sample=sample)
+        return not set_arm_and_detect_collision(context, joint_pos, verbose=verbose)
 
     # create an SE2 state space
     space = ob.RealVectorStateSpace(DOF)
@@ -410,10 +411,8 @@ def plan_arm_motion_ik(
     si = ss.getSpaceInformation()
     planner = ompl_geo.BITstar(si)
     ss.setPlanner(planner)
-
     start_conf = th.cat((robot.get_relative_eef_position(), T.quat2axisangle(robot.get_relative_eef_orientation())))
     # do fk
-
     start = ob.State(space)
     for i in range(DOF):
         start[i] = float(start_conf[i])
@@ -423,7 +422,7 @@ def plan_arm_motion_ik(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
-    if not state_valid_fn(start, sample=False) or not state_valid_fn(goal, sample=False):
+    if not state_valid_fn(start, verbose=False) or not state_valid_fn(goal, verbose=False):
         return
 
     # this will automatically choose a default planner with
@@ -443,14 +442,14 @@ def plan_arm_motion_ik(
     return None
 
 
-def set_base_and_detect_collision(context, pose, sample=True):
+def set_base_and_detect_collision(context, pose, verbose=True):
     """
     Moves the robot and detects robot collisions with the environment and itself
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
         pose (Array): Pose in the world frame to check for collisions at
-        sample (bool): Whether the action primitive is testing the sampling pose (default to True), or the pose is used for navigation (false)
+        verbose (bool): Whether the action primitive is testing the sampling pose (default to True), or the pose is used for navigation (false)
 
     Returns:
         bool: Whether the robot is in collision
@@ -464,10 +463,10 @@ def set_base_and_detect_collision(context, pose, sample=True):
 
     orientation = pose[1][[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
-    return detect_robot_collision(context, sample=sample)
+    return detect_robot_collision(context, verbose=verbose)
 
 
-def set_arm_and_detect_collision(context, joint_pos, sample=True):
+def set_arm_and_detect_collision(context, joint_pos, verbose=True):
     """
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
@@ -495,16 +494,16 @@ def set_arm_and_detect_collision(context, joint_pos, sample=True):
                 orientation = mesh_pose[1][[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
-    return detect_robot_collision(context, sample=sample)
+    return detect_robot_collision(context, verbose=verbose)
 
 
-def detect_robot_collision(context, sample=True):
+def detect_robot_collision(context, verbose=True):
     """
     Detects robot collisions
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
-        sample (bool): Whether the action primitive is testing the sampling pose (default to true), or the pose is used for navigation / arm movement (false)
+        verbose (bool): Whether the action primitive is testing the sampling pose (default to true), or the pose is used for navigation / arm movement (false)
 
     Returns:
         valid_hit(bool): Whether the robot is in collision
@@ -522,8 +521,8 @@ def detect_robot_collision(context, sample=True):
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 
         # if an non-sampling pose collides with any object, raise an action primitive error with the colliding object and robot mesh_path
-        if valid_hit and not sample:
-            raise ActionPrimitiveError(
+        if valid_hit and not verbose:
+            logger.warning(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 f"Could not make a plan to get to the target position, colliding objects: {hit.rigid_body} and {mesh_path}",
             )

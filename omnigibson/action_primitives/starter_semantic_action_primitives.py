@@ -47,6 +47,7 @@ from omnigibson.utils.motion_planning_utils import (
 )
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.python_utils import multi_dim_linspace
 
 m = create_module_macros(module_path=__file__)
 
@@ -1216,7 +1217,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         num_poses = int(
             th.max(th.tensor([2, int(travel_distance / m.MAX_CARTESIAN_HAND_STEP) + 1], dtype=th.float32)).item()
         )
-        pos_waypoints = self.linspace_1d_tensor(start_pos, target_pose[0], num_poses)
+        pos_waypoints = multi_dim_linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
         t_values = th.linspace(0, 1, num_poses)
@@ -1291,7 +1292,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-                pos_diff = th.norm(th.tensor(current_pos) - th.tensor(target_pose[0]))
+                pos_diff = th.norm(current_pos - target_pose[0])
                 orn_diff = T.get_orientation_diff_in_radian(target_pose[1], current_orn)
                 if pos_diff < 0.001 and orn_diff < th.deg2rad(th.tensor([0.1])).item():
                     return
@@ -1779,7 +1780,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 distance_lo, distance_hi = 0.0, 5.0
                 distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
                 yaw_lo, yaw_hi = -math.pi, math.pi
-                yaw = th.tensor((th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo).item(), dtype=th.float32)
+                yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = th.tensor(
                     [
@@ -2013,24 +2014,3 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 break
             empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
-
-    def linspace_1d_tensor(self, start_pos, target_pose, num_poses):
-        """
-        Create evenly spaced samples between two 1D tensors.
-
-        :param start_pos: Starting 1D tensor
-        :param target_pose: Ending 1D tensor
-        :param num_poses: Number of poses (samples) to generate
-        :return: Tensor of shape (num_poses, dim) where dim is the dimension of input tensors
-        """
-        # Ensure inputs are 1D tensors
-        assert start_pos.dim() == 1 and target_pose.dim() == 1, "Input tensors must be 1D"
-        assert start_pos.shape == target_pose.shape, "Input tensors must have the same shape"
-
-        # Create a tensor of interpolation factors
-        t = th.linspace(0, 1, num_poses)
-
-        # Perform the interpolation
-        interpolated_points = start_pos.unsqueeze(0) + (target_pose - start_pos).unsqueeze(0) * t.unsqueeze(1)
-
-        return interpolated_points

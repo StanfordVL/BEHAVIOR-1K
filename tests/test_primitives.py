@@ -17,9 +17,10 @@ og.launch()
 
 
 def load_robot_config(robot_name):
-    config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_config.yaml")
+    config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_primitives.yaml")
     with open(config_filename, "r") as file:
-        return yaml.safe_load(file)
+        full_config = yaml.safe_load(file)
+        return full_config.get('robots', {})[0]
 
 
 def setup_environment(load_object_categories, robot="Fetch"):
@@ -78,9 +79,8 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
     return True
 
-
 @pytest.mark.flaky(reruns=3)
-@pytest.mark.parametrize("robot", ["Fetch", "Tiago"])
+@pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
 class TestPrimitives:
     def test_navigate(self, robot):
         categories = ["floors", "ceilings", "walls"]

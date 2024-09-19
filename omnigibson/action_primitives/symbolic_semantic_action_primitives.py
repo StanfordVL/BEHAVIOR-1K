@@ -12,7 +12,7 @@ from omnigibson.action_primitives.action_primitive_set_base import ActionPrimiti
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects import DatasetObject
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
+from omnigibson.transition_rules import REGISTERED_RULES, SlicingRule, TransitionRuleAPI
 
 
 class SymbolicSemanticActionPrimitiveSet(IntEnum):
@@ -532,7 +532,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # TODO: Do some more validation
         added_obj_attrs = []
         removed_objs = []
-        output = REGISTERED_RULES["SlicingRule"].transition({"sliceable": [obj]})
+        slicing_rule, = [rule for rule in obj.scene.transition_rule_api.active_rules if isinstance(rule, SlicingRule)]
+        output = slicing_rule.transition({"sliceable": [obj]})
         added_obj_attrs += output.add
         removed_objs += output.remove
 
