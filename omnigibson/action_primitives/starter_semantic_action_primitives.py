@@ -836,7 +836,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "You need to be grasping an object first to place it somewhere.",
             )
-        
+
         # Sample location to place object
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
