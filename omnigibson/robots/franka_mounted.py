@@ -38,6 +38,10 @@ class FrankaMounted(FrankaPanda):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted.urdf")
 
     @property
+    def curobo_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted_description_curobo.yaml")
+
+    @property
     def eef_usd_path(self):
         # TODO: Update!
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
