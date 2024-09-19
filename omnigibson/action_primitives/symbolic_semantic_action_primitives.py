@@ -532,7 +532,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # TODO: Do some more validation
         added_obj_attrs = []
         removed_objs = []
-        slicing_rule, = [rule for rule in obj.scene.transition_rule_api.active_rules if isinstance(rule, SlicingRule)]
+        (slicing_rule,) = [rule for rule in obj.scene.transition_rule_api.active_rules if isinstance(rule, SlicingRule)]
         output = slicing_rule.transition({"sliceable": [obj]})
         added_obj_attrs += output.add
         removed_objs += output.remove

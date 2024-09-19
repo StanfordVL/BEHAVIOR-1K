@@ -46,8 +46,8 @@ from omnigibson.utils.motion_planning_utils import (
     set_base_and_detect_collision,
 )
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
-from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import multi_dim_linspace
+from omnigibson.utils.ui_utils import create_module_logger
 
 m = create_module_macros(module_path=__file__)
 
