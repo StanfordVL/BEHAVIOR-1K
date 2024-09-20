@@ -13,13 +13,13 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
 )
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
-
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.python_utils import create_class_from_registry_and_config
 
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = True
 current_robot_type = "Fetch"
+
 
 def load_robot_config(robot_name):
     config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_primitives.yaml")
@@ -87,6 +87,7 @@ def start_env(robot_type):
 
     return env
 
+
 def retrieve_obj_cfg(obj):
     return {
         "name": obj.name,
@@ -99,9 +100,11 @@ def retrieve_obj_cfg(obj):
         "visual_only": obj.visual_only,
     }
 
+
 def pytest_generate_tests(metafunc):
     if "robot_type" in metafunc.fixturenames:
         metafunc.parametrize("robot_type", ["Fetch", "Tiago"], scope="session")
+
 
 @pytest.fixture(scope="module")
 def shared_env(robot_type):
@@ -109,11 +112,13 @@ def shared_env(robot_type):
     env = start_env(robot_type=robot_type)
     yield env
 
+
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
     shared_env.scene.reset()
     yield shared_env
+
 
 @pytest.fixture
 def robot(env):
@@ -305,7 +310,7 @@ class TestSymbolicPrimitives:
         half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
         for apple in half_apples:
             env.scene.remove_object(apple)
-        
+
         objs = [DatasetObject(**obj_cfg) for obj_cfg in deleted_objs_cfg]
         og.sim.batch_add_objects(objs, scenes=[env.scene] * len(objs))
         og.sim.step()
