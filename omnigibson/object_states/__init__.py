@@ -14,6 +14,7 @@ from omnigibson.object_states.frozen import Frozen
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.heated import Heated
 from omnigibson.object_states.inside import Inside
+from omnigibson.object_states.joint_state import Joint
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.next_to import NextTo
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES

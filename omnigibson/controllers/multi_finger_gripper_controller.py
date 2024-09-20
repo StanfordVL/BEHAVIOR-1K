@@ -74,8 +74,8 @@ class MultiFingerGripperController(GripperController):
 
                 "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
                     (send max pos / vel / tor signal), otherwise send max close control signals
-                "smooth": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
-                "independent": 2D command, sends independent signals to each finger joint equal to the preprocessed command
+                "smooth": 1D command, sends symmetric signal to all finger joints equal to the preprocessed commands
+                "independent": n-dimensional command, sends independent signals to each finger joint equal to the preprocessed command
 
             open_qpos (None or Array[float]): If specified, the joint positions representing a fully-opened gripper.
                 This is to allow representing the open state as a partially opened gripper, rather than the full
@@ -122,7 +122,7 @@ class MultiFingerGripperController(GripperController):
         self._is_grasping = IsGraspingState.FALSE
 
     def _preprocess_command(self, command):
-        # We extend this method to make sure command is always 2D
+        # We extend this method to make sure command is always n-dimensional
         if self._mode != "independent":
             command = (
                 th.tensor([command] * self.command_dim)
@@ -163,7 +163,8 @@ class MultiFingerGripperController(GripperController):
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
-            if target[0] >= 0.0:
+            should_open = target[0] >= 0.0 if not self._inverted else target[0] > 0.0
+            if should_open:
                 u = (
                     self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
                     if self._open_qpos is None
@@ -217,15 +218,16 @@ class MultiFingerGripperController(GripperController):
         elif self._control is None:
             is_grasping = IsGraspingState.FALSE
 
-        else:
-            assert th.all(
-                self._control == self._control[0]
-            ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
-            assert m.POS_TOLERANCE > self._limit_tolerance, (
-                "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "
-                "gripper controller's tolerance of zero-ing out velocities, which makes the heuristics invalid."
-            )
+        #  Different values in the command for non-independent mode - cannot use heuristics
+        elif not th.all(self._control == self._control[0]):
+            is_grasping = IsGraspingState.UNKNOWN
 
+        # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
+        # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
+        elif not m.POS_TOLERANCE > self._limit_tolerance:
+            is_grasping = IsGraspingState.UNKNOWN
+
+        else:
             finger_pos = control_dict["joint_position"][self.dof_idx]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
