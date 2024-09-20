@@ -86,7 +86,7 @@ def execute_controller(ctrl_gen, env):
 def primitive_tester(env, objects, primitives, primitives_args):
     for obj in objects:
         env.scene.add_object(obj["object"])
-        obj["object"].set_position_orientation(obj["position"], obj["orientation"])
+        obj["object"].set_position_orientation(position=obj["position"], orientation=obj["orientation"])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)

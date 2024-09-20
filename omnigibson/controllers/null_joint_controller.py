@@ -55,7 +55,7 @@ class NullJointController(JointController):
                 applied
         """
         # Store values
-        self._default_command = th.zeros(len(dof_idx)) if default_command is None else th.tensor(default_command)
+        self._default_command = th.zeros(len(dof_idx)) if default_command is None else default_command
 
         # Run super init
         super().__init__(
