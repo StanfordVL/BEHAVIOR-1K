@@ -15,3 +15,7 @@ def vtarray_to_torch(vtarray, dtype=th.float32, device="cpu"):
     else:
         assert device.startswith("cuda")
         return th.tensor(np.array(vtarray), dtype=dtype, device=device)
+
+
+def pil_to_tensor(pil_image):
+    return th.tensor(np.array(pil_image), dtype=th.uint8)

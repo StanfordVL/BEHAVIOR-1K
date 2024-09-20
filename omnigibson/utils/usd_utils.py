@@ -5,6 +5,7 @@ import os
 import re
 from collections.abc import Iterable
 
+import numpy as np
 import torch as th
 import trimesh
 
@@ -359,7 +360,7 @@ class RigidContactAPIImpl:
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
         ]
-        interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+        interesting_columns = [list(self.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
 
         # Get the interesting-columns from the impulse matrix
         interesting_impulse_columns = impulses[:, interesting_columns]
@@ -367,9 +368,7 @@ class RigidContactAPIImpl:
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
         interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1)).flatten()
-        interesting_row_paths = [
-            GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
-        ]
+        interesting_row_paths = [self.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
         # Filter out idxes by whether or not the row path is in the row prim paths list
         if row_prim_paths is not None:
@@ -473,7 +472,7 @@ class RigidContactAPIImpl:
         if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
             self._CONTACT_CACHE[key] = th.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-        return self._CONTACT_CACHE[key]
+        return self._CONTACT_CACHE[key].item()
 
     def clear(self):
         """
@@ -1604,6 +1603,14 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
             [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
         )
     )
+
+    # Modify values so that all faces are triangular
+    tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+    face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+    mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
+    mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
+    mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
+    mesh.GetPrim().GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()]))
 
     return mesh
 

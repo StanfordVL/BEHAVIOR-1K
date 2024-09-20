@@ -33,11 +33,9 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Stretch does not support discrete actions
         raise ValueError("Stretch does not support discrete actions!")
 
     @property
@@ -78,8 +76,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=[0.013, 0.0, 0.01]),
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=[-0.01, 0.0, 0.009]),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 
@@ -87,8 +85,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=[0.013, 0.0, 0.01]),
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=[-0.01, 0.0, 0.009]),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 

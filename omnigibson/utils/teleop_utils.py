@@ -68,10 +68,10 @@ class TeleopSystem(TeleopPolicy):
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn)
             gripper_pos = th.mean(
                 self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[i]]]
-            )
+            ).unsqueeze(0)
             # if we are grasping, we manually set the gripper position to be at most 0.5
             if self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"].is_grasping():
-                gripper_pos = min(gripper_pos, 0.5)
+                gripper_pos = th.min(gripper_pos, th.tensor([0.5]))
             robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
         return robot_obs
 
@@ -88,7 +88,9 @@ class TeleopSystem(TeleopPolicy):
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
+                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(
+                    th.tensor(self.teleop_action[arm_name][3:6])
+                )
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 base_pos, base_orn = self.robot.get_position_orientation()
