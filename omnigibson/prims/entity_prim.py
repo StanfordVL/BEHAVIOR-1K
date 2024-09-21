@@ -160,6 +160,8 @@ class EntityPrim(XFormPrim):
         # Run super
         super()._post_load()
 
+        assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
+
         # Cache material information
         materials = set()
         material_paths = set()
