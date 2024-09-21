@@ -1010,7 +1010,7 @@ def _launch_simulator(*args, **kwargs):
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
                     self.update_handles()
-                    
+
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
                     # sim was stopped. We need to reset them to default_kp and default_kd defined in ControllableObject.
