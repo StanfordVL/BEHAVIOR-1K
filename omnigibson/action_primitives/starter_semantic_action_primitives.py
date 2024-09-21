@@ -1459,6 +1459,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             action[action_idx] = th.cat(list(no_op_goal.values()))
         return action
+
     def _reset_hand(self):
         """
         Yields action to move the hand to the position optimal for executing subsequent action primitives
