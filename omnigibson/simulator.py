@@ -1002,12 +1002,15 @@ def _launch_simulator(*args, **kwargs):
                     channels.append("omni.physx.plugin")
                 with suppress_omni_log(channels=channels):
                     super().play()
+
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
+
                 # Update all object handles, unless this is a play during initialization
                 if og.sim is not None:
                     self.update_handles()
+                    
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
                     # sim was stopped. We need to reset them to default_kp and default_kd defined in ControllableObject.

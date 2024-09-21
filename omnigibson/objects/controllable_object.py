@@ -304,7 +304,6 @@ class ControllableObject(BaseObject):
             controller_config (None or Dict[str, ...]): nested dictionary mapping controller name(s) to specific
                 controller configurations for this object. This will override any default values specified by this class.
         """
-        breakpoint()
         self._controller_config = {} if controller_config is None else controller_config
 
         # (Re-)load controllers
