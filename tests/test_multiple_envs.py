@@ -78,10 +78,9 @@ def test_multi_scene_dump_load_states():
     robot_0_state = vec_env.envs[0].scene._dump_state()
     robot_1_state = vec_env.envs[1].scene._dump_state()
     robot_2_state = vec_env.envs[2].scene._dump_state()
-    og.clear()
-
-    # recreate the environments
-    vec_env = setup_multi_environment(3)
+    
+    # reset the object_positions
+    vec_env.reset()
 
     # Load the states in a different order
     vec_env.envs[1].scene._load_state(robot_1_state)
@@ -103,6 +102,8 @@ def test_multi_scene_dump_load_states():
 
     og.clear()
 
+if __name__ == "__main__":
+    test_multi_scene_dump_load_states()
 
 def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)

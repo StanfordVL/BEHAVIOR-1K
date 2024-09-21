@@ -124,7 +124,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load this environment
         self.load()
-
         # If we are not in a vec env, we can play ourselves. Otherwise we wait for the vec env to play.
         if not self.in_vec_env:
             og.sim.play()

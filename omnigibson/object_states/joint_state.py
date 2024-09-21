@@ -19,5 +19,7 @@ class Joint(AbsoluteObjectState):
         old_q = value
         # Get current joint values
         cur_q = self.get_value()
+        if len(old_q) != len(cur_q):
+            return True
         dist_squared = th.sum(th.square(cur_q - old_q))
         return dist_squared > m.POSITIONAL_VALIDATION_EPSILON

@@ -147,7 +147,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Force the recomputation of this cached property
         del self.control_limits
 
-        self.reload_controllers()
+        # self.reload_controllers()
 
     @property
     def base_idx(self):
