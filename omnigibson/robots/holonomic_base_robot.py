@@ -140,7 +140,6 @@ class HolonomicBaseRobot(LocomotionRobot):
         for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
             joint_name = f"base_footprint_{component}_joint"
             assert joint_name in self.joints, f"Missing base joint: {joint_name}"
-            breakpoint()
             if i < 3:
                 self.joints[joint_name].max_velocity = m.MAX_LINEAR_VELOCITY
             else:
@@ -149,7 +148,8 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Force the recomputation of this cached property
         del self.control_limits
 
-        # self.reload_controllers()
+        # Reload the controllers to update command_output_limits, which read the updated control limits
+        self.reload_controllers(self._controller_config)
 
     @property
     def base_idx(self):

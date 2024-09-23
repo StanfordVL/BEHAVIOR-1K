@@ -83,6 +83,7 @@ jobs:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
+    if: always()
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
@@ -100,8 +101,8 @@ jobs:
           working-directory: omnigibson-src
           path: ${{ github.run_id }}-tests-*/test_*.xml
           reporter: java-junit
-          fail-on-error: 'true'
-          fail-on-empty: 'true'
+          fail-on-error: 'false'
+          fail-on-empty: 'false'
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0

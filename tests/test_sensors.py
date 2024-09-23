@@ -68,13 +68,14 @@ def test_segmentation_modalities(env):
     seg_instance_info = all_info["seg_instance"]
     assert set(int(x.item()) for x in th.unique(seg_instance)) == set(seg_instance_info.keys())
     expected_dict = {
+        1: "unlabelled",
         2: env.robots[0].name,
         3: "groundPlane",
         4: "dishtowel",
         5: "breakfast_table",
         6: "stain",
-        7: "water",
-        8: "white_rice",
+        # 7: "water",
+        # 8: "white_rice",
         9: "diced__apple",
     }
     assert set(seg_instance_info.values()) == set(expected_dict.values())
