@@ -1440,7 +1440,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
         """
-
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             action_idx = self.robot.controller_action_idx[name]

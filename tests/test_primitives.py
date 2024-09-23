@@ -1,5 +1,4 @@
 import os
-
 import pytest
 import yaml
 
@@ -15,13 +14,11 @@ from omnigibson.objects.dataset_object import DatasetObject
 # Make sure that Omniverse is launched before setting up the tests.
 og.launch()
 
-
 def load_robot_config(robot_name):
     config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_primitives.yaml")
     with open(config_filename, "r") as file:
         full_config = yaml.safe_load(file)
         return full_config.get("robots", {})[0]
-
 
 def setup_environment(load_object_categories, robot="Fetch"):
     if robot not in ["Fetch", "Tiago"]:

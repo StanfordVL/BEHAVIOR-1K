@@ -20,7 +20,6 @@ gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = True
 current_robot_type = "Fetch"
 
-
 def load_robot_config(robot_name):
     config_filename = os.path.join(og.example_config_path, f"{robot_name.lower()}_primitives.yaml")
     with open(config_filename, "r") as file:
@@ -28,7 +27,6 @@ def load_robot_config(robot_name):
         robot_config = full_config.get("robots", {})[0]
         robot_config["disable_grasp_handling"] = True
         return robot_config
-
 
 def start_env(robot_type):
     global current_robot_type
@@ -87,7 +85,6 @@ def start_env(robot_type):
 
     return env
 
-
 def retrieve_obj_cfg(obj):
     return {
         "name": obj.name,
@@ -99,7 +96,6 @@ def retrieve_obj_cfg(obj):
         "abilities": obj.abilities,
         "visual_only": obj.visual_only,
     }
-
 
 def pytest_generate_tests(metafunc):
     if "robot_type" in metafunc.fixturenames:

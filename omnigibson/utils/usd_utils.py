@@ -394,7 +394,6 @@ class RigidContactAPIImpl:
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         # First check if the object has any contacts. Since impulses is pre-filtered, we no longer need to use row_idx and col_idx filtering here
         impulses = self.get_all_impulses(scene_idx)
-
         row_idx = (
             list(range(impulses.shape[0]))
             if row_prim_paths is None

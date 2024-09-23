@@ -16,7 +16,6 @@ from omnigibson.utils.usd_utils import GripperRigidContactAPI
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
-
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
 m.DIST_DIFF = 0.1
