@@ -382,7 +382,7 @@ class VisionSensor(BaseSensor):
 
         image_keys = th.unique(img)
         if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
-            log.warning(
+            log.debug(
                 "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
             )
 
