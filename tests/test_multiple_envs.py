@@ -102,6 +102,7 @@ def test_multi_scene_dump_load_states():
 
     og.clear()
 
+
 def test_multi_scene_get_local_position():
     vec_env = setup_multi_environment(3)
 
