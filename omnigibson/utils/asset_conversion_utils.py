@@ -13,6 +13,7 @@ from datetime import datetime
 from os.path import exists
 from pathlib import Path
 
+from omnigibson.utils.ui_utils import create_module_logger
 import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -22,6 +23,9 @@ from omnigibson.objects import DatasetObject
 from omnigibson.scenes import Scene
 from omnigibson.utils.usd_utils import create_primitive_mesh
 import omnigibson.utils.transform_utils as T
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 _LIGHT_MAPPING = {
     0: "Rect",
@@ -1020,13 +1024,6 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     for link_name, link_metadata in meta_links.items():
         for meta_link_type, meta_link_infos in link_metadata.items():
             _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos)
-
-    # Apply temporary fillable meshes.
-    # TODo: Disable after fillable meshes are backported into 3ds Max.
-    fillable_path = f"{model_root_path}/fillable.obj"
-    if exists(fillable_path):
-        mesh = trimesh.load(fillable_path, force="mesh")
-        import_fillable_mesh(stage, obj_model, mesh)
 
     log.debug("Done processing meta links")
 
