@@ -482,6 +482,8 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
             bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        # Replicator returns each box as a numpy.void; we convert them to tuples here
+        bboxes = [box.tolist() for box in bboxes]
         info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
         return bboxes, info
 
