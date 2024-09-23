@@ -10,6 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.controllers.joint_controller import ControlType
 
 m = create_module_macros(module_path=__file__)
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
@@ -139,6 +140,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
             joint_name = f"base_footprint_{component}_joint"
             assert joint_name in self.joints, f"Missing base joint: {joint_name}"
+            breakpoint()
             if i < 3:
                 self.joints[joint_name].max_velocity = m.MAX_LINEAR_VELOCITY
             else:

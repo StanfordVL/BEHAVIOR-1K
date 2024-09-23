@@ -238,11 +238,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
     def _compute_no_op_action(self, control_dict):
         if self._use_delta_commands:
-            base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
-            # TODO: do we need to care about the entire gimbal lock situation?
-            command = self._goal["target"] - base_value
+            command = th.zeros(self.command_dim)
         else:
-            command = self._goal["target"]
+            command = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
 
         return command
 
