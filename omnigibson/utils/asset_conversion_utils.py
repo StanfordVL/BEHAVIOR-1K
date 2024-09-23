@@ -1863,15 +1863,14 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
             collision_filename = obj_relative_path.replace(".obj", f"-{i}.obj")
 
             # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
-            scaled_collision_mesh = processed_collision_mesh.copy()
-            bounding_box = scaled_collision_mesh.bounding_box.extents
+            bounding_box = processed_collision_mesh.bounding_box.extents
             assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
-            collision_scale = 1 / bounding_box
+            collision_scale = 1. / bounding_box
             collision_scale_matrix = th.eye(4)
             collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
-            scaled_collision_mesh.apply_transform(collision_scale_matrix.numpy())
+            processed_collision_mesh.apply_transform(collision_scale_matrix.numpy())
             processed_collision_mesh.export(obj_link_collision_mesh_folder / collision_filename, file_type="obj")
-            collision_filenames_and_scales.append((collision_filename, collision_scale))
+            collision_filenames_and_scales.append((collision_filename, 1 / collision_scale))
 
     # Create the link in URDF
     link_xml = ET.SubElement(tree_root, "link")
