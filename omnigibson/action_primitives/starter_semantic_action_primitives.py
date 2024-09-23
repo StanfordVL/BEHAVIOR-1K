@@ -1442,28 +1442,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
 
         action = th.zeros(self.robot.action_dim)
-        # for name, controller in self.robot._controllers.items():
-        #     action_idx = self.robot.controller_action_idx[name]
-        #     no_op_goal = controller.compute_no_op_goal(self.robot.get_control_dict())
-
-        #     # TODO: wip solution for goal pose not consistent with action pose. if the controller uses delta motion, convert the no_op to all zeros
-        #     if self.robot._controller_config[name].get("use_delta_commands", True):
-        #         no_op_goal = {key: th.zeros_like(value) for key, value in no_op_goal.items()}
-
-        #     if self.robot._controller_config[name]["name"] == "InverseKinematicsController":
-        #         assert (
-        #             self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori"
-        #         ), "Controller must be in pose_absolute_ori mode"
-        #         # convert quaternion to axis-angle representation for control input
-        #         no_op_goal["target_quat"] = T.quat2axisangle(no_op_goal["target_quat"])
-
-        #     action[action_idx] = th.cat(list(no_op_goal.values()))
         for name, controller in self.robot._controllers.items():
             action_idx = self.robot.controller_action_idx[name]
             no_op_action = controller.compute_no_op_action(self.robot.get_control_dict())
             action[action_idx] = no_op_action
-            # if th.norm(no_op_action) > 0.1:
-            #     # breakpoint()
         return action
 
     def _reset_hand(self):
