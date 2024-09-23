@@ -1,8 +1,11 @@
+import io
 import json
 import math
 import os
 import pathlib
 import shutil
+import tempfile
+from xml.dom import minidom
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from copy import deepcopy
@@ -224,7 +227,7 @@ def _set_mtl_albedo(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_normal(mtl_prim, texture):
@@ -232,7 +235,7 @@ def _set_mtl_normal(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_ao(mtl_prim, texture):
@@ -240,7 +243,7 @@ def _set_mtl_ao(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_roughness(mtl_prim, texture):
@@ -254,7 +257,7 @@ def _set_mtl_roughness(mtl_prim, texture):
     )
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_metalness(mtl_prim, texture):
@@ -263,7 +266,7 @@ def _set_mtl_metalness(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, "metallic_texture_influence", 1.0, lazy.pxr.Sdf.ValueTypeNames.Float)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_opacity(mtl_prim, texture):
@@ -273,7 +276,7 @@ def _set_mtl_opacity(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity_texture", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _set_mtl_emission(mtl_prim, texture):
@@ -282,7 +285,7 @@ def _set_mtl_emission(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, "enable_emission", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
 def _rename_prim(prim, name):
@@ -327,7 +330,7 @@ def _get_visual_objs_from_urdf(urdf_path):
                     visual_mesh_name = sub_ele.get("name", "visuals").replace("-", "_")
                     obj_file = None if sub_ele.find(".//mesh") is None else sub_ele.find(".//mesh").get("filename")
                     if obj_file is None:
-                        print(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
+                        log.debug(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
                     visual_objs[name][visual_mesh_name] = obj_file
 
     return visual_objs
@@ -405,7 +408,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         for subprim in looks_prim.GetChildren():
             if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
                 continue
-            print(
+            log.debug(
                 f"Removed material prim {subprim.GetPath()}:",
                 stage.RemovePrim(subprim.GetPath()),
             )
@@ -420,7 +423,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     # )
     # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
     # default_mat = rename_prim(prim=default_mat, name=f"default_material")
-    # print("Created default material:", default_mat.GetPath())
+    # log.debug("Created default material:", default_mat.GetPath())
     #
     # # We may delete this default material if it's never used
     # default_mat_is_used = False
@@ -506,13 +509,13 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                 render_channel_fcn(mat, os.path.join("materials", mat_file))
             else:
                 # Warn user that we didn't find the correct rendering channel
-                print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
+                log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
 
         # Rename material
         mat = _rename_prim(prim=mat, name=mtl_name)
         shade = lazy.pxr.UsdShade.Material(mat)
         shaders[mtl_name] = shade
-        print(f"Created material {mtl_name}:", mtl_created_list[0])
+        log.debug(f"Created material {mtl_name}:", mtl_created_list[0])
 
     # Bind each (visual) mesh to its appropriate material in the object
     # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
@@ -539,7 +542,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             visual_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
             assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
             # Bind the created link material to the visual prim
-            print(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
+            log.debug(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
             lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
@@ -557,8 +560,8 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     #         # This could be a link, check if it owns a visual subprim
     #         link_name = prim.GetName()
     #         visual_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{prim.GetPrimPath().pathString}/visuals")
-    #         print(f"path: {prim.GetPrimPath().pathString}/visuals")
-    #         print(f"visual prim: {visual_prim}")
+    #         log.debug(f"path: {prim.GetPrimPath().pathString}/visuals")
+    #         log.debug(f"visual prim: {visual_prim}")
     #
     #         if visual_prim:
     #             # Aggregate all material files for this prim
@@ -569,7 +572,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     #                     link_mat_files.append(mat_file)
     #                     mat_files.remove(mat_file)
     #             # Potentially write material files for this prim if we have any valid materials
-    #             print("link_mat_files:", link_mat_files)
+    #             log.debug("link_mat_files:", link_mat_files)
     #             if not link_mat_files:
     #                 # Bind default material to the visual prim
     #                 shade = lazy.pxr.UsdShade.Material(default_mat)
@@ -584,7 +587,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     #                     mtl_name="OmniPBR",
     #                     mtl_created_list=mtl_created_list,
     #                 )
-    #                 print(f"Created material for link {link_name}:", mtl_created_list[0])
+    #                 log.debug(f"Created material for link {link_name}:", mtl_created_list[0])
     #                 mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
     #
     #                 shade = lazy.pxr.UsdShade.Material(mat)
@@ -604,7 +607,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     #                         render_channel_fcn(mat, os.path.join("materials", link_mat_file))
     #                     else:
     #                         # Warn user that we didn't find the correct rendering channel
-    #                         print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
+    #                         log.warning(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
     #
     #                 # Rename material
     #                 mat = rename_prim(prim=mat, name=f"material_{link_name}")
@@ -612,7 +615,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     # # For any remaining materials, we write them to the default material
     # # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
     # # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_default")
-    # print(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
+    # log.debug(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
     # for mat_file in mat_files:
     #     # Copy this file into the materials folder
     #     mat_fpath = os.path.join(usd_dir, "materials")
@@ -626,7 +629,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     #         default_mat_is_used = True
     #     else:
     #         # Warn user that we didn't find the correct rendering channel
-    #         print(f"Warning: could not find rendering channel function for material: {mat_type}")
+    #         log.warning(f"Could not find rendering channel function for material: {mat_type}")
     #
     # # Possibly delete the default material prim if it was never used
     # if not default_mat_is_used:
@@ -970,9 +973,7 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
-    print("Loading", usd_path, "for metadata import.")
-
-    print("Start metadata import")
+    log.debug("Loading", usd_path, "for metadata import.")
 
     # Load model
     lazy.omni.isaac.core.utils.stage.open_stage(usd_path)
@@ -1013,7 +1014,7 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     # Grab light info if any
     meta_links = data["metadata"].get("meta_links", dict())
 
-    print("Process meta links")
+    log.debug("Process meta links")
 
     # TODO: Use parent link name
     for link_name, link_metadata in meta_links.items():
@@ -1027,12 +1028,12 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
         mesh = trimesh.load(fillable_path, force="mesh")
         import_fillable_mesh(stage, obj_model, mesh)
 
-    print("Done processing meta links")
+    log.debug("Done processing meta links")
 
     # Iterate over dict and replace any lists of dicts as dicts of dicts (with each dict being indexed by an integer)
     data = _recursively_replace_list_of_dict(data)
 
-    print("Done recursively replacing")
+    log.debug("Done recursively replacing")
 
     # Create attributes for bb, offset, category, model and store values
     prim.CreateAttribute("ig:nativeBB", lazy.pxr.Sdf.ValueTypeNames.Vector3f)
@@ -1044,19 +1045,19 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     prim.GetAttribute("ig:category").Set(obj_category)
     prim.GetAttribute("ig:model").Set(obj_model)
 
-    print(f"data: {data}")
+    log.debug(f"data: {data}")
 
     # Store remaining data as metadata
     prim.SetCustomData(data)
 
     # Add material channels
-    # print(f"prim children: {prim.GetChildren()}")
+    # log.debug(f"prim children: {prim.GetChildren()}")
     # looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
     # looks_prim = prim.GetChildren()[0] #lazy.omni.isaac.core.utils.prims.get_prim_at_path(looks_prim_path)
     # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
     # mat_prim = looks_prim.GetChildren()[0] #lazy.omni.isaac.core.utils.prims.get_prim_at_path(mat_prim_path)
-    # print(f"looks children: {looks_prim.GetChildren()}")
-    # print(f"mat prim: {mat_prim}")
+    # log.debug(f"looks children: {looks_prim.GetChildren()}")
+    # log.debug(f"mat prim: {mat_prim}")
     if import_render_channels:
         _import_rendering_channels(
             obj_prim=prim,
@@ -1102,7 +1103,6 @@ def _recursively_replace_list_of_dict(dic):
         dict: The processed dictionary with the specified transformations applied.
     """
     for k, v in dic.items():
-        print(f"k: {k}")
         if v is None:
             # Replace None
             dic[k] = lazy.pxr.lazy.pxr.UsdGeom.Tokens.none
@@ -1118,7 +1118,6 @@ def _recursively_replace_list_of_dict(dic):
                 # dic[k] = []
                 # for vv in v:
                 #     dic[k] += vv
-                print("v0: ", v[0])
                 if len(v[0]) == 1:
                     # Do nothing
                     pass
@@ -1200,9 +1199,9 @@ def import_obj_urdf(obj_category, obj_model, dataset_root):
     # Check if filepath exists
     usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if _SPLIT_COLLISION_MESHES:
-        print(f"Converting collision meshes from {obj_category}, {obj_model}...")
+        log.debug(f"Converting collision meshes from {obj_category}, {obj_model}...")
         urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
-    print(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
+    log.debug(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
     # Only import if it doesn't exist
     lazy.omni.kit.commands.execute(
         "URDFParseAndImportFile",
@@ -1210,7 +1209,7 @@ def import_obj_urdf(obj_category, obj_model, dataset_root):
         import_config=cfg,
         dest_path=usd_path,
     )
-    print(f"Imported {obj_category}, {obj_model}")
+    log.debug(f"Imported {obj_category}, {obj_model}")
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
@@ -1473,7 +1472,7 @@ def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
             json.dump(metadata, f)
 
         meta_links = metadata.pop("meta_links")
-        print("meta_links:", meta_links)
+        log.debug("meta_links:", meta_links)
         for parent_link_name, child_link_attrs in meta_links.items():
             for meta_link_name, ml_attrs in child_link_attrs.items():
                 assert (
@@ -1599,7 +1598,7 @@ def _load_scene_from_urdf(urdf):
                     ".usd", ".encrypted.usd"
                 )
             ):
-                print("Missing object", obj_name)
+                log.warning("Missing object", obj_name)
                 continue
             obj = DatasetObject(
                 name=obj_name,
@@ -1675,7 +1674,7 @@ def _get_objects_config_from_element(element, model_pose_info):
                 # Skip this
                 pass
             else:
-                print(name)
+                log.debug(name)
                 assert name in model_pose_info, f"Did not find {name} in current model pose info!"
                 model_pose_info[name]["cfg"]["category"] = ele.get("category")
                 model_pose_info[name]["cfg"]["model"] = ele.get("model")
@@ -1721,7 +1720,7 @@ def _get_joint_info(joint_element):
     return child, pos, quat, fixed_jnt
 
 
-def _generate_collision_meshes(trimesh_mesh, hull_count=32, discard_not_volume=True):
+def generate_collision_meshes(trimesh_mesh, hull_count=32, discard_not_volume=True):
     """
     Generates a set of collision meshes from a trimesh mesh using CoACD.
 
@@ -1760,25 +1759,170 @@ def _generate_collision_meshes(trimesh_mesh, hull_count=32, discard_not_volume=T
     return hulls
 
 
-def generate_urdf_for_obj(obj_file_path, category, mdl, collision_file_path=None, collision_generation_option="coacd"):
-    # Load the mesh
-    mesh: trimesh.Trimesh = trimesh.load(obj_file_path, force="mesh", process=False)
-
-    # Either load, or generate, the collision mesh
-    if collision_file_path is not None:
-        collision_mesh = trimesh.load(collision_file_path, force="mesh", process=False)
-    else:
-        if collision_generation_option == "coacd":
-            collision_meshes = _generate_collision_meshes(mesh)
-            collision_mesh = trimesh.util.concatenate(collision_meshes)
-        elif collision_generation_option == "convex":
-            collision_mesh = mesh.convex_hull
-        else:
-            raise ValueError(f"Unsupported collision generation option: {collision_generation_option}")
-
+def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
     # Create a directory for the object
     obj_dir = pathlib.Path(gm.USER_ASSETS_PATH) / "objects" / category / mdl
     assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
     obj_dir.mkdir(parents=True)
 
-    # Start the XML file
+    obj_name = "-".join([category, mdl])
+
+    # Prepare the URDF tree
+    tree_root = ET.Element("robot")
+    tree_root.attrib = {"name": mdl}
+
+    # Canonicalize the object by putting the origin at the visual mesh center
+    mesh_center = visual_mesh.centroid
+    if visual_mesh.is_watertight:
+        mesh_center = visual_mesh.center_mass
+    transform = th.eye(4)
+    transform[:3, 3] = th.as_tensor(mesh_center)
+    inv_transform = th.linalg.inv(transform)
+    visual_mesh.apply_transform(inv_transform.numpy())
+
+    # Somehow we need to manually write the vertex normals to cache
+    visual_mesh._cache.cache["vertex_normals"] = visual_mesh.vertex_normals
+
+    # Save the mesh
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = pathlib.Path(temp_dir)
+        obj_relative_path = f"{obj_name}-base_link.obj"
+        obj_temp_path = temp_dir_path / obj_relative_path
+        visual_mesh.export(obj_temp_path, file_type="obj")
+
+        # Move the mesh to the correct path
+        obj_link_mesh_folder = obj_dir / "shape"
+        obj_link_mesh_folder.mkdir(exist_ok=True)
+        obj_link_visual_mesh_folder = obj_link_mesh_folder / "visual"
+        obj_link_visual_mesh_folder.mkdir(exist_ok=True)
+        obj_link_collision_mesh_folder = obj_link_mesh_folder / "collision"
+        obj_link_collision_mesh_folder.mkdir(exist_ok=True)
+        obj_link_material_folder = obj_dir / "material"
+        obj_link_material_folder.mkdir(exist_ok=True)
+
+        # Check if a material got exported.
+        material_files = [x for x in temp_dir_path.iterdir() if x.suffix == ".mtl"]
+        if material_files:
+            assert (
+                len(material_files) == 1
+            ), f"Something's wrong: there's more than 1 material file in {list(temp_dir_path.iterdir())}"
+            original_material_filename = material_files[0]
+
+            # Fix texture file paths if necessary.
+            # original_material_dir = G.nodes[link_node]["material_dir"]
+            # if original_material_dir:
+            #     for src_texture_file in original_material_dir.iterdir():
+            #         fname = src_texture_file
+            #         # fname is in the same format as room_light-0-0_VRayAOMap.png
+            #         vray_name = fname[fname.index("VRay") : -4] if "VRay" in fname else None
+            #         if vray_name in VRAY_MAPPING:
+            #             dst_fname = VRAY_MAPPING[vray_name]
+            #         else:
+            #             raise ValueError(f"Unknown texture map: {fname}")
+
+            #         dst_texture_file = f"{obj_name}-base_link-{dst_fname}.png"
+
+            #         # Load the image
+            #         shutil.copy2(original_material_dir / src_texture_file, obj_link_material_folder / dst_texture_file)
+
+            # Modify MTL reference in OBJ file
+            mtl_name = f"{obj_name}-base_link.mtl"
+            with open(obj_temp_path, "r") as f:
+                new_lines = []
+                for line in f.readlines():
+                    if f"mtllib {original_material_filename}" in line:
+                        line = f"mtllib {mtl_name}\n"
+                    new_lines.append(line)
+
+            with open(obj_temp_path, "w") as f:
+                for line in new_lines:
+                    f.write(line)
+
+            # # Modify texture reference in MTL file
+            # with open(temp_dir_path / original_material_filename, "r") as f:
+            #     new_lines = []
+            #     for line in f.readlines():
+            #         if "map_Kd material_0.png" in line:
+            #             line = ""
+            #             for key in MTL_MAPPING:
+            #                 line += f"{key} ../../material/{obj_name}-{link_name}-{MTL_MAPPING[key]}.png\n"
+            #         new_lines.append(line)
+
+            with open(obj_link_visual_mesh_folder / mtl_name, "w") as f:
+                for line in new_lines:
+                    f.write(line)
+
+        # Copy the OBJ into the right spot
+        obj_final_path = obj_link_visual_mesh_folder / obj_relative_path
+        shutil.copy2(obj_temp_path, obj_final_path)
+
+        # Save and merge precomputed collision mesh
+        collision_filenames_and_scales = []
+        for i, collision_mesh in enumerate(collision_meshes):
+            processed_collision_mesh = collision_mesh.copy()
+            processed_collision_mesh.apply_transform(inv_transform)
+            processed_collision_mesh._cache.cache["vertex_normals"] = processed_collision_mesh.vertex_normals
+            collision_filename = obj_relative_path.replace(".obj", f"-{i}.obj")
+
+            # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
+            scaled_collision_mesh = processed_collision_mesh.copy()
+            bounding_box = scaled_collision_mesh.bounding_box.extents
+            assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
+            collision_scale = 1 / bounding_box
+            collision_scale_matrix = th.eye(4)
+            collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
+            scaled_collision_mesh.apply_transform(collision_scale_matrix.numpy())
+            processed_collision_mesh.export(obj_link_collision_mesh_folder / collision_filename, file_type="obj")
+            collision_filenames_and_scales.append((collision_filename, collision_scale))
+
+    # Create the link in URDF
+    link_xml = ET.SubElement(tree_root, "link")
+    link_xml.attrib = {"name": "base_link"}
+    visual_xml = ET.SubElement(link_xml, "visual")
+    visual_origin_xml = ET.SubElement(visual_xml, "origin")
+    visual_origin_xml.attrib = {"xyz": " ".join([str(item) for item in [0.0] * 3])}
+    visual_geometry_xml = ET.SubElement(visual_xml, "geometry")
+    visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
+    visual_mesh_xml.attrib = {
+        "filename": os.path.join("shape", "visual", obj_relative_path).replace("\\", "/"),
+        "scale": "1 1 1",
+    }
+
+    collision_origin_xmls = []
+    for collision_filename, collision_scale in collision_filenames_and_scales:
+        collision_xml = ET.SubElement(link_xml, "collision")
+        collision_xml.attrib = {"name": collision_filename.replace(".obj", "")}
+        collision_origin_xml = ET.SubElement(collision_xml, "origin")
+        collision_origin_xml.attrib = {"xyz": " ".join([str(item) for item in [0.0] * 3])}
+        collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
+        collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
+        collision_mesh_xml.attrib = {
+            "filename": os.path.join("shape", "collision", collision_filename).replace("\\", "/"),
+            "scale": " ".join([str(item) for item in collision_scale]),
+        }
+        collision_origin_xmls.append(collision_origin_xml)
+
+    # Save the URDF file.
+    xmlstr = minidom.parseString(ET.tostring(tree_root)).toprettyxml(indent="   ")
+    xmlio = io.StringIO(xmlstr)
+    tree = ET.parse(xmlio)
+
+    with open(obj_dir / f"{mdl}.urdf", "wb") as f:
+        tree.write(f, xml_declaration=True)
+
+    base_link_offset = visual_mesh.bounding_box.centroid
+    bbox_size = visual_mesh.bounding_box.extents
+
+    # Save metadata json
+    out_metadata = {
+        "meta_links": {},
+        "link_tags": {},
+        "object_parts": [],
+        "base_link_offset": base_link_offset.tolist(),
+        "bbox_size": bbox_size.tolist(),
+        "orientations": [],
+    }
+    misc_dir = obj_dir / "misc"
+    misc_dir.mkdir()
+    with open(misc_dir / "metadata.json", "w") as f:
+        json.dump(out_metadata, f)
