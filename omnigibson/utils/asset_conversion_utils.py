@@ -5,24 +5,25 @@ import os
 import pathlib
 import shutil
 import tempfile
-from xml.dom import minidom
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
 from os.path import exists
 from pathlib import Path
+from xml.dom import minidom
 
-from omnigibson.utils.ui_utils import create_module_logger
 import torch as th
+import trimesh
+
 import omnigibson as og
 import omnigibson.lazy as lazy
-import trimesh
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.scenes import Scene
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import create_primitive_mesh
-import omnigibson.utils.transform_utils as T
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
