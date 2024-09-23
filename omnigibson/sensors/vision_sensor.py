@@ -444,35 +444,13 @@ class VisionSensor(BaseSensor):
             self._register_instance(value, id=id)
             replicator_mapping[key] = value
 
-        # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
-        # They show up in the image, but not in the info (id_to_labels).
-        # We identify these values, find the corresponding semantic label (system name), and add the mapping.
+        # This is a temporary fix for the problem where some small number of pixels show up in the image, but not in the info (id_to_labels).
+        # We identify these values and mark them as unlabelled.
         image_keys = th.unique(img)
         for key in image_keys:
             if str(key.item()) not in id_to_labels:
-                semantic_label = semantic_img[img == key].unique().item()
-                assert (
-                    semantic_label in semantic_labels
-                ), f"Semantic map value {semantic_label} is not in the semantic labels!"
-                category_name = semantic_labels[semantic_label]
-                if category_name in self.scene.available_systems.keys():
-                    value = category_name
-                    self._register_instance(value, id=id)
-                # If the category name is not in the registered systems,
-                # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
-                # we will label this as "unlabelled" for now
-                # This only happens with a very small number of pixels, e.g. 0.1% of the image
-                else:
-                    num_of_pixels = (img == key).sum().item()
-                    resolution = (self._load_config["image_width"], self._load_config["image_height"])
-                    percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
-                    if percentage > 2:
-                        log.warning(
-                            f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
-                            f"Percentage of pixels: {percentage}%"
-                        )
-                    value = "unlabelled"
-                    self._register_instance(value, id=id)
+                value = "unlabelled"
+                self._register_instance(value, id=id)
                 replicator_mapping[key.item()] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
