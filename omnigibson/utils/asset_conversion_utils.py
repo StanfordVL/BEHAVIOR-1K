@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import pathlib
 import shutil
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
@@ -13,6 +14,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import trimesh
+from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.scenes import Scene
 from omnigibson.utils.usd_utils import create_primitive_mesh
@@ -1717,3 +1719,66 @@ def _get_joint_info(joint_element):
         elif ele.tag == "child":
             child = ele.get("link")
     return child, pos, quat, fixed_jnt
+
+
+def _generate_collision_meshes(trimesh_mesh, hull_count=32, discard_not_volume=True):
+    """
+    Generates a set of collision meshes from a trimesh mesh using CoACD.
+
+    Args:
+        trimesh_mesh (trimesh.Trimesh): The trimesh mesh to generate the collision mesh from.
+
+    Returns:
+        List[trimesh.Trimesh]: The collision meshes.
+    """
+    try:
+        import coacd
+    except ImportError:
+        raise ImportError("Please install the `coacd` package to use this function.")
+
+    # Get the vertices and faces
+    coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
+
+    # Run CoACD with the hull count
+    result = coacd.run_coacd(
+        coacd_mesh,
+        max_convex_hull=hull_count,
+    )
+
+    # Convert the returned vertices and faces to trimesh meshes
+    # and assert that they are volumes (and if not, discard them if required)
+    hulls = []
+    for vs, fs in result:
+        hull = trimesh.Trimesh(vertices=vs, faces=fs, process=False)
+        if discard_not_volume and not hull.is_volume:
+            continue
+        hulls.append(hull)
+
+    # Assert that we got _some_ collision meshes
+    assert len(hulls) > 0, "No collision meshes generated!"
+
+    return hulls
+
+
+def generate_urdf_for_obj(obj_file_path, category, mdl, collision_file_path=None, collision_generation_option="coacd"):
+    # Load the mesh
+    mesh: trimesh.Trimesh = trimesh.load(obj_file_path, force="mesh", process=False)
+
+    # Either load, or generate, the collision mesh
+    if collision_file_path is not None:
+        collision_mesh = trimesh.load(collision_file_path, force="mesh", process=False)
+    else:
+        if collision_generation_option == "coacd":
+            collision_meshes = _generate_collision_meshes(mesh)
+            collision_mesh = trimesh.util.concatenate(collision_meshes)
+        elif collision_generation_option == "convex":
+            collision_mesh = mesh.convex_hull
+        else:
+            raise ValueError(f"Unsupported collision generation option: {collision_generation_option}")
+
+    # Create a directory for the object
+    obj_dir = pathlib.Path(gm.USER_ASSETS_PATH) / "objects" / category / mdl
+    assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
+    obj_dir.mkdir(parents=True)
+
+    # Start the XML file
