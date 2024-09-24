@@ -160,6 +160,8 @@ class EntityPrim(XFormPrim):
         # Run super
         super()._post_load()
 
+        assert th.all(self.original_scale == 1.0), "scale should be [1, 1, 1] at the EntityPrim (object) level"
+
         # Cache material information
         materials = set()
         material_paths = set()
@@ -498,6 +500,10 @@ class EntityPrim(XFormPrim):
             dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
+
+    @cached_property
+    def link_prim_paths(self):
+        return [link.prim_path for link in self._links.values()]
 
     @cached_property
     def has_attachment_points(self):
@@ -1374,7 +1380,6 @@ class EntityPrim(XFormPrim):
         Returns:
             bool: Whether self-collisions are enabled for this prim or not
         """
-        assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
         return lazy.omni.isaac.core.utils.prims.get_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
         )
@@ -1387,7 +1392,6 @@ class EntityPrim(XFormPrim):
         Args:
             flag (bool): Whether self collisions are enabled for this prim or not
         """
-        assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
         lazy.omni.isaac.core.utils.prims.set_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )

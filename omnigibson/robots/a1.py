@@ -4,12 +4,11 @@ import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
 
 
-class FrankaPanda(ManipulationRobot):
+class A1(ManipulationRobot):
     """
-    The Franka Emika Panda robot
+    The A1 robot with inspire hand
     """
 
     def __init__(
@@ -37,8 +36,7 @@ class FrankaPanda(ManipulationRobot):
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
-        # Unique to Franka
-        end_effector="gripper",
+        end_effector="inspire",
         **kwargs,
     ):
         """
@@ -81,85 +79,23 @@ class FrankaPanda(ManipulationRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
-            end_effector (str): type of end effector to use. One of {"gripper", "allegro", "leap_right", "leap_left", "inspire"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # store end effector information
         self.end_effector = end_effector
-        if end_effector == "gripper":
-            self._model_name = "franka_panda"
-            self._gripper_control_idx = th.arange(7, 9)
-            self._eef_link_names = "panda_hand"
-            self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
-            self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
-            self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
-            self._ag_start_points = [
-                GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
-            ]
-            self._ag_end_points = [
-                GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),
-            ]
-        elif end_effector == "allegro":
-            self._model_name = "franka_allegro"
-            self._eef_link_names = "base_link"
-            # thumb.proximal, ..., thumb.tip, ..., ring.tip
-            self._finger_link_names = [f"link_{i}_0" for i in range(16)]
-            self._finger_joint_names = [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]
-            # the robot hand at [0.5973, 0.0008, 0.6947] offset from base with palm open and facing downwards.
-            self._default_robot_model_joint_pos = th.cat(
-                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
-            )
-            self._teleop_rotation_offset = th.tensor([0, 0.7071, 0, 0.7071])
-            self._ag_start_points = [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([0.015, 0, -0.03])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([0.015, 0, -0.08])),
-                GraspingPoint(link_name=f"link_15_0_tip", position=th.tensor([0, 0.015, 0.007])),
-            ]
-            self._ag_end_points = [
-                GraspingPoint(link_name=f"link_3_0_tip", position=th.tensor([0.012, 0, 0.007])),
-                GraspingPoint(link_name=f"link_7_0_tip", position=th.tensor([0.012, 0, 0.007])),
-                GraspingPoint(link_name=f"link_11_0_tip", position=th.tensor([0.012, 0, 0.007])),
-            ]
-        elif "leap" in end_effector:
-            self._model_name = f"franka_{end_effector}"
-            self._eef_link_names = "palm_center"
-            # thumb.proximal, ..., thumb.tip, ..., ring.tip
-            self._finger_link_names = [
-                f"{link}_{i}" for i in range(1, 5) for link in ["mcp_joint", "pip", "dip", "fingertip", "realtip"]
-            ]
-            self._finger_joint_names = [
-                f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]
-            ]
-            # the robot hand at [0.4577, 0.0006, 0.7146] offset from base with palm open and facing downwards.
-            self._default_robot_model_joint_pos = th.cat(
-                (th.tensor([0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72]), th.zeros(16))
-            )
-            self._teleop_rotation_offset = th.tensor([-0.7071, 0.7071, 0, 0])
-            self._ag_start_points = [
-                GraspingPoint(link_name=f"palm_center", position=th.tensor([0, -0.025, 0.035])),
-                GraspingPoint(link_name=f"palm_center", position=th.tensor([0, 0.03, 0.035])),
-                GraspingPoint(link_name=f"fingertip_4", position=th.tensor([-0.0115, -0.07, -0.015])),
-            ]
-            self._ag_end_points = [
-                GraspingPoint(link_name=f"fingertip_1", position=th.tensor([-0.0115, -0.06, 0.015])),
-                GraspingPoint(link_name=f"fingertip_2", position=th.tensor([-0.0115, -0.06, 0.015])),
-                GraspingPoint(link_name=f"fingertip_3", position=th.tensor([-0.0115, -0.06, 0.015])),
-            ]
-        elif end_effector == "inspire":
-            self._model_name = f"franka_{end_effector}"
-            self._eef_link_names = "palm_center"
+        self._model_name = f"a1_{end_effector}"
+        if end_effector == "inspire":
+            self._eef_link_names = "palm_lower"
             # thumb.proximal, ..., thumb.tip, ..., ring.tip
             hand_part_names = [11, 12, 13, 14, 21, 22, 31, 32, 41, 42, 51, 52]
             self._finger_link_names = [f"link{i}" for i in hand_part_names]
             self._finger_joint_names = [f"joint{i}" for i in hand_part_names]
             # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
             self._default_robot_model_joint_pos = th.cat(
-                (th.tensor([0.652, -0.271, -0.622, -2.736, -0.263, 2.497, 1.045]), th.zeros(12))
+                [th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571]), th.zeros(12)]
             )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
-            # TODO: add ag support for inspire hand
             self._ag_start_points = [
                 GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
                 GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
@@ -172,7 +108,7 @@ class FrankaPanda(ManipulationRobot):
                 GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
             ]
         else:
-            raise ValueError(f"End effector {end_effector} not supported for FrankaPanda")
+            raise ValueError(f"End effector {end_effector} not supported for A1")
 
         # Run super init
         super().__init__(
@@ -202,7 +138,7 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def model_name(self):
-        # Override based on specified Franka variant
+        # Override based on specified A1 variant
         return self._model_name
 
     @property
@@ -210,7 +146,7 @@ class FrankaPanda(ManipulationRobot):
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        raise ValueError("Franka does not support discrete actions!")
+        raise ValueError("A1 does not support discrete actions!")
 
     @property
     def controller_order(self):
@@ -229,15 +165,15 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def finger_lengths(self):
-        return {self.default_arm: 0.1}
+        return {self.default_arm: 0.087}
 
     @property
     def arm_link_names(self):
-        return {self.default_arm: [f"panda_link{i}" for i in range(8)]}
+        return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
 
     @property
     def arm_joint_names(self):
-        return {self.default_arm: [f"panda_joint{i+1}" for i in range(7)]}
+        return {self.default_arm: [f"arm_joint{i+1}" for i in range(6)]}
 
     @property
     def eef_link_names(self):
@@ -253,27 +189,19 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
+        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description.yaml")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_description.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
-
-    @property
-    def curobo_path(self):
-        # Only supported for normal franka now
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
+        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.urdf")
 
     @property
     def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_eef.usd")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_eef.usd")}
 
     @property
     def teleop_rotation_offset(self):
@@ -290,9 +218,7 @@ class FrankaPanda(ManipulationRobot):
     @property
     def disabled_collision_pairs(self):
         # some dexhand has self collisions that needs to be filtered out
-        if self.end_effector == "allegro":
-            return [["link_12_0", "part_studio_link"]]
-        elif self.end_effector == "inspire":
+        if self.end_effector == "inspire":
             return [["base_link", "link12"]]
         else:
             return []

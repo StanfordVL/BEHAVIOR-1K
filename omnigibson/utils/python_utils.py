@@ -149,6 +149,15 @@ def create_object_from_init_info(init_info):
     return cls(**init_info["args"], **init_info.get("kwargs", {}))
 
 
+def safe_equal(a, b):
+    if isinstance(a, th.Tensor) and isinstance(b, th.Tensor):
+        return (a == b).all().item()
+    elif isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return all(safe_equal(a_item, b_item) for a_item, b_item in zip(a, b))
+    else:
+        return a == b
+
+
 def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
     """
     Iteratively updates @base_dict with values from @extra_dict. Note: This generates a new dictionary!
@@ -171,10 +180,8 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
             if isinstance(v, dict) and isinstance(base_dict[k], dict):
                 base_dict[k] = merge_nested_dicts(base_dict[k], v)
             else:
-                not_equal = base_dict[k] != v
-                if isinstance(not_equal, th.Tensor):
-                    not_equal = not_equal.any()
-                if not_equal and verbose:
+                equal = safe_equal(base_dict[k], v)
+                if not equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")
                 base_dict[k] = v
 

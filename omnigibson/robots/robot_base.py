@@ -67,7 +67,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-        # Unique to this class
+        # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
         proprio_obs="default",
         sensor_config=None,
@@ -76,8 +76,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -130,12 +129,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Initialize internal attributes that will be loaded later
         self._sensors = None  # e.g.: scan sensor, vision sensor
 
-        # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
-        # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
-        assert (
-            scale is None or isinstance(scale, int) or isinstance(scale, float) or th.all(scale == scale[0])
-        ), f"Robot scale must be uniform! Got: {scale}"
-
         # All BaseRobots should have xform properties pre-loaded
         load_config = {} if load_config is None else load_config
         load_config["xform_props_pre_loaded"] = True
@@ -162,6 +155,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             reset_joint_pos=reset_joint_pos,
             **kwargs,
         )
+
+        assert not isinstance(self._load_config["scale"], th.Tensor) or th.all(
+            self._load_config["scale"] == self._load_config["scale"][0]
+        ), f"Robot scale must be uniform! Got: {self._load_config['scale']}"
 
     def _post_load(self):
         # Run super post load first
@@ -586,6 +583,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Returns:
             str: file path to the robot urdf file.
+        """
+        raise NotImplementedError
+
+    @property
+    def curobo_path(self):
+        """
+        Returns:
+            str: file path to the robot curobo configuration yaml file.
         """
         raise NotImplementedError
 

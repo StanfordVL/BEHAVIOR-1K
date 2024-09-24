@@ -766,7 +766,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Omniverse has a bug where all particle positions, orientations, velocities, and scales are correctly reset
         when sim is stopped, but not the prototype IDs. This function is a workaround for that.
         """
-        if self.initialized:
+        if self.initialized and self.particle_instancers is not None:
             for instancer in self.particle_instancers.values():
                 instancer.particle_prototype_ids = th.zeros(instancer.n_particles, dtype=th.int32)
 

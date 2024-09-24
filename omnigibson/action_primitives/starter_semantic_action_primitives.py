@@ -61,6 +61,7 @@ m.KP_LIN_VEL = {
     Freight: 0.05,
     Locobot: 1.5,
     BehaviorRobot: 0.3,
+    R1: 0.3,
 }
 m.KP_ANGLE_VEL = {
     Tiago: 0.2,
@@ -71,6 +72,7 @@ m.KP_ANGLE_VEL = {
     Freight: 0.05,
     Locobot: 1.5,
     BehaviorRobot: 0.2,
+    R1: 0.2,
 }
 
 m.MAX_STEPS_FOR_SETTLING = 500
