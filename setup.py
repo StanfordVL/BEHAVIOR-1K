@@ -22,7 +22,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "gymnasium>=0.28.1",
-        "numpy>=1.23.5",
+        "numpy<2.0.0,>=1.23.5",
         "scipy>=1.10.1",
         "GitPython~=3.1.40",
         "transforms3d~=0.4.1",
