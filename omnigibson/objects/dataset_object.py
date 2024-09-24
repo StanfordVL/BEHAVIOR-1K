@@ -49,6 +49,7 @@ class DatasetObject(USDObject):
         include_default_states=True,
         bounding_box=None,
         in_rooms=None,
+        user_added=False,
         **kwargs,
     ):
         """
@@ -84,6 +85,8 @@ class DatasetObject(USDObject):
                 -- not both!
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
                 a list of room type(s) or a single room type
+            user_added (bool): Whether this object was added by the user or not. If True, then this object will be found
+                in the user_assets dir instead of og_dataset, and will not be encrypted.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -99,6 +102,7 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
+        load_config["user_added"] = user_added
         # All DatasetObjects should have xform properties pre-loaded
         load_config["xform_props_pre_loaded"] = True
 
@@ -119,13 +123,13 @@ class DatasetObject(USDObject):
             )
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model)
+        usd_path = self.get_usd_path(category=category, model=model, user_added=user_added)
 
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=True,
+            encrypted=not user_added,
             name=name,
             category=category,
             scale=scale,
@@ -142,7 +146,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model):
+    def get_usd_path(cls, category, model, user_added=False):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -155,7 +159,8 @@ class DatasetObject(USDObject):
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
+        dataset_path = gm.USER_ASSETS_PATH if user_added else gm.DATASET_PATH
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
         """
