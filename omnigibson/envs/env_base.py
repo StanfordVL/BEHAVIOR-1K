@@ -619,9 +619,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - dict: info, i.e. dictionary with any useful information
         """
         # Pre-processing before stepping simulation
-        if isinstance(action, Iterable) and not isinstance(action, OrderedDict):
+        if isinstance(action, Iterable) and not isinstance(action, (dict, OrderedDict)):
             # Convert numpy arrays and lists to tensors
-            # Skip action sampled from action space (OrderedDict)
+            # Skip dict action
             action = th.as_tensor(action).flatten()
         self._pre_step(action)
 
