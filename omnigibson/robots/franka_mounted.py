@@ -1,11 +1,8 @@
 import os
 
-import numpy as np
-
 from omnigibson.macros import gm
 from omnigibson.robots.franka import FrankaPanda
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
+from omnigibson.robots.manipulation_robot import GraspingPoint
 
 
 class FrankaMounted(FrankaPanda):
@@ -41,6 +38,10 @@ class FrankaMounted(FrankaPanda):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted.urdf")
 
     @property
+    def curobo_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted_description_curobo.yaml")
+
+    @property
     def eef_usd_path(self):
         # TODO: Update!
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
@@ -49,7 +50,7 @@ class FrankaMounted(FrankaPanda):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="panda_rightfinger", position=[0.0, 0.001, 0.045]),
+                GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
             ]
         }
 
@@ -57,6 +58,6 @@ class FrankaMounted(FrankaPanda):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="panda_leftfinger", position=[0.0, 0.001, 0.045]),
+                GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),
             ]
         }

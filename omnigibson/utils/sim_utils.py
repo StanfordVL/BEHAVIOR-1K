@@ -1,7 +1,8 @@
+import math
 from collections import namedtuple
 from collections.abc import Iterable
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -305,9 +306,11 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     from omnigibson.object_states import AABB
 
     lower, _ = obj.states[AABB].get_value()
-    cur_pos = obj.get_position()
+    cur_pos = obj.get_position_orientation()[0]
     z_diff = cur_pos[2] - lower[2]
-    obj.set_position_orientation(pos + np.array([0, 0, z_diff if z_offset is None else z_diff + z_offset]), quat)
+    obj.set_position_orientation(
+        position=pos + th.tensor([0, 0, z_diff if z_offset is None else z_diff + z_offset]), orientation=quat
+    )
 
 
 def test_valid_pose(obj, pos, quat=None, z_offset=None):
@@ -359,14 +362,15 @@ def land_object(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
-    quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
+    quat_lo, quat_hi = 0, math.pi * 2
+    quat = T.euler2quat([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]) if quat is None else quat
     place_base_pose(obj, pos, quat, z_offset)
     obj.keep_still()
 
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
     land_success = False
-    max_simulator_step = int(1.0 / og.sim.get_rendering_dt())
+    max_simulator_step = int(1.0 / og.sim.get_sim_step_dt())
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
         og.sim.step()

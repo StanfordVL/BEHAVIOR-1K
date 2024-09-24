@@ -59,10 +59,10 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
         # Iterate over all particles and aggregate contacts
         positions = system.get_particles_position_orientation()[0]
         # Only check positions that are within the relaxed AABB of this object
-        inbound_idxs = ((lower < positions) & (positions < upper)).all(axis=-1).nonzero()[0]
+        inbound_idxs = ((lower < positions) & (positions < upper)).all(dim=-1).nonzero()
         dist = system.particle_contact_radius + m.CONTACT_TOLERANCE
         for idx in inbound_idxs:
-            og.sim.psqi.overlap_sphere(dist, positions[idx], report_hit, False)
+            og.sim.psqi.overlap_sphere(dist, positions[idx.item()].cpu().numpy(), report_hit, False)
 
         # Return contacts
         return contacts

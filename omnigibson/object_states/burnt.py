@@ -1,3 +1,5 @@
+import torch as th
+
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
@@ -38,7 +40,7 @@ class Burnt(AbsoluteObjectState, BooleanStateMixin):
         # Decrease all channels by 0.3 (to make it black)
         albedo_add = -0.3
         # No final scaling
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     # Nothing needs to be done to save/load Burnt since it will happen due to

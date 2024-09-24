@@ -1,7 +1,7 @@
 import argparse
 import time
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -59,14 +59,14 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the viewer camera's pose so that it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([4.32248, -5.74338, 6.85436]),
-        orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
+        position=th.tensor([4.32248, -5.74338, 6.85436]),
+        orientation=th.tensor([0.39592, 0.13485, 0.29286, 0.85982]),
     )
 
     robot = env.robots[0]
 
     # Set robot base at the origin
-    robot.set_position_orientation(np.array([0, 0, 0]), np.array([0, 0, 0, 1]))
+    robot.set_position_orientation(position=th.tensor([0, 0, 0]), orientation=th.tensor([0, 0, 0, 1]))
     # At least one simulation step while the simulator is playing must occur for the robot (or in general, any object)
     # to be fully initialized after it is imported into the simulator
     og.sim.play()
@@ -79,7 +79,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the IK solver -- note that we are controlling both the trunk and the arm since both are part of the
     # controllable kinematic chain for the end-effector!
-    control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     ik_solver = IKSolver(
         robot_description_path=robot.robot_arm_descriptor_yamls[robot.default_arm],
         robot_urdf_path=robot.urdf_path,
@@ -128,7 +128,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Get initial EE position and set marker to that location
         command = robot.get_eef_position()
-        marker.set_position(command)
+        marker.set_position_orientation(position=command)
         og.sim.step()
 
         # Setup callbacks for grabbing keyboard inputs from omni
@@ -154,7 +154,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     delta_cmd = input_to_xyz_delta_command(inp=event.input)
                     if delta_cmd is not None:
                         command = command + delta_cmd
-                        marker.set_position(command)
+                        marker.set_position_orientation(position=command)
                         og.sim.step()
 
             # Callback must return True if valid
@@ -174,17 +174,17 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.sim.step()
 
     # Always shut the simulation down cleanly at the end
-    og.app.close()
+    og.clear()
 
 
 def input_to_xyz_delta_command(inp, delta=0.01):
     mapping = {
-        lazy.carb.input.KeyboardInput.W: np.array([delta, 0, 0]),
-        lazy.carb.input.KeyboardInput.S: np.array([-delta, 0, 0]),
-        lazy.carb.input.KeyboardInput.DOWN: np.array([0, 0, -delta]),
-        lazy.carb.input.KeyboardInput.UP: np.array([0, 0, delta]),
-        lazy.carb.input.KeyboardInput.A: np.array([0, delta, 0]),
-        lazy.carb.input.KeyboardInput.D: np.array([0, -delta, 0]),
+        lazy.carb.input.KeyboardInput.W: th.tensor([delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.S: th.tensor([-delta, 0, 0]),
+        lazy.carb.input.KeyboardInput.DOWN: th.tensor([0, 0, -delta]),
+        lazy.carb.input.KeyboardInput.UP: th.tensor([0, 0, delta]),
+        lazy.carb.input.KeyboardInput.A: th.tensor([0, delta, 0]),
+        lazy.carb.input.KeyboardInput.D: th.tensor([0, -delta, 0]),
     }
 
     return mapping.get(inp)

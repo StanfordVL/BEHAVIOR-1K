@@ -1,14 +1,12 @@
 import os
 
-import numpy as np
-from PIL import Image
-
-# Accommodate large maps (e.g. 10k x 10k) while suppressing DecompressionBombError
-Image.MAX_IMAGE_PIXELS = None
+import cv2
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
+from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -55,26 +53,27 @@ class SegmentationMap(BaseMap):
     def _load_map(self):
         layout_dir = os.path.join(self.scene_dir, "layout")
         room_seg_imgs = os.path.join(layout_dir, "floor_insseg_0.png")
-        img_ins = Image.open(room_seg_imgs)
+        img_ins = cv2.imread(room_seg_imgs, cv2.IMREAD_GRAYSCALE)
         room_seg_imgs = os.path.join(layout_dir, "floor_semseg_0.png")
-        img_sem = Image.open(room_seg_imgs)
-        height, width = img_ins.size
+        img_sem = cv2.imread(room_seg_imgs, cv2.IMREAD_GRAYSCALE)
+        height = img_ins.shape[0]
+        width = img_ins.shape[1]
         assert height == width, "room seg map is not a square"
-        assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
+        assert img_ins.shape == img_sem.shape, "semantic and instance seg maps have different sizes"
         map_size = int(height * self.map_default_resolution / self.map_resolution)
-        img_ins = np.array(img_ins.resize((map_size, map_size), Image.NEAREST))
-        img_sem = np.array(img_sem.resize((map_size, map_size), Image.NEAREST))
+        img_ins = th.tensor(cv2.resize(img_ins, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
+        img_sem = th.tensor(cv2.resize(img_sem, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
 
         room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
             room_cats = [line.rstrip() for line in fp.readlines()]
 
         sem_id_to_ins_id = {}
-        unique_ins_ids = np.unique(img_ins)
-        unique_ins_ids = np.delete(unique_ins_ids, 0)
+        unique_ins_ids = th.unique(img_ins)
+        unique_ins_ids = torch_delete(unique_ins_ids, 0)
         for ins_id in unique_ins_ids:
             # find one pixel for each ins id
-            x, y = np.where(img_ins == ins_id)
+            x, y = th.where(img_ins == ins_id)
             # retrieve the correspounding sem id
             sem_id = img_sem[x[0], y[0]]
             if sem_id not in sem_id_to_ins_id:
@@ -122,14 +121,14 @@ class SegmentationMap(BaseMap):
             return None, None
 
         sem_id = self.room_sem_name_to_sem_id[room_type]
-        valid_idx = np.array(np.where(self.room_sem_map == sem_id))
-        random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
+        valid_idx = th.tensor(th.where(self.room_sem_map == sem_id))
+        random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, np.array([x, y, z])
+        return floor, th.tensor([x, y, z])
 
     def get_random_point_by_room_instance(self, room_instance):
         """
@@ -148,14 +147,14 @@ class SegmentationMap(BaseMap):
             return None, None
 
         ins_id = self.room_ins_name_to_ins_id[room_instance]
-        valid_idx = np.array(np.where(self.room_ins_map == ins_id))
-        random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
+        valid_idx = th.tensor(th.where(self.room_ins_map == ins_id))
+        random_point_map = valid_idx[:, th.randint(valid_idx.shape[1])]
 
         x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, np.array([x, y, z])
+        return floor, th.tensor([x, y, z])
 
     def get_room_type_by_point(self, xy):
         """

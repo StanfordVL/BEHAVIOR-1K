@@ -1,11 +1,15 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.utils.ui_utils import create_module_logger
+
+log = create_module_logger(module_name=__name__)
 
 
 class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
@@ -14,13 +18,24 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     Reference: https://hello-robot.com/stretch-3-product
     """
 
+    def _post_load(self):
+        super()._post_load()
+
+        # Set the wheels back to using sphere approximations
+        for wheel_name in ["link_left_wheel", "link_right_wheel"]:
+            log.warning(
+                "Stretch wheel links are post-processed to use sphere approximation collision meshes. "
+                "Please ignore any previous errors about these collision meshes."
+            )
+            wheel_link = self.links[wheel_name]
+            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Stretch does not support discrete actions
         raise ValueError("Stretch does not support discrete actions!")
 
     @property
@@ -43,7 +58,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.array([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, np.pi / 8, np.pi / 8])
+        return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
 
     @property
     def wheel_radius(self):
@@ -61,8 +76,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=[0.013, 0.0, 0.01]),
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=[-0.01, 0.0, 0.009]),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 
@@ -70,8 +85,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=[0.013, 0.0, 0.01]),
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=[-0.01, 0.0, 0.009]),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 

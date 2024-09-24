@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable
 
 import numpy as np
+import torch as th
 import trimesh
 
 import omnigibson as og
@@ -13,6 +14,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -105,10 +107,10 @@ def create_joint(
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
         body1 (str or None): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
         enabled (bool): whether to enable this joint or not.
-        joint_frame_in_parent_frame_pos (np.ndarray or None): relative position of the joint frame to the parent frame (body0).
-        joint_frame_in_parent_frame_quat (np.ndarray or None): relative orientation of the joint frame to the parent frame (body0).
-        joint_frame_in_child_frame_pos (np.ndarray or None): relative position of the joint frame to the child frame (body1).
-        joint_frame_in_child_frame_quat (np.ndarray or None): relative orientation of the joint frame to the child frame (body1).
+        joint_frame_in_parent_frame_pos (th.tensor or None): relative position of the joint frame to the parent frame (body0).
+        joint_frame_in_parent_frame_quat (th.tensor or None): relative orientation of the joint frame to the parent frame (body0).
+        joint_frame_in_child_frame_pos (th.tensor or None): relative position of the joint frame to the child frame (body1).
+        joint_frame_in_child_frame_quat (th.tensor or None): relative orientation of the joint frame to the child frame (body1).
         break_force (float or None): break force for linear dofs, unit is Newton.
         break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
 
@@ -146,16 +148,16 @@ def create_joint(
     og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos))
+        joint_prim.GetAttribute("physics:localPos0").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_parent_frame_pos.tolist()))
     if joint_frame_in_parent_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot0").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]])
+            lazy.pxr.Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]].tolist())
         )
     if joint_frame_in_child_frame_pos is not None:
-        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos))
+        joint_prim.GetAttribute("physics:localPos1").Set(lazy.pxr.Gf.Vec3f(*joint_frame_in_child_frame_pos.tolist()))
     if joint_frame_in_child_frame_quat is not None:
         joint_prim.GetAttribute("physics:localRot1").Set(
-            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]])
+            lazy.pxr.Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]].tolist())
         )
 
     if break_force is not None:
@@ -271,8 +273,8 @@ class RigidContactAPIImpl:
                     path: i for i, path in enumerate(self._CONTACT_VIEW[scene_idx].sensor_paths)
                 }
 
-                self._ROW_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_ROW_IDX[scene_idx].keys()))
-                self._COL_IDX_TO_PATH[scene_idx] = np.array(list(self._PATH_TO_COL_IDX[scene_idx].keys()))
+                self._ROW_IDX_TO_PATH[scene_idx] = list(self._PATH_TO_ROW_IDX[scene_idx].keys())
+                self._COL_IDX_TO_PATH[scene_idx] = list(self._PATH_TO_COL_IDX[scene_idx].keys())
 
         # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
         # n_bodies = len(cls._PATH_TO_COL_IDX)
@@ -354,42 +356,40 @@ class RigidContactAPIImpl:
 
     def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         """Get pairs of prim paths that are in contact."""
-        impulses = np.linalg.norm(self.get_all_impulses(scene_idx), axis=-1)
+        impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
         interesting_col_paths = [
             p for p in self._PATH_TO_COL_IDX[scene_idx].keys() if column_prim_paths is None or p in column_prim_paths
         ]
-        interesting_columns = [list(GripperRigidContactAPI.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
+        interesting_columns = [list(self.get_body_col_idx(pp))[1] for pp in interesting_col_paths]
 
         # Get the interesting-columns from the impulse matrix
         interesting_impulse_columns = impulses[:, interesting_columns]
         assert (
             interesting_impulse_columns.ndim == 2
         ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
-        interesting_row_idxes = np.nonzero(np.any(interesting_impulse_columns > 0, axis=1))[0]
-        interesting_row_paths = [
-            GripperRigidContactAPI.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes
-        ]
+        interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1)).flatten()
+        interesting_row_paths = [self.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
         # Filter out idxes by whether or not the row path is in the row prim paths list
         if row_prim_paths is not None:
             interesting_row_idxes, interesting_row_paths = zip(
                 *[(i, p) for i, p in zip(interesting_row_idxes, interesting_row_paths) if p in row_prim_paths]
             )
-            interesting_row_idxes = np.array(list(interesting_row_idxes))
+            interesting_row_idxes = th.tensor(list(interesting_row_idxes))
 
         # Get the full interesting section of the impulse matrix
         interesting_impulses = interesting_impulse_columns[interesting_row_idxes]
         assert interesting_impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {interesting_impulses.shape}"
 
         # Early return if not in contact.
-        if not np.any(interesting_impulses > 0):
+        if not th.any(interesting_impulses > 0):
             return set()
 
         # Get all of the (row, col) pairs where the impulse is greater than 0
         return {
             (interesting_row_paths[row], interesting_col_paths[col])
-            for row, col in np.argwhere(interesting_impulses > 0)
+            for row, col in th.nonzero(interesting_impulses > 0, as_tuple=True)
         }
 
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
@@ -406,7 +406,7 @@ class RigidContactAPIImpl:
             else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
         )
         relevant_impulses = impulses[row_idx][:, col_idx]
-        if not np.any(relevant_impulses > 0):
+        if not th.any(relevant_impulses > 0):
             return []
 
         # Get the contact data
@@ -471,8 +471,8 @@ class RigidContactAPIImpl:
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
         if key not in self._CONTACT_CACHE:
             # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-            self._CONTACT_CACHE[key] = np.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-        return self._CONTACT_CACHE[key]
+            self._CONTACT_CACHE[key] = th.any(self.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return self._CONTACT_CACHE[key].item()
 
     def clear(self):
         """
@@ -632,17 +632,17 @@ class FlatcacheAPI:
             from omnigibson.prims.xform_prim import XFormPrim
 
             # 1. For every link, update its xformOp properties based on the delta_tf between object frame and link frame
-            obj_pos, obj_quat = XFormPrim.get_local_pose(prim)
+            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame="parent")
             for link in prim.links.values():
                 rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_local_pose(link, rel_pos, rel_quat)
+                XFormPrim.set_position_orientation(link, position=rel_pos, orientation=rel_quat, frame="parent")
             # 2. For every joint, update its linear / angular joint state
             if prim.n_joints > 0:
                 joints_pos = prim.get_joint_positions()
                 for joint, joint_pos in zip(prim.joints.values(), joints_pos):
                     state_name = "linear" if joint.joint_type == JointType.JOINT_PRISMATIC else "angular"
                     joint_pos = (
-                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / np.pi
+                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / math.pi
                     )
                     joint.set_attribute(f"state:{state_name}:physics:position", float(joint_pos))
 
@@ -679,7 +679,9 @@ class FlatcacheAPI:
 
             # 1. For every link, update its xformOp properties to be 0
             for link in prim.links.values():
-                XFormPrim.set_local_pose(link, np.zeros(3), np.array([0, 0, 0, 1.0]))
+                XFormPrim.set_position_orientation(
+                    link, position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]), frame="parent"
+                )
             # 2. For every joint, update its linear / angular joint state to be 0
             if prim.n_joints > 0:
                 for joint in prim.joints.values():
@@ -714,6 +716,13 @@ class PoseAPI:
 
     VALID = False
 
+    # Dictionary mapping prim path to fabric prim
+    PRIMS = dict()
+
+    @classmethod
+    def clear(cls):
+        cls.PRIMS = dict()
+
     @classmethod
     def invalidate(cls):
         cls.VALID = False
@@ -737,9 +746,26 @@ class PoseAPI:
 
     @classmethod
     def get_world_pose(cls, prim_path):
+        """
+        Gets pose of the prim object with respect to the world frame
+        Args:
+            Prim_path: the path of the prim object
+        Returns:
+            2-tuple:
+                - torch.Tensor: (x,y,z) position in the world frame
+                - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
+        """
+        # Add to stored prims if not already existing
+        if prim_path not in cls.PRIMS:
+            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+
         cls._refresh()
-        position, orientation = lazy.omni.isaac.core.utils.xforms.get_world_pose(prim_path)
-        return np.array(position), np.array(orientation)[[1, 2, 3, 0]]
+
+        # Avoid premature imports
+        from omnigibson.utils.deprecated_utils import get_world_pose
+
+        position, orientation = get_world_pose(cls.PRIMS[prim_path])
+        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):
@@ -747,13 +773,39 @@ class PoseAPI:
         This is used when information about the prim's global scale is needed,
         e.g. when converting points in the prim frame to the world frame.
         """
+        # Add to stored prims if not already existing
+        if prim_path not in cls.PRIMS:
+            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+
         cls._refresh()
-        return np.array(lazy.omni.isaac.core.utils.xforms._get_world_pose_transform_w_scale(prim_path)).T
+        # Avoid premature imports
+        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
+
+        return th.tensor(_get_world_pose_transform_w_scale(cls.PRIMS[prim_path]), dtype=th.float32).T
+
+    @classmethod
+    def convert_world_pose_to_local(cls, prim, position, orientation):
+        """Converts a world pose to a local pose under a prim's parent."""
+        world_transform = T.pose2mat((position, orientation))
+        parent_path = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_world_transform = cls.get_world_pose_with_scale(parent_path)
+
+        local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
+        local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)  # unscale local transform's rotation
+
+        # Check that the local transform consists only of a position, scale and rotation
+        product = local_transform[:3, :3] @ local_transform[:3, :3].T
+        assert th.allclose(
+            product, th.diag(th.diag(product)), atol=1e-3
+        ), f"{prim.GetPath()} local transform is not orthogonal."
+
+        # Return the local pose
+        return T.mat2pose(local_transform)
 
 
 class BatchControlViewAPIImpl:
     """
-    A centralized view that allows for reading and writing to an ArticulationView that covers all
+    A centralized view that allows for reading and writing to an ArticulationView that covers multiple
     controllable objects in the scene. This is used to avoid the overhead of reading from many views
     for each robot in each physics step, a source of significant overhead.
     """
@@ -761,10 +813,6 @@ class BatchControlViewAPIImpl:
     def __init__(self, pattern):
         # The prim path pattern that will be passed into the view
         self._pattern = pattern
-        # TODO: Remove this once we loosen the constraint that everything must end with /base_link
-        assert self._pattern.endswith(
-            "/base_link"
-        ), "BatchControlViewAPIImpl can only be created with a pattern ending in /base_link!"
 
         # The unified ArticulationView used to access all of the controllable objects in the scene.
         self._view = None
@@ -783,25 +831,28 @@ class BatchControlViewAPIImpl:
         # Mapping from prim idx to a dict that maps link name to link index in the view.
         self._link_idx = {}
 
+        # Mapping from prim path to base footprint link name if one exists, None if the root is the base link.
+        self._base_footprint_link_names = {}
+
     def clear(self):
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
 
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
-            pos_indices = np.array(sorted(self._write_idx_cache["dof_position_targets"]))
+            pos_indices = th.tensor(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
-            self._view.set_dof_position_targets(pos_targets, np.array(pos_indices))
+            self._view.set_dof_position_targets(pos_targets, pos_indices)
 
         if "dof_velocity_targets" in self._write_idx_cache:
-            vel_indices = np.array(sorted(self._write_idx_cache["dof_velocity_targets"]))
+            vel_indices = th.tensor(sorted(self._write_idx_cache["dof_velocity_targets"]))
             vel_targets = self._read_cache["dof_velocity_targets"]
-            self._view.set_dof_velocity_targets(vel_targets, np.array(vel_indices))
+            self._view.set_dof_velocity_targets(vel_targets, vel_indices)
 
         if "dof_actuation_forces" in self._write_idx_cache:
-            eff_indices = np.array(sorted(self._write_idx_cache["dof_actuation_forces"]))
+            eff_indices = th.tensor(sorted(self._write_idx_cache["dof_actuation_forces"]))
             eff_targets = self._read_cache["dof_actuation_forces"]
-            self._view.set_dof_actuation_forces(eff_targets, np.array(eff_indices))
+            self._view.set_dof_actuation_forces(eff_targets, eff_indices)
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -811,28 +862,12 @@ class BatchControlViewAPIImpl:
             obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
         ]
 
-        # This only works if the root link is called base_link for every controllable object, so assert that
-        assert all(
-            co.root_link.prim_path.endswith("/base_link") for co in controllable_objects
-        ), "Controllable objects must have a link named base_link as the root link."
-
         # Get their corresponding prim paths
-        expected_regular_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
-        expected_dummy_prim_paths = {
-            obj._dummy.articulation_root_path
-            for obj in controllable_objects
-            if hasattr(obj, "_dummy") and obj._dummy is not None
-        }
-        expected_prim_paths = expected_regular_prim_paths | expected_dummy_prim_paths
+        expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
 
-        # Apply the pattern -- we manually check for the two cases:
-        # 1) (Non-fixed base objects) Articulation root path exists at the root link level, i.e.: /PRIM/PATH/object/base_link
-        # 2) (Fixed-base objects) Articulation root path exists at the object prim level, i.e.: /PRIM/PATH/object
+        # Apply the pattern to find the expected prim paths
         expected_prim_paths = {
-            prim_path
-            for prim_path in expected_prim_paths
-            if re.fullmatch(self._pattern.replace("*", ".*"), prim_path)
-            or re.fullmatch(self._pattern.replace("*", ".*").split("/base_link")[0], prim_path)
+            prim_path for prim_path in expected_prim_paths if re.fullmatch(self._pattern.replace("*", ".*"), prim_path)
         }
 
         # Make sure we have at least one controllable object
@@ -854,6 +889,12 @@ class BatchControlViewAPIImpl:
             {link_path.split("/")[-1]: j for j, link_path in enumerate(articulation_link_paths)}
             for articulation_link_paths in self._view.link_paths
         ]
+        self._base_footprint_link_names = {
+            obj.articulation_root_path: (
+                obj.base_footprint_link_name if obj.base_footprint_link_name != obj.root_link_name else None
+            )
+            for obj in controllable_objects
+        }
 
     def set_joint_position_targets(self, prim_path, positions, indices):
         assert len(indices) == len(positions), "Indices and values must have the same length"
@@ -897,7 +938,7 @@ class BatchControlViewAPIImpl:
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
-    def get_position_orientation(self, prim_path):
+    def get_root_transform(self, prim_path):
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = self._view.get_root_transforms()
 
@@ -905,14 +946,37 @@ class BatchControlViewAPIImpl:
         pose = self._read_cache["root_transforms"][idx]
         return pose[:3], pose[3:]
 
+    def get_position_orientation(self, prim_path):
+        # Here we want to return the position of the base footprint link. If the base footprint link is None,
+        # we return the position of the root link.
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_transform(prim_path, link_name)
+        else:
+            return self.get_root_transform(prim_path)
+
     def get_linear_velocity(self, prim_path):
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_linear_velocity(prim_path, link_name)
+        else:
+            return self.get_root_linear_velocity(prim_path)
+
+    def get_angular_velocity(self, prim_path):
+        if self._base_footprint_link_names[prim_path] is not None:
+            link_name = self._base_footprint_link_names[prim_path]
+            return self.get_link_angular_velocity(prim_path, link_name)
+        else:
+            return self.get_root_angular_velocity(prim_path)
+
+    def get_root_linear_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
             self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
         idx = self._idx[prim_path]
         return self._read_cache["root_velocities"][idx][:3]
 
-    def get_angular_velocity(self, prim_path):
+    def get_root_angular_velocity(self, prim_path):
         if "root_velocities" not in self._read_cache:
             self._read_cache["root_velocities"] = self._view.get_root_velocities()
 
@@ -922,12 +986,14 @@ class BatchControlViewAPIImpl:
     def get_relative_linear_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         linvel = self.get_linear_velocity(prim_path)
+        # x.T --> transpose (inverse) orientation
         return T.quat2mat(orn).T @ linvel
 
     def get_relative_angular_velocity(self, prim_path):
         orn = self.get_position_orientation(prim_path)[1]
         angvel = self.get_angular_velocity(prim_path)
-        return T.mat2euler(T.quat2mat(orn).T @ T.euler2mat(angvel))
+        # x.T --> transpose (inverse) orientation
+        return T.quat2mat(orn).T @ angvel
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
@@ -971,14 +1037,17 @@ class BatchControlViewAPIImpl:
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
-    def get_link_relative_position_orientation(self, prim_path, link_name):
+    def get_link_transform(self, prim_path, link_name):
         if "link_transforms" not in self._read_cache:
             self._read_cache["link_transforms"] = self._view.get_link_transforms()
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         pose = self._read_cache["link_transforms"][idx][link_idx]
-        pos, orn = pose[:3], pose[3:]
+        return pose[:3], pose[3:]
+
+    def get_link_relative_position_orientation(self, prim_path, link_name):
+        pos, orn = self.get_link_transform(prim_path, link_name)
 
         # Get the root world transform too
         world_pos, world_orn = self.get_position_orientation(prim_path)
@@ -986,7 +1055,7 @@ class BatchControlViewAPIImpl:
         # Compute the relative position and orientation
         return T.relative_pose_transform(pos, orn, world_pos, world_orn)
 
-    def get_link_relative_linear_velocity(self, prim_path, link_name):
+    def get_link_linear_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
             self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
@@ -995,13 +1064,18 @@ class BatchControlViewAPIImpl:
         vel = self._read_cache["link_velocities"][idx][link_idx]
         linvel = vel[:3]
 
+        return linvel
+
+    def get_link_relative_linear_velocity(self, prim_path, link_name):
+        linvel = self.get_link_linear_velocity(prim_path, link_name)
+
         # Get the root world transform too
         _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
         return T.quat2mat(world_orn).T @ linvel
 
-    def get_link_relative_angular_velocity(self, prim_path, link_name):
+    def get_link_angular_velocity(self, prim_path, link_name):
         if "link_velocities" not in self._read_cache:
             self._read_cache["link_velocities"] = self._view.get_link_velocities()
 
@@ -1010,11 +1084,16 @@ class BatchControlViewAPIImpl:
         vel = self._read_cache["link_velocities"][idx][link_idx]
         angvel = vel[3:]
 
+        return angvel
+
+    def get_link_relative_angular_velocity(self, prim_path, link_name):
+        angvel = self.get_link_angular_velocity(prim_path, link_name)
+
         # Get the root world transform too
         _, world_orn = self.get_position_orientation(prim_path)
 
         # Compute the relative position and orientation
-        return T.mat2euler(T.quat2mat(world_orn).T @ T.euler2mat(angvel))
+        return T.quat2mat(world_orn).T @ angvel
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
@@ -1025,15 +1104,195 @@ class BatchControlViewAPIImpl:
 
     def get_relative_jacobian(self, prim_path):
         jacobian = self.get_jacobian(prim_path)
-        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T.astype(np.float32)
-        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T
+        tf = th.zeros((1, 6, 6), dtype=th.float32)
         tf[:, :3, :3] = ori_t
         tf[:, 3:, 3:] = ori_t
         return tf @ jacobian
 
 
-ControllableObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/controllable_*/base_link")
-DummyControllableObjectViewAPI = BatchControlViewAPIImpl("/World/scene_*/dummy_*/base_link")
+class ControllableObjectViewAPI:
+    """
+    An interface that creates BatchControlViewAPIImpl instances for each robot type in the scene.
+
+    This is done to avoid the overhead of reading from many views for each robot in each physics step,
+    providing major speed improvements in vector env use cases.
+
+    This class is a singleton, and should be used to access the BatchControlViewAPIImpl instances.
+
+    The pattern used to group the robots is based on the robot prim paths, which is assumed to be in the format
+    /World/scene_*/controllable__robottype__robotname.
+
+    The patterns used by the subviews are generated by replacing the robot name with a wildcard, so that all robots
+    of the same type are grouped together. If there are fixed base robots, they will be grouped separately from
+    non-fixed base robots even within the same robot type, by virtue of their different articulation root paths.
+    """
+
+    # Dictionary mapping from pattern to BatchControlViewAPIImpl
+    _VIEWS_BY_PATTERN = {}
+
+    @classmethod
+    def clear(cls):
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.clear()
+
+    @classmethod
+    def flush_control(cls):
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.flush_control()
+
+    @classmethod
+    def initialize_view(cls):
+        cls._VIEWS_BY_PATTERN = {}
+
+        # First, get all of the controllable objects in the scene (avoiding circular import)
+        from omnigibson.objects.controllable_object import ControllableObject
+
+        controllable_objects = [
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+        ]
+
+        # Get their corresponding prim paths
+        expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
+
+        # Group the prim paths by robot type
+        patterns = {cls._get_pattern_from_prim_path(prim_path) for prim_path in expected_prim_paths}
+
+        # Create the view for each robot type / fixedness combo
+        for pattern in patterns:
+            if pattern not in cls._VIEWS_BY_PATTERN:
+                cls._VIEWS_BY_PATTERN[pattern] = BatchControlViewAPIImpl(pattern)
+
+        # Initialize the views
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.initialize_view()
+
+        # Assert that the views' prim paths are disjoint
+        all_prim_paths = []
+        for view in cls._VIEWS_BY_PATTERN.values():
+            all_prim_paths.extend(view._idx.keys())
+        counts = collections.Counter(all_prim_paths)
+
+        missing = set(expected_prim_paths) - set(all_prim_paths)
+        assert len(missing) == 0, f"Prim paths {missing} are missing from the views!"
+
+        more_than_once = {prim_path: count for prim_path, count in counts.items() if count > 1}
+        assert len(more_than_once) == 0, f"Prim paths {more_than_once} are present in multiple views!"
+
+    @classmethod
+    def _get_pattern_from_prim_path(cls, prim_path):
+        """
+        Returns which of the regexes this prim path should be found in.
+
+        Note that since the prim path will be an articulation root path, this works for both fixed base and
+        non-fixed base robots. Fixed and non-fixed versions of the same robot will be mapped to different
+        patterns since they have different articulation root paths (object prim vs base link prim).
+        """
+        scene_id, robot_name = prim_path.split("/")[2:4]
+        assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
+        components = robot_name.split("__")
+        assert (
+            len(components) == 3
+        ), f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
+        assert (
+            components[0] == "controllable"
+        ), f"Prim path {prim_path} 3rd component does not start with prefix {cls._prefix}__"
+        robot_name_pattern = prim_path.replace(f"/{scene_id}/", "/scene_*/").replace(
+            f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
+        )
+        return robot_name_pattern
+
+    @classmethod
+    def set_joint_position_targets(cls, prim_path, positions, indices):
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
+            prim_path, positions, indices
+        )
+
+    @classmethod
+    def set_joint_velocity_targets(cls, prim_path, velocities, indices):
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
+            prim_path, velocities, indices
+        )
+
+    @classmethod
+    def set_joint_efforts(cls, prim_path, efforts, indices):
+        cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_efforts(prim_path, efforts, indices)
+
+    @classmethod
+    def get_position_orientation(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
+
+    @classmethod
+    def get_linear_velocity(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
+
+    @classmethod
+    def get_angular_velocity(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(prim_path)
+
+    @classmethod
+    def get_relative_linear_velocity(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(prim_path)
+
+    @classmethod
+    def get_relative_angular_velocity(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
+            prim_path
+        )
+
+    @classmethod
+    def get_joint_positions(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
+
+    @classmethod
+    def get_joint_velocities(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(prim_path)
+
+    @classmethod
+    def get_joint_efforts(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
+
+    @classmethod
+    def get_mass_matrix(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
+
+    @classmethod
+    def get_generalized_gravity_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
+            prim_path
+        )
+
+    @classmethod
+    def get_coriolis_and_centrifugal_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
+            prim_path
+        )
+
+    @classmethod
+    def get_link_relative_position_orientation(cls, prim_path, link_name):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_position_orientation(
+            prim_path, link_name
+        )
+
+    @classmethod
+    def get_link_relative_linear_velocity(cls, prim_path, link_name):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
+            prim_path, link_name
+        )
+
+    @classmethod
+    def get_link_relative_angular_velocity(cls, prim_path, link_name):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
+            prim_path, link_name
+        )
+
+    @classmethod
+    def get_jacobian(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
+
+    @classmethod
+    def get_relative_jacobian(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
 
 
 def clear():
@@ -1043,7 +1302,6 @@ def clear():
     PoseAPI.invalidate()
     CollisionAPI.clear()
     ControllableObjectViewAPI.clear()
-    DummyControllableObjectViewAPI.clear()
 
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
@@ -1114,9 +1372,9 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type == "Mesh", f"Expected mesh prim to have type Mesh, got {mesh_type}"
-    face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
-    vertices = np.array(mesh_prim.GetAttribute("points").Get())
-    face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())
+    face_vertex_counts = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+    vertices = vtarray_to_torch(mesh_prim.GetAttribute("points").Get())
+    face_indices = vtarray_to_torch(mesh_prim.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
 
     faces = []
     i = 0
@@ -1128,12 +1386,12 @@ def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texc
     kwargs = dict(vertices=vertices, faces=faces)
 
     if include_normals:
-        kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
+        kwargs["vertex_normals"] = vtarray_to_torch(mesh_prim.GetAttribute("normals").Get())
 
     if include_texcoord:
         raw_texture = mesh_prim.GetAttribute("primvars:st").Get()
         if raw_texture is not None:
-            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(raw_texture))
+            kwargs["visual"] = trimesh.visual.TextureVisuals(uv=vtarray_to_torch(raw_texture))
 
     return trimesh.Trimesh(**kwargs)
 
@@ -1219,29 +1477,22 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
     # Set seed if deterministic
     if seed is not None:
-        np.random.seed(seed)
+        th.manual_seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
     tm = mesh_prim_mesh_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
     n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
-    faces_flat = tm.faces.flatten()
-    n_vertices = len(faces_flat)
+    faces_flat = th.tensor(tm.faces.flatten(), dtype=th.int32)
 
     # Sample vertices
-    unique_vertices = np.unique(faces_flat)
+    unique_vertices = th.unique(faces_flat)
     assert len(unique_vertices) == n_unique_vertices
     keypoint_idx = (
-        np.random.choice(unique_vertices, size=n_keypoints, replace=False)
-        if n_unique_vertices > n_keypoints
-        else unique_vertices
+        th.randperm(len(unique_vertices))[:n_keypoints] if n_unique_vertices > n_keypoints else unique_vertices
     )
 
     # Sample faces
-    keyface_idx = (
-        np.random.choice(n_unique_faces, size=n_keyfaces, replace=False)
-        if n_unique_faces > n_keyfaces
-        else np.arange(n_unique_faces)
-    )
+    keyface_idx = th.randperm(n_unique_faces)[:n_keyfaces] if n_unique_faces > n_keyfaces else th.arange(n_unique_faces)
 
     return keypoint_idx, keyface_idx
 
@@ -1255,7 +1506,7 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
         world_frame (bool): Whether to return the volume and CoM in the world frame
 
     Returns:
-        Tuple[float, np.array]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
+        Tuple[float, th.tensor]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
 
     trimesh_mesh = mesh_prim_to_trimesh_mesh(
@@ -1263,19 +1514,19 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     )
     if trimesh_mesh.is_volume:
         volume = trimesh_mesh.volume
-        com = trimesh_mesh.center_mass
+        com = th.tensor(trimesh_mesh.center_mass)
     else:
         # If the mesh is not a volume, we compute its convex hull and use that instead
         try:
             trimesh_mesh_convex = trimesh_mesh.convex_hull
             volume = trimesh_mesh_convex.volume
-            com = trimesh_mesh_convex.center_mass
+            com = th.tensor(trimesh_mesh_convex.center_mass)
         except:
             # if convex hull computation fails, it usually means the mesh is degenerated: use trivial values.
             volume = 0.0
-            com = np.zeros(3)
+            com = th.zeros(3)
 
-    return volume, com
+    return volume, com.to(dtype=th.float32)
 
 
 def check_extent_radius_ratio(geom_prim, com):
@@ -1287,7 +1538,7 @@ def check_extent_radius_ratio(geom_prim, com):
 
     Args:
         geom_prim (GeomPrim): Geom prim to check
-        com (np.array): Center of mass of the mesh. Obtained from get_mesh_volume_and_com
+        com (th.tensor): Center of mass of the mesh. Obtained from get_mesh_volume_and_com
 
     Returns:
         bool: True if the min extent (world) and the extent radius ratio (local frame) is acceptable, False otherwise
@@ -1304,7 +1555,7 @@ def check_extent_radius_ratio(geom_prim, com):
         return False
 
     max_radius = extent.max() / 2.0
-    min_radius = np.min(np.linalg.norm(geom_prim.points - com, axis=-1), axis=0)
+    min_radius = th.min(th.norm(geom_prim.points - com, dim=-1), dim=0).values
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
@@ -1343,13 +1594,23 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
     # -- i.e.: 2cm-wide mesh
-    extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
+    extents = th.ones(3) * extents if isinstance(extents, float) else th.tensor(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
-        vals = np.array(attr.Get()).astype(np.float64)
-        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
+        vals = th.tensor(attr.Get()).double()
+        attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0).tolist()) for val in vals]))
     mesh.GetExtentAttr().Set(
-        lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(-extents / 2.0)), lazy.pxr.Gf.Vec3f(*(extents / 2.0))])
+        lazy.pxr.Vt.Vec3fArray(
+            [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]
+        )
     )
+
+    # Modify values so that all faces are triangular
+    tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+    face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
+    mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
+    mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
+    mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
+    mesh.GetPrim().GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()]))
 
     return mesh
 

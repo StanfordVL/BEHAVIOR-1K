@@ -1,6 +1,7 @@
-import numpy as np
+import math
+
 import pytest
-from scipy.spatial.transform import Rotation as R
+import torch as th
 from utils import (
     get_random_pose,
     og_test,
@@ -32,8 +33,10 @@ def test_dryer_rule(env):
     og.sim.step()
 
     # Place the two objects inside the dryer
-    remover_dishtowel.set_position_orientation([0.06, 0, 0.2], [0.0311883, -0.23199339, -0.06849886, 0.96980107])
-    bowl.set_position_orientation([0.0, 0.0, 0.2], [0, 0, 0, 1])
+    remover_dishtowel.set_position_orientation(
+        position=[0.06, 0, 0.2], orientation=[0.0311883, -0.23199339, -0.06849886, 0.96980107]
+    )
+    bowl.set_position_orientation(position=[0.0, 0.0, 0.2], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert remover_dishtowel.states[Saturated].set_value(water, True)
@@ -94,9 +97,11 @@ def test_washer_rule(env):
 
     # Place the two objects inside the washer
     # (Hacky) use baking_sheet as a stepping stone to elevate the objects so that they are inside the container volume.
-    baking_sheet.set_position_orientation([0.0, 0.0, 0.04], T.euler2quat([np.pi, 0, 0]))
-    remover_dishtowel.set_position_orientation([0.0, 0.0, 0.05], [0, 0, 0, 1])
-    bowl.set_position_orientation([0.10, 0.0, 0.08], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(
+        position=[0.0, 0.0, 0.04], orientation=T.euler2quat(th.tensor([math.pi, 0, 0], dtype=th.float32))
+    )
+    remover_dishtowel.set_position_orientation(position=[0.0, 0.0, 0.05], orientation=[0, 0, 0, 1])
+    bowl.set_position_orientation(position=[0.10, 0.0, 0.08], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert bowl.states[Covered].set_value(dust, True)
@@ -159,7 +164,9 @@ def test_slicing_rule(env):
     place_obj_on_floor_plane(apple)
     og.sim.step()
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
     assert not table_knife.states[Touching].get_value(apple)
     final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
@@ -167,7 +174,9 @@ def test_slicing_rule(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.10], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.10], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
     final_half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
     assert len(final_half_apples) > len(initial_half_apples)
@@ -183,12 +192,12 @@ def test_slicing_rule(env):
         assert half_apple.states[Cooked].get_value()
 
     # Clean up
-    og.sim.remove_object(new_half_apples)
+    for apple in new_half_apples:
+        env.scene.remove_object(apple)
     og.sim.step()
 
-    for obj_cfg in deleted_objs_cfg:
-        obj = DatasetObject(**obj_cfg)
-        env.scene.add_object(obj)
+    objs = [DatasetObject(**obj_cfg) for obj_cfg in deleted_objs_cfg]
+    og.sim.batch_add_objects(objs, scenes=[env.scene] * len(objs))
     og.sim.step()
 
 
@@ -202,7 +211,7 @@ def test_dicing_rule_cooked(env):
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    half_apple.set_orientation(T.euler2quat([0, -np.pi / 2, 0]))
+    half_apple.set_orientation(T.euler2quat(th.tensor([0, -math.pi / 2, 0], dtype=th.float32)))
     place_obj_on_floor_plane(half_apple)
     og.sim.step()
 
@@ -210,7 +219,9 @@ def test_dicing_rule_cooked(env):
 
     assert cooked_diced_apple.n_particles == 0
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert not table_knife.states[Touching].get_value(half_apple)
@@ -218,7 +229,9 @@ def test_dicing_rule_cooked(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.07], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert cooked_diced_apple.n_particles > 0
@@ -226,7 +239,9 @@ def test_dicing_rule_cooked(env):
         assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
-    table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 1.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     # Clean up
@@ -248,13 +263,15 @@ def test_dicing_rule_uncooked(env):
     deleted_objs = [half_apple]
     deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
-    half_apple.set_orientation(T.euler2quat([0, -np.pi / 2, 0]))
+    half_apple.set_orientation(T.euler2quat(th.tensor([0, -math.pi / 2, 0], dtype=th.float32)))
     place_obj_on_floor_plane(half_apple)
     og.sim.step()
 
     assert diced_apple.n_particles == 0
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.15], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert not table_knife.states[Touching].get_value(half_apple)
@@ -262,7 +279,9 @@ def test_dicing_rule_uncooked(env):
     for obj in deleted_objs:
         assert env.scene.object_registry("name", obj.name) is not None
 
-    table_knife.set_position_orientation([-0.05, 0.0, 0.07], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 0.07], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     assert diced_apple.n_particles > 0
@@ -270,7 +289,9 @@ def test_dicing_rule_uncooked(env):
         assert env.scene.object_registry("name", obj.name) is None
 
     # Move the knife away so that it doesn't immediately dice the half_apple again once it's imported back
-    table_knife.set_position_orientation([-0.05, 0.0, 1.15], T.euler2quat([-np.pi / 2, 0, 0]))
+    table_knife.set_position_orientation(
+        position=[-0.05, 0.0, 1.15], orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32))
+    )
     og.sim.step()
 
     # Clean up
@@ -296,11 +317,11 @@ def test_melting_rule(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    swiss_cheese.set_position_orientation([-0.24, 0.11, 0.92], [0, 0, 0, 1])
+    swiss_cheese.set_position_orientation(position=[-0.24, 0.11, 0.92], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert swiss_cheese.states[Inside].get_value(stockpot)
 
@@ -345,7 +366,7 @@ def test_cooking_physical_particle_rule_failure_recipe_systems(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
@@ -385,7 +406,7 @@ def test_cooking_physical_particle_rule_success(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
@@ -445,7 +466,7 @@ def test_mixing_rule_failure_recipe_systems(env):
     assert lemonade.n_particles == 0
     assert sludge.n_particles == 0
 
-    tablespoon.set_position_orientation([0.04, 0.0, 0.11], [0, 0, 0, 1])
+    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.11], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
@@ -489,7 +510,7 @@ def test_mixing_rule_failure_nonrecipe_systems(env):
     assert lemonade.n_particles == 0
     assert sludge.n_particles == 0
 
-    tablespoon.set_position_orientation([0.04, 0.0, 0.11], [0, 0, 0, 1])
+    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.11], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
@@ -529,7 +550,7 @@ def test_mixing_rule_success(env):
 
     assert lemonade.n_particles == 0
 
-    tablespoon.set_position_orientation([0.04, 0.0, 0.11], [0, 0, 0, 1])
+    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.11], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
@@ -560,11 +581,11 @@ def test_cooking_system_rule_failure_recipe_systems(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    chicken.set_position_orientation([-0.24, 0.11, 0.86], [0, 0, 0, 1])
+    chicken.set_position_orientation(position=[-0.24, 0.11, 0.86], orientation=[0, 0, 0, 1])
     # This fails the recipe because chicken broth (recipe system) is not in the stockpot
     chicken_broth.generate_particles(positions=[[-0.33, 0.05, 1.93]])
     diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.93]])
@@ -616,11 +637,11 @@ def test_cooking_system_rule_failure_nonrecipe_systems(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    chicken.set_position_orientation([-0.24, 0.11, 0.86], [0, 0, 0, 1])
+    chicken.set_position_orientation(position=[-0.24, 0.11, 0.86], orientation=[0, 0, 0, 1])
     # This fails the recipe because water (nonrecipe system) is inside the stockpot
     water.generate_particles(positions=[[-0.24, 0.11, 0.93]])
     chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.93]])
@@ -675,13 +696,13 @@ def test_cooking_system_rule_failure_nonrecipe_objects(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    stockpot.set_position_orientation([-0.24, 0.11, 0.89], [0, 0, 0, 1])
+    stockpot.set_position_orientation(position=[-0.24, 0.11, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    chicken.set_position_orientation([-0.24, 0.11, 0.86], [0, 0, 0, 1])
+    chicken.set_position_orientation(position=[-0.24, 0.11, 0.86], orientation=[0, 0, 0, 1])
     # This fails the recipe because the bowl (nonrecipe object) is inside the stockpot
-    bowl.set_position_orientation([-0.20, 0.15, 1], [0, 0, 0, 1])
+    bowl.set_position_orientation(position=[-0.20, 0.15, 1], orientation=[0, 0, 0, 1])
     chicken_broth.generate_particles(positions=[[-0.33, 0.05, 0.93]])
     diced_carrot.generate_particles(positions=[[-0.28, 0.05, 0.93]])
     diced_celery.generate_particles(positions=[[-0.23, 0.05, 0.93]])
@@ -839,13 +860,13 @@ def test_cooking_object_rule_failure_recipe_objects(env):
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.05, 0.455], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     # This fails the recipe because it requires the bagel dough to be on top of the baking sheet
-    bagel_dough.set_position_orientation([1, 0, 0.5], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([1.02, 0, 0.55], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[1, 0, 0.5], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[1.02, 0, 0.55], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert not bagel_dough.states[OnTop].get_value(baking_sheet)
 
@@ -881,12 +902,12 @@ def test_cooking_object_rule_failure_unary_states(env):
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.05, 0.455], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[0, 0, 0.492], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[0.02, 0, 0.534], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -924,12 +945,12 @@ def test_cooking_object_rule_failure_binary_system_states(env):
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.05, 0.455], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[0, 0, 0.492], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[0.02, 0, 0.534], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -967,12 +988,12 @@ def test_cooking_object_rule_failure_binary_object_states(env):
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.05, 0.455], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.12, 0.15, 0.47], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[0, 0, 0.492], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[0.12, 0.15, 0.47], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     # This fails the recipe because it requires the raw egg to be on top of the bagel dough
@@ -1011,12 +1032,12 @@ def test_cooking_object_rule_failure_wrong_heat_source(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    heat_source_position = stove.states[HeatSourceOrSink].link.get_position()
-    baking_sheet.set_position_orientation([-0.20, 0, 0.80], [0, 0, 0, 1])
+    heat_source_position = stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
+    baking_sheet.set_position_orientation(position=[-0.20, 0, 0.80], orientation=[0, 0, 0, 1])
     og.sim.step()
 
-    bagel_dough.set_position_orientation([-0.20, 0, 0.84], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([-0.18, 0, 0.89], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[-0.20, 0, 0.84], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.18, 0, 0.89], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -1059,12 +1080,12 @@ def test_cooking_object_rule_success(env):
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation([0.0, 0.05, 0.455], [0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.05, 0.455], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
-    bagel_dough.set_position_orientation([0, 0, 0.492], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([0.02, 0, 0.534], [0, 0, 0, 1])
+    bagel_dough.set_position_orientation(position=[0, 0, 0.492], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[0.02, 0, 0.534], orientation=[0, 0, 0, 1])
     og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     assert raw_egg.states[OnTop].get_value(bagel_dough)
@@ -1101,7 +1122,8 @@ def test_cooking_object_rule_success(env):
     # Clean up
     remove_all_systems(env.scene)
 
-    og.sim.remove_object(new_bagels)
+    for bagel in new_bagels:
+        env.scene.remove_object(bagel)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:
@@ -1127,9 +1149,9 @@ def test_single_toggleable_machine_rule_output_system_failure_wrong_container(en
     place_obj_on_floor_plane(food_processor)
     og.sim.step()
 
-    milk.generate_particles(positions=np.array([[0.02, 0.06, 0.22]]))
-    chocolate_sauce.generate_particles(positions=np.array([[-0.05, -0.04, 0.22]]))
-    ice_cream.set_position_orientation([0.03, -0.02, 0.23], [0, 0, 0, 1])
+    milk.generate_particles(positions=th.tensor([[0.02, 0.06, 0.22]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[-0.05, -0.04, 0.22]]))
+    ice_cream.set_position_orientation(position=[0.03, -0.02, 0.23], orientation=[0, 0, 0, 1])
 
     og.sim.step()
 
@@ -1177,9 +1199,9 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_systems(env
     og.sim.step()
 
     # This fails the recipe because it requires the milk to be in the blender
-    milk.generate_particles(positions=np.array([[0.02, 0, 1.57]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.57]]))
-    ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 1.57]], dtype=th.float32))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]], dtype=th.float32))
+    ice_cream.set_position_orientation(position=[0, 0, 0.51], orientation=[0, 0, 0, 1])
     og.sim.step()
 
     assert not blender.states[Contains].get_value(milk)
@@ -1221,10 +1243,10 @@ def test_single_toggleable_machine_rule_output_system_failure_recipe_objects(env
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=np.array([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     # This fails the recipe because it requires the ice cream to be inside the blender
-    ice_cream.set_position_orientation([0, 0, 1.51], [0, 0, 0, 1])
+    ice_cream.set_position_orientation(position=[0, 0, 1.51], orientation=[0, 0, 0, 1])
 
     og.sim.step()
 
@@ -1265,11 +1287,11 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_systems(
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=np.array([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.57]]))
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
     # This fails the recipe because water (nonrecipe system) is in the blender
-    water.generate_particles(positions=np.array([[0, 0, 0.57]]))
-    ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
+    water.generate_particles(positions=th.tensor([[0, 0, 0.57]]))
+    ice_cream.set_position_orientation(position=[0, 0, 0.51], orientation=[0, 0, 0, 1])
 
     og.sim.step()
 
@@ -1316,11 +1338,11 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=np.array([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.57]]))
-    ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
+    ice_cream.set_position_orientation(position=[0, 0, 0.51], orientation=[0, 0, 0, 1])
     # This fails the recipe because the bowl (nonrecipe object) is in the blender
-    bowl.set_position_orientation([0, 0, 0.58], [0, 0, 0, 1])
+    bowl.set_position_orientation(position=[0, 0, 0.58], orientation=[0, 0, 0, 1])
 
     og.sim.step()
 
@@ -1365,9 +1387,9 @@ def test_single_toggleable_machine_rule_output_system_success(env):
     place_obj_on_floor_plane(blender)
     og.sim.step()
 
-    milk.generate_particles(positions=np.array([[0.02, 0, 0.57]]))
-    chocolate_sauce.generate_particles(positions=np.array([[0, -0.02, 0.57]]))
-    ice_cream.set_position_orientation([0, 0, 0.51], [0, 0, 0, 1])
+    milk.generate_particles(positions=th.tensor([[0.02, 0, 0.57]]))
+    chocolate_sauce.generate_particles(positions=th.tensor([[0, -0.02, 0.57]]))
+    ice_cream.set_position_orientation(position=[0, 0, 0.51], orientation=[0, 0, 0, 1])
 
     og.sim.step()
 
@@ -1420,14 +1442,14 @@ def test_single_toggleable_machine_rule_output_object_failure_unary_states(env):
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation([-0.01, -0.14, 0.50], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([-0.01, -0.14, 0.47], [0, 0, 0, 1])
-    flour.generate_particles(positions=np.array([[-0.01, -0.15, 0.43]]))
-    granulated_sugar.generate_particles(positions=np.array([[0.01, -0.15, 0.43]]))
-    vanilla.generate_particles(positions=np.array([[0.03, -0.15, 0.43]]))
-    melted_butter.generate_particles(positions=np.array([[-0.01, -0.13, 0.43]]))
-    baking_powder.generate_particles(positions=np.array([[0.01, -0.13, 0.43]]))
-    salt.generate_particles(positions=np.array([[0.03, -0.13, 0.43]]))
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
+    granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
+    vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
+    melted_butter.generate_particles(positions=th.tensor([[-0.01, -0.13, 0.43]]))
+    baking_powder.generate_particles(positions=th.tensor([[0.01, -0.13, 0.43]]))
+    salt.generate_particles(positions=th.tensor([[0.03, -0.13, 0.43]]))
     # This fails the recipe because the egg should not be cooked
     raw_egg.states[Cooked].set_value(True)
     og.sim.step()
@@ -1494,14 +1516,14 @@ def test_single_toggleable_machine_rule_output_object_success(env):
     place_obj_on_floor_plane(electric_mixer)
     og.sim.step()
 
-    another_raw_egg.set_position_orientation([-0.01, -0.14, 0.50], [0, 0, 0, 1])
-    raw_egg.set_position_orientation([-0.01, -0.14, 0.47], [0, 0, 0, 1])
-    flour.generate_particles(positions=np.array([[-0.01, -0.15, 0.43]]))
-    granulated_sugar.generate_particles(positions=np.array([[0.01, -0.15, 0.43]]))
-    vanilla.generate_particles(positions=np.array([[0.03, -0.15, 0.43]]))
-    melted_butter.generate_particles(positions=np.array([[-0.01, -0.13, 0.43]]))
-    baking_powder.generate_particles(positions=np.array([[0.01, -0.13, 0.43]]))
-    salt.generate_particles(positions=np.array([[0.03, -0.13, 0.43]]))
+    another_raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.50], orientation=[0, 0, 0, 1])
+    raw_egg.set_position_orientation(position=[-0.01, -0.14, 0.47], orientation=[0, 0, 0, 1])
+    flour.generate_particles(positions=th.tensor([[-0.01, -0.15, 0.43]]))
+    granulated_sugar.generate_particles(positions=th.tensor([[0.01, -0.15, 0.43]]))
+    vanilla.generate_particles(positions=th.tensor([[0.03, -0.15, 0.43]]))
+    melted_butter.generate_particles(positions=th.tensor([[-0.01, -0.13, 0.43]]))
+    baking_powder.generate_particles(positions=th.tensor([[0.01, -0.13, 0.43]]))
+    salt.generate_particles(positions=th.tensor([[0.03, -0.13, 0.43]]))
 
     og.sim.step()
 
@@ -1545,7 +1567,8 @@ def test_single_toggleable_machine_rule_output_object_success(env):
         assert dough.states[OnTop].get_value(electric_mixer)
 
     # Clean up
-    og.sim.remove_object(new_doughs)
+    for dough in new_doughs:
+        env.scene.remove_object(dough)
     og.sim.step()
 
     for obj_cfg in deleted_objs_cfg:

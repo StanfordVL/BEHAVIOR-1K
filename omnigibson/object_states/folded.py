@@ -1,6 +1,7 @@
+import math
 from collections import namedtuple
 
-import numpy as np
+import torch as th
 from scipy.spatial import ConvexHull, QhullError, distance_matrix
 
 from omnigibson.macros import create_module_macros
@@ -25,7 +26,7 @@ m.NORMAL_Z_PERCENTAGE = 0.5
 m.DEBUG_CLOTH_PROJ_VIS = False
 
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
-m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
+m.NORMAL_Z_ANGLE_DIFF = th.deg2rad(th.tensor([45.0])).item()
 
 """
 FoldedLevelData contains the following fields:
@@ -60,8 +61,8 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
         normals = cloth.compute_face_normals(face_ids=cloth.keyface_idx)
 
         # projection onto the z-axis
-        proj = np.abs(np.dot(normals, np.array([0.0, 0.0, 1.0])))
-        percentage = np.mean(proj > np.cos(m.NORMAL_Z_ANGLE_DIFF))
+        proj = th.abs(normals @ th.tensor([0.0, 0.0, 1.0], dtype=th.float32))
+        percentage = th.mean((proj > math.cos(m.NORMAL_Z_ANGLE_DIFF)).float()).item()
         return percentage
 
     def calculate_projection_area_and_diagonal_maximum(self):

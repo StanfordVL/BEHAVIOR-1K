@@ -26,7 +26,7 @@ def test_removal_and_readdition(env):
         og.sim.step()
 
     # Remove the apple
-    og.sim.remove_object(obj=apple)
+    env.scene.remove_object(obj=apple)
 
     # Check that NAMES is the same as before
     assert env.scene.object_registry("name", "apple_unique") is None
@@ -41,7 +41,7 @@ def test_removal_and_readdition(env):
     og.sim.step()
 
     # Clear the stuff we added
-    og.sim.remove_object(apple2)
+    env.scene.remove_object(apple2)
 
 
 @og_test
@@ -76,4 +76,4 @@ def test_readdition(env):
     assert env.scene.object_registry("name", "apple_unique") is not None
 
     # Clear the stuff we added
-    og.sim.remove_object(apple)
+    env.scene.remove_object(apple)

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
@@ -31,10 +31,10 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             glb = max(objA_lower[dim], objB_lower[dim])
             lub = min(objA_upper[dim], objB_upper[dim])
             distance_vec.append(max(0, glb - lub))
-        distance = np.linalg.norm(np.array(distance_vec))
+        distance = th.norm(th.tensor(distance_vec, dtype=th.float32))
         objA_dims = objA_upper - objA_lower
         objB_dims = objB_upper - objB_lower
-        avg_aabb_length = np.mean(objA_dims + objB_dims)
+        avg_aabb_length = th.mean(objA_dims + objB_dims)
 
         # If the distance is longer than acceptable, return False.
         if distance > avg_aabb_length * (1.0 / 6.0):

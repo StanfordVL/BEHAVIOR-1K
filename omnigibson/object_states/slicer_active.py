@@ -1,11 +1,13 @@
-import numpy as np
+import math
+
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.object_state_base import BooleanStateMixin
 from omnigibson.object_states.tensorized_value_state import TensorizedValueState
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, torch_delete
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create settings for this module
@@ -17,10 +19,10 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     # int: Keep track of how many steps each object is waiting for
     STEPS_TO_WAIT = None
 
-    # np.ndarray: Keep track of the current delay for a given slicer
+    # th.tensor: Keep track of the current delay for a given slicer
     DELAY_COUNTER = None
 
-    # np.ndarray: Keep track of whether we touched a sliceable in the previous timestep
+    # th.tensor: Keep track of whether we touched a sliceable in the previous timestep
     PREVIOUSLY_TOUCHING = None
 
     # list of list of str: Body prim paths belonging to each slicer obj
@@ -38,9 +40,9 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super().global_initialize()
 
         # Initialize other global variables
-        cls.STEPS_TO_WAIT = max(1, int(np.ceil(m.REACTIVATION_DELAY / og.sim.get_rendering_dt())))
-        cls.DELAY_COUNTER = np.array([], dtype=int)
-        cls.PREVIOUSLY_TOUCHING = np.array([], dtype=bool)
+        cls.STEPS_TO_WAIT = max(1, int(math.ceil(m.REACTIVATION_DELAY / og.sim.get_sim_step_dt())))
+        cls.DELAY_COUNTER = th.empty(0, dtype=int)
+        cls.PREVIOUSLY_TOUCHING = th.empty(0, dtype=bool)
         cls.SLICER_LINK_PATHS = []
 
     @classmethod
@@ -49,8 +51,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         super()._add_obj(obj=obj)
 
         # Add to previously touching and delay counter
-        cls.DELAY_COUNTER = np.concatenate([cls.DELAY_COUNTER, [0]])
-        cls.PREVIOUSLY_TOUCHING = np.concatenate([cls.PREVIOUSLY_TOUCHING, [False]])
+        cls.DELAY_COUNTER = th.cat([cls.DELAY_COUNTER, th.tensor([0])])
+        cls.PREVIOUSLY_TOUCHING = th.cat([cls.PREVIOUSLY_TOUCHING, th.tensor([False])])
 
         # Add this object's prim paths to slicer paths
         cls.SLICER_LINK_PATHS.append([link.prim_path for link in obj.links.values()])
@@ -61,8 +63,8 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
         deleted_idx = cls.OBJ_IDXS[obj]
 
         # Remove from all internal tracked arrays
-        cls.DELAY_COUNTER = np.delete(cls.DELAY_COUNTER, [deleted_idx])
-        cls.PREVIOUSLY_TOUCHING = np.delete(cls.PREVIOUSLY_TOUCHING, [deleted_idx])
+        cls.DELAY_COUNTER = torch_delete(cls.DELAY_COUNTER, [deleted_idx])
+        cls.PREVIOUSLY_TOUCHING = torch_delete(cls.PREVIOUSLY_TOUCHING, [deleted_idx])
         del cls.SLICER_LINK_PATHS[deleted_idx]
 
         # Call super
@@ -71,20 +73,23 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
     @classmethod
     def _update_values(cls, values):
         # If we were slicing in the past step, deactivate now
-        previously_touching_idxs = np.nonzero(cls.PREVIOUSLY_TOUCHING)[0]
+        previously_touching_idxs = th.nonzero(cls.PREVIOUSLY_TOUCHING)
         values[previously_touching_idxs] = False
         cls.DELAY_COUNTER[previously_touching_idxs] = 0  # Reset the counter when we stop touching a sliceable object
 
         # Are we currently touching any sliceables?
         currently_touching_sliceables = cls._currently_touching_sliceables()
 
+        # Track changed variables between currently and previously touched sliceables
+        changed_idxs = set((cls.PREVIOUSLY_TOUCHING ^ currently_touching_sliceables).nonzero().flatten().tolist())
+
         # If any of our values are False, we need to consider reverting back.
-        if not np.all(values):
+        if not th.all(values):
             not_active_not_touching = ~values & ~currently_touching_sliceables
             not_active_is_touching = ~values & currently_touching_sliceables
 
-            not_active_not_touching_idxs = np.where(not_active_not_touching)[0]
-            not_active_is_touching_idxs = np.where(not_active_is_touching)[0]
+            not_active_not_touching_idxs = th.where(not_active_not_touching)[0]
+            not_active_is_touching_idxs = th.where(not_active_is_touching)[0]
 
             # If we are not touching any sliceable objects, we increment the delay "cooldown" counter that will
             # eventually re-activate the slicer
@@ -93,18 +98,25 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             # If we are touching a sliceable object, reset the counter
             cls.DELAY_COUNTER[not_active_is_touching_idxs] = 0
 
+            # Update changed idxs to include not active not touching / is touching
+            changed_idxs = set.union(changed_idxs, not_active_not_touching_idxs, not_active_is_touching_idxs)
+
             # If the delay counter is greater than steps to wait, set to True
-            values = np.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
+            values = th.where(cls.DELAY_COUNTER >= cls.STEPS_TO_WAIT, True, values)
 
         # Record if we were touching anything previously
         cls.PREVIOUSLY_TOUCHING = currently_touching_sliceables
+
+        # Add all changed objects to the current state update set in their respective scenes
+        for idx in changed_idxs:
+            cls.IDX_OBJS[idx].state_updated()
 
         return values
 
     @classmethod
     def _currently_touching_sliceables(cls):
         # Initialize return value as all falses
-        currently_touching = np.zeros_like(cls.PREVIOUSLY_TOUCHING)
+        currently_touching = th.zeros_like(cls.PREVIOUSLY_TOUCHING)
 
         # Grab all sliceable objects
         for scene_idx, scene in enumerate(og.sim.scenes):
@@ -129,7 +141,7 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
             # TODO: This can be vectorized. No point in doing this tensorized state to then compute this in a loop.
             # Batch check each slicer against all sliceables
             for i, slicer_idxs in enumerate(all_slicer_idxs):
-                if np.any(impulses[slicer_idxs][:, sliceable_idxs]):
+                if th.any(impulses[slicer_idxs][:, sliceable_idxs]):
                     # We are touching at least one sliceable
                     currently_touching[i] = True
 
@@ -173,12 +185,11 @@ class SlicerActive(TensorizedValueState, BooleanStateMixin):
 
     def serialize(self, state):
         state_flat = super().serialize(state=state)
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
-                [state["previously_touching"], state["delay_counter"]],
-            ],
-            dtype=float,
+                th.tensor([state["previously_touching"], state["delay_counter"]]),
+            ]
         )
 
     def deserialize(self, state):

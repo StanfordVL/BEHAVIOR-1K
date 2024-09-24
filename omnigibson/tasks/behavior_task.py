@@ -1,6 +1,6 @@
 import os
 
-import numpy as np
+import torch as th
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
@@ -107,7 +107,7 @@ class BehaviorTask(BaseTask):
         self.future_obj_instances = None  # set of str
 
         # Info for demonstration collection
-        self.instruction_order = None  # np.array of int
+        self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
         self.activity_natural_language_goal_conditions = None  # str
@@ -162,18 +162,12 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    def write_task_metadata(self):
+    @property
+    def task_metadata(self):
         # Store mapping from entity name to its corresponding BDDL instance name
-        metadata = dict(
+        return dict(
             inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
         )
-
-        # Write to sim
-        og.sim.write_metadata(key="task", data=metadata)
-
-    def load_task_metadata(self):
-        # Load from sim
-        return og.sim.get_metadata(key="task")
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
@@ -213,7 +207,7 @@ class BehaviorTask(BaseTask):
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
         callback_name = f"{self.activity_name}_refresh"
-        og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
+        og.sim.add_callback_on_add_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
         og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
@@ -268,8 +262,9 @@ class BehaviorTask(BaseTask):
         )
 
         # Demo attributes
-        self.instruction_order = np.arange(len(self.activity_conditions.parsed_goal_conditions))
-        np.random.shuffle(self.instruction_order)
+        self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
+        self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
+
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
         self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
@@ -369,7 +364,7 @@ class BehaviorTask(BaseTask):
                     f"from loaded scene, but could not be found!"
                 )
                 name = inst_to_name[obj_inst]
-                is_system = name in env.scene.system_registry.object_names
+                is_system = name in env.scene.available_systems.keys()
                 entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
@@ -382,15 +377,15 @@ class BehaviorTask(BaseTask):
         # Batch rpy calculations for much better efficiency
         objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
-            np.array(
+            th.stack(
                 [
-                    obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
+                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
                     for obj, obj_exist in objs_exist.items()
                 ]
             )
         )
-        objs_rpy_cos = np.cos(objs_rpy)
-        objs_rpy_sin = np.sin(objs_rpy)
+        objs_rpy_cos = th.cos(objs_rpy)
+        objs_rpy_sin = th.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)
@@ -402,21 +397,21 @@ class BehaviorTask(BaseTask):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.array([1.0])
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
                 low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
                 low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
                 low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.zeros(1)
+                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 
@@ -446,7 +441,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_removed_obj(self, obj):
         """
-        Internal callback function to be called when sim.remove_object() is called to potentially update internal
+        Internal callback function to be called when sim._pre_remove_object() is called to potentially update internal
         bddl object scope
 
         Args:

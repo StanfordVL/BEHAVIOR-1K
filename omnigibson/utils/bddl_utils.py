@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import bddl
 import networkx as nx
-import numpy as np
+import torch as th
 from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation
@@ -1012,8 +1012,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.prod(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.prod(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1063,7 +1063,9 @@ class BDDLSampler:
         else:
             problematic_objs_by_proportion = defaultdict(list)
             for child_scope_name, parent_obj_names in problematic_objs.items():
-                problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+                problematic_objs_by_proportion[
+                    th.mean(th.tensor(list(parent_obj_names.values()), dtype=th.float32)).item()
+                ].append(child_scope_name)
             max_problematic_objs = problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
         return filtered_object_scope, max_problematic_objs
@@ -1183,7 +1185,9 @@ class BDDLSampler:
         assert og.sim.is_stopped(), "Simulator should be stopped when importing sampleable objects"
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
-        self._agent.set_position_orientation([300, 300, 300], [0, 0, 0, 1])
+        self._agent.set_position_orientation(
+            position=th.tensor([300, 300, 300], dtype=th.float32), orientation=th.tensor([0, 0, 0, 1], dtype=th.float32)
+        )
 
         self._sampled_objects = set()
         num_new_obj = 0
@@ -1231,7 +1235,7 @@ class BDDLSampler:
                     continue
 
                 # Shuffle categories and sample to find a valid model
-                np.random.shuffle(categories)
+                random.shuffle(categories)
                 model_choices = set()
                 for category in categories:
                     # Get all available models that support all of its synset abilities
@@ -1256,7 +1260,7 @@ class BDDLSampler:
                     return f"Missing valid object models for all categories: {categories}"
 
                 # Randomly select an object model
-                model = np.random.choice(list(model_choices))
+                model = random.choice(list(model_choices))
 
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
@@ -1279,7 +1283,9 @@ class BDDLSampler:
                 self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
-                simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
+                simulator_obj.set_position_orientation(
+                    position=th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0
+                )
 
                 self._sampled_objects.add(simulator_obj)
                 self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
@@ -1310,7 +1316,8 @@ class BDDLSampler:
         ground_goal_state_options = get_ground_goal_state_options(
             self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions
         )
-        np.random.shuffle(ground_goal_state_options)
+        num_options = ground_goal_state_options.size(0)
+        ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
@@ -1363,8 +1370,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.prod(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.prod(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1408,7 +1415,7 @@ class BDDLSampler:
 
                             # If any scales are equal or less than the lower threshold, terminate immediately
                             new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
-                            if np.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                            if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
                                 break
 
                             # Re-scale and re-attempt
@@ -1448,8 +1455,8 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         error_msg, problematic_objs = "", []
-        while not np.any(
-            [np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
+        while not any(
+            th.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE).item() for obj_inst in problematic_objs
         ):
             filtered_object_scope, problematic_objs = self._filter_object_scope(
                 input_object_scope, conditions, condition_type
@@ -1466,7 +1473,7 @@ class BDDLSampler:
                 if obj_inst in self._attached_objects or "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
                     og.sim.play()
                     return error_msg, None
-                assert np.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
+                assert th.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
                 obj.scale -= m.DYNAMIC_SCALE_INCREMENT
             og.sim.play()
 

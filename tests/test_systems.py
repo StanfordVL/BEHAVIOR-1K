@@ -19,4 +19,4 @@ def test_system_clear(env):
                 system.generate_particles(positions=[[0, 0, 1]])
             assert system.n_particles > 0
             og.sim.step()
-            system.clear()
+            env.scene.clear_system(system_name)

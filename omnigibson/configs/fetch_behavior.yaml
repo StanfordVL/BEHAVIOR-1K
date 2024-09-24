@@ -9,6 +9,8 @@ env:
   initial_pos_z_offset: 0.1
   external_sensors:                     # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
     - sensor_type: VisionSensor
+      name: external_sensor0
+      relative_prim_path: /external_sensor0
       modalities: [rgb, depth]
       sensor_kwargs:
         image_height: 128

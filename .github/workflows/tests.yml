@@ -17,19 +17,25 @@ jobs:
     runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
     strategy:
+      fail-fast: false
       matrix:
         test_file:
+          - test_controllers
+          - test_data_collection
           - test_dump_load_states
           - test_envs
+          - test_multiple_envs
           - test_object_removal
           - test_object_states
           - test_primitives
           - test_robot_states_flatcache
           - test_robot_states_no_flatcache
           - test_robot_teleoperation
+          - test_scene_graph
           - test_sensors
           - test_symbolic_primitives
           - test_systems
+          - test_transform_utils
           - test_transition_rules
 
     defaults:
@@ -37,9 +43,6 @@ jobs:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
 
     steps:
-      - name: Fix home
-        run: echo "HOME=/root" >> $GITHUB_ENV
-
       - name: Checkout source
         uses: actions/checkout@v2
         with:
@@ -57,12 +60,21 @@ jobs:
       - name: Run tests
         working-directory: omnigibson-src
         run: pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
+        continue-on-error: true
 
       - name: Deploy artifact
         uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
           path: ${{ matrix.test_file }}.xml
+
+      - name: Check for failures or errors
+        run: |
+          if grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' ${{ matrix.test_file }}.xml; then
+            exit 1
+          else
+            exit 0
+          fi
 
   upload_report:
     name: Compile Report
@@ -71,6 +83,7 @@ jobs:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
+    if: always()
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
@@ -88,8 +101,8 @@ jobs:
           working-directory: omnigibson-src
           path: ${{ github.run_id }}-tests-*/test_*.xml
           reporter: java-junit
-          fail-on-error: 'true'
-          fail-on-empty: 'true'
+          fail-on-error: 'false'
+          fail-on-empty: 'false'
 
       # - name: Upload coverage to Codecov
       #   uses: codecov/codecov-action@v2.1.0

@@ -1,5 +1,5 @@
-import numpy as np
 import pytest
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -42,7 +42,10 @@ def setup_environment(load_object_categories):
                     "arm_0": {
                         "name": "InverseKinematicsController",
                         "command_input_limits": "default",
-                        "command_output_limits": [[-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]],
+                        "command_output_limits": [
+                            th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], dtype=th.float32),
+                            th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], dtype=th.float32),
+                        ],
                         "mode": "pose_absolute_ori",
                         "kp": 300.0,
                     },
@@ -83,7 +86,7 @@ def execute_controller(ctrl_gen, env):
 def primitive_tester(env, objects, primitives, primitives_args):
     for obj in objects:
         env.scene.add_object(obj["object"])
-        obj["object"].set_position_orientation(obj["position"], obj["orientation"])
+        obj["object"].set_position_orientation(position=obj["position"], orientation=obj["orientation"])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)

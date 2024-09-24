@@ -12,7 +12,7 @@ from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import ALL_SENSOR_MODALITIES
-from omnigibson.simulator import launch_simulator as launch
+from omnigibson.simulator import _launch_simulator as launch
 from omnigibson.tasks import REGISTERED_TASKS
 
 # Create logger
@@ -45,58 +45,67 @@ sim = None  # (this is a singleton so it's okay that it's global)
 tempdir = tempfile.mkdtemp()
 
 
-def clear():
+def clear(
+    gravity=None,
+    physics_dt=None,
+    rendering_dt=None,
+    sim_step_dt=None,
+    viewer_width=None,
+    viewer_height=None,
+    device=None,
+):
     """
-    Clear the stage and then call launch_simulator again to make og.sim point to a new simulator instance
+    Clear the stage and then call launch again to make og.sim point to a new simulator instance
+
+    Args:
+        gravity (None or float): gravity on z direction.
+        physics_dt (None or float): dt between physics steps.
+            If None, will use the current simulator value
+        rendering_dt (None or float): dt between rendering steps. Note: rendering means rendering a frame of the
+            current application and not only rendering a frame to the viewports/ cameras. So UI elements of
+            Isaac Sim will be refreshed with this dt as well if running non-headless.
+            If None, will use the current simulator value
+        sim_step_dt (None or float): dt between self.step() calls. This is the amount of simulation time that
+            passes every time step() is called. Note: This must be a multiple of @rendering_dt. If None, will
+            use the current simulator value
+        viewer_width (None or int): width of the camera image, in pixels
+            If None, will use the current simulator value
+        viewer_height (None or int): height of the camera image, in pixels
+            If None, will use the current simulator value
+        device (None or str): specifies the device to be used if running on the gpu with torch backend
+            If None, will use the current simulator value
+
     """
     global sim
 
     import omnigibson.lazy as lazy
-    from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin
-    from omnigibson.prims.material_prim import MaterialPrim
-    from omnigibson.sensors.vision_sensor import VisionSensor
-    from omnigibson.utils.python_utils import clear as clear_python_utils
-    from omnigibson.utils.usd_utils import clear as clear_usd_utils
 
-    # Stop the physics
-    sim.stop()
+    # First save important simulator settings
+    init_kwargs = dict(
+        gravity=sim.gravity if gravity is None else gravity,
+        physics_dt=sim.get_physics_dt() if physics_dt is None else physics_dt,
+        rendering_dt=sim.get_rendering_dt() if rendering_dt is None else rendering_dt,
+        sim_step_dt=sim.get_sim_step_dt() if sim_step_dt is None else sim_step_dt,
+        viewer_width=sim.viewer_width if viewer_width is None else viewer_width,
+        viewer_height=sim.viewer_height if viewer_height is None else viewer_height,
+        device=sim.device if device is None else device,
+    )
 
-    # Clear all scenes
-    for scene in sim.scenes:
-        scene.clear()
+    # First let the simulator clear everything it owns.
+    sim._partial_clear()
 
-    # Remove the skybox, floor plane and viewer camera
-    if sim._skybox is not None:
-        sim._skybox.remove()
-
-    if sim._floor_plane is not None:
-        sim._floor_plane.remove()
-
-    if sim._viewer_camera is not None:
-        sim._viewer_camera.remove()
-
-    if sim._camera_mover is not None:
-        sim._camera_mover.clear()
-
-    # Clear the vision sensor cache
-    VisionSensor.clear()
-
-    # Clear all global update states
-    for state in sim.object_state_types_requiring_update:
-        if issubclass(state, GlobalUpdateStateMixin):
-            state.global_initialize()
-
-    # Clear all materials
-    MaterialPrim.clear()
-
-    # Clear uniquely named items and other internal states
-    clear_python_utils()
-    clear_usd_utils()
-
+    # Then close the stage and remove pointers to the simulator object.
     assert lazy.omni.isaac.core.utils.stage.close_stage()
     sim = None
     lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
-    launch()
+
+    # Then relaunch the simulator.
+    launch(**init_kwargs)
+
+    # Check that the device remains the same
+    assert (
+        sim.device == init_kwargs["device"]
+    ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
 
 
 def cleanup(*args, **kwargs):

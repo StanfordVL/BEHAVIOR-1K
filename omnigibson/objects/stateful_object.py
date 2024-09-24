@@ -1,7 +1,8 @@
 import sys
 from collections import defaultdict
+from typing import Literal
 
-import numpy as np
+import torch as th
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
@@ -69,7 +70,6 @@ class StatefulObject(BaseObject):
         name,
         relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -87,8 +87,6 @@ class StatefulObject(BaseObject):
             name (str): Name for the object. Names need to be unique per scene
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -130,7 +128,6 @@ class StatefulObject(BaseObject):
             relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -200,6 +197,22 @@ class StatefulObject(BaseObject):
             dict: Dictionary mapping ability name to ability arguments for this object
         """
         return self._abilities
+
+    @property
+    def is_active(self):
+        """
+        Returns:
+            bool: True if this object is currently considered active -- e.g.: if this object is currently awake
+        """
+        return super().is_active or self in self.scene.updated_state_objects
+
+    def state_updated(self):
+        """
+        Adds this object to this object's scene's updated_state_objects set -- generally called externally
+        by owned object state instances when its state is updated. This is useful for tracking when this object
+        has had its state updated within the last simulation step
+        """
+        self.scene.updated_state_objects.add(self)
 
     def prepare_object_states(self):
         """
@@ -386,7 +399,7 @@ class StatefulObject(BaseObject):
             else:
                 bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
                 # Radius is the average x-y half-extent of the object
-                radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
+                radius = float(th.mean(bbox_extent_world[:2]) / 2.0)
             emitter.CreateAttribute("radius", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius)
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(radius * 0.2)
             smoke.CreateAttribute("fade", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
@@ -401,10 +414,10 @@ class StatefulObject(BaseObject):
             colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
             emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
             )
             simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
-                bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO
+                bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
             )
 
     def set_emitter_enabled(self, emitter_type, value):
@@ -489,20 +502,20 @@ class StatefulObject(BaseObject):
         if object_state is None:
             # This restore the albedo map to its original value
             albedo_add = 0.0
-            diffuse_tint = (1.0, 1.0, 1.0)
+            diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         else:
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
         if material.is_glass:
-            if not np.allclose(material.glass_color, diffuse_tint):
+            if not th.allclose(material.glass_color, diffuse_tint):
                 material.glass_color = diffuse_tint
 
         else:
             if material.albedo_add != albedo_add:
                 material.albedo_add = albedo_add
 
-            if not np.allclose(material.diffuse_tint, diffuse_tint):
+            if not th.allclose(material.diffuse_tint, diffuse_tint):
                 material.diffuse_tint = diffuse_tint
 
     def remove(self):
@@ -553,18 +566,18 @@ class StatefulObject(BaseObject):
 
         # Iterate over all states and serialize them individually
         non_kin_state_flat = (
-            np.concatenate(
+            th.cat(
                 [
                     self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
                     for state_name, state_dict in state["non_kin"].items()
                 ]
             )
             if len(state["non_kin"]) > 0
-            else np.array([])
+            else th.empty(0)
         )
 
         # Combine these two arrays
-        return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
+        return th.cat([state_flat, non_kin_state_flat])
 
     def deserialize(self, state):
         # Call super method first
@@ -591,8 +604,19 @@ class StatefulObject(BaseObject):
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
 
-    def set_position_orientation(self, position=None, orientation=None):
-        super().set_position_orientation(position=position, orientation=orientation)
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
+        """
+        Set the position and orientation of stateful object.
+
+        Args:
+            position (None or 3-array): The position to set the object to. If None, the position is not changed.
+            orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
+            set position relative to the object parent. scene frame set position relative to the scene.
+        """
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
         self.clear_states_cache()
 
     @classproperty

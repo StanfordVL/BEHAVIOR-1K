@@ -1,5 +1,3 @@
-import numpy as np
-
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
@@ -39,7 +37,7 @@ class Temperature(TensorizedValueState):
         """
         # Get idxs for objs
         idxs = [cls.OBJ_IDXS[obj] for obj in objs]
-        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_rendering_dt()
+        cls.VALUES[idxs] += (temperature - cls.VALUES[idxs]) * rate * og.sim.get_sim_step_dt()
 
     @classmethod
     def get_dependencies(cls):
@@ -56,7 +54,7 @@ class Temperature(TensorizedValueState):
     @classmethod
     def _update_values(cls, values):
         # Apply temperature decay
-        return values + (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
+        return values + (m.DEFAULT_TEMPERATURE - values) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_sim_step_dt()
 
     @classproperty
     def value_name(cls):

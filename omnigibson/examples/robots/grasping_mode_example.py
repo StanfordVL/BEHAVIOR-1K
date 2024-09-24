@@ -2,7 +2,7 @@
 Example script demo'ing robot manipulation control with grasping.
 """
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -80,7 +80,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Reset the robot
     robot = env.robots[0]
-    robot.set_position([0, 0, 0])
+    robot.set_position_orientation(position=[0, 0, 0])
     robot.reset()
     robot.keep_still()
 
@@ -92,8 +92,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-2.39951, 2.26469, 2.66227]),
-        orientation=np.array([-0.23898481, 0.48475231, 0.75464013, -0.37204802]),
+        position=th.tensor([-2.39951, 2.26469, 2.66227]),
+        orientation=th.tensor([-0.23898481, 0.48475231, 0.75464013, -0.37204802]),
     )
 
     # Create teleop controller
@@ -116,7 +116,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             step += 1
 
     # Always shut down the environment cleanly at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 from test_robot_states_flatcache import camera_pose_test, setup_environment
 
 import omnigibson as og
@@ -22,9 +22,9 @@ def test_camera_semantic_segmentation():
     all_observation, all_info = vision_sensor.get_obs()
     seg_semantic = all_observation["seg_semantic"]
     seg_semantic_info = all_info["seg_semantic"]
-    agent_label = semantic_class_name_to_id(env.scene)["agent"]
-    background_label = semantic_class_name_to_id(env.scene)["background"]
-    assert np.all(np.isin(seg_semantic, [agent_label, background_label]))
+    agent_label = semantic_class_name_to_id()["agent"]
+    background_label = semantic_class_name_to_id()["background"]
+    assert th.all(th.isin(seg_semantic, th.tensor([agent_label, background_label], device=seg_semantic.device)))
     assert set(seg_semantic_info.keys()) == {agent_label, background_label}
     og.clear()
 

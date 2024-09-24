@@ -1,9 +1,10 @@
 import argparse
 import json
+import math
 import os
 import time
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -142,8 +143,8 @@ def main():
 
     for n, knife in enumerate(knifes):
         knife.set_position_orientation(
-            position=apples[n].get_position() + np.array([-0.15, 0.0, 0.1 * (n + 2)]),
-            orientation=T.euler2quat([-np.pi / 2, 0, 0]),
+            position=apples[n].get_position_orientation()[0] + th.tensor([-0.15, 0.0, 0.1 * (n + 2)]),
+            orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0], dtype=th.float32)),
         )
         knife.keep_still()
     if args.fluids:
@@ -152,14 +153,19 @@ def main():
     output, results = [], []
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position([SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1])
+    og.sim.viewer_camera.set_position_orientation(
+        position=[SCENE_OFFSET[args.scene][0], -3 + SCENE_OFFSET[args.scene][1], 1]
+    )
     # record total load time
     total_load_time = time.time() - load_start
 
     for i in range(300):
         if args.robot:
+            action_lo, action_hi = -0.3, 0.3
             result = env.step(
-                np.array([np.random.uniform(-0.3, 0.3, env.robots[i].action_dim) for i in range(args.robot)]).flatten()
+                th.stack(
+                    [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
+                ).flatten()
             )[4]
         else:
             result = env.step(None)[4]
@@ -177,14 +183,14 @@ def main():
     output.append(
         {"name": field, "unit": "time (ms)", "value": total_load_time, "extra": ["Loading time", "Loading time"]}
     )
-    results = np.array(results)
+    results = th.tensor(results)
     for i, title in enumerate(PROFILING_FIELDS):
         unit = "time (ms)" if "time" in title else "GB"
-        value = np.mean(results[:, i])
+        value = th.mean(results[:, i])
         if title == "FPS":
             value = 1000 / value
             unit = "fps"
-        output.append({"name": field, "unit": unit, "value": value, "extra": [title, title]})
+        output.append({"name": field, "unit": unit, "value": value.item(), "extra": [title, title]})
 
     ret = []
     if os.path.exists("output.json"):

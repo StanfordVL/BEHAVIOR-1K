@@ -8,7 +8,7 @@ icon: material/silverware-fork-knife
 
 BEHAVIOR is short for Benchmark for Everyday Household Activities in Virtual, Interactive, and ecOlogical enviRonments.
 
-[**`BehaviorTask`**](../reference/tasks/behavior_task.html) represents a family of 1000 long-horizon household activities that humans benefit the most from robots' help based on our survey results.
+[**`BehaviorTask`**](../reference/tasks/behavior_task.md) represents a family of 1000 long-horizon household activities that humans benefit the most from robots' help based on our survey results.
 
 To browse and modify the definition of BEHAVIOR tasks, you might find it helpful to download a local editable copy of our `bddl` repo.
 ```{.python .annotate}

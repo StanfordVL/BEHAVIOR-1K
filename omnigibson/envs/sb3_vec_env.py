@@ -1,7 +1,7 @@
 import copy
 import time
 
-import numpy as np
+import torch as th
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn
 from tqdm import trange
@@ -41,7 +41,7 @@ class SB3VectorEnvironment(DummyVecEnv):
         # Keep track of our last reset time
         self.last_reset_time = time.time()
 
-    def step_async(self, actions: np.ndarray) -> None:
+    def step_async(self, actions: th.tensor) -> None:
         # We go into this context in case the pre-step tries to call step / render
         with og.sim.render_on_step(self.render_on_step):
             global last_stepped_env, last_stepped_time
@@ -87,8 +87,8 @@ class SB3VectorEnvironment(DummyVecEnv):
 
             return (
                 self._obs_from_buf(),
-                np.copy(self.buf_rews),
-                np.copy(self.buf_dones),
+                th.clone(self.buf_rews),
+                th.clone(self.buf_dones),
                 copy.deepcopy(self.buf_infos),
             )
 

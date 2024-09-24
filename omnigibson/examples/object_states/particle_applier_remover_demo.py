@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm, macros
@@ -125,21 +125,21 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.61340969, -1.79803028, 2.53167412]),
-        orientation=np.array([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
+        position=th.tensor([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=th.tensor([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
 
     # Play the simulator and take some environment steps to let the objects settle
     og.sim.play()
     for _ in range(25):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
         table.states[Covered].set_value(env.scene.get_system(particle_type), True)
         # Take a few steps to let particles settle
         for _ in range(25):
-            env.step(np.array([]))
+            env.step(th.empty(0))
 
     # If the particle remover/applier is projection type, set the turn on shaker
     if method_type == "Projection":
@@ -153,39 +153,39 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set the modifier object to be in position to modify particles
     if modifier_type == "particleRemover" and method_type == "Projection":
         tool.set_position_orientation(
-            position=np.array([0, 0.3, 1.45]),
-            orientation=np.array([0, 0, 0, 1.0]),
+            position=[0, 0.3, 1.45],
+            orientation=[0, 0, 0, 1.0],
         )
     elif modifier_type == "particleRemover" and method_type == "Adjacency":
         tool.set_position_orientation(
-            position=np.array([0, 0.3, 1.175]),
-            orientation=np.array([0, 0, 0, 1.0]),
+            position=[0, 0.3, 1.175],
+            orientation=[0, 0, 0, 1.0],
         )
     elif modifier_type == "particleApplier" and particle_type == "water":
         tool.set_position_orientation(
-            position=np.array([0, 0.3, 1.4]),
-            orientation=np.array([0.3827, 0, 0, 0.9239]),
+            position=[0, 0.3, 1.4],
+            orientation=[0.3827, 0, 0, 0.9239],
         )
     else:
         tool.set_position_orientation(
-            position=np.array([0, 0.3, 1.5]),
-            orientation=np.array([0.7071, 0, 0.7071, 0]),
+            position=[0, 0.3, 1.5],
+            orientation=[0.7071, 0, 0.7071, 0],
         )
 
     # Move object in square around table
     deltas = [
-        [130, np.array([-0.01, 0, 0])],
-        [60, np.array([0, -0.01, 0])],
-        [130, np.array([0.01, 0, 0])],
-        [60, np.array([0, 0.01, 0])],
+        [130, th.tensor([-0.01, 0, 0])],
+        [60, th.tensor([0, -0.01, 0])],
+        [130, th.tensor([0.01, 0, 0])],
+        [60, th.tensor([0, 0.01, 0])],
     ]
     for t, delta in deltas:
         for _ in range(t):
-            tool.set_position(tool.get_position() + delta)
-            env.step(np.array([]))
+            tool.set_position_orientation(position=tool.get_position_orientation()[0] + delta)
+            env.step(th.empty(0))
 
     # Always shut down environment at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

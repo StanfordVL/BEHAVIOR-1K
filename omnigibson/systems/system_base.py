@@ -1,7 +1,7 @@
 import json
 import os
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -49,8 +49,8 @@ class BaseSystem(Serializable):
         # Whether this system has been initialized or not
         self.initialized = False
 
-        self.min_scale = min_scale if min_scale is not None else np.ones(3)
-        self.max_scale = max_scale if max_scale is not None else np.ones(3)
+        self.min_scale = min_scale if min_scale is not None else th.ones(3)
+        self.max_scale = max_scale if max_scale is not None else th.ones(3)
 
         self._uuid = get_uuid(self.name)
         UUID_TO_SYSTEM_NAME[self._uuid] = self.name
@@ -131,7 +131,7 @@ class BaseSystem(Serializable):
             scene.transition_rule_api.refresh_all_rules()
 
         # Run any callbacks
-        for callback in og.sim.get_callbacks_on_system_init():
+        for callback in og.sim.get_callbacks_on_system_init().values():
             callback(self)
 
     @property
@@ -165,7 +165,7 @@ class BaseSystem(Serializable):
         Removes pre-existing particles
 
         Args:
-            idxs (np.array): (n_particles,) shaped array specifying IDs of particles to delete
+            idxs (th.tensor): (n_particles,) shaped array specifying IDs of particles to delete
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """
         raise NotImplementedError()
@@ -181,10 +181,10 @@ class BaseSystem(Serializable):
         Generates new particles
 
         Args:
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+            scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (self.min_scale, self.max_scale)
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
         """
@@ -199,7 +199,7 @@ class BaseSystem(Serializable):
             self._clear()
 
     def _clear(self):
-        for callback in og.sim.get_callbacks_on_system_clear():
+        for callback in og.sim.get_callbacks_on_system_clear().values():
             callback(self)
 
         self.reset()
@@ -227,7 +227,7 @@ class BaseSystem(Serializable):
         Returns:
             (n, 3) array: Array of sampled scales
         """
-        return np.random.uniform(self.min_scale, self.max_scale, (n, 3))
+        return th.rand(n, 3) * (self.max_scale - self.min_scale) + self.min_scale
 
     def get_particles_position_orientation(self):
         """
@@ -365,15 +365,14 @@ class BaseSystem(Serializable):
 
     def serialize(self, state):
         # Array is n_particles, then min_scale and max_scale, then poses for all particles
-        return np.concatenate(
+        return th.cat(
             [
-                [state["n_particles"]],
+                th.tensor([state["n_particles"]], dtype=th.float32),
                 state["min_scale"],
                 state["max_scale"],
                 state["positions"].flatten(),
                 state["orientations"].flatten(),
-            ],
-            dtype=float,
+            ]
         )
 
     def deserialize(self, state):
@@ -577,18 +576,18 @@ class VisualParticleSystem(BaseSystem):
         """
         # First set the bbox ranges -- depends on the object's bounding box
         obj = self._group_objects[group]
-        median_aabb_dim = np.median(obj.aabb_extent)
+        median_aabb_dim = th.median(obj.aabb_extent)
 
         # Compute lower and upper limits to bbox
         bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_lower_limit = np.clip(
+        bbox_lower_limit = th.clip(
             bbox_lower_limit_from_aabb,
             m.BBOX_LOWER_LIMIT_MIN,
             m.BBOX_LOWER_LIMIT_MAX,
         )
 
         bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_upper_limit = np.clip(
+        bbox_upper_limit = th.clip(
             bbox_upper_limit_from_aabb,
             m.BBOX_UPPER_LIMIT_MIN,
             m.BBOX_UPPER_LIMIT_MAX,
@@ -596,8 +595,8 @@ class VisualParticleSystem(BaseSystem):
 
         # Convert these into scaling factors for the x and y axes for our particle object
         particle_bbox = self.particle_object.aabb_extent
-        minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
-        maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+        minimum = th.tensor([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+        maximum = th.tensor([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
 
         return minimum, maximum
 
@@ -617,7 +616,7 @@ class VisualParticleSystem(BaseSystem):
 
         # Sample based on whether we're scaling relative to parent or not
         scales = (
-            np.random.uniform(*self._group_scales[group], (n, 3))
+            th.rand(n, 3) * (self._group_scales[group][1] - self._group_scales[group][0]) + self._group_scales[group][0]
             if self._scale_relative_to_parent
             else self.sample_scales(n=n)
         )
@@ -627,7 +626,7 @@ class VisualParticleSystem(BaseSystem):
         # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
         # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
         obj = self._group_objects[group]
-        avg_scale = np.cbrt(np.prod(obj.scale))
+        avg_scale = th.pow(th.prod(obj.scale), 1 / 3)
         return scales / avg_scale
 
     def generate_particles(
@@ -659,10 +658,10 @@ class VisualParticleSystem(BaseSystem):
 
         Args:
             group (str): Object on which to sample particle locations
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+            positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or th.tensor): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
+            scales (None or th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
                 local frame. If not specified, all we randomly sampled based on @self.min_scale and @self.max_scale
             link_prim_paths (None or list of str): Determines which link each generated particle will
                 be attached to. If not specified, all will be attached to the group object's prim, NOT a link
@@ -762,7 +761,7 @@ class PhysicalParticleSystem(BaseSystem):
         super().initialize(scene)
 
         # Make sure min and max scale are identical
-        assert np.all(
+        assert th.all(
             self.min_scale == self.max_scale
         ), "Min and max scale should be identical for PhysicalParticleSystem!"
 
@@ -810,15 +809,15 @@ class PhysicalParticleSystem(BaseSystem):
         object physically interacts with its non-uniform geometry.
 
         Args:
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            positions (th.tensor): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
 
         Returns:
             n-array: (n_particles,) boolean array, True if in contact, otherwise False
         """
-        in_contact = np.zeros(len(positions), dtype=bool)
+        in_contact = th.zeros(len(positions), dtype=bool)
         for idx, pos in enumerate(positions):
             # TODO: Maybe multiply particle contact radius * 2?
-            in_contact[idx] = og.sim.psqi.overlap_sphere_any(self.particle_contact_radius, pos)
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(self.particle_contact_radius, pos.tolist())
         return in_contact
 
     def generate_particles_from_link(
@@ -871,30 +870,28 @@ class PhysicalParticleSystem(BaseSystem):
             extent = obj.aabb_extent
         # We sample the range of each extent minus
         sampling_distance = 2 * self.particle_radius if sampling_distance is None else sampling_distance
-        n_particles_per_axis = (extent / sampling_distance).astype(int)
-        assert np.all(
+        n_particles_per_axis = (extent / sampling_distance).int()
+        assert th.all(
             n_particles_per_axis
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
 
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            np.arange(l + self.particle_radius, h - self.particle_radius + 1e-10, self.particle_particle_rest_distance)
+            th.arange(l + self.particle_radius, h - self.particle_radius + 1e-10, self.particle_particle_rest_distance)
             for l, h, n in zip(low, high, n_particles_per_axis)
         ]
         # Generate 3D-rectangular grid of points
-        particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        particle_positions = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
-        particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
+        particle_positions = particle_positions[th.where(check_in_volume(particle_positions))[0]]
 
         # Also prune any that in contact with anything if requested
         if check_contact:
-            particle_positions = particle_positions[np.where(self.check_in_contact(particle_positions) == 0)[0]]
+            particle_positions = particle_positions[th.where(self.check_in_contact(particle_positions) == 0)[0]]
 
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(int(max_samples),), replace=False)
-            ]
+            particle_positions = particle_positions[th.randperm(len(particle_positions))[: int(max_samples)]]
 
         return self.generate_particles(
             positions=particle_positions,
@@ -935,20 +932,18 @@ class PhysicalParticleSystem(BaseSystem):
             # the grid is fully dense - particles are sitting next to each other
             ray_spacing=radius * 2 if sampling_distance is None else sampling_distance,
             # assume the particles are extremely small - sample cuboids of size 0 for better performance
-            cuboid_dimensions=np.zeros(3),
+            cuboid_dimensions=th.zeros(3),
             # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
-            aabb_offset=np.array([-radius, -radius, radius]),
+            aabb_offset=th.tensor([-radius, -radius, radius]),
             # bottom padding should be the same as the particle radius
             cuboid_bottom_padding=radius,
             # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
             undo_cuboid_bottom_padding=False,
         )
-        particle_positions = np.array([result[0] for result in results if result[0] is not None])
+        particle_positions = th.stack([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if max_samples is not None and len(particle_positions) > max_samples:
-            particle_positions = particle_positions[
-                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)
-            ]
+            particle_positions = particle_positions[th.randperm(len(particle_positions))[:max_samples]]
 
         n_particles = len(particle_positions)
         success = n_particles >= min_samples_for_success
@@ -960,6 +955,19 @@ class PhysicalParticleSystem(BaseSystem):
             )
 
         return success
+
+
+def get_all_system_names():
+    """
+    Gets all available systems from the OmniGibson dataset
+
+    Returns:
+        set: Set of all available system names that can be created in OmniGibson
+    """
+    system_dir = os.path.join(gm.DATASET_PATH, "systems")
+
+    assert os.path.exists(system_dir), f"Path for OmniGibson systems not found! Attempted path: {system_dir}"
+    return set(os.listdir(system_dir))
 
 
 def create_system_from_metadata(system_name):
@@ -976,7 +984,7 @@ def create_system_from_metadata(system_name):
 
     # Search for the appropriate system, if not found, fallback
     # TODO: Once dataset is fully constructed, DON'T fallback, and assert False instead
-    all_systems = set(get_all_system_categories())
+    all_systems = set(get_all_system_categories(include_cloth=True))
     if system_name not in all_systems:
         # Use default config -- assume @system_name is a fluid that uses the same params as water
         return systems.FluidSystem(
@@ -1089,7 +1097,7 @@ def create_system_from_metadata(system_name):
         def generate_customize_particle_material_fcn(mat_kwargs):
             def customize_mat(mat):
                 for attr, val in mat_kwargs.items():
-                    setattr(mat, attr, np.array(val) if isinstance(val, list) else val)
+                    setattr(mat, attr, th.tensor(val) if isinstance(val, list) else val)
 
             return customize_mat
 

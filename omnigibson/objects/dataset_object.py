@@ -1,7 +1,8 @@
 import math
 import os
+import random
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -36,7 +37,6 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -62,8 +62,6 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -108,7 +106,7 @@ class DatasetObject(USDObject):
         if model is None:
             available_models = get_all_object_category_models(category=category)
             assert len(available_models) > 0, f"No available models found for category {category}!"
-            model = np.random.choice(available_models)
+            model = random.choice(available_models)
 
         # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
         # TODO: Remove this once the asset is fixed!
@@ -130,7 +128,6 @@ class DatasetObject(USDObject):
             encrypted=True,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -171,17 +168,17 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = np.array([0, 0, 0, 1.0])
+            chosen_orientation = th.tensor([0, 0, 0, 1.0])
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = np.array(probabilities) / np.sum(probabilities)
-            chosen_orientation = np.array(
-                np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
-            )
+            probabilities = th.tensor(probabilities, dtype=th.float32) / th.sum(probabilities)
+            option = th.multinomial(probabilities, 1).item()
+            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
 
         # Randomize yaw from -pi to pi
-        rot_num = np.random.uniform(-1, 1)
-        rot_matrix = np.array(
+        rot_lo, rot_hi = -1, 1
+        rot_num = (th.rand(1) * (rot_hi - rot_lo) + rot_lo).item()
+        rot_matrix = th.tensor(
             [
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
@@ -225,16 +222,16 @@ class DatasetObject(USDObject):
     def _post_load(self):
         # If manual bounding box is specified, scale based on ratio between that and the native bbox
         if self._load_config["bounding_box"] is not None:
-            scale = np.ones(3)
+            scale = th.ones(3)
             valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = (
-                np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
             )
         else:
-            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
         # Assert that the scale does not have too small dimensions
-        assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
+        assert th.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
@@ -315,13 +312,16 @@ class DatasetObject(USDObject):
                 None means it will not be changed
         """
         if orientation is None:
-            orientation = self.get_orientation()
+            orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
-                [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]
+                th.tensor([0, 0, 0], dtype=th.float32),
+                orientation,
+                self.scaled_bbox_center_in_base_frame,
+                th.tensor([0, 0, 0, 1], dtype=th.float32),
             )[0]
             position = position + rotated_offset
-        self.set_position_orientation(position, orientation)
+        self.set_position_orientation(position=position, orientation=orientation)
 
     @property
     def model(self):
@@ -362,7 +362,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return np.array(self.get_attribute(attr="ig:nativeBB"))
+        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property
     def base_link_offset(self):
@@ -372,7 +372,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return np.array(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
 
     @property
     def metadata(self):
@@ -447,9 +447,11 @@ class DatasetObject(USDObject):
                             prim.GetAttribute("physics:localRot1").Get()
                         )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                        local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+                        local_ori = T.quat_multiply(
+                            quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
+                        )
                         jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
+                        scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
                         scales[child_name] = scale_in_child_lf
 
         return scales

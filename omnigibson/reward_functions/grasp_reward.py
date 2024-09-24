@@ -1,7 +1,6 @@
 import math
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
+import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
@@ -70,7 +69,7 @@ class GraspReward(BaseRewardFunction):
         reward = 0.0
 
         # Penalize large actions
-        action_mag = np.sum(np.abs(action))
+        action_mag = th.sum(th.abs(action))
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
         info["regularization_penalty_factor"] = action_mag
@@ -88,16 +87,16 @@ class GraspReward(BaseRewardFunction):
             info["position_penalty"] = position_penalty
         self.prev_eef_pos = eef_pos
 
-        eef_rot = R.from_quat(robot.get_eef_orientation(robot.default_arm))
+        eef_quat = robot.get_eef_orientation(robot.default_arm)
         info["rotation_penalty_factor"] = 0.0
         info["rotation_penalty"] = 0.0
-        if self.prev_eef_rot is not None:
-            delta_rot = (eef_rot * self.prev_eef_rot.inv()).magnitude()
+        if self.prev_eef_quat is not None:
+            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat, eef_quat)
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
-            info["rotation_penalty_factor"] = delta_rot
-            info["rotation_penalty"] = rotation_penalty
-        self.prev_eef_rot = eef_rot
+            info["rotation_penalty_factor"] = delta_rot.item()
+            info["rotation_penalty"] = rotation_penalty.item()
+        self.prev_eef_quat = eef_quat
 
         # Penalize robot for colliding with an object
         info["collision_penalty_factor"] = 0.0
@@ -118,7 +117,7 @@ class GraspReward(BaseRewardFunction):
         info["postgrasp_dist_reward"] = 0.0
         if not current_grasping:
             # TODO: If we dropped the object recently, penalize for that
-            obj_center = self.obj.get_position()
+            obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(eef_pos, obj_center)
             dist_reward = math.exp(-dist) * self.dist_coeff
             reward += dist_reward
@@ -132,8 +131,8 @@ class GraspReward(BaseRewardFunction):
             info["grasp_reward"] = self.grasp_reward
 
             # Then apply a distance reward to take us to a tucked position
-            robot_center = robot.links["torso_lift_link"].get_position()
-            obj_center = self.obj.get_position()
+            robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
+            obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(robot_center, obj_center)
             dist_reward = math.exp(-dist) * self.dist_coeff
             reward += dist_reward

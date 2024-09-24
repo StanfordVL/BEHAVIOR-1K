@@ -1,6 +1,6 @@
 import colorsys
 
-import numpy as np
+import torch as th
 from PIL import Image, ImageDraw
 
 import omnigibson as og
@@ -44,7 +44,7 @@ class RandomScale:
             PIL.Image: Rescaled image.
         """
 
-        size = np.random.randint(self.minsize, self.maxsize + 1)
+        size = th.randint(self.minsize, self.maxsize + 1)
 
         if isinstance(size, int):
             w, h = img.size
@@ -69,13 +69,13 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = np.array([], dtype=np.uint32)  # Initialize the key_array as empty
+        self.key_array = th.empty(0, dtype=th.int32, device="cuda")  # Initialize the key_array as empty
         self.known_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = np.array([], dtype=np.uint32)
+        self.key_array = th.empty(0, dtype=th.int32, device="cuda")
         self.known_ids = set()
 
     def remap(self, old_mapping, new_mapping, image, image_keys=None):
@@ -89,23 +89,23 @@ class Remapper:
                 e.g. {1: 'desk', 2: 'chair'}.
             new_mapping (dict): The new mapping dictionary that maps another set of image values to labels,
                 e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
-            image (np.ndarray): The 2D image to remap, e.g. [[1, 3], [1, 2]].
-            image_keys (np.ndarray): The unique keys in the image, e.g. [1, 2, 3].
+            image (th.tensor): The 2D image to remap, e.g. [[1, 3], [1, 2]].
+            image_keys (th.tensor): The unique keys in the image, e.g. [1, 2, 3].
 
         Returns:
-            np.ndarray: The remapped image, e.g. [[5,100],[5,7]].
+            th.tensor: The remapped image, e.g. [[5,100],[5,7]].
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
-        # Make sure that max uint32 doesn't match any value in the new mapping
-        assert np.all(
-            np.array(list(new_mapping.keys())) != np.iinfo(np.uint32).max
+        # Make sure that max int32 doesn't match any value in the new mapping
+        assert th.all(
+            th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
-        image_max_key = np.max(image)
+        image_max_key = th.max(image).item()
         key_array_max_key = len(self.key_array) - 1
         if image_max_key > key_array_max_key:
-            prev_key_array = self.key_array.copy()
-            # We build a new key array and use max uint32 as the default value.
-            self.key_array = np.full(image_max_key + 1, np.iinfo(np.uint32).max, dtype=np.uint32)
+            prev_key_array = self.key_array.clone()
+            # We build a new key array and use max int32 as the default value.
+            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device="cuda")
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 
@@ -122,8 +122,8 @@ class Remapper:
         # For all the values that exist in the image but not in old_mapping.keys(), we map them to whichever key in
         # new_mapping that equals to 'unlabelled'. This is needed because some values in the image don't necessarily
         # show up in the old_mapping, i.e. particle systems.
-        for key in np.unique(image) if image_keys is None else image_keys:
-            if key not in old_mapping.keys():
+        for key in th.unique(image) if image_keys is None else image_keys:
+            if key.item() not in old_mapping.keys():
                 new_key = next((k for k, v in new_mapping.items() if v == "unlabelled"), None)
                 assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
                 self.key_array[key] = new_key
@@ -131,30 +131,12 @@ class Remapper:
         # Apply remapping
         remapped_img = self.key_array[image]
         # Make sure all values are correctly remapped and not equal to the default value
-        assert np.all(remapped_img != np.iinfo(np.uint32).max), "Not all keys in the image are in the key array!"
+        assert th.all(remapped_img != th.iinfo(th.int32).max), "Not all keys in the image are in the key array!"
         remapped_labels = {}
-        for key in np.unique(remapped_img):
-            remapped_labels[key] = new_mapping[key]
+        for key in th.unique(remapped_img):
+            remapped_labels[key.item()] = new_mapping[key.item()]
 
         return remapped_img, remapped_labels
-
-    def remap_bbox(self, semantic_id, scene):
-        """
-        Remaps a semantic id to a new id using the key_array.
-        Args:
-            semantic_id (int): The semantic id to remap.
-            scene: The scene we are remapping for.
-        Returns:
-            int: The remapped id.
-        """
-        if semantic_id >= len(self.key_array):
-            if semantic_id not in self.warning_printed:
-                og.log.warning(
-                    f"We do not have semantic information about bounding box semantic id {semantic_id} yet. Marking as unlabelled."
-                )
-                self.warning_printed.add(semantic_id)
-            return semantic_class_name_to_id(scene)["unlabelled"]
-        return self.key_array[semantic_id]
 
 
 def randomize_colors(N, bright=True):
@@ -172,9 +154,8 @@ def randomize_colors(N, bright=True):
     """
     brightness = 1.0 if bright else 0.5
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
-    colors = np.array(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
-    rstate = np.random.RandomState(seed=20)
-    np.random.shuffle(colors)
+    colors = th.tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
+    colors = colors[th.randperm(colors.size(0))]
     colors[0] = [0, 0, 0]  # First color is black
     return colors
 
@@ -192,7 +173,7 @@ def segmentation_to_rgb(seg_im, N, colors=None):
             to different segmentation IDs. Otherwise, will be generated randomly
     """
     # ensure all values lie within [0, N]
-    seg_im = np.mod(seg_im, N)
+    seg_im = th.fmod(seg_im, N)
 
     if colors is None:
         use_colors = randomize_colors(N=N, bright=True)
@@ -200,9 +181,9 @@ def segmentation_to_rgb(seg_im, N, colors=None):
         use_colors = colors
 
     if N <= 256:
-        return (255.0 * use_colors[seg_im]).astype(np.uint8)
+        return (255.0 * use_colors[seg_im]).to(th.uint8)
     else:
-        return (use_colors[seg_im]).astype(np.float)
+        return use_colors[seg_im]
 
 
 def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
@@ -211,21 +192,21 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     Reference: https://forums.developer.nvidia.com/t/mathematical-definition-of-3d-bounding-boxes-annotator-nvidia-omniverse-isaac-sim/223416
 
     Args:
-        bbox_3d_data (np.ndarray): 3D bounding box data
-        rgb_image (np.ndarray): RGB image
+        bbox_3d_data (th.tensor): 3D bounding box data
+        rgb_image (th.tensor): RGB image
         camera_params (dict): Camera parameters
 
     Returns:
-        np.ndarray: RGB image with 3D bounding boxes drawn
+        th.tensor: RGB image with 3D bounding boxes drawn
     """
 
     def world_to_image_pinhole(world_points, camera_params):
         # Project corners to image space (assumes pinhole camera model)
         proj_mat = camera_params["cameraProjection"].reshape(4, 4)
         view_mat = camera_params["cameraViewTransform"].reshape(4, 4)
-        view_proj_mat = np.dot(view_mat, proj_mat)
-        world_points_homo = np.pad(world_points, ((0, 0), (0, 1)), constant_values=1.0)
-        tf_points = np.dot(world_points_homo, view_proj_mat)
+        view_proj_mat = view_mat @ proj_mat
+        world_points_homo = th.nn.functional.pad(world_points, (0, 1, 0, 0), value=1.0)
+        tf_points = th.dot(world_points_homo, view_proj_mat)
         tf_points = tf_points / (tf_points[..., -1:])
         return 0.5 * (tf_points[..., :2] + 1)
 
@@ -287,9 +268,9 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     # Project to image space
     corners_2d = world_to_image_pinhole(corners_3d, camera_params)
     width, height = rgb.size
-    corners_2d *= np.array([[width, height]])
+    corners_2d *= th.tensor([[width, height]])
 
     # Now, draw all bounding boxes
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
-    return np.array(rgb)
+    return th.tensor(rgb)

@@ -12,10 +12,12 @@ import omni.graph.core as ogc
 import omni.timeline
 import omni.usd as ou
 import torch
+import usdrt
 import warp as wp
 from omni.isaac.core.articulations import ArticulationView as _ArticulationView
 from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.isaac.core.prims import XFormPrimView as _XFormPrimView
+from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.particle.system.core.scripts.core import Core as OmniCore
@@ -23,6 +25,7 @@ from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
 from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
+from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
 
@@ -285,6 +288,88 @@ class ArticulationView(_ArticulationView):
                 articulation_write_idx += 1
             values = self._backend_utils.convert(values, dtype="float32", device=self._device, indexed=True)
             return values
+
+    def get_joint_position_targets(
+        self,
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        clone: bool = True,
+    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+        """Get the joint position targets of articulations in the view
+
+        Args:
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to query. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+                                                                                 to query. Shape (K,).
+                                                                                 Where K <= num of dofs.
+                                                                                 Defaults to None (i.e: all dofs).
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor, wp.indexedarray]: joint positions of articulations in the view.
+            Shape is (M, K).
+        """
+        if not self._is_initialized:
+            carb.log_warn("ArticulationView needs to be initialized.")
+            return None
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+            current_joint_positions = self._physics_view.get_dof_position_targets()
+            if clone:
+                current_joint_positions = self._backend_utils.clone_tensor(current_joint_positions, device=self._device)
+            result = current_joint_positions[
+                self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, joint_indices
+            ]
+            return result
+        else:
+            carb.log_warn("Physics Simulation View is not created yet in order to use get_joint_position_targets")
+            return None
+
+    def get_joint_velocity_targets(
+        self,
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        joint_indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+        clone: bool = True,
+    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+        """Get the joint velocity targets of articulations in the view
+
+        Args:
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to query. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            joint_indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): joint indices to specify which joints
+                                                                                 to query. Shape (K,).
+                                                                                 Where K <= num of dofs.
+                                                                                 Defaults to None (i.e: all dofs).
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor, wp.indexedarray]: joint velocities of articulations in the view.
+            Shape is (M, K).
+        """
+        if not self._is_initialized:
+            carb.log_warn("ArticulationView needs to be initialized.")
+            return None
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            joint_indices = self._backend_utils.resolve_indices(joint_indices, self.num_dof, self._device)
+            current_joint_velocities = self._physics_view.get_dof_velocity_targets()
+            if clone:
+                current_joint_velocities = self._backend_utils.clone_tensor(
+                    current_joint_velocities, device=self._device
+                )
+            result = current_joint_velocities[
+                self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, joint_indices
+            ]
+            return result
+        else:
+            carb.log_warn("Physics Simulation View is not created yet in order to use get_joint_velocity_targets")
+            return None
 
     def set_max_velocities(
         self,
@@ -605,6 +690,198 @@ class ArticulationView(_ArticulationView):
 
 
 class RigidPrimView(_RigidPrimView):
+    def get_linear_velocities(
+        self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, clone: bool = True
+    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+        """Get the linear velocities of prims in the view.
+
+        Args:
+            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                    to query. Shape (M,).
+                                                                                    Where M <= size of the encapsulated prims in the view.
+                                                                                    Defaults to None (i.e: all prims in the view)
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor, wp.indexedarray]: linear velocities of the prims in the view. shape is (M, 3).
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get all rigid prim linear velocities. Returned shape is (5, 3) for the example: 5 envs, linear (3)
+            >>> prims.get_linear_velocities()
+            [[0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]]
+            >>>
+            >>> # get only the rigid prim linear velocities for the first, middle and last of the 5 envs.
+            >>> # Returned shape is (3, 3) for the example: 3 envs selected, linear (3)
+            >>> prims.get_linear_velocities(indices=np.array([0, 2, 4]))
+            [[0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]]
+        """
+        indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            linear_velocities = self._physics_view.get_velocities()
+            if clone:
+                # THIS LINE WAS NAMED INCORRECTLY!!!
+                linear_velocities = self._backend_utils.clone_tensor(linear_velocities, device=self._device)
+            return linear_velocities[indices, 0:3]
+        else:
+            linear_velocities = np.zeros(shape=(indices.shape[0], 3), dtype=np.float32)
+            write_idx = 0
+            indices = self._backend_utils.to_list(indices)
+            for i in indices:
+                if self._rigid_body_apis[i] is None:
+                    if self._prims[i].HasAPI(UsdPhysics.RigidBodyAPI):
+                        rigid_api = UsdPhysics.RigidBodyAPI(self._prims[i])
+                    else:
+                        rigid_api = UsdPhysics.RigidBodyAPI.Apply(self._prims[i])
+                    self._rigid_body_apis[i] = rigid_api
+                linear_velocities[write_idx] = np.array(
+                    self._rigid_body_apis[i].GetVelocityAttr().Get(), dtype=np.float32
+                )
+                write_idx += 1
+            linear_velocities = self._backend_utils.convert(
+                linear_velocities, dtype="float32", device=self._device, indexed=True
+            )
+            return linear_velocities
+
+    def get_angular_velocities(
+        self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None, clone: bool = True
+    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+        """Get the angular velocities of prims in the view.
+
+        Args:
+            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                    to query. Shape (M,).
+                                                                                    Where M <= size of the encapsulated prims in the view.
+                                                                                    Defaults to None (i.e: all prims in the view)
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor, wp.indexedarray]: angular velocities of the prims in the view. shape is (M, 3).
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get all rigid prim angular velocities. Returned shape is (5, 3) for the example: 5 envs, angular (3)
+            >>> prims.get_angular_velocities()
+            [[0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]]
+            >>>
+            >>> # get only the rigid prim angular velocities for the first, middle and last of the 5 envs
+            >>> # Returned shape is (5, 3) for the example: 3 envs selected, angular (3)
+            >>> prims.get_angular_velocities(indices=np.array([0, 2, 4]))
+            [[0. 0. 0.]
+             [0. 0. 0.]
+             [0. 0. 0.]]
+        """
+        indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            angular_velocities = self._physics_view.get_velocities()
+            if clone:
+                # THIS LINE WAS NAMED INCORRECTLY!!
+                angular_velocities = self._backend_utils.clone_tensor(angular_velocities, device=self._device)
+            return angular_velocities[indices, 3:6]
+        else:
+            angular_velocities = np.zeros(shape=(indices.shape[0], 3), dtype=np.float32)
+            write_idx = 0
+            indices = self._backend_utils.to_list(indices)
+            for i in indices:
+                if self._rigid_body_apis[i] is None:
+                    if self._prims[i].HasAPI(UsdPhysics.RigidBodyAPI):
+                        rigid_api = UsdPhysics.RigidBodyAPI(self._prims[i])
+                    else:
+                        rigid_api = UsdPhysics.RigidBodyAPI.Apply(self._prims[i])
+                    self._rigid_body_apis[i] = rigid_api
+                angular_velocities[write_idx] = np.array(
+                    self._rigid_body_apis[i].GetAngularVelocityAttr().Get(), dtype="float32"
+                )
+                write_idx += 1
+            angular_velocities = self._backend_utils.convert(
+                angular_velocities, dtype="float32", device=self._device, indexed=True
+            )
+            return angular_velocities
+
+    def get_world_poses(
+        self,
+        indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None,
+        clone: bool = True,
+        usd: bool = True,
+    ) -> Union[
+        Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]
+    ]:
+        """Get the poses of the prims in the view with respect to the world's frame.
+
+        Args:
+            indices (Optional[Union[np.ndarray, list, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to query. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+            usd (bool, optional): True to query from usd. Otherwise False to query from Fabric data. Defaults to True.
+
+        Returns:
+            Union[Tuple[np.ndarray, np.ndarray], Tuple[torch.Tensor, torch.Tensor], Tuple[wp.indexedarray, wp.indexedarray]]:
+            first index is positions in the world frame of the prims. shape is (M, 3).
+            second index is quaternion orientations in the world frame of the prims.
+            quaternion is scalar-first (w, x, y, z). shape is (M, 4).
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get all rigid prim poses with respect to the world's frame.
+            >>> # Returned shape is position (5, 3) and orientation (5, 4) for the example: 5 envs
+            >>> positions, orientations = prims.get_world_poses()
+            >>> positions
+            [[ 1.4999989e+00 -7.4999851e-01 -1.5118626e-07]
+             [ 1.4999989e+00  7.5000149e-01 -2.5988294e-07]
+             [-1.0017333e-06 -7.4999845e-01  7.6070329e-08]
+             [-9.5906785e-07  7.5000149e-01  1.0593490e-07]
+             [-1.5000011e+00 -7.4999851e-01  1.9655154e-07]]
+            >>> orientations
+            [[ 9.9999994e-01 -8.8168377e-07 -4.1946004e-07 -1.5067183e-08]
+             [ 9.9999994e-01 -8.8691013e-07 -4.2665880e-07 -2.7188951e-09]
+             [ 1.0000000e+00 -9.5171310e-07 -2.2615541e-07  5.5922797e-08]
+             [ 1.0000000e+00 -8.9923367e-07 -1.4408238e-07  1.3476099e-08]
+             [ 1.0000000e+00 -7.9806580e-07 -1.3064776e-07  5.3154917e-08]]
+            >>>
+            >>> # get only the rigid prim poses with respect to the world's frame for the first, middle and last of the 5 envs.
+            >>> # Returned shape is position (3, 3) and orientation (3, 4) for the example: 3 envs selected
+            >>> positions, orientations = prims.get_world_poses(indices=np.array([0, 2, 4]))
+            >>> positions
+            [[ 1.4999989e+00 -7.4999851e-01 -1.5118626e-07]
+             [-1.0017333e-06 -7.4999845e-01  7.6070329e-08]
+             [-1.5000011e+00 -7.4999851e-01  1.9655154e-07]]
+            >>> orientations
+            [[ 9.9999994e-01 -8.8168377e-07 -4.1946004e-07 -1.5067183e-08]
+             [ 1.0000000e+00 -9.5171310e-07 -2.2615541e-07  5.5922797e-08]
+             [ 1.0000000e+00 -7.9806580e-07 -1.3064776e-07  5.3154917e-08]]
+        """
+        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            pose = self._physics_view.get_transforms()
+            if clone:
+                pose = self._backend_utils.clone_tensor(pose, device=self._device)
+            pos = pose[indices, 0:3]
+
+            # We AVOID native self._backend_utils.xyzw2wxyz(pose[indices, 3:7]) because it's slow!!
+            rot = pose[:, [6, 3, 4, 5]][indices]
+            return pos, rot
+        else:
+            return _XFormPrimView.get_world_poses(self, indices=indices, usd=usd)
+
     def enable_gravities(self, indices: Optional[Union[np.ndarray, list, torch.Tensor, wp.array]] = None) -> None:
         """Enable gravity on rigid bodies (enabled by default).
 
@@ -699,3 +976,56 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
         )
     bboxes_2d_rgb = np.array(rgb_img)
     return bboxes_2d_rgb
+
+
+# This is a faster version than the native implementation, as it avoids pre-processing initially
+def _get_world_pose_transform_w_scale(fabric_prim):
+    # This will return a transformation matrix with translation as the last row and scale included
+    xformable_prim = usdrt.Rt.Xformable(fabric_prim)
+    if xformable_prim.HasWorldXform():
+        world_pos_attr = xformable_prim.GetWorldPositionAttr()
+        if not world_pos_attr.IsValid():
+            world_pos = usdrt.Gf.Vec3d(0)
+        else:
+            world_pos = world_pos_attr.Get(usdrt.Usd.TimeCode.Default())
+        world_orientation_attr = xformable_prim.GetWorldOrientationAttr()
+        if not world_orientation_attr.IsValid():
+            world_orientation = usdrt.Gf.Quatf(1)
+        else:
+            world_orientation = world_orientation_attr.Get(usdrt.Usd.TimeCode.Default())
+        world_scale_attr = xformable_prim.GetWorldScaleAttr()
+        if not world_scale_attr.IsValid():
+            world_scale = usdrt.Gf.Vec3d(1)
+        else:
+            world_scale = world_scale_attr.Get(usdrt.Usd.TimeCode.Default())
+        scale = usdrt.Gf.Matrix4d()
+        rot = usdrt.Gf.Matrix4d()
+        scale.SetScale(usdrt.Gf.Vec3d(world_scale))
+        rot.SetRotate(usdrt.Gf.Quatd(world_orientation))
+        result = scale * rot
+        result.SetTranslateOnly(world_pos)
+        return result
+    elif xformable_prim.HasLocalXform():
+        local_transform = xformable_prim.GetLocalMatrixAttr().Get(usdrt.Usd.TimeCode.Default())
+        parent_prim = fabric_prim.GetParent()
+        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
+        if parent_prim:
+            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
+        return local_transform * parent_world_transform
+    else:
+        usd_prim = get_prim_at_path(prim_path=fabric_prim.GetPrimPath().pathString, fabric=False)
+        local_transform = usdrt.Gf.Matrix4d(UsdGeom.Xformable(usd_prim).GetLocalTransformation(Usd.TimeCode.Default()))
+        parent_prim = fabric_prim.GetParent()
+        parent_world_transform = usdrt.Gf.Matrix4d(1.0)
+        if parent_prim:
+            parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
+        return local_transform * parent_world_transform
+
+
+# This is a faster version than the native implementation, as it avoids pre-processing initially and also avoids
+# re-ordering the quaternion
+def get_world_pose(fabric_prim):
+    result_transform = _get_world_pose_transform_w_scale(fabric_prim)
+    result_transform.Orthonormalize()
+    result_transform = np.transpose(result_transform)
+    return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()

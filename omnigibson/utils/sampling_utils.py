@@ -1,15 +1,14 @@
 import itertools
-import time
+import math
+import random
 from collections import Counter, defaultdict
 
-import numpy as np
-import trimesh
-from scipy.spatial.transform import Rotation as R
+import torch as th
 from scipy.stats import truncnorm
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.utils.ui_utils import create_module_logger, draw_line
 
 # Create module logger
@@ -23,7 +22,7 @@ m.DEBUG_SAMPLING = False
 m.DEFAULT_AABB_OFFSET_FRACTION = 0.02
 m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE = 1.0  # Around 60 degrees
 m.DEFAULT_HIT_TO_PLANE_THRESHOLD = 0.05
-m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * np.pi / 4
+m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * math.pi / 4
 m.DEFAULT_MAX_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_CUBOID_BOTTOM_PADDING = 0.005
 # We will cast an additional parallel ray for each additional this much distance.
@@ -37,7 +36,7 @@ def fit_plane(points, refusal_log):
     Copied from https://stackoverflow.com/a/18968498
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.tensor of shape (k, 3)
         refusal_log (dict): Debugging dictionary to add error messages to
 
     Returns:
@@ -50,10 +49,10 @@ def fit_plane(points, refusal_log):
             refusal_log.append(f"insufficient points to fit a 3D plane: needs 3, has {points.shape[0]}.")
         return None, None
 
-    ctr = points.mean(axis=0)
+    ctr = points.mean(dim=0)
     x = points - ctr
-    normal = np.linalg.svd(np.dot(x.T, x))[0][:, -1]
-    normal /= np.linalg.norm(normal)
+    normal = th.linalg.svd(x.T @ x).U[:, -1]
+    normal /= th.norm(normal)
     return ctr, normal
 
 
@@ -63,7 +62,7 @@ def check_distance_to_plane(points, plane_centroid, plane_normal, hit_to_plane_t
     and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
         hit_to_plane_threshold (float): Threshold distance to check between @points and plane
@@ -73,7 +72,7 @@ def check_distance_to_plane(points, plane_centroid, plane_normal, hit_to_plane_t
         bool: True if all points are within @hit_to_plane_threshold distance to plane, otherwise False
     """
     distances = get_distance_to_plane(points, plane_centroid, plane_normal)
-    if np.any(distances > hit_to_plane_threshold):
+    if th.any(distances > hit_to_plane_threshold):
         if m.DEBUG_SAMPLING:
             refusal_log.append("distances to plane: %r" % distances)
         return False
@@ -85,14 +84,14 @@ def get_distance_to_plane(points, plane_centroid, plane_normal):
     Computes distance from @points to plane defined by @plane_centroid and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
 
     Returns:
         k-array: Absolute distances from each point to the plane
     """
-    return np.abs(np.dot(points - plane_centroid, plane_normal))
+    return th.abs((points - plane_centroid) @ plane_normal)
 
 
 def get_projection_onto_plane(points, plane_centroid, plane_normal):
@@ -100,7 +99,7 @@ def get_projection_onto_plane(points, plane_centroid, plane_normal):
     Computes @points' projection onto the plane defined by @plane_centroid and @plane_normal
 
     Args:
-        points ((k, 3)-array): np.array of shape (k, 3)
+        points ((k, 3)-array): th.tensor of shape (k, 3)
         plane_centroid (3-array): (x,y,z) points' centroid
         plane_normal (3-array): (x,y,z) normal of the fitted plane
 
@@ -108,7 +107,7 @@ def get_projection_onto_plane(points, plane_centroid, plane_normal):
         (k,3)-array: Points' positions projected onto the plane
     """
     distances_to_plane = get_distance_to_plane(points, plane_centroid, plane_normal)
-    return points - np.outer(distances_to_plane, plane_normal)
+    return points - th.outer(distances_to_plane, plane_normal)
 
 
 def draw_debug_markers(hit_positions, radius=0.01):
@@ -119,11 +118,11 @@ def draw_debug_markers(hit_positions, radius=0.01):
         hit_positions ((n, 3)-array): Desired positions to place markers at
         radius (float): Radius of the generated virtual marker
     """
-    color = np.concatenate([np.random.rand(3), [1]])
+    color = th.cat([th.rand(3), [1]])
     for vec in hit_positions:
         for dim in range(3):
-            start_point = vec + np.eye(3)[dim] * radius
-            end_point = vec - np.eye(3)[dim] * radius
+            start_point = vec + th.eye(3)[dim] * radius
+            end_point = vec - th.eye(3)[dim] * radius
             draw_line(start_point, end_point, color)
 
 
@@ -151,31 +150,31 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     ray_direction = destination - source
 
     # Get an orthogonal vector using a random vector.
-    random_vector = np.random.rand(3)
-    orthogonal_vector_1 = np.cross(ray_direction, random_vector)
-    orthogonal_vector_1 /= np.linalg.norm(orthogonal_vector_1)
+    random_vector = th.rand(3)
+    orthogonal_vector_1 = th.linalg.cross(ray_direction, random_vector)
+    orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 
     # Get a second vector orthogonal to both the ray and the first vector.
-    orthogonal_vector_2 = -np.cross(ray_direction, orthogonal_vector_1)
-    orthogonal_vector_2 /= np.linalg.norm(orthogonal_vector_2)
+    orthogonal_vector_2 = -th.linalg.cross(ray_direction, orthogonal_vector_1)
+    orthogonal_vector_2 /= th.norm(orthogonal_vector_2)
 
-    orthogonal_vectors = np.array([orthogonal_vector_1, orthogonal_vector_2])
-    assert np.all(np.isfinite(orthogonal_vectors))
+    orthogonal_vectors = th.stack([orthogonal_vector_1, orthogonal_vector_2])
+    assert th.all(th.isfinite(orthogonal_vectors))
 
     # Convert the offset into a 2-vector if it already isn't one.
-    offset = np.array([1, 1]) * offset
+    offset = th.tensor([1, 1]) * offset
 
     # Compute the grid of rays
-    steps = (offset / new_ray_per_horizontal_distance).astype(int) * 2 + 1
-    steps = np.maximum(steps, 3)
-    x_range = np.linspace(-offset[0], offset[0], steps[0])
-    y_range = np.linspace(-offset[1], offset[1], steps[1])
-    ray_grid = np.dstack(np.meshgrid(x_range, y_range, indexing="ij"))
+    steps = (offset / new_ray_per_horizontal_distance).int() * 2 + 1
+    steps = th.maximum(steps, th.tensor(3))
+    x_range = th.linspace(-offset[0], offset[0], steps[0])
+    y_range = th.linspace(-offset[1], offset[1], steps[1])
+    ray_grid = th.stack(th.meshgrid(x_range, y_range, indexing="ij"), dim=-1)
     ray_grid_flattened = ray_grid.reshape(-1, 2)
 
     # Apply the grid onto the orthogonal vectors to obtain the rays in the world frame.
-    sources = [source + np.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
-    destinations = [destination + np.dot(offsets, orthogonal_vectors) for offsets in ray_grid_flattened]
+    sources = [source + offsets @ orthogonal_vectors for offsets in ray_grid_flattened]
+    destinations = [destination + offsets @ orthogonal_vectors for offsets in ray_grid_flattened]
 
     return sources, destinations, ray_grid
 
@@ -209,7 +208,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     results = []
     for i in range(count):
         # Get the uniform sample first.
-        position = np.random.rand(3)
+        position = th.rand(3)
 
         # Sample the bimodal normal.
         bottom = (0 - bimodal_mean_fraction) / bimodal_stdev_fraction
@@ -217,13 +216,13 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
         bimodal_sample = truncnorm.rvs(bottom, top, loc=bimodal_mean_fraction, scale=bimodal_stdev_fraction)
 
         # Pick which axis the bimodal normal sample should go to.
-        bimodal_axis = np.random.choice([0, 1, 2], p=axis_probabilities)
+        bimodal_axis = th.multinomial(th.tensor(axis_probabilities, dtype=th.float32), 1).item()
 
         # Choose which side of the axis to sample from. We only sample from the top for the Z axis.
         if bimodal_axis == 2:
             bimodal_axis_top_side = True
         else:
-            bimodal_axis_top_side = np.random.choice([True, False])
+            bimodal_axis_top_side = random.choice([True, False])
 
         # Move sample based on chosen side.
         position[bimodal_axis] = bimodal_sample if bimodal_axis_top_side else 1 - bimodal_sample
@@ -325,19 +324,24 @@ def raytest(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
-    # Make sure start point, end point are numpy arrays
-    start_point, end_point = np.array(start_point), np.array(end_point)
+    # Make sure start point, end point are torch tensors
+    start_point = th.tensor(start_point) if not isinstance(start_point, th.Tensor) else start_point
+    end_point = th.tensor(end_point) if not isinstance(end_point, th.Tensor) else end_point
     point_diff = end_point - start_point
-    distance = np.linalg.norm(point_diff)
+    distance = th.norm(point_diff)
     direction = point_diff / distance
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
     if only_closest and ignore_bodies is None and ignore_collisions is None:
-        return og.sim.psqi.raycast_closest(
-            origin=start_point,
-            dir=direction,
-            distance=distance,
+        result = og.sim.psqi.raycast_closest(
+            origin=start_point.tolist(),
+            dir=direction.tolist(),
+            distance=distance.tolist(),
         )
+        if result["hit"]:
+            result["position"] = th.tensor(result["position"])
+            result["normal"] = th.tensor(result["normal"])
+        return result
     else:
         # Compose callback function for finding raycasts
         hits = []
@@ -350,8 +354,8 @@ def raytest(
                 hits.append(
                     {
                         "hit": True,
-                        "position": np.array(hit.position),
-                        "normal": np.array(hit.normal),
+                        "position": th.tensor(hit.position),
+                        "normal": th.tensor(hit.normal),
                         "distance": hit.distance,
                         "collision": hit.collision,
                         "rigidBody": hit.rigid_body,
@@ -362,9 +366,9 @@ def raytest(
 
         # Grab all collisions
         og.sim.psqi.raycast_all(
-            origin=start_point,
-            dir=direction,
-            distance=distance,
+            origin=start_point.tolist(),
+            dir=direction.tolist(),
+            distance=distance.tolist(),
             reportFn=hit_callback,
         )
 
@@ -417,8 +421,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
 
-    start_points = np.zeros((num_samples, max_sampling_attempts, 3))
-    end_points = np.zeros((num_samples, max_sampling_attempts, 3))
+    start_points = th.zeros((num_samples, max_sampling_attempts, 3))
+    end_points = th.zeros((num_samples, max_sampling_attempts, 3))
     for i in range(num_samples):
         # Sample the starting positions in advance.
         # TODO: Narrow down the sampling domain so that we don't sample scenarios where the center is in-domain but the
@@ -444,12 +448,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     # Convert the points into the world frame
     orig_shape = start_points.shape
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = trimesh.transformations.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(
-        orig_shape
-    )
-    end_points = trimesh.transformations.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(
-        orig_shape
-    )
+    start_points = T.transform_points(start_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape)
+    end_points = T.transform_points(end_points.reshape(-1, 3), to_wf_transform).reshape(orig_shape)
 
     return start_points, end_points
 
@@ -482,32 +482,32 @@ def sample_raytest_start_end_full_grid_topdown(
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
 
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
-    x = np.linspace(
+    x = th.linspace(
         -half_extent_with_offset[0], half_extent_with_offset[0], int(half_extent_with_offset[0] * 2 / ray_spacing) + 1
     )
-    y = np.linspace(
+    y = th.linspace(
         -half_extent_with_offset[1], half_extent_with_offset[1], int(half_extent_with_offset[1] * 2 / ray_spacing) + 1
     )
     n_rays = len(x) * len(y)
 
-    start_points = np.stack(
+    start_points = th.stack(
         [
-            np.tile(x, len(y)),
-            np.repeat(y, len(x)),
-            np.ones(n_rays) * half_extent_with_offset[2],
+            th.tile(x, (len(y),)),
+            th.repeat_interleave(y, len(x)),
+            th.ones(n_rays) * half_extent_with_offset[2],
         ]
     ).T
 
-    end_points = np.copy(start_points)
+    end_points = th.clone(start_points)
     end_points[:, 2] = -half_extent_with_offset[2]
 
     # Convert the points into the world frame
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = trimesh.transformations.transform_points(start_points, to_wf_transform)
-    end_points = trimesh.transformations.transform_points(end_points, to_wf_transform)
+    start_points = T.transform_points(start_points, to_wf_transform)
+    end_points = T.transform_points(end_points, to_wf_transform)
 
-    start_points = np.expand_dims(start_points, axis=1)
-    end_points = np.expand_dims(end_points, axis=1)
+    start_points = th.unsqueeze(start_points, dim=1)
+    end_points = th.unsqueeze(end_points, dim=1)
 
     return start_points, end_points
 
@@ -824,8 +824,7 @@ def sample_cuboid_on_object(
     ), "the start and end points of raycasting are expected to have the same shape."
     num_samples = start_points.shape[0]
 
-    cuboid_dimensions = np.array(cuboid_dimensions)
-    if np.any(cuboid_dimensions > 50.0):
+    if th.any(cuboid_dimensions > 50.0):
         log.warning(
             "WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50). "
             "Terminating immediately, no hits will be registered."
@@ -866,11 +865,9 @@ def sample_cuboid_on_object(
                     this_cuboid_dimensions[:2] / 2.0,
                     new_ray_per_horizontal_distance,
                 )
-                sources = np.array(sources)
-                destinations = np.array(destinations)
             else:
-                sources = np.array([start_pos])
-                destinations = np.array([end_pos])
+                sources = [start_pos]
+                destinations = [end_pos]
 
             # Time to cast the rays.
             cast_results = raytest_batch(
@@ -896,9 +893,9 @@ def sample_cuboid_on_object(
                         filtered_center_idx = len(filtered_cast_results) - 1
 
             # Process the hit positions and normals.
-            hit_positions = np.array([ray_res["position"] for ray_res in filtered_cast_results])
-            hit_normals = np.array([ray_res["normal"] for ray_res in filtered_cast_results])
-            hit_normals /= np.linalg.norm(hit_normals, axis=1, keepdims=True)
+            hit_positions = th.stack([ray_res["position"] for ray_res in filtered_cast_results])
+            hit_normals = th.stack([ray_res["normal"] for ray_res in filtered_cast_results])
+            hit_normals /= th.norm(hit_normals, dim=1, keepdim=True)
 
             assert filtered_center_idx is not None
             hit_link = filtered_cast_results[filtered_center_idx]["rigidBody"]
@@ -932,7 +929,7 @@ def sample_cuboid_on_object(
                 # We get a vector from the centroid towards the center ray source, and flip the plane normal to match it.
                 # The cosine has positive sign if the two vectors are similar and a negative one if not.
                 plane_to_source = sources[center_idx] - plane_centroid
-                plane_normal *= np.sign(np.dot(plane_to_source, plane_normal))
+                plane_normal *= th.sign(th.dot(plane_to_source, plane_normal))
 
                 # Check that the plane normal is similar to the hit normal
                 if not check_normal_similarity(
@@ -954,7 +951,7 @@ def sample_cuboid_on_object(
                     continue
 
                 # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-                hit_positions = np.array([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
+                hit_positions = th.stack([ray_res.get("position", th.tensor([0.0] * 3)) for ray_res in cast_results])
                 projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
                 padding = cuboid_bottom_padding * plane_normal
                 projected_hits += padding
@@ -974,20 +971,12 @@ def sample_cuboid_on_object(
                 if rotation is None:
                     continue
 
-                corner_positions = cuboid_centroid[None, :] + (
-                    rotation.apply(
-                        0.5
-                        * this_cuboid_dimensions
-                        * np.array(
-                            [
-                                [1, 1, -1],
-                                [-1, 1, -1],
-                                [-1, -1, -1],
-                                [1, -1, -1],
-                            ]
-                        )
-                    )
+                corner_vectors = (
+                    0.5
+                    * this_cuboid_dimensions
+                    * th.tensor([[1, 1, -1], [-1, 1, -1], [-1, -1, -1], [1, -1, -1]], dtype=th.float32)
                 )
+                corner_positions = cuboid_centroid.unsqueeze(0) + T.quat_apply(rotation, corner_vectors)
 
                 # Now we use the cuboid's diagonals to check that the cuboid is actually empty
                 if verify_cuboid_empty and not check_cuboid_empty(
@@ -1006,11 +995,11 @@ def sample_cuboid_on_object(
                 if not undo_cuboid_bottom_padding:
                     padding = cuboid_bottom_padding * center_hit_normal
                     cuboid_centroid += padding
-                plane_normal = np.zeros(3)
-                rotation = R.from_quat([0, 0, 0, 1])
+                plane_normal = th.zeros(3)
+                rotation = th.tensor([0, 0, 0, 1], dtype=th.float32)
 
             # We've found a nice attachment point. Continue onto next point to sample.
-            results[i] = (cuboid_centroid, plane_normal, rotation.as_quat(), hit_link, refusal_reasons)
+            results[i] = (cuboid_centroid, plane_normal, rotation, hit_link, refusal_reasons)
             break
 
     if m.DEBUG_SAMPLING:
@@ -1044,21 +1033,21 @@ def compute_rotation_from_grid_sample(
         None or scipy.Rotation: If successfully hit, returns relative rotation from two_d_grid to
             generated hit plane. Otherwise, returns None
     """
-    if np.sum(hits) < 3:
+    if sum(hits) < 3:
         if m.DEBUG_SAMPLING:
-            refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {np.sum(hits)}")
+            refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {th.sum(hits)}")
         return None
 
     grid_in_planar_coordinates = two_d_grid.reshape(-1, 2)
     grid_in_planar_coordinates = grid_in_planar_coordinates[hits]
-    grid_in_object_coordinates = np.zeros((len(grid_in_planar_coordinates), 3))
+    grid_in_object_coordinates = th.zeros((len(grid_in_planar_coordinates), 3))
     grid_in_object_coordinates[:, :2] = grid_in_planar_coordinates
     grid_in_object_coordinates[:, 2] = -this_cuboid_dimensions[2] / 2.0
 
     projected_hits = projected_hits[hits]
     sampled_grid_relative_vectors = projected_hits - cuboid_centroid
 
-    rotation, _ = R.align_vectors(sampled_grid_relative_vectors, grid_in_object_coordinates)
+    rotation = T.align_vector_sets(sampled_grid_relative_vectors, grid_in_object_coordinates)
 
     return rotation
 
@@ -1076,17 +1065,16 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     Returns:
         bool: Whether the normal similarity is acceptable or not
     """
-    parallel_hit_main_hit_dot_products = np.clip(
-        np.dot(hit_normals, center_hit_normal)
-        / (np.linalg.norm(hit_normals, axis=1) * np.linalg.norm(center_hit_normal)),
+    parallel_hit_main_hit_dot_products = th.clip(
+        hit_normals @ center_hit_normal / (th.norm(hit_normals, dim=1) * th.norm(center_hit_normal)),
         -1.0,
         1.0,
     )
-    parallel_hit_normal_angles_to_hit_normal = np.arccos(parallel_hit_main_hit_dot_products)
-    all_rays_hit_with_similar_normal = np.all(parallel_hit_normal_angles_to_hit_normal < tolerance)
+    parallel_hit_normal_angles_to_hit_normal = th.arccos(parallel_hit_main_hit_dot_products)
+    all_rays_hit_with_similar_normal = th.all(parallel_hit_normal_angles_to_hit_normal < tolerance)
     if not all_rays_hit_with_similar_normal:
         if m.DEBUG_SAMPLING:
-            refusal_log.append("angles %r" % (np.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
+            refusal_log.append("angles %r" % (th.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
 
         return False
 
@@ -1136,7 +1124,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
         bool: True if the angle between @hit_normal and the global z-axis is less than @max_angle_with_z_axis,
             otherwise False
     """
-    hit_angle_with_z = np.arccos(np.clip(np.dot(hit_normal, np.array([0, 0, 1])), -1.0, 1.0))
+    hit_angle_with_z = th.arccos(th.clip(th.dot(hit_normal, th.tensor([0.0, 0.0, 1.0])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
         if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)
@@ -1162,7 +1150,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
         3-array: computed (x,y,z) point on the AABB surface
     """
     # Get the ray casting direction - we want to do it parallel to the sample axis.
-    ray_direction = np.array([0, 0, 0])
+    ray_direction = th.tensor([0, 0, 0])
     ray_direction[axis] = 1
     ray_direction *= -1 if is_top else 1
 
@@ -1172,21 +1160,21 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
     point_to_max = aabb_max - start_pos
 
     # Then choose the distance to the point in the correct direction on each axis.
-    closer_point_on_each_axis = np.where(ray_direction < 0, point_to_min, point_to_max)
+    closer_point_on_each_axis = th.where(ray_direction < 0, point_to_min, point_to_max)
 
     # For each axis, find how many times the ray direction should be multiplied to reach the AABB's boundary.
     multiple_to_face_on_each_axis = closer_point_on_each_axis / ray_direction
 
     # Choose the minimum of these multiples, e.g. how many times the ray direction should be multiplied
     # to reach the nearest boundary.
-    multiple_to_face = np.min(multiple_to_face_on_each_axis[np.isfinite(multiple_to_face_on_each_axis)])
+    multiple_to_face = th.min(multiple_to_face_on_each_axis[th.isfinite(multiple_to_face_on_each_axis)]).item()
 
     # Finally, use the multiple we found to calculate the point on the AABB boundary that we want to cast our
     # ray until.
     point_on_face = start_pos + ray_direction * multiple_to_face
 
     # Make sure that we did not end up with all NaNs or infinities due to division issues.
-    assert not np.any(np.isnan(point_on_face)) and not np.any(np.isinf(point_on_face))
+    assert not th.any(th.isnan(point_on_face)) and not th.any(th.isinf(point_on_face))
 
     return point_on_face
 
@@ -1225,8 +1213,9 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     top_pairs = list(itertools.combinations(top_corner_positions, 2))
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
-    all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
-    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
+    pairs_list = top_to_bottom_pairs + bottom_pairs + top_pairs
+    all_pairs = th.stack([th.cat([pair[0], pair[1]]) for pair in pairs_list])
+    check_cast_results = raytest_batch(start_points=all_pairs[:, :3], end_points=all_pairs[:, 3:])
     if any(ray["hit"] for ray in check_cast_results):
         if m.DEBUG_SAMPLING:
             refusal_log.append("check ray info: %r" % (check_cast_results))

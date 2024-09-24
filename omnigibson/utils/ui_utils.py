@@ -5,16 +5,17 @@ Helper classes and functions for streamlining user interactions
 import contextlib
 import datetime
 import logging
+import math
+import random
 import sys
 from pathlib import Path
 
 import imageio
-import numpy as np
+import torch as th
 from IPython import embed
 from PIL import Image
 from scipy.integrate import quad
 from scipy.interpolate import CubicSpline
-from scipy.spatial.transform import Rotation as R
 from termcolor import colored
 
 import omnigibson as og
@@ -288,7 +289,7 @@ def choose_from_options(options, name, random_selection=False):
             k = 0
             print("Input is not valid. Use {} by default.".format(list(options)[k]))
     else:
-        k = np.random.choice(range(len(options)))
+        k = random.choice(range(len(options)))
 
     # Return requested option
     return list(options)[k]
@@ -373,7 +374,7 @@ class CameraMover:
         Helper function for quickly grabbing the currently viewed RGB image
 
         Returns:
-            np.array: (H, W, 3) sized RGB image array
+            th.tensor: (H, W, 3) sized RGB image array
         """
         return self.cam.get_obs()[0]["rgb"][:, :, :-1]
 
@@ -439,7 +440,7 @@ class CameraMover:
         an mp4 video file on disk.
 
         Args:
-            waypoints (np.array): (n, 3) global position waypoint values to set the viewer camera to defining this trajectory
+            waypoints (th.tensor): (n, 3) global position waypoint values to set the viewer camera to defining this trajectory
             per_step_distance (float): How much distance (in m) should be approximately covered per trajectory step.
                 This will determine the path length between individual waypoints
             fps (int): Frames per second when recording this video
@@ -459,17 +460,17 @@ class CameraMover:
 
         # Function help get arc derivative
         def arc_derivative(u):
-            return np.sqrt(np.sum([dspline(u) ** 2 for dspline in dsplines]))
+            return th.sqrt(th.sum([dspline(u) ** 2 for dspline in dsplines]))
 
         # Function to help get interpolated positions
         def get_interpolated_positions(step):
             assert step < n_waypoints - 1
             dist = quad(func=arc_derivative, a=step, b=step + 1)[0]
             path_length = int(dist / per_step_distance)
-            interpolated_points = np.zeros((path_length, 3))
+            interpolated_points = th.zeros((path_length, 3))
             for i in range(path_length):
                 curr_step = step + (i / path_length)
-                interpolated_points[i, :] = np.array([spline(curr_step) for spline in splines])
+                interpolated_points[i, :] = th.tensor([spline(curr_step) for spline in splines])
             return interpolated_points
 
         # Iterate over all waypoints and infer the resulting trajectory, recording the resulting poses
@@ -479,14 +480,14 @@ class CameraMover:
             for j in range(len(positions) - 1):
                 # Get direction vector from the current to the following point
                 direction = positions[j + 1] - positions[j]
-                direction = direction / np.linalg.norm(direction)
+                direction = direction / th.norm(direction)
                 # Infer tilt and pan angles from this direction
-                xy_direction = direction[:2] / np.linalg.norm(direction[:2])
+                xy_direction = direction[:2] / th.norm(direction[:2])
                 z = direction[2]
-                pan_angle = np.arctan2(-xy_direction[0], xy_direction[1])
-                tilt_angle = np.arcsin(z)
+                pan_angle = th.arctan2(-xy_direction[0], xy_direction[1])
+                tilt_angle = th.arcsin(z)
                 # Infer global quat orientation from these angles
-                quat = T.euler2quat([np.pi / 2 + tilt_angle, 0.0, pan_angle])
+                quat = T.euler2quat([math.pi / 2 + tilt_angle, 0.0, pan_angle])
                 poses.append([positions[j], quat])
 
         # Record the generated trajectory
@@ -530,12 +531,12 @@ class CameraMover:
             dict: Mapping from relevant keypresses to corresponding delta command to apply to the camera pose
         """
         return {
-            lazy.carb.input.KeyboardInput.D: np.array([self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.A: np.array([-self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.W: np.array([0, 0, -self.delta]),
-            lazy.carb.input.KeyboardInput.S: np.array([0, 0, self.delta]),
-            lazy.carb.input.KeyboardInput.T: np.array([0, self.delta, 0]),
-            lazy.carb.input.KeyboardInput.G: np.array([0, -self.delta, 0]),
+            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0]),
+            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0]),
+            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta]),
+            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta]),
+            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0]),
+            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0]),
         }
 
     def _sub_keyboard_event(self, event, *args, **kwargs):
@@ -558,9 +559,10 @@ class CameraMover:
 
                 if command is not None:
                     # Convert to world frame to move the camera
-                    transform = T.quat2mat(self.cam.get_orientation())
+                    pos, orn = self.cam.get_position_orientation()
+                    transform = T.quat2mat(orn)
                     delta_pos_global = transform @ command
-                    self.cam.set_position(self.cam.get_position() + delta_pos_global)
+                    self.cam.set_position_orientation(position=pos + delta_pos_global)
 
         return True
 
@@ -589,7 +591,7 @@ class KeyboardRobotController:
                 "command_dim": controller.command_dim,
             }
             idx += controller.command_dim
-            for i in controller.dof_idx:
+            for i in controller.dof_idx.tolist():
                 self.joint_idx_to_controller[i] = controller
 
         # Other persistent variables we need to keep track of
@@ -789,7 +791,7 @@ class KeyboardRobotController:
                 )
                 new_arm = self.ik_arms[self.active_arm_idx]
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(self.controller_info[new_arm]))
-                print(f"Now controlling arm {new_arm} with IK")
+                print(f"Now controlling arm {new_arm} EEF")
 
             elif (
                 event.input in {lazy.carb.input.KeyboardInput.KEY_5, lazy.carb.input.KeyboardInput.KEY_6}
@@ -840,14 +842,15 @@ class KeyboardRobotController:
         Returns:
             n-array: Generated random action vector (normalized)
         """
-        return np.random.uniform(-1, 1, self.action_dim)
+        action_lo, action_hi = -1, 1
+        return th.rand(self.action_dim) * (action_hi - action_lo) + action_lo
 
     def get_teleop_action(self):
         """
         Returns:
             n-array: Generated action vector based on received user inputs from the keyboard
         """
-        action = np.zeros(self.action_dim)
+        action = th.zeros(self.action_dim)
 
         # Handle the action if any key is actively being pressed
         if self.active_action is not None:
@@ -903,7 +906,7 @@ class KeyboardRobotController:
         # Print out the user what is being pressed / controlled
         sys.stdout.write("\033[K")
         keypress_str = self.current_keypress.__str__().split(".")[-1]
-        print("Pressed {}. Action: {}".format(keypress_str, action))
+        print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         sys.stdout.write("\033[F")
 
         # Return action

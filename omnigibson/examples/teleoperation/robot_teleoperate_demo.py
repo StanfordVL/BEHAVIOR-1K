@@ -118,7 +118,7 @@ def main():
     env = og.Environment(configs=cfg)
     env.reset()
     # update viewer camera pose
-    og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
+    og.sim.viewer_camera.set_position_orientation(position=[-0.22, 0.99, 1.09], orientation=[-0.14, 0.47, 0.84, -0.23])
     # Start teleoperation system
     robot = env.robots[0]
 
@@ -133,7 +133,7 @@ def main():
 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

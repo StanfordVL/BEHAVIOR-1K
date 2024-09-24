@@ -4,7 +4,7 @@ A set of action primitives that work without executing low-level physics but ins
 objects directly into their post-condition states. Useful for learning high-level methods.
 """
 
-import numpy as np
+import torch as th
 from aenum import IntEnum, auto
 
 from omnigibson import object_states
@@ -69,7 +69,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             attempts (int): Number of attempts to make before raising an error
 
         Returns:
-            np.array or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
+            th.tensor or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
 
         Raises:
             ActionPrimitiveError: If primitive fails to execute
@@ -149,7 +149,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             DatasetObject: Object for robot to grasp
 
         Returns:
-            np.array or None: Action array for one step for the robot to grasp or None if grasp completed
+            th.tensor or None: Action array for one step for the robot to grasp or None if grasp completed
         """
         # Don't do anything if the object is already grasped.
         obj_in_hand = self._get_obj_in_hand()
@@ -167,8 +167,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # yield from self._navigate_if_needed(obj)
 
         # Perform forced assisted grasp
-        obj.set_position(self.robot.get_eef_position(self.arm))
-        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position())
+        obj.set_position_orientation(position=self.robot.get_eef_position(self.arm))
+        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position_orientation()[0])
 
         # Execute for a moment
         yield from self._settle_robot()
@@ -242,7 +242,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             predicate (object_states.OnTop or object_states.Inside): Determines whether to place on top or inside
 
         Returns:
-            np.array or None: Action array for one step for the robot to place or None if place completed
+            th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
@@ -553,8 +553,11 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         # Get the position of the heat source on the thing we're placing near
-        heating_element_positions = np.array(
-            [link.get_position() for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()]
+        heating_element_positions = th.tensor(
+            [
+                link.get_position_orientation()[0]
+                for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()
+            ]
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 
@@ -599,7 +602,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             pose_2d (Iterable): (x, y, yaw) 2d pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         robot_pose = self._get_robot_pose_from_2d_pose(pose_2d)
         self.robot.set_position_orientation(*robot_pose)

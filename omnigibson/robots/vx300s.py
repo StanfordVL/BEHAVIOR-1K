@@ -1,6 +1,7 @@
+import math
 import os
 
-import numpy as np
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
@@ -18,7 +19,6 @@ class VX300S(ManipulationRobot):
         # Shared kwargs in hierarchy
         name,
         relative_prim_path=None,
-        uuid=None,
         scale=None,
         visible=True,
         visual_only=False,
@@ -34,7 +34,7 @@ class VX300S(ManipulationRobot):
         action_normalize=True,
         reset_joint_pos=None,
         # Unique to BaseRobot
-        obs_modalities="all",
+        obs_modalities=("rgb", "proprio"),
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -44,10 +44,7 @@ class VX300S(ManipulationRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -70,9 +67,8 @@ class VX300S(ManipulationRobot):
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
                 Set this value instead if you want to initialize the robot with a different rese joint position.
-            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
-                corresponds to all modalities being used.
-                Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
+            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
+                Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
@@ -92,7 +88,6 @@ class VX300S(ManipulationRobot):
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -114,11 +109,9 @@ class VX300S(ManipulationRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
         raise ValueError("VX300S does not support discrete actions!")
 
     @property
@@ -134,7 +127,7 @@ class VX300S(ManipulationRobot):
 
     @property
     def _default_joint_pos(self):
-        return np.array([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+        return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
 
     @property
     def finger_lengths(self):
@@ -201,19 +194,23 @@ class VX300S(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
 
     @property
+    def curobo_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")
+
+    @property
     def eef_usd_path(self):
         # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
         raise NotImplementedError
 
     @property
     def teleop_rotation_offset(self):
-        return {self.default_arm: euler2quat([-np.pi, 0, 0])}
+        return {self.default_arm: euler2quat([-math.pi, 0, 0])}
 
     @property
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }
 
@@ -221,6 +218,6 @@ class VX300S(ManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }
