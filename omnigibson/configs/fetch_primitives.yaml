@@ -48,7 +48,7 @@ robots:
         name: JointController
         motor_type: position
         command_input_limits: null
-        use_delta_commands: True
+        use_delta_commands: false
         # name: InverseKinematicController
         # command_input_limits: default
         # command_output_limits:
@@ -61,7 +61,7 @@ robots:
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
-        use_delta_commands: true
+        use_delta_commands: false
       camera:
         name: JointController
         use_delta_commands: False

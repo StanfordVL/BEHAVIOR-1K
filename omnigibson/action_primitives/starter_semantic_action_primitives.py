@@ -331,6 +331,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._always_track_eef = always_track_eef
         self._tracking_object = None
 
+        # Store the current position of the arm as the arm target
+        control_dict = self.robot.get_control_dict()
+        self._arm_targets = {}
+        if isinstance(self.robot, ManipulationRobot):
+            for arm in self.robot.arm_names:
+                arm = f"arm_{arm}"
+                arm_ctrl = self.robot.controllers[arm]
+                if isinstance(arm_ctrl, JointController):
+                    arm_target = control_dict["joint_position"][arm_ctrl.dof_idx]
+                    self._arm_targets[arm] = arm_target
+                else:
+                    pos_relative = control_dict[f"{arm}_pos_relative"]
+                    quat_relative = control_dict[f"{arm}_quat_relative"]
+                    quat_relative_axis_angle = T.quat2axisangle(quat_relative)
+                    self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
+
         self.robot_copy = self._load_robot_copy()
 
     @property
@@ -1082,11 +1098,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        controller_name = f"arm_{self.arm}"
-        use_delta = self.robot._controllers[controller_name].use_delta_commands
 
         # Store the previous eef pose for checking if we got stuck
         prev_eef_pos = th.zeros(3)
+
+        # All we need to do here is save the target joint position so that empty action takes us towards it
+        controller_name = f"arm_{self.arm}"
+        self._arm_targets[controller_name] = joint_pos
 
         for i in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
             current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
@@ -1103,11 +1121,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # We're stuck!
                 break
 
+            # Since we set the new joint target as the arm_target, the empty action will take us towards it.
             action = self._empty_action()
-            if use_delta:
-                action[self.robot.controller_action_idx[controller_name]] = diff_joint_pos
-            else:
-                action[self.robot.controller_action_idx[controller_name]] = joint_pos
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
             yield self._postprocess_action(action)
@@ -1157,13 +1172,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = target_pose[0]
         target_orn = target_pose[1]
         target_orn_axisangle = T.quat2axisangle(target_pose[1])
-        action = self._empty_action()
         control_idx = self.robot.controller_action_idx["arm_" + self.arm]
         prev_pos = prev_orn = None
 
+        # All we need to do here is save the target IK position so that empty action takes us towards it
+        controller_name = f"arm_{self.arm}"
+        self._arm_targets[controller_name] = (target_pos, target_orn_axisangle)
+
         for i in range(m.MAX_STEPS_FOR_HAND_MOVE_IK):
             current_pose = self._get_pose_in_robot_frame(
-                (self.robot.get_eef_position(), self.robot.get_eef_orientation())
+                (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
             )
             current_pos = current_pose[0]
             current_orn = current_pose[1]
@@ -1188,7 +1206,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             prev_pos = current_pos
             prev_orn = current_orn
 
-            action[control_idx] = th.cat([delta_pos, target_orn_axisangle])
+            # Since we set the new IK target as the arm_target, the empty action will take us towards it.
+            action = self._empty_action()
             yield self._postprocess_action(action)
 
         if not ignore_failure:
@@ -1363,13 +1382,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action (array) : action array to overwrite
         """
         if self._always_track_eef:
-            target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
+            target_obj_pose = (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
         else:
             if self._tracking_object is None:
                 return action
 
             if self._tracking_object == self.robot:
-                target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
+                target_obj_pose = (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
             else:
                 target_obj_pose = self._tracking_object.get_position_orientation()
 
@@ -1442,9 +1461,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
+            if name in self._arm_targets:
+                if isinstance(controller, JointController):
+                    target_joint_pos = self._arm_targets[name]
+                    current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
+                    if controller.use_delta_commands:
+                        partial_action = target_joint_pos - current_joint_pos
+                    else:
+                        partial_action = target_joint_pos
+                else:
+                    target_pose = self._arm_targets[name]
+                    target_orn_axisangle = target_pose[1]
+                    current_pose = self._get_pose_in_robot_frame(
+                        (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
+                    )
+                    delta_pos = target_pose[0] - current_pose[0]
+                    partial_action = th.cat([delta_pos, target_orn_axisangle])
+            else:
+                partial_action = controller.compute_no_op_action(self.robot.get_control_dict())
             action_idx = self.robot.controller_action_idx[name]
-            no_op_action = controller.compute_no_op_action(self.robot.get_control_dict())
-            action[action_idx] = no_op_action
+            action[action_idx] = partial_action
         return action
 
     def _reset_hand(self):

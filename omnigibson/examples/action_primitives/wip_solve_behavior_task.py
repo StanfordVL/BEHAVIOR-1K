@@ -24,7 +24,7 @@ def main():
     """
     Demonstrates how to use the action primitives to solve a simple BEHAVIOR-1K task.
 
-    It loads Benevolence_1_int with a Fetch robot, and the robot attempts to solve the
+    It loads Benevolence_1_int with a robot, and the robot attempts to solve the
     picking_up_trash task using a hardcoded sequence of primitives.
     """
     # Load the config

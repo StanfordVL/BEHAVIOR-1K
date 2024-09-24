@@ -31,7 +31,7 @@ scene:
   include_robots: false
 
 robots:
-  - type: Tiago
+  - type: R1
     obs_modalities: [rgb, depth, seg_semantic, normal, seg_instance, seg_instance_id]
     scale: 1.0
     self_collisions: true
@@ -52,27 +52,25 @@ robots:
       arm_left:
         name: JointController
         motor_type: position
-        command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        use_delta_commands: true
       arm_right:
         name: JointController
         motor_type: position
-        command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        use_delta_commands: true
       gripper_left:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
-        use_delta_commands: false
+        use_delta_commands: true
       gripper_right:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
-        use_delta_commands: false
+        use_delta_commands: true
       camera:
         name: JointController
 
