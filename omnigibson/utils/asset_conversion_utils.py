@@ -1865,7 +1865,7 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
             # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
             bounding_box = processed_collision_mesh.bounding_box.extents
             assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
-            collision_scale = 1. / bounding_box
+            collision_scale = 1.0 / bounding_box
             collision_scale_matrix = th.eye(4)
             collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
             processed_collision_mesh.apply_transform(collision_scale_matrix.numpy())
