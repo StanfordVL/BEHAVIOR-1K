@@ -82,7 +82,7 @@ class PrimitiveObject(StatefulObject):
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
-        load_config["color"] = th.tensor(rgba[:3])
+        load_config["color"] = rgba[:3]
         load_config["opacity"] = rgba[3]
         load_config["radius"] = radius
         load_config["height"] = height
@@ -211,7 +211,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
-        original_extent = th.tensor(self._extents)
+        original_extent = self._extents.clone()
         self._extents = (
             th.ones(3) * radius * 2.0
             if self._primitive_type == "Sphere"
@@ -269,7 +269,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         # Update the extents variable
-        original_extent = th.tensor(self._extents)
+        original_extent = self._extents.clone()
         self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -316,7 +316,7 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
         # Update the extents variable
-        original_extent = th.tensor(self._extents)
+        original_extent = self._extents.clone()
         self._extents = th.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately

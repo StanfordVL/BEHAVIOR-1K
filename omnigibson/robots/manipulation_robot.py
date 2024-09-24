@@ -294,7 +294,8 @@ class ManipulationRobot(BaseRobot):
             return {other for other, _ in raw_contact_data}, robot_contact_links
 
         # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
-        contacts = GripperRigidContactAPI.get_contact_data(self.scene.idx, column_prim_paths=link_paths)
+        finger_paths = set([link.prim_path for link in self.finger_links[arm]])
+        contacts = GripperRigidContactAPI.get_contact_data(self.scene.idx, column_prim_paths=finger_paths)
         contact_data = {(contact[0], contact[3]) for contact in contacts}
         robot_contact_links = {}
         for con_data in contacts:
@@ -867,7 +868,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = th.norm(th.tensor(candidate_link.get_position_orientation()[0]) - th.tensor(gripper_center_pos))
+            dist = th.norm(candidate_link.get_position_orientation()[0] - gripper_center_pos)
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1240,7 +1241,7 @@ class ManipulationRobot(BaseRobot):
             force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
             for c_link_prim_path, c_contact_pos in force_data:
                 if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = th.tensor(c_contact_pos)
+                    contact_pos = c_contact_pos
                     break
         assert contact_pos is not None
 
