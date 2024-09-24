@@ -4,9 +4,8 @@ from abc import ABC, abstractmethod
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable
-from omnigibson.utils.sim_utils import check_deletable_prim
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
+from omnigibson.utils.usd_utils import delete_or_deactivate_prim, scene_relative_prim_path_to_absolute
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -133,9 +132,9 @@ class BasePrim(Serializable, Recreatable, ABC):
         if not self._loaded:
             raise ValueError("Cannot remove a prim that was never loaded.")
 
-        # Remove prim if it can be deleted
-        if check_deletable_prim(self.prim_path):
-            lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
+        # Remove or deactivate prim if it's possible
+        if not delete_or_deactivate_prim(self.prim_path):
+            log.warning(f"Prim {self.name} at prim_path {self.prim_path} could not be deleted or deactivated.")
 
     def _load(self):
         """

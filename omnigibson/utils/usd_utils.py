@@ -1743,3 +1743,39 @@ def deep_copy_prim(source_root_prim, dest_stage, dest_root_path):
         for child in source_prim.GetAllChildren():
             new_dest_path = dest_path + "/" + child.GetName()
             queue.append((child, new_dest_path))
+
+
+def delete_or_deactivate_prim(prim_path):
+    """
+    Attept to delete or deactivate the prim defined at @prim_path.
+
+    Args:
+        prim_path (str): Path defining which prim should be deleted or deactivated
+
+    Returns:
+        bool: Whether the operation was successful or not
+    """
+    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+        return False
+    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
+        return False
+    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        return False
+    if prim_path == "/World":
+        return False
+    if prim_path == "/":
+        return False
+    # Don't remove any /Render prims as that can cause crashes
+    if prim_path.startswith("/Render"):
+        return False
+
+    # If the prim is not ancestral, we can delete it.
+    if not lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
+        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
+
+    # Otherwise, we can only deactivate it, which essentially serves the same purpose.
+    # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
+    else:
+        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
+
+    return True
