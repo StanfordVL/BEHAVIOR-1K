@@ -49,7 +49,7 @@ setup(
         "numba>=0.60.0",
     ],
     extras_require={
-        "isaac": ["isaacsim-for-omnigibson>=4.1.0"],
+        "isaac": ["isaacsim-for-omnigibson>=4.2.0"],
     },
     tests_require=[],
     python_requires=">=3",
