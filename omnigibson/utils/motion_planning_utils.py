@@ -33,13 +33,7 @@ def _wrap_angle(theta):
     return (theta + math.pi) % (2 * math.pi) - math.pi
 
 
-def plan_base_motion(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    verbose=False
-):
+def plan_base_motion(robot, end_conf, context, planning_time=15.0, verbose=False):
     """
     Plans a base motion to a 2d pose
 
@@ -221,14 +215,7 @@ def plan_base_motion(
     return None
 
 
-def plan_arm_motion(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True,
-    verbose=False
-):
+def plan_arm_motion(robot, end_conf, context, planning_time=15.0, torso_fixed=True, verbose=False):
     """
     Plans an arm motion to a final joint position
 
@@ -321,14 +308,7 @@ def plan_arm_motion(
     return None
 
 
-def plan_arm_motion_ik(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True,
-    verbose=False
-):
+def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed=True, verbose=False):
     """
     Plans an arm motion to a final end effector pose
 

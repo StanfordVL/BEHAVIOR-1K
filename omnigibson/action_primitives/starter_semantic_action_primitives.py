@@ -1004,11 +1004,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion(
-                robot=self.robot,
-                end_conf=joint_pos,
-                context=context,
-                torso_fixed=m.TIAGO_TORSO_FIXED,
-                verbose=True
+                robot=self.robot, end_conf=joint_pos, context=context, torso_fixed=m.TIAGO_TORSO_FIXED, verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1040,11 +1036,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         with PlanningContext(self.env, self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion_ik(
-                robot=self.robot,
-                end_conf=end_conf,
-                context=context,
-                torso_fixed=m.TIAGO_TORSO_FIXED,
-                verbose=True
+                robot=self.robot, end_conf=end_conf, context=context, torso_fixed=m.TIAGO_TORSO_FIXED, verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1589,12 +1581,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
-            plan = plan_base_motion(
-                robot=self.robot,
-                end_conf=pose_2d,
-                context=context,
-                verbose=True
-            )
+            plan = plan_base_motion(robot=self.robot, end_conf=pose_2d, context=context, verbose=True)
 
         if plan is None:
             # TODO: Would be great to produce a more informative error.
