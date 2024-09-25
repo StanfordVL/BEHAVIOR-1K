@@ -1,7 +1,6 @@
 import os
-
-import pytest
 import yaml
+from pytest_rerunfailures import pytest
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -70,7 +69,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
         for primitive, args in zip(primitives, primitives_args):
             try:
-                execute_controller(controller.apply_ref(primitive, *args, attempts=3), env)
+                execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)
             except Exception as e:
                 return False
     finally:
@@ -80,7 +79,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
     return True
 
 
-@pytest.mark.flaky(reruns=3)
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
 class TestPrimitives:
     def test_navigate(self, robot):
@@ -117,7 +116,6 @@ class TestPrimitives:
 
         assert primitive_tester(env, objects, primitives, primitives_args)
 
-    @pytest.mark.skip(reason="primitives are broken")
     def test_place(self, robot):
         categories = ["floors", "ceilings", "walls", "coffee_table"]
         env = setup_environment(categories, robot=robot)

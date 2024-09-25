@@ -103,7 +103,7 @@ m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
-m.TIME_WITHOUT_CHECKING = 1.0
+m.TIME_BEFORE_JOINT_STUCK_CHECK = 1.0
 
 log = create_module_logger(module_name=__name__)
 
@@ -174,10 +174,6 @@ class PlanningContext(object):
             joint_combined_idx = th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
             joint_pos = self.robot.get_joint_positions()[joint_combined_idx]
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
-
-        # Set position of robot copy root prim as a tensor tuple
-        pos, orn = self.robot.get_position_orientation()
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], (pos, orn))
 
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
@@ -1012,6 +1008,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 end_conf=joint_pos,
                 context=context,
                 torso_fixed=m.TIAGO_TORSO_FIXED,
+                verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1047,6 +1044,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 end_conf=end_conf,
                 context=context,
                 torso_fixed=m.TIAGO_TORSO_FIXED,
+                verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1115,7 +1113,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return
             # check if the eef stayed in the same pose for sufficiently long
             if (
-                og.sim.get_sim_step_dt() * i > m.TIME_WITHOUT_CHECKING
+                og.sim.get_sim_step_dt() * i > m.TIME_BEFORE_JOINT_STUCK_CHECK
                 and th.max(th.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)).item() < 0.0001
             ):
                 # We're stuck!
@@ -1455,6 +1453,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def _empty_action(self):
         """
         Get a no-op action that allows us to run simulation without changing robot configuration.
+        This is not a comment on this file, but - let's go to the base copy of the no op action function and update its docstring to say that this is the action that updates the goal to match the current position, and let's add a disclaimer that it might cause drift under external load (e.g. when the controller cannot reach the goal position for some reason).
 
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
@@ -1594,6 +1593,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 robot=self.robot,
                 end_conf=pose_2d,
                 context=context,
+                verbose=True
             )
 
         if plan is None:
@@ -1807,7 +1807,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yaw_lo, yaw_hi = -math.pi, math.pi
                 yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
                 avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
-                pose_2d = th.tensor(
+                pose_2d = th.cat(
                     [
                         pose_on_obj[0][0] + distance * th.cos(yaw),
                         pose_on_obj[0][1] + distance * th.sin(yaw),

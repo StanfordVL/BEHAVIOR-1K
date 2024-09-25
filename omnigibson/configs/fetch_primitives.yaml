@@ -49,13 +49,6 @@ robots:
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
-        # name: InverseKinematicController
-        # command_input_limits: default
-        # command_output_limits:
-        #   - [-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]
-        #   - [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
-        # mode: pose_absolute_ori
-        # kp: 300.0
       gripper_0:
         name: JointController
         motor_type: position

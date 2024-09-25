@@ -1221,3 +1221,6 @@ def test_covered(env):
 
 def test_clear_sim():
     og.clear()
+
+if __name__ == "__main__":
+    test_temperature()

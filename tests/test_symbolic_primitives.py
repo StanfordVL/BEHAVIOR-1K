@@ -110,14 +110,13 @@ def pytest_generate_tests(metafunc):
 def shared_env(robot_type):
     """Create the environment once per session for each robot type."""
     env = start_env(robot_type=robot_type)
-    yield env
-
+    return env
 
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
     shared_env.scene.reset()
-    yield shared_env
+    return shared_env
 
 
 @pytest.fixture
@@ -280,7 +279,7 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert sponge.states[object_states.Saturated].get_value(water_system)
 
-        # Then toggle on the sink
+        # Then toggle off the sink
         sink.states[object_states.ToggledOn].set_value(False)
         assert not sink.states[object_states.ToggledOn].get_value()
 
@@ -342,27 +341,3 @@ class TestSymbolicPrimitives:
 
     def teardown_class(cls):
         og.clear()
-
-
-def main():
-    test = TestSymbolicPrimitives()
-    env = start_env()
-    prim_gen = SymbolicSemanticActionPrimitives(env)
-    apple = next(iter(env.scene.object_registry("category", "apple")))
-    sponge = next(iter(env.scene.object_registry("category", "sponge")))
-    knife = next(iter(env.scene.object_registry("category", "carving_knife")))
-    sink = next(iter(env.scene.object_registry("category", "sink")))
-    fridge = next(iter(env.scene.object_registry("category", "fridge")))
-    pan = next(iter(env.scene.object_registry("category", "frying_pan")))
-    robot = env.robots[0]
-    countertop = next(iter(env.scene.object_registry("category", "countertop")))
-
-    try:
-        test.test_close(env, prim_gen, fridge)
-        test.test_in_hand_state(env, robot, prim_gen, apple)
-    except:
-        raise
-
-
-if __name__ == "__main__":
-    main()

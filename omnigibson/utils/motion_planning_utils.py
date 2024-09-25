@@ -6,7 +6,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
@@ -39,6 +38,7 @@ def plan_base_motion(
     end_conf,
     context,
     planning_time=15.0,
+    verbose=False
 ):
     """
     Plans a base motion to a 2d pose
@@ -48,6 +48,7 @@ def plan_base_motion(
         end_conf (Iterable): [x, y, yaw] 2d pose to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         Array of arrays: Array of 2d poses that the robot should navigate to
@@ -123,10 +124,10 @@ def plan_base_motion(
         state().setYaw(_wrap_angle(yaw))
         return state
 
-    def state_valid_fn(q, verbose=True):
+    def state_valid_fn(q, verbose=False):
         """
         returns if the input pose is in collision with any objects within the context
-        verbose (bool): Whether the action primitive is testing the sampling point (default to true), or the pose is used for navigation (false)
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
         """
 
         x = q.getX()
@@ -201,7 +202,7 @@ def plan_base_motion(
     goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
 
     ss.setStartAndGoalStates(start, goal)
-    if not state_valid_fn(start(), verbose=False) or not state_valid_fn(goal(), verbose=False):
+    if not state_valid_fn(start(), verbose=verbose) or not state_valid_fn(goal(), verbose=verbose):
         return
 
     solved = ss.solve(planning_time)
@@ -226,6 +227,7 @@ def plan_arm_motion(
     context,
     planning_time=15.0,
     torso_fixed=True,
+    verbose=False
 ):
     """
     Plans an arm motion to a final joint position
@@ -235,6 +237,7 @@ def plan_arm_motion(
         end_conf (Iterable): Final joint position to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         Array of arrays: Array of joint positions that the robot should navigate to
@@ -258,7 +261,7 @@ def plan_arm_motion(
             initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
 
-    def state_valid_fn(q, verbose=True):
+    def state_valid_fn(q, verbose=False):
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = th.tensor([q[i] for i in range(dim)])
         return not set_arm_and_detect_collision(context, joint_pos, verbose=verbose)
@@ -298,7 +301,7 @@ def plan_arm_motion(
     ss.setStartAndGoalStates(start, goal)
 
     # if the start pose or the goal pose collides, abort
-    if not state_valid_fn(start, verbose=False) or not state_valid_fn(goal, verbose=False):
+    if not state_valid_fn(start, verbose=verbose) or not state_valid_fn(goal, verbose=verbose):
         return
 
     # this will automatically choose a default planner with
@@ -324,6 +327,7 @@ def plan_arm_motion_ik(
     context,
     planning_time=15.0,
     torso_fixed=True,
+    verbose=False
 ):
     """
     Plans an arm motion to a final end effector pose
@@ -333,6 +337,7 @@ def plan_arm_motion_ik(
         end_conf (Iterable): Final end effector pose to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
@@ -367,7 +372,7 @@ def plan_arm_motion_ik(
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
-    def state_valid_fn(q, verbose=True):
+    def state_valid_fn(q, verbose=False):
         joint_pos = initial_joint_pos
         eef_pose = th.tensor([q[i] for i in range(6)], dtype=th.float32)
         control_joint_pos = ik_solver.solve(
@@ -421,7 +426,7 @@ def plan_arm_motion_ik(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
-    if not state_valid_fn(start, verbose=False) or not state_valid_fn(goal, verbose=False):
+    if not state_valid_fn(start, verbose=verbose) or not state_valid_fn(goal, verbose=verbose):
         return
 
     # this will automatically choose a default planner with
@@ -441,14 +446,14 @@ def plan_arm_motion_ik(
     return None
 
 
-def set_base_and_detect_collision(context, pose, verbose=True):
+def set_base_and_detect_collision(context, pose, verbose=False):
     """
     Moves the robot and detects robot collisions with the environment and itself
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
         pose (Array): Pose in the world frame to check for collisions at
-        verbose (bool): Whether the action primitive is testing the sampling pose (default to True), or the pose is used for navigation (false)
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         bool: Whether the robot is in collision
@@ -465,13 +470,14 @@ def set_base_and_detect_collision(context, pose, verbose=True):
     return detect_robot_collision(context, verbose=verbose)
 
 
-def set_arm_and_detect_collision(context, joint_pos, verbose=True):
+def set_arm_and_detect_collision(context, joint_pos, verbose=False):
     """
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
         joint_pos (Array): Joint positions to set the robot to
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         bool: Whether the robot is in a valid state i.e. not in collision
@@ -496,13 +502,13 @@ def set_arm_and_detect_collision(context, joint_pos, verbose=True):
     return detect_robot_collision(context, verbose=verbose)
 
 
-def detect_robot_collision(context, verbose=True):
+def detect_robot_collision(context, verbose=False):
     """
     Detects robot collisions
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
-        verbose (bool): Whether the action primitive is testing the sampling pose (default to true), or the pose is used for navigation / arm movement (false)
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         valid_hit(bool): Whether the robot is in collision
@@ -519,10 +525,9 @@ def detect_robot_collision(context, verbose=True):
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 
-        # if an non-sampling pose collides with any object, raise an action primitive error with the colliding object and robot mesh_path
-        if valid_hit and not verbose:
+        # if verbose mode is on and overlap is detected, output a warning on the colliding object and robot mesh_path
+        if valid_hit and verbose:
             logger.warning(
-                ActionPrimitiveError.Reason.PLANNING_ERROR,
                 f"Could not make a plan to get to the target position, colliding objects: {hit.rigid_body} and {mesh_path}",
             )
 
