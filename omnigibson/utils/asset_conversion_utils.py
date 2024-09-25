@@ -1804,7 +1804,7 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
             assert (
                 len(material_files) == 1
             ), f"Something's wrong: there's more than 1 material file in {list(temp_dir_path.iterdir())}"
-            original_material_filename = material_files[0]
+            original_material_filename = material_files[0].name
 
             # Fix texture file paths if necessary.
             # original_material_dir = G.nodes[link_node]["material_dir"]
@@ -1836,15 +1836,16 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
                 for line in new_lines:
                     f.write(line)
 
-            # # Modify texture reference in MTL file
-            # with open(temp_dir_path / original_material_filename, "r") as f:
-            #     new_lines = []
-            #     for line in f.readlines():
-            #         if "map_Kd material_0.png" in line:
-            #             line = ""
-            #             for key in MTL_MAPPING:
-            #                 line += f"{key} ../../material/{obj_name}-{link_name}-{MTL_MAPPING[key]}.png\n"
-            #         new_lines.append(line)
+            # Modify texture reference in MTL file
+            with open(temp_dir_path / original_material_filename, "r") as f:
+                new_lines = []
+                for line in f.readlines():
+                    # We temporarily disable this material renaming.
+                    # if "map_Kd material_0.png" in line:
+                    #     line = ""
+                    #     for key in MTL_MAPPING:
+                    #         line += f"{key} ../../material/{obj_name}-{link_name}-{MTL_MAPPING[key]}.png\n"
+                    new_lines.append(line)
 
             with open(obj_link_visual_mesh_folder / mtl_name, "w") as f:
                 for line in new_lines:
