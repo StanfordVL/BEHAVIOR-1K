@@ -460,7 +460,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                     mtl = mtls[0]
                     # TODO: Make name unique
                     mtl_name = ".".join(os.path.basename(mtl).split(".")[:-1]).replace("-", "_").replace(".", "_")
-                    mtl_old_dir = f"{'/'.join(obj_path.split('/')[:-1])}"
+                    mtl_old_dir = os.path.dirname(obj_path)
                     link_mtl_files[link_name][mesh_name] = mtl_name
                     mtl_infos[mtl_name] = OrderedDict()
                     mtl_old_dirs[mtl_name] = mtl_old_dir
@@ -478,6 +478,8 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                                 mat_files[mtl_name].append(map_filename)
                                 mat_old_paths[mtl_name].append(map_file)
                                 mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
+
+                    print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
     # Next, for each material information, we create a new material and port the material files to the USD directory
     mat_new_fpath = os.path.join(usd_dir, "materials")
