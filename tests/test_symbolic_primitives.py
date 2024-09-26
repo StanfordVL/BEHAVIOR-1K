@@ -112,6 +112,7 @@ def shared_env(robot_type):
     env = start_env(robot_type=robot_type)
     return env
 
+
 @pytest.fixture(scope="function")
 def env(shared_env):
     """Reset the environment before each test function."""
