@@ -89,6 +89,7 @@ def create_joint(
     body0=None,
     body1=None,
     enabled=True,
+    exclude_from_articulation=False,
     joint_frame_in_parent_frame_pos=None,
     joint_frame_in_parent_frame_quat=None,
     joint_frame_in_child_frame_pos=None,
@@ -107,6 +108,7 @@ def create_joint(
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
         body1 (str or None): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
         enabled (bool): whether to enable this joint or not.
+        exclude_from_articulation (bool): whether to exclude this joint from the articulation or not.
         joint_frame_in_parent_frame_pos (th.tensor or None): relative position of the joint frame to the parent frame (body0).
         joint_frame_in_parent_frame_quat (th.tensor or None): relative orientation of the joint frame to the parent frame (body0).
         joint_frame_in_child_frame_pos (th.tensor or None): relative position of the joint frame to the child frame (body1).
@@ -167,6 +169,9 @@ def create_joint(
 
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
+
+    # Possibly exclude this joint from the articulation
+    joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
     if og.sim.is_playing():
@@ -389,12 +394,14 @@ class RigidContactAPIImpl:
         # Get all of the (row, col) pairs where the impulse is greater than 0
         return {
             (interesting_row_paths[row], interesting_col_paths[col])
-            for row, col in th.nonzero(interesting_impulses > 0, as_tuple=True)
+            for row, col in zip(*th.nonzero(interesting_impulses > 0, as_tuple=True))
         }
 
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         # First check if the object has any contacts
-        impulses = self.get_all_impulses(scene_idx)
+        impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
+        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
+
         row_idx = (
             list(range(impulses.shape[0]))
             if row_prim_paths is None
@@ -406,6 +413,8 @@ class RigidContactAPIImpl:
             else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
         )
         relevant_impulses = impulses[row_idx][:, col_idx]
+
+        # Early return if not in contact.
         if not th.any(relevant_impulses > 0):
             return []
 
