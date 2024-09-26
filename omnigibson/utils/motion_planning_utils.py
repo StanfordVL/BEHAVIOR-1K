@@ -220,13 +220,7 @@ def plan_base_motion(
     return None
 
 
-def plan_arm_motion(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True
-):
+def plan_arm_motion(robot, end_conf, context, planning_time=15.0, torso_fixed=True):
     """
     Plans an arm motion to a final joint position
 
@@ -319,13 +313,7 @@ def plan_arm_motion(
     return None
 
 
-def plan_arm_motion_ik(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True
-):
+def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed=True):
     """
     Plans an arm motion to a final end effector pose
 
