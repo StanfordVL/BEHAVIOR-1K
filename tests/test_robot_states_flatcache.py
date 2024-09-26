@@ -210,7 +210,7 @@ def test_robot_load_drive():
         og.sim.stop()
         env.scene.remove_object(obj=robot)
 
-    env.close()
+    og.clear()
 
 
 def test_grasping_mode():
@@ -233,7 +233,6 @@ def test_grasping_mode():
             bounding_box=[0.5, 0.5, 0.8],
             fixed_base=True,
             position=[0.7, -0.1, 0.6],
-            orientation=[0, 0, 0.707, 0.707],
         )
     )
     objects_cfg.append(
@@ -323,4 +322,4 @@ def test_grasping_mode():
         og.sim.stop()
         env.scene.remove_object(obj=robot)
 
-    env.close()
+    og.clear()
