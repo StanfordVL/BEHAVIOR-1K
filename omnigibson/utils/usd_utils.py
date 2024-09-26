@@ -248,7 +248,7 @@ class RigidContactAPIImpl:
             for i, link_path in enumerate(filters):
                 self._PATH_TO_COL_IDX[scene_idx][link_path] = i
                 self._PATH_TO_SCENE_IDX[link_path] = scene_idx
-                
+
         # If there are no valid objects, clear the view and terminate early
         if len(column_filters) == 0:
             self._CONTACT_VIEW = dict()
