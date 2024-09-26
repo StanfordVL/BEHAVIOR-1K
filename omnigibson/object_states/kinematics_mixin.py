@@ -29,7 +29,7 @@ class KinematicsMixin(BaseObjectState):
         info[self.obj] = {"q": self.obj.states[Joint].get_value(), "p": self.obj.states[Pose].get_value()}
         for arg in get_value_args:
             if isinstance(arg, StatefulObject):
-                info[arg] = {"q": self.obj.states[Joint].get_value(), "p": arg.states[Pose].get_value()}
+                info[arg] = {"q": arg.states[Joint].get_value(), "p": arg.states[Pose].get_value()}
 
         return info
 

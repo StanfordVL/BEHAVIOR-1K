@@ -316,7 +316,7 @@ class AttachedTo(
             _, parent_local_quat = T.relative_pose_transform([0, 0, 0], child_quat, [0, 0, 0], parent_quat)
 
         # Disable collision between the parent and child objects
-        self._disable_collision_between_child_and_parent(child=self.obj, parent=other)
+        # self._disable_collision_between_child_and_parent(child=self.obj, parent=other)
 
         # Set the parent references
         self.parent = other
@@ -341,6 +341,7 @@ class AttachedTo(
             joint_frame_in_parent_frame_quat=parent_local_quat,
             joint_frame_in_child_frame_pos=th.zeros(3),
             joint_frame_in_child_frame_quat=th.tensor([0.0, 0.0, 0.0, 1.0]),
+            exclude_from_articulation=True,
             **kwargs,
         )
 

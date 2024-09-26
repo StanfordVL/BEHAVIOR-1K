@@ -38,7 +38,6 @@ def plan_base_motion(
     end_conf,
     context,
     planning_time=15.0,
-    verbose=False
 ):
     """
     Plans a base motion to a 2d pose
@@ -202,7 +201,7 @@ def plan_base_motion(
     goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
 
     ss.setStartAndGoalStates(start, goal)
-    if not state_valid_fn(start(), verbose=verbose) or not state_valid_fn(goal(), verbose=verbose):
+    if not state_valid_fn(start(), verbose=True) or not state_valid_fn(goal(), verbose=True):
         return
 
     solved = ss.solve(planning_time)
@@ -226,8 +225,7 @@ def plan_arm_motion(
     end_conf,
     context,
     planning_time=15.0,
-    torso_fixed=True,
-    verbose=False
+    torso_fixed=True
 ):
     """
     Plans an arm motion to a final joint position
@@ -301,7 +299,7 @@ def plan_arm_motion(
     ss.setStartAndGoalStates(start, goal)
 
     # if the start pose or the goal pose collides, abort
-    if not state_valid_fn(start, verbose=verbose) or not state_valid_fn(goal, verbose=verbose):
+    if not state_valid_fn(start, verbose=True) or not state_valid_fn(goal, verbose=True):
         return
 
     # this will automatically choose a default planner with
@@ -326,8 +324,7 @@ def plan_arm_motion_ik(
     end_conf,
     context,
     planning_time=15.0,
-    torso_fixed=True,
-    verbose=False
+    torso_fixed=True
 ):
     """
     Plans an arm motion to a final end effector pose
@@ -426,7 +423,7 @@ def plan_arm_motion_ik(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
-    if not state_valid_fn(start, verbose=verbose) or not state_valid_fn(goal, verbose=verbose):
+    if not state_valid_fn(start, verbose=True) or not state_valid_fn(goal, verbose=True):
         return
 
     # this will automatically choose a default planner with

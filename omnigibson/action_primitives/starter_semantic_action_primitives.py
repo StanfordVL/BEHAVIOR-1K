@@ -1008,7 +1008,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 end_conf=joint_pos,
                 context=context,
                 torso_fixed=m.TIAGO_TORSO_FIXED,
-                verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1044,7 +1043,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 end_conf=end_conf,
                 context=context,
                 torso_fixed=m.TIAGO_TORSO_FIXED,
-                verbose=True
             )
 
         # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1452,14 +1450,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _empty_action(self):
         """
-        Get a no-op action that allows us to run simulation without changing robot configuration.
-        This is not a comment on this file, but - let's go to the base copy of the no op action function and update its docstring to say that this is the action that updates the goal to match the current position, and let's add a disclaimer that it might cause drift under external load (e.g. when the controller cannot reach the goal position for some reason).
+        Generate a no-op action that will keep the robot still but aim to move the arms to the saved pose targets, if possible
 
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
         """
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
+            # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
             if name in self._arm_targets:
                 if isinstance(controller, JointController):
                     target_joint_pos = self._arm_targets[name]
@@ -1593,7 +1591,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 robot=self.robot,
                 end_conf=pose_2d,
                 context=context,
-                verbose=True
             )
 
         if plan is None:
