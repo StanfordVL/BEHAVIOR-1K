@@ -37,7 +37,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             category="shelf_back_panel",
             model="gjsnrt",
             position=[0, 0, 0.01],
-            fixed_base=True,
             abilities={"attachable": {}},
         )
     )
@@ -99,7 +98,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"shelf_baseboard",
             category="shelf_baseboard",
             model="hlhneo",
-            position=[0, -0.97884506, base_z + delta_z * idx],
+            position=[0, -10.97884506, base_z + delta_z * idx],
             abilities={"attachable": {}},
         )
     )
@@ -119,13 +118,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step([])
 
     shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
-    shelf_baseboard.set_position_orientation(position=[0, -0.979, 0.26], orientation=[0, 0, 0, 1])
+    shelf_baseboard.set_position_orientation(position=[0, -0.979, 0.21], orientation=[0, 0, 0, 1])
     shelf_baseboard.keep_still()
-    shelf_baseboard.set_linear_velocity(th.tensor([-0.2, 0, 0]))
-
-    shelf_side_left = env.scene.object_registry("name", "shelf_side_left")
-    shelf_side_left.set_position_orientation(position=[-0.4, 0.0, 0.2], orientation=[0, 0, 0, 1])
-    shelf_side_left.keep_still()
+    # Lower the mass of the baseboard - otherwise, the gravity will create enough torque to break the joint
+    shelf_baseboard.root_link.mass = 0.1
 
     input(
         "\n\nShelf parts fall to their correct poses and get automatically attached to the back panel.\n"

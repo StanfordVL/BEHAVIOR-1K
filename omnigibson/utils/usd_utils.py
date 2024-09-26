@@ -89,6 +89,7 @@ def create_joint(
     body0=None,
     body1=None,
     enabled=True,
+    exclude_from_articulation=False,
     joint_frame_in_parent_frame_pos=None,
     joint_frame_in_parent_frame_quat=None,
     joint_frame_in_child_frame_pos=None,
@@ -107,6 +108,7 @@ def create_joint(
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
         body1 (str or None): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
         enabled (bool): whether to enable this joint or not.
+        exclude_from_articulation (bool): whether to exclude this joint from the articulation or not.
         joint_frame_in_parent_frame_pos (th.tensor or None): relative position of the joint frame to the parent frame (body0).
         joint_frame_in_parent_frame_quat (th.tensor or None): relative orientation of the joint frame to the parent frame (body0).
         joint_frame_in_child_frame_pos (th.tensor or None): relative position of the joint frame to the child frame (body1).
@@ -167,6 +169,9 @@ def create_joint(
 
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
+
+    # Possibly exclude this joint from the articulation
+    joint_prim.GetAttribute("physics:excludeFromArticulation").Set(exclude_from_articulation)
 
     # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
     if og.sim.is_playing():
@@ -394,7 +399,9 @@ class RigidContactAPIImpl:
 
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
         # First check if the object has any contacts
-        impulses = self.get_all_impulses(scene_idx)
+        impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
+        assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
+
         row_idx = (
             list(range(impulses.shape[0]))
             if row_prim_paths is None
@@ -406,6 +413,8 @@ class RigidContactAPIImpl:
             else [self.get_body_col_idx(path)[1] for path in column_prim_paths]
         )
         relevant_impulses = impulses[row_idx][:, col_idx]
+
+        # Early return if not in contact.
         if not th.any(relevant_impulses > 0):
             return []
 
@@ -1743,3 +1752,39 @@ def deep_copy_prim(source_root_prim, dest_stage, dest_root_path):
         for child in source_prim.GetAllChildren():
             new_dest_path = dest_path + "/" + child.GetName()
             queue.append((child, new_dest_path))
+
+
+def delete_or_deactivate_prim(prim_path):
+    """
+    Attept to delete or deactivate the prim defined at @prim_path.
+
+    Args:
+        prim_path (str): Path defining which prim should be deleted or deactivated
+
+    Returns:
+        bool: Whether the operation was successful or not
+    """
+    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+        return False
+    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
+        return False
+    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        return False
+    if prim_path == "/World":
+        return False
+    if prim_path == "/":
+        return False
+    # Don't remove any /Render prims as that can cause crashes
+    if prim_path.startswith("/Render"):
+        return False
+
+    # If the prim is not ancestral, we can delete it.
+    if not lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
+        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
+
+    # Otherwise, we can only deactivate it, which essentially serves the same purpose.
+    # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
+    else:
+        lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
+
+    return True
