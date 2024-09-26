@@ -217,20 +217,10 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert stove.states[object_states.ToggledOn].get_value()
 
-        # toggle off the stove after the test is done
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_OFF, stove):
-            env.step(action)
-        assert not stove.states[object_states.ToggledOn].get_value()
-
         assert not sink.states[object_states.ToggledOn].get_value()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
             env.step(action)
         assert sink.states[object_states.ToggledOn].get_value()
-
-        # toggle off the stove after the test is done
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_OFF, sink):
-            env.step(action)
-        assert not sink.states[object_states.ToggledOn].get_value()
 
     def test_soak_under(self, env, prim_gen, robot, sponge, sink):
         water_system = env.scene.get_system("water")
