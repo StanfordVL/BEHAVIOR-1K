@@ -273,32 +273,38 @@ class ManipulationRobot(BaseRobot):
                     set of unique robot link prim_paths that it is in contact with
         """
         arm = self.default_arm if arm == "default" else arm
-        # Get robot contact links
+
+        # Get robot finger links
+        finger_paths = set([link.prim_path for link in self.finger_links[arm]])
+
+        # Get robot links
         link_paths = set(self.link_prim_paths)
 
         if not return_contact_positions:
             raw_contact_data = {
                 (row, col)
-                for row, col in GripperRigidContactAPI.get_contact_pairs(self.scene.idx, column_prim_paths=link_paths)
+                for row, col in GripperRigidContactAPI.get_contact_pairs(self.scene.idx, column_prim_paths=finger_paths)
+                if row not in link_paths
+            }
+        else:
+            raw_contact_data = {
+                (row, col, point)
+                for row, col, force, point, normal, sep in GripperRigidContactAPI.get_contact_data(
+                    self.scene.idx, column_prim_paths=finger_paths
+                )
                 if row not in link_paths
             }
 
-            # Translate that to robot contact data
-            robot_contact_links = {}
-            for con_data in raw_contact_data:
+        # Translate to robot contact data
+        robot_contact_links = dict()
+        contact_data = set()
+        for con_data in raw_contact_data:
+            if not return_contact_positions:
                 other_contact, link_contact = con_data
-                if other_contact not in robot_contact_links:
-                    robot_contact_links[other_contact] = set()
-                robot_contact_links[other_contact].add(link_contact)
-
-            return {other for other, _ in raw_contact_data}, robot_contact_links
-
-        # Otherwise, we rely on the simpler, but more costly, get_contact_data API.
-        contacts = GripperRigidContactAPI.get_contact_data(self.scene.idx, column_prim_paths=link_paths)
-        contact_data = {(contact[0], contact[3]) for contact in contacts}
-        robot_contact_links = {}
-        for con_data in contacts:
-            other_contact, link_contact = con_data[:2]
+                contact_data.add(other_contact)
+            else:
+                other_contact, link_contact, point = con_data
+                contact_data.add((other_contact, point))
             if other_contact not in robot_contact_links:
                 robot_contact_links[other_contact] = set()
             robot_contact_links[other_contact].add(link_contact)
@@ -867,7 +873,7 @@ class ManipulationRobot(BaseRobot):
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
             candidate_link = candidate_obj.links[link_name]
-            dist = th.norm(th.tensor(candidate_link.get_position_orientation()[0]) - th.tensor(gripper_center_pos))
+            dist = th.norm(candidate_link.get_position_orientation()[0] - gripper_center_pos)
             candidate_data.append((prim_path, dist))
 
         if not candidate_data:
@@ -1240,9 +1246,14 @@ class ManipulationRobot(BaseRobot):
             force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
             for c_link_prim_path, c_contact_pos in force_data:
                 if c_link_prim_path == ag_link.prim_path:
-                    contact_pos = th.tensor(c_contact_pos)
+                    contact_pos = c_contact_pos
                     break
-        assert contact_pos is not None
+
+        assert contact_pos is not None, (
+            f"contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
+            f"self._find_gripper_contacts(return_contact_positions=False). This is likely because "
+            f"GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
+        )
 
         # Joint frame set at the contact point
         # Need to find distance between robot and contact point in robot link's local frame and
@@ -1266,6 +1277,7 @@ class ManipulationRobot(BaseRobot):
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
             enabled=True,
+            exclude_from_articulation=True,
             joint_frame_in_parent_frame_pos=parent_frame_pos / self.scale,
             joint_frame_in_parent_frame_quat=parent_frame_orn,
             joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
@@ -1448,6 +1460,7 @@ class ManipulationRobot(BaseRobot):
             body0=ag_link.prim_path,
             body1=None,
             enabled=False,
+            exclude_from_articulation=True,
             joint_frame_in_child_frame_pos=attachment_point_pos,
         )
 
