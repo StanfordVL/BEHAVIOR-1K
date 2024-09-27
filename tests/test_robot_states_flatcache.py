@@ -210,4 +210,116 @@ def test_robot_load_drive():
         og.sim.stop()
         env.scene.remove_object(obj=robot)
 
-    env.close()
+    og.clear()
+
+
+def test_grasping_mode():
+
+    if og.sim is None:
+        # Set global flags
+        gm.ENABLE_FLATCACHE = True
+    else:
+        # Make sure sim is stopped
+        og.sim.stop()
+
+    scene_cfg = dict(type="Scene")
+    objects_cfg = []
+    objects_cfg.append(
+        dict(
+            type="DatasetObject",
+            name=f"table",
+            category="breakfast_table",
+            model="lcsizg",
+            bounding_box=[0.5, 0.5, 0.8],
+            fixed_base=True,
+            position=[0.7, -0.1, 0.6],
+        )
+    )
+    objects_cfg.append(
+        dict(
+            type="PrimitiveObject",
+            name=f"box",
+            primitive_type="Cube",
+            rgba=[1.0, 0, 0, 1.0],
+            size=0.05,
+            position=[0.53, 0.0, 0.87],
+        )
+    )
+    cfg = dict(scene=scene_cfg, objects=objects_cfg)
+
+    env = og.Environment(configs=cfg)
+    og.sim.viewer_camera.set_position_orientation(
+        position=[1.0170, 0.5663, 1.0554],
+        orientation=[0.1734, 0.5006, 0.8015, 0.2776],
+    )
+    og.sim.stop()
+
+    grasping_modes = dict(
+        sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
+        assisted="Assisted Grasping - Objects are magnetized when they touch the fingers, are within the hand, and a CLOSE command is given",
+        physical="Physical Grasping - No additional grasping assistance applied",
+    )
+
+    def object_is_in_hand(robot, obj):
+        eef_position = robot.get_eef_position()
+        obj_position = obj.get_position_orientation()[0]
+        return th.norm(eef_position - obj_position) < 0.05
+
+    for grasping_mode in grasping_modes:
+        robot = Fetch(
+            name="Fetch",
+            obs_modalities=[],
+            controller_config={f"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
+            grasping_mode=grasping_mode,
+        )
+        env.scene.add_object(robot)
+
+        # At least one step is always needed while sim is playing for any imported object to be fully initialized
+        og.sim.play()
+
+        env.scene.reset()
+
+        # Reset robot and make sure it's not moving
+        robot.reset()
+        robot.keep_still()
+
+        # Let the box settle
+        for _ in range(10):
+            og.sim.step()
+
+        action_primitives = StarterSemanticActionPrimitives(env)
+
+        box_object = env.scene.object_registry("name", "box")
+        target_eef_pos = box_object.get_position_orientation()[0]
+        target_eef_orn = robot.get_eef_orientation()
+
+        # Move eef to the box
+        for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
+            env.step(action)
+
+        # Grasp the box
+        for action in action_primitives._execute_grasp():
+            env.step(action)
+
+        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to grasp the object"
+
+        # Move eef
+        eef_offset = th.tensor([0.0, 0.2, 0.2])
+        for action in action_primitives._move_hand_direct_ik((target_eef_pos + eef_offset, target_eef_orn)):
+            env.step(action)
+
+        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to keep the object in hand"
+
+        # Release the box
+        for action in action_primitives._execute_release():
+            env.step(action)
+        for _ in range(10):
+            og.sim.step()
+
+        assert not object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to release the object"
+
+        # Stop the simulator and remove the robot
+        og.sim.stop()
+        env.scene.remove_object(obj=robot)
+
+    og.clear()

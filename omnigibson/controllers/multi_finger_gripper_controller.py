@@ -273,21 +273,15 @@ class MultiFingerGripperController(GripperController):
     def _compute_no_op_action(self, control_dict):
         # Take care of the special case of binary control
         if self._mode == "binary":
-            command_val = -1 if self.is_grasping == IsGraspingState.TRUE else 1
+            command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
             if self._inverted:
                 command_val = -1 * command_val
             return th.tensor([command_val], dtype=th.float32)
 
-        if self.motor_type == "position":
-            if self._use_delta_commands:
-                command = th.zeros(self.command_dim)
-            else:
-                command = control_dict[f"joint_position"][self.dof_idx]
-        elif self.motor_type == "velocity":
-            if self._use_delta_commands:
-                command = -control_dict[f"joint_velocity"][self.dof_idx]
-            else:
-                command = th.zeros(self.command_dim)
+        if self._motor_type == "position":
+            command = control_dict[f"joint_position"][self.dof_idx]
+        elif self._motor_type == "velocity":
+            command = th.zeros(self.command_dim)
         else:
             raise ValueError("Cannot compute noop action for effort motor type.")
 

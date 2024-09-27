@@ -134,15 +134,15 @@ def test_bbox_modalities(env):
     bbox_2d_loose = all_observation["bbox_2d_loose"]
     bbox_3d = all_observation["bbox_3d"]
 
-    assert bbox_2d_tight.shape[0] == 4
-    assert bbox_2d_loose.shape[0] == 4
-    assert bbox_3d.shape[0] == 3
+    assert len(bbox_2d_tight) == 4
+    assert len(bbox_2d_loose) == 4
+    assert len(bbox_3d) == 3
 
     bbox_2d_expected_objs = set(["floors", "agent", "breakfast_table", "dishtowel"])
     bbox_3d_expected_objs = set(["agent", "breakfast_table", "dishtowel"])
 
-    bbox_2d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_2d_tight])
-    bbox_3d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_3d])
+    bbox_2d_objs = set([semantic_class_id_to_name()[bbox[0]] for bbox in bbox_2d_tight])
+    bbox_3d_objs = set([semantic_class_id_to_name()[bbox[0]] for bbox in bbox_3d])
 
     assert bbox_2d_objs == bbox_2d_expected_objs
     assert bbox_3d_objs == bbox_3d_expected_objs

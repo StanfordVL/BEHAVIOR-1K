@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable
 
 import gymnasium as gym
 import torch as th
@@ -56,6 +57,9 @@ def recursively_generate_compatible_dict(dic):
         elif isinstance(v, th.Tensor) and v.dim() > 1:
             # Map to list of tuples
             out[k] = tuple(tuple(row.tolist()) for row in v)
+        elif isinstance(v, Iterable):
+            # bounding box modalities give a list of tuples
+            out[k] = tuple(v)
         else:
             # Preserve the key-value pair
             out[k] = v
