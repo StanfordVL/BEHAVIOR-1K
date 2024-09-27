@@ -21,12 +21,12 @@ Please make sure your system meets the following specs:
 
 There are three ways to setup **`OmniGibson`**, all built upon different ways of installing NVIDIA Isaac Sim:
 
-- **🐍 Pip Install (Linux / Windows, Recommended)**: You can clone **`Omnigibson`** and automatically install Isaac Sim through pip for the fastest startup.
+- **🐍 Install with pip (Linux / Windows, Recommended)**: You can install **`Omnigibson`** and automatically install Isaac Sim through pip for the fastest startup.
 - **🐳 Install with Docker (Linux only)**: You can quickly get **`OmniGibson`** immediately up and running from our pre-built docker image that includes Isaac Sim.
 - **🧪 Install with Omniverse Launcher (Linux / Windows)**: You can install Isaac Sim via the Omniverse launcher and hook **`OmniGibson`** up to it.
 
 !!! tip ""
-    === "🐍 Pip Install (Linux / Windows)"
+    === "🐍 Install with pip (Linux / Windows)"
 
         <div class="annotate" markdown>
 
@@ -57,7 +57,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
             </div>
 
-            ??? note "Nightly build"
+            !!! note "Nightly build"
 
                 The main branch contains the stable version of **`OmniGibson`**. For our latest developed (yet not fully tested) features and bug fixes, please clone from the `og-develop` branch.
 
@@ -169,17 +169,17 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
             </div>
 
-            ??? note "Nightly build"
+            !!! note "Nightly build"
 
                 The main branch contains the stable version of **`OmniGibson`**. For our latest developed (yet not fully tested) features and bug fixes, please clone from the `og-develop` branch.
 
-        4. Run the installation script to install Isaac Sim as well as **`OmniGibson`** dataset and assets:
+        4. Run the installation script to hook the environment up to Isaac Sim as well as **`OmniGibson`** dataset and assets:
 
             ```shell
             python -m omnigibson.install --launcher-install
             ```
 
-            ??? note "What does this do?"
+            !!! note "What does this do?"
 
                 When you install OmniGibson this way, it will modify your conda environment setup to hook it up to the launcher-installed Isaac Sim.
 
@@ -204,21 +204,24 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
     
     The process could take up to 5 minutes. This is expected behavior, and should only occur once!
 
-**`OmniGibson`** is now successfully installed! Try exploring some of our new scenes interactively:
+**`OmniGibson`** is now successfully installed! You can try teleoperating one of our robots:
+
+```{.shell .annotate}
+python -m omnigibson.examples.robots.robot_control_example --quickstart # (1)!
+```
+
+1. This demo lets you choose a scene, robot, and set of controllers, and then teleoperate the robot using your keyboard.
+    The `--quickstart` flag will automatically select the scene and robot for you - remove that if you want to change
+    the scene or robot.
+
+
+You can also try exploring some of our new scenes interactively:
 
 ```{.shell .annotate}
 python -m omnigibson.examples.scenes.scene_selector # (1)!
 ```
 
 1. This demo lets you choose a scene and interactively move around using your keyboard and mouse. Hold down **`Shift`** and then **`Left-click + Drag`** an object to apply forces!
-
-You can also try teleoperating one of our robots:
-
-```{.shell .annotate}
-python -m omnigibson.examples.robots.robot_control_example # (1)!
-```
-
-1. This demo lets you choose a scene, robot, and set of controllers, and then teleoperate the robot using your keyboard.
 
 ***
 
