@@ -209,7 +209,7 @@ def _launcher_based_install(isaac_sim_path: Optional[Path]):
         isaac_version_str = version_content.split("-")[0]
         isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
 
-    if isaac_version_tuple not in ((4, 0, 0), (4, 1, 0), (4, 2, 0)):
+    if isaac_version_tuple not in ((4, 0, 0), (4, 1, 0)):
         click.echo(f"Isaac Sim version {isaac_version_str} is not supported by OmniGibson.")
         return False
 
@@ -219,6 +219,12 @@ def _launcher_based_install(isaac_sim_path: Optional[Path]):
         _setup_windows_conda_env(isaac_sim_path, conda_prefix)
     else:
         _setup_unix_conda_env(isaac_sim_path, conda_prefix)
+
+    # Temporarily apply the env vars to this script, too
+    sys.path.append(str(isaac_sim_path / "site"))
+    os.environ["CARB_APP_PATH"] = str(isaac_sim_path / "kit")
+    os.environ["EXP_PATH"] = str(isaac_sim_path / "apps")
+    os.environ["ISAAC_PATH"] = str(isaac_sim_path)
 
     return True
 
@@ -259,7 +265,7 @@ def attempt_launcher_install(isaac_sim_path: Optional[Path]):
 
 
 def attempt_pip_install():
-    click.echo("We will now try to install Isaac Sim via pip.")
+    click.echo("Installing Isaac Sim via pip.")
     success = _pip_based_install()
     if success:
         click.echo("Successfully installed Isaac Sim via pip.")
@@ -273,14 +279,9 @@ def attempt_pip_install():
     "--install-datasets", default=True, help="Install the OmniGibson dataset and assets after installing Isaac Sim"
 )
 @click.option(
-    "--force-pip-install",
+    "--launcher-install/--pip-install",
     default=False,
-    help="Install Isaac Sim via pip even if a launcher-based installation is found",
-)
-@click.option(
-    "--force-launcher-install",
-    default=False,
-    help="Do not install Isaac Sim via pip even if a launcher-based installation is not found",
+    help="Hook up to a launcher-installed Isaac Sim installation instead of installing via pip",
 )
 @click.option(
     "--isaac-sim-path",
@@ -288,13 +289,7 @@ def attempt_pip_install():
     default=None,
     help="Path to the existing launcher-based Isaac Sim installation directory, to force the setup script to use it",
 )
-def setup_omnigibson(
-    install_datasets: bool, force_pip_install: bool, force_launcher_install: bool, isaac_sim_path: Optional[Path]
-):
-    if force_pip_install and force_launcher_install:
-        click.echo("You can't force both pip and launcher-based installations at the same time.")
-        return
-
+def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_path: Optional[Path]):
     # Check that we are in a conda environment
     if "CONDA_PREFIX" not in os.environ:
         click.echo("Please run this script from within a conda environment.")
@@ -316,16 +311,6 @@ def setup_omnigibson(
         click.echo("You can do this by running `conda create -n omnigibson python=3.10`.")
         return
 
-    # Check that we have torch already installed.
-    try:
-        import torch
-    except ImportError:
-        click.echo("Please install PyTorch before running this script.")
-        click.echo(
-            "You can do this by running `conda install pytorch torchvision torchaudio pytorch-cuda=12.1 numpy<2 -c pytorch -c nvidia`."
-        )
-        return
-
     # Check if the isaacsim package is already installed
     try:
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
@@ -337,29 +322,20 @@ def setup_omnigibson(
     except ImportError:
         pass
 
-    # First, try to install Isaac Sim via the launcher
-    launcher_installation_successful = False
-    pip_installation_successful = False
-    if not force_pip_install:
-        launcher_installation_successful = attempt_launcher_install(isaac_sim_path)
-
-    # If that failed, try to install it via pip
-    if not launcher_installation_successful:
-        if force_launcher_install:
-            # If the user forced a launcher-based installation, we should not try to install via pip
-            click.echo("You forced the script to use a launcher-based installation, but we couldn't find it.")
+    # Do the actual work
+    if launcher_install:
+        if not attempt_launcher_install(isaac_sim_path):
+            click.echo("Failed to hook environment up to launcher-based Isaac Sim installation.")
             click.echo("Please make sure you have installed Isaac Sim correctly before running this setup script.")
-        else:
-            pip_installation_successful = attempt_pip_install()
+            return
+    else:
+        if not attempt_pip_install():
+            click.echo("Failed to install Isaac Sim. Please check the installation requirements and try again.")
+            return
 
-    # If neither installation was successful, we should exit
-    if not launcher_installation_successful and not pip_installation_successful:
-        click.echo("Failed to install Isaac Sim. Please check the installation requirements and try again.")
-        return
-
-    # Now prompt the user to install the dataset and assets
     click.echo("Isaac Sim has been successfully installed.")
 
+    # Now prompt the user to install the dataset and assets
     if install_datasets:
         click.echo("We will now install the datasets.")
 
@@ -401,7 +377,7 @@ def setup_omnigibson(
     )
 
     # If this is a launcher install, we need to tell the user to deactivate and reactivate
-    if launcher_installation_successful:
+    if launcher_install:
         click.echo(
             "IMPORTANT: Please deactivate and reactivate your conda environment to ensure the Isaac Sim environment variables are set correctly."
         )
