@@ -397,7 +397,7 @@ def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed
     si = ss.getSpaceInformation()
     planner = ompl_geo.BITstar(si)
     ss.setPlanner(planner)
-    
+
     start_conf = th.cat((robot.get_relative_eef_position(), T.quat2axisangle(robot.get_relative_eef_orientation())))
     # do fk
     start = ob.State(space)
