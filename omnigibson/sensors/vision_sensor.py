@@ -382,7 +382,7 @@ class VisionSensor(BaseSensor):
 
         image_keys = th.unique(img)
         if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
-            log.warning(
+            log.debug(
                 "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
             )
 
@@ -482,6 +482,8 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
             bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        # Replicator returns each box as a numpy.void; we convert them to tuples here
+        bboxes = [box.tolist() for box in bboxes]
         info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
         return bboxes, info
 

@@ -1,3 +1,5 @@
+from collections import OrderedDict
+from collections.abc import Iterable
 from copy import deepcopy
 
 import gymnasium as gym
@@ -18,7 +20,7 @@ from omnigibson.utils.gym_utils import (
     recursively_generate_compatible_dict,
     recursively_generate_flat_dict,
 )
-from omnigibson.utils.numpy_utils import NumpyTypes
+from omnigibson.utils.numpy_utils import NumpyTypes, list_to_np_array
 from omnigibson.utils.python_utils import (
     Recreatable,
     assert_valid_key,
@@ -403,8 +405,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 lows.append(space.low)
                 highs.append(space.high)
             action_space = gym.spaces.Box(
-                th.tensor(lows, dtype=th.float32).cpu().numpy(),
-                th.tensor(highs, dtype=th.float32).cpu().numpy(),
+                list_to_np_array(lows),
+                list_to_np_array(highs),
                 dtype=NumpyTypes.FLOAT32,
             )
 
@@ -617,6 +619,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - dict: info, i.e. dictionary with any useful information
         """
         # Pre-processing before stepping simulation
+        if isinstance(action, Iterable) and not isinstance(action, (dict, OrderedDict)):
+            # Convert numpy arrays and lists to tensors
+            # Skip dict action
+            action = th.as_tensor(action).flatten()
         self._pre_step(action)
 
         # Step simulation
