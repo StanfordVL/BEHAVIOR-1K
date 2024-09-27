@@ -27,7 +27,7 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.controllers import DifferentialDriveController, JointController
+from omnigibson.controllers import DifferentialDriveController, JointController, InverseKinematicsController
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
@@ -331,17 +331,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
         if isinstance(self.robot, ManipulationRobot):
-            for arm in self.robot.arm_names:
-                arm = f"arm_{arm}"
-                arm_ctrl = self.robot.controllers[arm]
-                if isinstance(arm_ctrl, JointController):
-                    arm_target = control_dict["joint_position"][arm_ctrl.dof_idx]
-                    self._arm_targets[arm] = arm_target
-                else:
-                    pos_relative = control_dict[f"{arm}_pos_relative"]
-                    quat_relative = control_dict[f"{arm}_quat_relative"]
+            for arm_name in self.robot.arm_names:
+                eef = f"eef_{arm_name}"
+                arm = f"arm_{arm_name}"
+                arm_ctrl = self.robot.controllers[arm]  
+                if isinstance(arm_ctrl, InverseKinematicsController):
+                    pos_relative = control_dict[f"{eef}_pos_relative"]
+                    quat_relative = control_dict[f"{eef}_quat_relative"]
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
+                else:
+        
+                    arm_target = control_dict["joint_position"][arm_ctrl.dof_idx]
+                    self._arm_targets[arm] = arm_target 
 
         self.robot_copy = self._load_robot_copy()
 
@@ -1458,22 +1460,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
-            if name in self._arm_targets:
-                if isinstance(controller, JointController):
-                    target_joint_pos = self._arm_targets[name]
-                    current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
-                    if controller.use_delta_commands:
-                        partial_action = target_joint_pos - current_joint_pos
-                    else:
-                        partial_action = target_joint_pos
-                else:
+            if name in self._arm_targets:  
+                if isinstance(controller, InverseKinematicsController):
                     target_pose = self._arm_targets[name]
                     target_orn_axisangle = target_pose[1]
                     current_pose = self._get_pose_in_robot_frame(
                         (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
                     )
                     delta_pos = target_pose[0] - current_pose[0]
-                    partial_action = th.cat([delta_pos, target_orn_axisangle])
+                    partial_action = th.cat((delta_pos, target_orn_axisangle))
+                else:
+                    target_joint_pos = self._arm_targets[name]
+                    current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
+                    if controller.use_delta_commands:
+                        partial_action = target_joint_pos - current_joint_pos
+                    else:
+                        partial_action = target_joint_pos
             else:
                 partial_action = controller.compute_no_op_action(self.robot.get_control_dict())
             action_idx = self.robot.controller_action_idx[name]
