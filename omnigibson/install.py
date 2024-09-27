@@ -260,7 +260,7 @@ def attempt_pip_install():
 )
 @click.option(
     "--isaac-sim-path",
-    type=click.Path(exists=True, dir_okay=True, file_okay=False, writeable=True, readable=True, path_type=Path),
+    type=click.Path(exists=True, dir_okay=True, file_okay=False, writable=True, readable=True, path_type=Path),
     default=None,
     help="Path to the existing launcher-based Isaac Sim installation directory, to force the setup script to use it",
 )
@@ -281,6 +281,24 @@ def setup_omnigibson(
     if sys.version_info[:2] != (3, 10):
         click.echo("Please run this script with Python 3.10.")
         return
+
+    # Check that we do not have an EXP_PATH, CARB_APP_PATH or ISAAC_PATH set
+    if any(env_var in os.environ for env_var in ["EXP_PATH", "CARB_APP_PATH", "ISAAC_PATH"]):
+        click.echo(
+            "Please unset the EXP_PATH, CARB_APP_PATH and ISAAC_PATH environment variables before running this script."
+        )
+        click.echo("These can stem from a dirty environment from an existing Isaac Sim installation.")
+        return
+
+    # Check if the isaacsim package is already installed
+    try:
+        import isaacsim
+
+        click.echo("Isaac Sim is already installed via pip in your current env.")
+        click.echo("If you need to download the datasets, please run omnigibson/download_datasets.py.")
+        return
+    except ImportError:
+        pass
 
     # First, try to install Isaac Sim via the launcher
     installation_successful = False
