@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 
 import click
-import pip
 
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import download_assets, download_og_dataset
@@ -105,7 +104,7 @@ def _is_glibc_older():
 def _pip_install(filename: Path):
     """Install a package using pip."""
     try:
-        pip.main(["install", str(filename)])
+        subprocess.run(["pip", "install", str(filename)], check=True)
     except Exception as e:
         raise ValueError(f"Failed to install {filename}") from e
 
@@ -289,6 +288,22 @@ def setup_omnigibson(
         )
         click.echo("These can stem from a dirty environment from an existing Isaac Sim installation.")
         return
+
+    # Check that we have torch already installed, if not, install ltt and torch
+    try:
+        import torch
+    except ImportError:
+        try:
+            click.echo("Installing torch.")
+            subprocess.run(["pip", "install", "light-the-torch"], check=True)
+            subprocess.run(["ltt", "install", "torch"], check=True)
+        except subprocess.CalledProcessError:
+            click.echo("Failed to install torch.")
+            click.echo(
+                "You can install it yourself from conda following the instructions here: https://pytorch.org/get-started/locally/"
+            )
+            click.echo("Rerun this script after installing torch.")
+            return
 
     # Check if the isaacsim package is already installed
     try:
