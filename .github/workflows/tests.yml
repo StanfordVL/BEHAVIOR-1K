@@ -68,11 +68,16 @@ jobs:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
           path: ${{ matrix.test_file }}.xml
 
-      - name: Check for failures or errors
+      - name: Check for failures, errors, or missing XML
         run: |
-          if grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' ${{ matrix.test_file }}.xml; then
+          if [ ! -f ${{ matrix.test_file }}.xml ]; then
+            echo "Error: XML file not found, probably due to segfault"
+            exit 1
+          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' ${{ matrix.test_file }}.xml; then
+            echo "Error: Test failures or errors found"
             exit 1
           else
+            echo "All tests passed successfully"
             exit 0
           fi
 
