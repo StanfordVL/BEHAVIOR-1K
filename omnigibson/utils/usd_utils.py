@@ -391,8 +391,6 @@ class RigidContactAPIImpl:
         if not th.any(interesting_impulses > 0):
             return set()
 
-        # Get all of the (row, col) pairs where the impulse is greater than 0
-        nonzero_indices = th.nonzero(interesting_impulses > 0, as_tuple=True)
         return {
             (interesting_row_paths[row], interesting_col_paths[col])
             for row, col in zip(*th.nonzero(interesting_impulses > 0, as_tuple=True))

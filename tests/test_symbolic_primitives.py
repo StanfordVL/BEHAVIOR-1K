@@ -279,6 +279,7 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert not countertop.states[object_states.Covered].get_value(mud_system)
 
+    @pytest.mark.skip("Disabled until env reset can add/remove objects")
     def test_cut(self, env, prim_gen, apple, knife, countertop):
         # Store the apple object information for scene reset
         deleted_objs = [apple]
@@ -297,13 +298,13 @@ class TestSymbolicPrimitives:
             env.step(action)
 
         # clean up
-        half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
-        for apple in half_apples:
-            env.scene.remove_object(apple)
+        # half_apples = env.scene.object_registry("category", "half_apple", set()).copy()
+        # for apple in half_apples:
+        #     env.scene.remove_object(apple)
 
-        objs = [DatasetObject(**obj_cfg) for obj_cfg in deleted_objs_cfg]
-        og.sim.batch_add_objects(objs, scenes=[env.scene] * len(objs))
-        og.sim.step()
+        # objs = [DatasetObject(**obj_cfg) for obj_cfg in deleted_objs_cfg]
+        # og.sim.batch_add_objects(objs, scenes=[env.scene] * len(objs))
+        # og.sim.step()
 
     def test_persistent_sticky_grasping(self, env, robot, prim_gen, apple):
         assert not robot.states[object_states.IsGrasping].get_value(apple)

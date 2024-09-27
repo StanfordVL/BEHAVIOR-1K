@@ -47,7 +47,6 @@ def plan_base_motion(
         end_conf (Iterable): [x, y, yaw] 2d pose to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
-        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         Array of arrays: Array of 2d poses that the robot should navigate to
@@ -229,7 +228,6 @@ def plan_arm_motion(robot, end_conf, context, planning_time=15.0, torso_fixed=Tr
         end_conf (Iterable): Final joint position to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
-        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         Array of arrays: Array of joint positions that the robot should navigate to
@@ -322,7 +320,6 @@ def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed
         end_conf (Iterable): Final end effector pose to plan to
         context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
-        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
