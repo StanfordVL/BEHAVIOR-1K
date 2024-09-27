@@ -33,7 +33,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
         1. Create a conda environment with Python version **`3.10`**:
 
             ```shell
-            conda create -n omnigibson python=3.10
+            conda create -n omnigibson python=3.10 pytorch torchvision torchaudio pytorch-cuda=12.1 numpy<2 -c pytorch -c nvidia
             conda activate omnigibson
             ```
 

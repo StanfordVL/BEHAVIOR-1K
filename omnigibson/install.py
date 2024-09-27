@@ -5,38 +5,39 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import click
+import tqdm
 
 # List of NVIDIA PyPI packages needed for OmniGibson
 ISAAC_SIM_PACKAGES = [
-    "omniverse_kit-106.1.0.140981",
-    "isaacsim_kernel-4.2.0.2",
-    "isaacsim_app-4.2.0.2",
-    "isaacsim_core-4.2.0.2",
-    "isaacsim_gui-4.2.0.2",
-    "isaacsim_utils-4.2.0.2",
-    "isaacsim_storage-4.2.0.2",
-    "isaacsim_asset-4.2.0.2",
-    "isaacsim_sensor-4.2.0.2",
-    "isaacsim_robot_motion-4.2.0.2",
-    "isaacsim_robot-4.2.0.2",
-    "isaacsim_benchmark-4.2.0.2",
-    "isaacsim_code_editor-4.2.0.2",
-    "isaacsim_ros1-4.2.0.2",
-    "isaacsim_cortex-4.2.0.2",
-    "isaacsim_example-4.2.0.2",
-    "isaacsim_replicator-4.2.0.2",
-    "isaacsim_rl-4.2.0.2",
-    "isaacsim_robot_setup-4.2.0.2",
-    "isaacsim_ros2-4.2.0.2",
-    "isaacsim_template-4.2.0.2",
-    "isaacsim_test-4.2.0.2",
-    "isaacsim-4.2.0.2",
-    "isaacsim_extscache_physics-4.2.0.2",
-    "isaacsim_extscache_kit-4.2.0.2",
-    "isaacsim_extscache_kit_sdk-4.2.0.2",
+    "omniverse_kit-106.0.1.126909",
+    "isaacsim_kernel-4.1.0.0",
+    "isaacsim_app-4.1.0.0",
+    "isaacsim_core-4.1.0.0",
+    "isaacsim_gui-4.1.0.0",
+    "isaacsim_utils-4.1.0.0",
+    "isaacsim_storage-4.1.0.0",
+    "isaacsim_asset-4.1.0.0",
+    "isaacsim_sensor-4.1.0.0",
+    "isaacsim_robot_motion-4.1.0.0",
+    "isaacsim_robot-4.1.0.0",
+    "isaacsim_benchmark-4.1.0.0",
+    "isaacsim_code_editor-4.1.0.0",
+    "isaacsim_ros1-4.1.0.0",
+    "isaacsim_cortex-4.1.0.0",
+    "isaacsim_example-4.1.0.0",
+    "isaacsim_replicator-4.1.0.0",
+    "isaacsim_rl-4.1.0.0",
+    "isaacsim_robot_setup-4.1.0.0",
+    "isaacsim_ros2-4.1.0.0",
+    "isaacsim_template-4.1.0.0",
+    "isaacsim_test-4.1.0.0",
+    "isaacsim-4.1.0.0",
+    "isaacsim_extscache_physics-4.1.0.0",
+    "isaacsim_extscache_kit-4.1.0.0",
+    "isaacsim_extscache_kit_sdk-4.1.0.0",
 ]
 BASE_URL = "https://pypi.nvidia.com"
 
@@ -61,7 +62,7 @@ def _find_isaac_sim_path():
 
 def _get_filename(package: str, temp_dir: Path):
     if platform.system() == "Windows":
-        return temp_dir / f"{package}-cp310-win_amd64.whl"
+        return temp_dir / f"{package}-cp310-none-win_amd64.whl"
     return temp_dir / f"{package}-cp310-none-manylinux_2_34_x86_64.whl"
 
 
@@ -98,25 +99,28 @@ def _is_glibc_older():
         raise ValueError("Failed to check GLIBC version. `ldd` was not accessible. Try running it yourself to see why.")
 
 
-def _pip_install(filename: Path):
+def _pip_install(filenames: List[Path]):
     """Install a package using pip."""
     try:
-        subprocess.run(["pip", "install", str(filename)], check=True)
-    except Exception as e:
-        raise ValueError(f"Failed to install {filename}") from e
+        subprocess.run(["pip", "install"] + [str(x) for x in filenames], check=True)
+    except subprocess.CalledProcessError:
+        return False
+
+    return True
 
 
-def _install_isaac_sim_package(package: str, temp_dir: Path):
+def _download_isaac_sim_package(package: str, temp_dir: Path):
     package_name = package.split("-")[0].replace("_", "-")
     filename = _get_filename(package, temp_dir)
-    url = f"{BASE_URL}/{package_name}/{filename}"
+    url = f"{BASE_URL}/{package_name}/{filename.name}"
 
     try:
         _download_package(url, filename)
-        _pip_install(_rename_if_necessary(filename))
     except Exception as e:
-        click.echo(f"Failed to install {package}: {str(e)}")
+        click.echo(f"Failed to download {package}: {str(e)}")
         raise
+
+    return _rename_if_necessary(filename)
 
 
 def _setup_windows_conda_env(isaac_sim_path: Path, conda_prefix: Path):
@@ -223,11 +227,20 @@ def _pip_based_install():
     try:
         # Create a temporary directory to download the packages
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Install all required packages
-            for package in ISAAC_SIM_PACKAGES:
-                _install_isaac_sim_package(package, temp_dir)
+            temp_dir_path = Path(temp_dir)
+
+            # Download all required packages
+            package_filenames = []
+            for package in tqdm.tqdm(ISAAC_SIM_PACKAGES, desc="Downloading Isaac Sim packages"):
+                package_filenames.append(_download_isaac_sim_package(package, temp_dir_path))
+
+            # Install the packages
+            click.echo("Installing Isaac Sim packages...")
+            if not _pip_install(package_filenames):
+                return False
 
         # Check that it can now be imported
+        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim
     except ImportError:
         return False
@@ -241,7 +254,7 @@ def attempt_launcher_install(isaac_sim_path: Optional[Path]):
     if success:
         click.echo("Successfully found and attached to launcher-based Isaac Sim installation.")
     else:
-        click.echo("We did not find Isaac Sim installed via the launcher.")
+        click.echo("We did not find a compatible Isaac Sim installed via the launcher.")
     return success
 
 
@@ -251,7 +264,7 @@ def attempt_pip_install():
     if success:
         click.echo("Successfully installed Isaac Sim via pip.")
     else:
-        click.echo("Failed to import isaacsim. Something went wrong during the pip installation.")
+        click.echo("Something went wrong during the pip installation.")
     return success
 
 
@@ -299,26 +312,23 @@ def setup_omnigibson(
             "Please unset the EXP_PATH, CARB_APP_PATH and ISAAC_PATH environment variables before running this script."
         )
         click.echo("These can stem from a dirty environment from an existing Isaac Sim installation.")
+        click.echo("We recommend starting a new conda environment and running this script there.")
+        click.echo("You can do this by running `conda create -n omnigibson python=3.10`.")
         return
 
-    # Check that we have torch already installed, if not, install ltt and torch
+    # Check that we have torch already installed.
     try:
         import torch
     except ImportError:
-        try:
-            click.echo("Installing torch.")
-            subprocess.run(["python", "-m", "pip", "install", "light-the-torch"], check=True)
-            subprocess.run(["ltt", "install", "torch"], check=True)
-        except subprocess.CalledProcessError:
-            click.echo("Failed to install torch.")
-            click.echo(
-                "You can install it yourself from conda following the instructions here: https://pytorch.org/get-started/locally/"
-            )
-            click.echo("Rerun this script after installing torch.")
-            return
+        click.echo("Please install PyTorch before running this script.")
+        click.echo(
+            "You can do this by running `conda install pytorch torchvision torchaudio pytorch-cuda=12.1 numpy<2 -c pytorch -c nvidia`."
+        )
+        return
 
     # Check if the isaacsim package is already installed
     try:
+        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim
 
         click.echo("Isaac Sim is already installed via pip in your current env.")
