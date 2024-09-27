@@ -9,9 +9,6 @@ from typing import Optional
 
 import click
 
-from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import download_assets, download_og_dataset
-
 # List of NVIDIA PyPI packages needed for OmniGibson
 ISAAC_SIM_PACKAGES = [
     "omniverse_kit-106.1.0.140981",
@@ -295,7 +292,7 @@ def setup_omnigibson(
     except ImportError:
         try:
             click.echo("Installing torch.")
-            subprocess.run(["pip", "install", "light-the-torch"], check=True)
+            subprocess.run(["python", "-m", "pip", "install", "light-the-torch"], check=True)
             subprocess.run(["ltt", "install", "torch"], check=True)
         except subprocess.CalledProcessError:
             click.echo("Failed to install torch.")
@@ -339,6 +336,10 @@ def setup_omnigibson(
 
     if install_datasets:
         click.echo("We will now install the datasets.")
+
+        # We import these now to avoid OmniGibson imports before torch is installed etc.
+        from omnigibson.macros import gm
+        from omnigibson.utils.asset_utils import download_assets, download_og_dataset
 
         # Only execute if the dataset path or asset path does not exist
         dataset_exists, assets_exist = os.path.exists(gm.DATASET_PATH), os.path.exists(gm.ASSET_PATH)
