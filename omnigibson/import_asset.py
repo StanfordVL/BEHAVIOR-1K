@@ -35,16 +35,20 @@ from omnigibson.utils.asset_conversion_utils import (
     default="coacd",
     help="Method to generate the collision mesh. 'coacd' generates a set of convex decompositions, while 'convex' generates a single convex hull.",
 )
+@click.option("--scale", type=float, default=1.0, help="Scale factor to apply to the mesh.")
 @click.option("--up-axis", type=click.Choice(["z", "y"]), default="z", help="Up axis for the mesh.")
 @click.option("--headless", is_flag=True, help="Run the script in headless mode.")
+@click.option("--confirm-bbox", default=True, help="Whether to confirm the scale factor.")
 def import_asset(
     visual_mesh_path: str,
     category: str,
     model: str,
-    collision_mesh_path: Optional[Union[str, pathlib.Path, List[Union[str, pathlib.Path]]]] = None,
-    collision_method: Literal["coacd", "convex"] = "coacd",
-    up_axis: Literal["z", "y"] = "z",
-    headless: bool = False,
+    collision_mesh_path: Optional[Union[str, pathlib.Path, List[Union[str, pathlib.Path]]]],
+    collision_method: Literal["coacd", "convex"],
+    scale: float,
+    up_axis: Literal["z", "y"],
+    headless: bool,
+    confirm_bbox: bool,
 ):
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."
 
@@ -75,6 +79,25 @@ def import_asset(
         visual_mesh.apply_transform(rotation_matrix)
         for collision_mesh in collision_meshes:
             collision_mesh.apply_transform(rotation_matrix)
+
+    # If the scale is nonzero, we apply it to the meshes
+    if scale != 1.0:
+        scale_transform = trimesh.transformations.scale_matrix(scale)
+        visual_mesh.apply_transform(scale_transform)
+        for collision_mesh in collision_meshes:
+            collision_mesh.apply_transform(scale_transform)
+
+    # Check the bounding box size and complain if it's larger than 3 meters
+    bbox_size = visual_mesh.bounding_box.extents
+    click.echo(f"Visual mesh bounding box size: {bbox_size}")
+
+    if confirm_bbox:
+        if any(size > 3.0 for size in bbox_size):
+            click.echo(
+                f"Warning: The bounding box sounds a bit large. Are you sure you don't need to scale? "
+                f"We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
+            )
+            click.confirm("Do you want to continue?", abort=True)
 
     # Generate the URDF
     click.echo(f"Generating URDF for {category}/{model}...")
