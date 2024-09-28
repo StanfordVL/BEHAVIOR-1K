@@ -237,3 +237,22 @@ python -m omnigibson.examples.scenes.scene_selector # (1)!
 ??? question "OmniGibson is stuck at `HydraEngine rtx failed creating scene renderer.`"
 
     `OmniGibson` is likely using an unsupported GPU (default is id 0). Run `nvidia-smi` to see the active list of GPUs, and select an NVIDIA-supported GPU and set its corresponding ID when running `OmniGibson` with `export OMNIGIBSON_GPU_ID=<ID NUMBER>`.
+
+??? question "I'm getting the error `AttributeError: module 'x509' has no attribute 'Store'`"
+
+    This happens because launcher-based versions of Isaac Sim ship with a faulty copy of the `cryptography` module. You can simply look at the stack trace for the path of your copy of
+    the cryptography module, e.g. if it shows an error that looks like this:
+
+    ```
+    File "c:/users/cem/appdata/local/ov/pkg/isaac-sim-4.1.0/exts/omni.pip.cloud/pip_prebundle/cryptography/hazmat/backends/openssl/__init__.py", line 7, in <module>
+        from cryptography.hazmat.backends.openssl.backend import backend
+    File "c:/users/cem/appdata/local/ov/pkg/isaac-sim-4.1.0/exts/omni.pip.cloud/pip_prebundle/cryptography/hazmat/backends/openssl/backend.py", line 12, in <module>
+        from cryptography import utils, x509
+    File "c:/users/cem/appdata/local/ov/pkg/isaac-sim-4.1.0/exts/omni.pip.cloud/pip_prebundle/cryptography/x509/__init__.py", line 7, in <module>
+        from cryptography.x509 import certificate_transparency, verification
+    File "c:/users/cem/appdata/local/ov/pkg/isaac-sim-4.1.0/exts/omni.pip.cloud/pip_prebundle/cryptography/x509/verification.py", line 20, in <module>
+        Store = rust_x509.Store
+    AttributeError: module 'x509' has no attribute 'Store'
+    ```
+
+    You can simply remove the `c:/users/cem/appdata/local/ov/pkg/isaac-sim-4.1.0/exts/omni.pip.cloud/pip_prebundle/cryptography` directory and this issue should be resolved.
