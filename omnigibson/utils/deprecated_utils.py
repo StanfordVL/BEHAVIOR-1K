@@ -956,12 +956,12 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
     rgb_img = Image.fromarray(bboxes_2d_rgb)
     rgb_img_draw = ImageDraw.Draw(rgb_img)
     for bbox_2d in bboxes_2d_data:
-        semantic_id_list.append(bbox_2d["semanticId"])
+        semantic_id_list.append(bbox_2d[0])
         bbox_2d_list.append(bbox_2d)
     semantic_id_list_np = np.unique(np.array(semantic_id_list))
     color_list = random_colours(len(semantic_id_list_np.tolist()), True, num_channels)
     for bbox_2d in bbox_2d_list:
-        index = np.where(semantic_id_list_np == bbox_2d["semanticId"])[0][0]
+        index = np.where(semantic_id_list_np == bbox_2d[0])[0][0]
         bbox_color = color_list[index]
         outline = (bbox_color[0], bbox_color[1], bbox_color[2])
         if num_channels == 4:
@@ -971,9 +971,7 @@ def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):
                 bbox_color[2],
                 bbox_color[3],
             )
-        rgb_img_draw.rectangle(
-            [(bbox_2d["x_min"], bbox_2d["y_min"]), (bbox_2d["x_max"], bbox_2d["y_max"])], outline=outline, width=2
-        )
+        rgb_img_draw.rectangle([(bbox_2d[1], bbox_2d[2]), (bbox_2d[3], bbox_2d[4])], outline=outline, width=2)
     bboxes_2d_rgb = np.array(rgb_img)
     return bboxes_2d_rgb
 
