@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from importlib.util import find_spec
 from pathlib import Path
 from typing import List, Optional
 
@@ -332,6 +333,23 @@ def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_p
         if not attempt_pip_install():
             click.echo("Failed to install Isaac Sim. Please check the installation requirements and try again.")
             return
+
+    # Try to resolve the bug that occurs when `cryptography` is imported from Isaac Sim.
+    # This is a known issue on Windows and the workaround is removing the copy of cryptography
+    # shipped with Isaac Sim, usually included in the omni.kit.cloud package.
+    cryptography_spec = find_spec("cryptography")
+    if cryptography_spec is not None and cryptography_spec.origin is not None:
+        # Get the path to the cryptography module by searching for the first occurrence of the module name in the origin path
+        cryptography_path = Path(cryptography_spec.origin)
+        while "cryptography" not in cryptography_path.name:
+            cryptography_path = cryptography_path.parent
+
+        # Check if this path is a subpath of the ISAAC_PATH.
+        # If it is, remove the cryptography module from the ISAAC_PATH.
+        isaac_path = Path(os.environ["ISAAC_PATH"])
+        if cryptography_path in isaac_path.parents:
+            click.echo("Applying hotfix: removing the copy of cryptography shipped with Isaac Sim.")
+            cryptography_path.unlink()
 
     click.echo("Isaac Sim has been successfully installed.")
 
