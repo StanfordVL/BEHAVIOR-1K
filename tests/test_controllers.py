@@ -305,5 +305,6 @@ def test_arm_control():
                                 f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
                             )
 
+
 if __name__ == "__main__":
     test_arm_control()
