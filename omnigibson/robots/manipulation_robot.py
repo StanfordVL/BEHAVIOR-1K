@@ -279,7 +279,6 @@ class ManipulationRobot(BaseRobot):
 
         # Get robot links
         link_paths = set(self.link_prim_paths)
-        finger_paths = set([link.prim_path for link in self.finger_links[arm]])
 
         if not return_contact_positions:
             raw_contact_data = {
