@@ -1,3 +1,7 @@
+---
+icon: material/email
+---
+
 # **Contact**
 
 If you have any questions, comments, or concerns, please feel free to reach out to us by joining our Discord server:
