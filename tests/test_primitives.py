@@ -1,6 +1,8 @@
 import os
 
 import yaml
+import random
+import torch as th
 from pytest_rerunfailures import pytest
 
 import omnigibson as og
@@ -67,18 +69,11 @@ def primitive_tester(env, objects, primitives, primitives_args):
 
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
     try:
-
         for primitive, args in zip(primitives, primitives_args):
-            try:
-                execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)
-            except Exception as e:
-                return False
+            execute_controller(controller.apply_ref(primitive, *args), env)
     finally:
         # Clear the sim
         og.clear()
-
-    return True
-
 
 @pytest.mark.flaky(reruns=5)
 @pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
@@ -138,7 +133,7 @@ class TestPrimitives:
         primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
         primitives_args = [(obj_2["object"],), (obj_1["object"],)]
 
-        assert primitive_tester(env, objects, primitives, primitives_args)
+        primitive_tester(env, objects, primitives, primitives_args)
 
     @pytest.mark.skip(reason="primitives are broken")
     def test_open_prismatic(self, robot):
@@ -158,7 +153,7 @@ class TestPrimitives:
         primitives = [StarterSemanticActionPrimitiveSet.OPEN]
         primitives_args = [(obj_1["object"],)]
 
-        assert primitive_tester(env, objects, primitives, primitives_args)
+        primitive_tester(env, objects, primitives, primitives_args)
 
     @pytest.mark.skip(reason="primitives are broken")
     def test_open_revolute(self, robot):
@@ -176,4 +171,4 @@ class TestPrimitives:
         primitives = [StarterSemanticActionPrimitiveSet.OPEN]
         primitives_args = [(obj_1["object"],)]
 
-        assert primitive_tester(env, objects, primitives, primitives_args)
+        primitive_tester(env, objects, primitives, primitives_args)

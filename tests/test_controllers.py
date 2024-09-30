@@ -202,11 +202,11 @@ def test_arm_control():
                 "base_move": dict(),
             }
 
+            env.scene.load_state(env.scene._initial_state)
+
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
                 robot.reload_controllers(controller_config)
-                # reload the state for controllers
-                env.scene.update_initial_state()
 
                 # Define actions to use
                 zero_action = th.zeros(robot.action_dim)
@@ -260,6 +260,8 @@ def test_arm_control():
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
+            env.scene.update_initial_state()
+
             # For each action set, reset all robots, then run actions and see if arm moves in expected way
             for action_name, action in actions.items():
                 # Reset the environment and keep all robots still
@@ -304,6 +306,3 @@ def test_arm_control():
                                 f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
                                 f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
                             )
-
-if __name__ == "__main__":
-    test_arm_control()
