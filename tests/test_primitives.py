@@ -1,8 +1,6 @@
 import os
 
 import yaml
-import random
-import torch as th
 from pytest_rerunfailures import pytest
 
 import omnigibson as og
