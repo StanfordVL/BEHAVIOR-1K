@@ -1,8 +1,8 @@
 import os
-
-import yaml
 import random
+
 import torch as th
+import yaml
 from pytest_rerunfailures import pytest
 
 import omnigibson as og
@@ -74,6 +74,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
     finally:
         # Clear the sim
         og.clear()
+
 
 @pytest.mark.flaky(reruns=5)
 @pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
