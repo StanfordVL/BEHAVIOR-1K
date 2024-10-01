@@ -772,12 +772,12 @@ class VisionSensor(BaseSensor):
         horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
         vertical_fov = horizontal_fov * height / width
 
-        fx = (width / 2.0) / th.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / th.tan(vertical_fov / 2.0)
+        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 
-        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
         return intrinsic_matrix
 
     @property

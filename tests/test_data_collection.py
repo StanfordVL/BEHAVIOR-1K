@@ -124,8 +124,8 @@ def test_data_collect_and_playback():
                 "image_width": 128,
                 "focal_length": 12.0,
             },
-            "local_position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
-            "local_orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
+            "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
+            "orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
         },
     ]
 
