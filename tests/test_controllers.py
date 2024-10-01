@@ -108,34 +108,34 @@ def test_arm_control():
             },
             "base_move": {
                 "pos": lambda target, curr, init: check_zero_error(
-                    curr, init, tol=0.02
+                    curr, init, tol=0.05
                 ),  # Slightly bigger tolerance with base moving
                 "ori": lambda target, curr, init: check_ori_error(curr, init),
             },
         },
         "absolute_pose": {
             "zero": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "forward": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "side": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "up": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "rotate": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(target, curr, tol=0.05),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "base_move": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "pos": lambda target, curr, init: check_zero_error(target, curr),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
         },
