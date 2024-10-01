@@ -414,8 +414,7 @@ class VisionSensor(BaseSensor):
             key = int(key)
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
-            else:
-                assert "/" in value, f"Instance segmentation (ID) label {value} is not a valid prim path!"
+            elif "/" in value:
                 prim_name = value.split("/")[-1]
                 # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
                 # Remap instance segmentation and instance segmentation ID labels to system name
@@ -440,6 +439,9 @@ class VisionSensor(BaseSensor):
                     # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
                     else:
                         pass
+            else:
+                # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
+                value = "unlabelled"
 
             self._register_instance(value, id=id)
             replicator_mapping[key] = value
