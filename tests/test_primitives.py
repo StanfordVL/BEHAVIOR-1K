@@ -85,7 +85,6 @@ def primitive_tester(env, objects, primitives, primitives_args):
         og.clear()
 
 
-# @pytest.mark.flaky(reruns=5)
 @pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
 class TestPrimitives:
     def test_navigate(self, robot):
