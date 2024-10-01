@@ -1,5 +1,8 @@
 import os
 import yaml
+import random
+import torch as th
+import numpy as np
 from pytest_rerunfailures import pytest
 
 import omnigibson as og
@@ -37,6 +40,14 @@ def setup_environment(load_object_categories, robot="Fetch"):
         "robots": [robots],
     }
 
+    seed = 40
+    random.seed(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    th.cuda.manual_seed(seed)
+    th.backends.cudnn.benchmark = False
+    th.backends.cudnn.deterministic = True
+
     if og.sim is None:
         # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
         gm.ENABLE_OBJECT_STATES = True
@@ -67,13 +78,13 @@ def primitive_tester(env, objects, primitives, primitives_args):
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
     try:
         for primitive, args in zip(primitives, primitives_args):
-            execute_controller(controller.apply_ref(primitive, *args), env)
+            execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)
     finally:
         # Clear the sim
         og.clear()
 
 
-@pytest.mark.flaky(reruns=5)
+# @pytest.mark.flaky(reruns=5)
 @pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
 class TestPrimitives:
     def test_navigate(self, robot):
@@ -91,7 +102,7 @@ class TestPrimitives:
         primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
         primitives_args = [(obj_1["object"],)]
 
-        assert primitive_tester(env, objects, primitives, primitives_args)
+        primitive_tester(env, objects, primitives, primitives_args)
 
     def test_grasp(self, robot):
         categories = ["floors", "ceilings", "walls", "coffee_table"]
@@ -108,7 +119,7 @@ class TestPrimitives:
         primitives = [StarterSemanticActionPrimitiveSet.GRASP]
         primitives_args = [(obj_1["object"],)]
 
-        assert primitive_tester(env, objects, primitives, primitives_args)
+        primitive_tester(env, objects, primitives, primitives_args)
 
     def test_place(self, robot):
         categories = ["floors", "ceilings", "walls", "coffee_table"]
