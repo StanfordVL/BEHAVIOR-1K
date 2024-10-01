@@ -17,6 +17,7 @@ def test_arm_control():
         "robots": [
             {
                 "type": "FrankaPanda",
+                "name": "robot0",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -24,6 +25,7 @@ def test_arm_control():
             },
             {
                 "type": "Fetch",
+                "name": "robot1",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
@@ -31,6 +33,7 @@ def test_arm_control():
             },
             {
                 "type": "Tiago",
+                "name": "robot2",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 110],
                 "orientation": [0, 0, 0, 1],
@@ -38,6 +41,7 @@ def test_arm_control():
             },
             {
                 "type": "A1",
+                "name": "robot3",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 115],
                 "orientation": [0, 0, 0, 1],
@@ -45,6 +49,7 @@ def test_arm_control():
             },
             {
                 "type": "R1",
+                "name": "robot4",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 120],
                 "orientation": [0, 0, 0, 1],
@@ -52,6 +57,7 @@ def test_arm_control():
             },
         ],
     }
+
     env = og.Environment(configs=cfg)
 
     # Define error functions to use
@@ -108,34 +114,34 @@ def test_arm_control():
             },
             "base_move": {
                 "pos": lambda target, curr, init: check_zero_error(
-                    curr, init, tol=0.05
+                    curr, init, tol=0.02
                 ),  # Slightly bigger tolerance with base moving
                 "ori": lambda target, curr, init: check_ori_error(curr, init),
             },
         },
         "absolute_pose": {
             "zero": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "forward": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "side": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "up": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "rotate": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
-                "ori": lambda target, curr, init: check_ori_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
+                "ori": lambda target, curr, init: check_ori_error(target, curr, tol=0.05),
             },
             "base_move": {
-                "pos": lambda target, curr, init: check_zero_error(target, curr),
+                "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
                 "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
         },
@@ -202,6 +208,7 @@ def test_arm_control():
                 "base_move": dict(),
             }
 
+            # Load the initial state without stepping physics
             env.scene.load_state(env.scene._initial_state)
 
             for i, robot in enumerate(env.robots):
@@ -260,6 +267,9 @@ def test_arm_control():
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
+            # Update the state (e.g. goal) of the new controllers to the initial state
+            # This step is crucial because if env.reset() is called directly, we will load the state of the old controllers and step physics,
+            # which causes can cause errors because the goal is obsolete.
             env.scene.update_initial_state()
 
             # For each action set, reset all robots, then run actions and see if arm moves in expected way
