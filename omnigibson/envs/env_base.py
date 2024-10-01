@@ -1,3 +1,5 @@
+import random
+import string
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
@@ -267,7 +269,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}"
+                    robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
 
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")

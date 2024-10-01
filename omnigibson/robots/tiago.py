@@ -267,7 +267,8 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
     def arm_control_idx(self):
         # Add combined entry
         idxs = super().arm_control_idx
-        idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))
+        # Concatenate all values and sort them
+        idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
 
     @property
@@ -468,8 +469,8 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
     @property
     def arm_workspace_range(self):
         return {
-            "left": [th.deg2rad(th.tensor([15])).item(), th.deg2rad(th.tensor([75])).item()],
-            "right": [th.deg2rad(th.tensor([-75])).item(), th.deg2rad(th.tensor([-15])).item()],
+            "left": th.deg2rad(th.tensor([15, 75], dtype=th.float32)),
+            "right": th.deg2rad(th.tensor([-75, -15], dtype=th.float32)),
         }
 
     @property

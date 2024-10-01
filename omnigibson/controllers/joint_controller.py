@@ -237,14 +237,18 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return dict(target=target)
 
     def _compute_no_op_action(self, control_dict):
-        if self._use_delta_commands:
-            base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
-            # TODO: do we need to care about the entire gimbal lock situation?
-            command = self._goal["target"] - base_value
-        else:
-            command = self._goal["target"]
+        if self.motor_type == "position":
+            if self._use_delta_commands:
+                return th.zeros(self.command_dim)
+            else:
+                return control_dict[f"joint_position"][self.dof_idx]
+        elif self.motor_type == "velocity":
+            if self._use_delta_commands:
+                return -control_dict[f"joint_velocity"][self.dof_idx]
+            else:
+                return th.zeros(self.command_dim)
 
-        return command
+        raise ValueError("Cannot compute noop action for effort motor type.")
 
     def _get_goal_shapes(self):
         return dict(target=(self.control_dim,))

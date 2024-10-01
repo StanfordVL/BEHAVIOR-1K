@@ -169,7 +169,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             Array[float]: Processed command vector
         """
         # Make sure command is a th.tensor
-        command = th.tensor([command]) if type(command) in {int, float} else command
+        command = th.tensor([command], dtype=th.float32) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -336,7 +336,8 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def compute_no_op_action(self, control_dict):
         """
-        Compute no-op action given the goal
+        Compute a no-op action that updates the goal to match the current position
+        Disclaimer: this no-op might cause drift under external load (e.g. when the controller cannot reach the goal position)
         """
         if self._goal is None:
             self._goal = self.compute_no_op_goal(control_dict=control_dict)
