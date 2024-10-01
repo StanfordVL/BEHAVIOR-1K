@@ -131,9 +131,9 @@ nav:
     - FAQ: miscellaneous/faq.md
     - Known Issues & Troubleshooting: miscellaneous/known_issues.md
     - Contributing: miscellaneous/contributing.md
-    - Changelog: https://github.com/StanfordVL/OmniGibson/releases
     - Contact Us: miscellaneous/contact.md
   - API Reference: reference/*
+  - Changelog: https://github.com/StanfordVL/OmniGibson/releases
 
 extra:
   analytics:
