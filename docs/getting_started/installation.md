@@ -37,6 +37,21 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
             conda activate omnigibson
             ```
 
+            ??? question "What should I do if `conda create` fails?"
+
+                Sometimes, conda will fail to resolve dependencies. In that case, you can create a Python-only conda environment
+                first, and then install numpy<2 and PyTorch via pip.
+                
+                If the default PyTorch version does not work for you due to a CUDA version compatibility issue, follow instructions
+                on [the PyTorch website](https://pytorch.org/get-started/locally/) to add the correct index option to the pip install
+                line to get a different pytorch version.
+
+                ```shell
+                conda create -n omnigibson python=3.10
+                conda activate omnigibson
+                pip install "numpy<2" torch torchvision torchaudio
+                ```
+
         2. Install OmniGibson:
 
             <div class="grid" markdown>
@@ -63,11 +78,13 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
         3. Run the installation script to  install Isaac Sim as well as **`OmniGibson`** dataset and assets:
 
-            ```shell
-            python -m omnigibson.install
+            ```{.shell .annotate} 
+            python -m omnigibson.install # (1)!
             ```
 
-            If this step fails, we recommend considering the [source installation](#-install-from-source-linux--windows) method.
+            1. You can apply additional flag `--no-install-datasets` to skip dataset install.
+
+            If this step fails, we recommend considering the [source installation](#__tabbed_1_3) method.
 
         </div>
 
@@ -149,6 +166,21 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
             conda activate omnigibson
             ```
 
+            ??? question "What should I do if `conda create` fails?"
+
+                Sometimes, conda will fail to resolve dependencies. In that case, you can create a Python-only conda environment
+                first, and then install numpy<2 and PyTorch via pip.
+                
+                If the default PyTorch version does not work for you due to a CUDA version compatibility issue, follow instructions
+                on [the PyTorch website](https://pytorch.org/get-started/locally/) to add the correct index option to the pip install
+                line to get a different pytorch version.
+
+                ```shell
+                conda create -n omnigibson python=3.10
+                conda activate omnigibson
+                pip install "numpy<2" torch torchvision torchaudio
+                ```
+
         3. Install OmniGibson:
 
             <div class="grid" markdown>
@@ -175,9 +207,11 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
         4. Run the installation script to hook the environment up to Isaac Sim as well as **`OmniGibson`** dataset and assets:
 
-            ```shell
-            python -m omnigibson.install --launcher-install
+            ```{.shell .annotate} 
+            python -m omnigibson.install --launcher-install # (1)!
             ```
+
+            1. You can specify your Isaac Sim install location using the argument `--isaac-sim-path` if it differs from the default. You can also apply additional flag `--no-install-datasets` to skip dataset install.
 
             !!! note "What does this do?"
 
