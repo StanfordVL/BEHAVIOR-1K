@@ -72,7 +72,6 @@ m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 m.KIT_FILES = {
     (4, 0, 0): "omnigibson_4_0_0.kit",
     (4, 1, 0): "omnigibson_4_1_0.kit",
-    (2023, 1, 1): "omnigibson_2023_1_1.kit",
 }
 
 
@@ -111,6 +110,7 @@ def _launch_app():
     # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
     # On the regular omniverse launcher version this should not have any impact.
     try:
+        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim  # noqa: F401
     except ImportError:
         isaacsim = None

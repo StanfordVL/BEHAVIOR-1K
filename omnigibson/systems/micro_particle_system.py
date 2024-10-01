@@ -219,7 +219,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.tensor(self.get_attribute(attr="positions"))
+        return vtarray_to_torch(self.get_attribute(attr="positions"))
 
     @particle_positions.setter
     def particle_positions(self, pos):
@@ -273,7 +273,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.tensor(self.get_attribute(attr="velocities"))
+        return vtarray_to_torch(self.get_attribute(attr="velocities"))
 
     @particle_velocities.setter
     def particle_velocities(self, vel):
@@ -296,7 +296,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return th.tensor(self.get_attribute(attr="scales"))
+        return vtarray_to_torch(self.get_attribute(attr="scales"))
 
     @particle_scales.setter
     def particle_scales(self, scales):
@@ -319,7 +319,7 @@ class PhysxParticleInstancer(BasePrim):
             th.tensor: (N,) numpy array, where each of the N particles' prototype_id (i.e.: which prototype is being used
                 for that particle)
         """
-        return th.tensor(self.get_attribute(attr="protoIndices"))
+        return vtarray_to_torch(self.get_attribute(attr="protoIndices"))
 
     @particle_prototype_ids.setter
     def particle_prototype_ids(self, prototype_ids):
@@ -766,7 +766,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Omniverse has a bug where all particle positions, orientations, velocities, and scales are correctly reset
         when sim is stopped, but not the prototype IDs. This function is a workaround for that.
         """
-        if self.initialized:
+        if self.initialized and self.particle_instancers is not None:
             for instancer in self.particle_instancers.values():
                 instancer.particle_prototype_ids = th.zeros(instancer.n_particles, dtype=th.int32)
 
