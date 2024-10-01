@@ -49,3 +49,17 @@ The BEHAVIOR suite has continuous integration running via Github Actions in cont
 * When GitHub releases are created, a source distribution will be packed and shipped on PyPI by a hosted runner
 
 For more information about the workflows and runners, please reach out on our Discord channel.
+
+## **Release Process**
+At the time of each release, we follow the below process:
+
+1. Update the version of OmniGibson in the pyproject.toml and __init__.py files.
+2. Add a release note on the README.md file
+3. Push to `og-develop`
+4. Wait for all tests to finish, confirm they are passing, confirm docs build on behavior-website
+5. Push `og-develop` to `main`
+6. Click on create release on GitHub, tag the version starting with the letter `v`
+7. Create release notes. You can use the automated release notes but edit to include the important info.
+8. Create the release.
+9. Wait for docker and PyPI releases to finish, confirm success
+10. Announce on Discord, user channels.
