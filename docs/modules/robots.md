@@ -231,7 +231,7 @@ These are robots that can both navigate and manipulate (and inherit from both [`
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`R1`**](../reference/robots/tiago.md)<br><br>  
+            [**`R1`**](../reference/robots/R1.md)<br><br>  
             The bimanual R1 model, composed of a holonomic base (which we model as a 3-DOF (x,y,rz) set of joints), 4-DOF torso, x2 6-DOF arm, and x2 2-DOF parallel jaw grippers.<br><br> 
             <ul>
                 <li>_Controllers_: Base, Left Arm, Right Arm, Left Gripper, Right Gripper</li>
