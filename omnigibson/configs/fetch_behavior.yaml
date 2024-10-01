@@ -13,8 +13,9 @@ env:
       sensor_kwargs:
         image_height: 128
         image_width: 128
-      local_position: [0, 0, 1.0]
-      local_orientation: [0.707, 0.0, 0.0, 0.707]
+      position: [0, 0, 1.0]
+      orientation: [0.707, 0.0, 0.0, 0.707]
+      pose_frame: parent
 
 
 render:
