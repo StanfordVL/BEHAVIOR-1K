@@ -28,7 +28,7 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
