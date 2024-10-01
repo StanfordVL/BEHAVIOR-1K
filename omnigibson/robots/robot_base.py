@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from copy import deepcopy
 
-import matplotlib.pyplot as plt
 import torch as th
 
 import omnigibson.utils.transform_utils as T
@@ -416,6 +415,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             print(f"Modalities: {remaining_obs_modalities} cannot be visualized, skipping...")
 
         # Write all the frames to a plot
+        import matplotlib.pyplot as plt
+
         for sensor_name, sensor_frames in frames.items():
             n_sensor_frames = len(sensor_frames)
             if n_sensor_frames > 0:
