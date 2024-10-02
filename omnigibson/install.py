@@ -283,7 +283,9 @@ def attempt_pip_install():
 
 @click.command()
 @click.option(
-    "--install-datasets", default=True, help="Install the OmniGibson dataset and assets after installing Isaac Sim"
+    "--install-datasets/--no-install-datasets",
+    default=True,
+    help="Install the OmniGibson dataset and assets after installing Isaac Sim",
 )
 @click.option(
     "--launcher-install/--pip-install",
