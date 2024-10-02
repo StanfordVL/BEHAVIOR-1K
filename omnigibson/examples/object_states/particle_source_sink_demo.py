@@ -9,7 +9,6 @@ from omnigibson.utils.constants import ParticleModifyCondition
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_HQ_RENDERING = True
-gm.DEFAULT_RENDERING_FREQ = 60
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -32,9 +31,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
-        }
+        },
     }
 
     # Define objects to load into the environment

@@ -58,7 +58,7 @@ def set_carb_settings_for_fluid_isosurface():
     # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
     assert (
         1 / og.sim.get_rendering_dt()
-    ) >= min_frame_rate, f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing gm.DEFAULT_RENDERING_FREQ to {min_frame_rate}."
+    ) >= min_frame_rate, f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
 
     # Settings for Isosurface
     isregistry = lazy.carb.settings.acquire_settings_interface()
