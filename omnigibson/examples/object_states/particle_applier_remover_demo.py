@@ -17,6 +17,7 @@ macros.object_states.covered.MAX_VISUAL_PARTICLES = 300
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_HQ_RENDERING = True
+gm.DEFAULT_RENDERING_FREQ = 60
 
 
 def main(random_selection=False, headless=False, short_exec=False):

@@ -54,6 +54,12 @@ def set_carb_settings_for_fluid_isosurface():
     """
     Sets relevant rendering settings in the carb settings in order to use isosurface effectively
     """
+    min_frame_rate = 60
+    # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
+    assert (
+        1 / og.sim.get_rendering_dt()
+    ) >= min_frame_rate, f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing gm.DEFAULT_RENDERING_FREQ to {min_frame_rate}."
+
     # Settings for Isosurface
     isregistry = lazy.carb.settings.acquire_settings_interface()
     # disable grid and lights
@@ -63,7 +69,7 @@ def set_carb_settings_for_fluid_isosurface():
     isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
     isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
     isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)
-    isregistry.set_int("persistent/simulation/minFrameRate", 60)
+    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, min_frame_rate)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
     isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
