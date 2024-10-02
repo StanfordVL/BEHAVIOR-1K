@@ -78,11 +78,11 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
         3. Run the installation script to  install Isaac Sim as well as **`OmniGibson`** dataset and assets:
 
-            ```{.shell .annotate} 
-            python -m omnigibson.install # (1)!
+            ```shell
+            python -m omnigibson.install
             ```
 
-            1. You can apply additional flag `--no-install-datasets` to skip dataset install.
+            You can apply additional flag `--no-install-datasets` to skip dataset install.
 
             If this step fails, we recommend considering the [source installation](#__tabbed_1_3) method.
 
@@ -207,11 +207,11 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
         4. Run the installation script to hook the environment up to Isaac Sim as well as **`OmniGibson`** dataset and assets:
 
-            ```{.shell .annotate} 
-            python -m omnigibson.install --launcher-install # (1)!
+            ```shell
+            python -m omnigibson.install --launcher-install
             ```
 
-            1. You can specify your Isaac Sim install location using the argument `--isaac-sim-path` if it differs from the default. You can also apply additional flag `--no-install-datasets` to skip dataset install.
+            You can specify your Isaac Sim install location using the argument `--isaac-sim-path` if it differs from the default. You can also apply additional flag `--no-install-datasets` to skip dataset install.
 
             !!! note "What does this do?"
 
