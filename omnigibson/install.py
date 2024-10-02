@@ -83,7 +83,8 @@ def _rename_if_necessary(filename: Path):
     the filename suggests not - so we apply this hacky workaround. This allows pip to try to install them.
     """
     if platform.system() == "Linux" and _is_glibc_older():
-        return filename.with_name(filename.name.replace("manylinux_2_34", "manylinux_2_31"))
+        new_filename = filename.with_name(filename.name.replace("manylinux_2_34", "manylinux_2_31"))
+        shutil.move(filename, new_filename)
     return filename
 
 
