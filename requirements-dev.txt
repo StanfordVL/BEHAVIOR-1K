@@ -9,5 +9,4 @@ mkdocs-material-extensions
 mkdocstrings[python]
 mkdocs-section-index
 mkdocs-literate-nav
-wandb
 telemoma~=0.1.2

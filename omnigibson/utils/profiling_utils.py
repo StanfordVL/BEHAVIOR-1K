@@ -3,10 +3,34 @@ from time import time
 
 import gymnasium as gym
 import psutil
-from wandb.sdk.internal.system.assets.gpu import gpu_in_use_by_this_process
-from wandb.vendor.pynvml import pynvml
 
 import omnigibson as og
+import omnigibson.utils.pynvml_utils as pynvml
+
+
+def gpu_in_use_by_this_process(gpu_handle: "GPUHandle", pid: int) -> bool:
+    if psutil is None:
+        return False
+
+    try:
+        base_process = psutil.Process(pid=pid)
+    except psutil.NoSuchProcess:
+        # do not report any gpu metrics if the base process cant be found
+        return False
+
+    our_processes = base_process.children(recursive=True)
+    our_processes.append(base_process)
+
+    our_pids = {process.pid for process in our_processes}
+
+    compute_pids = {process.pid for process in pynvml.nvmlDeviceGetComputeRunningProcesses(gpu_handle)}  # type: ignore
+    graphics_pids = {
+        process.pid for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
+    }
+
+    pids_using_device = compute_pids | graphics_pids
+
+    return len(pids_using_device & our_pids) > 0
 
 
 class ProfilingEnv(og.Environment):
