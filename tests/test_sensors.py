@@ -69,7 +69,7 @@ def test_segmentation_modalities(env):
     assert set(int(x.item()) for x in th.unique(seg_instance)) == set(seg_instance_info.keys())
     expected_dict = {
         1: "unlabelled",
-        2: "robot0",
+        2: env.robots[0].name,
         3: "groundPlane",
         4: "dishtowel",
         5: "breakfast_table",
@@ -84,14 +84,14 @@ def test_segmentation_modalities(env):
     seg_instance_id_info = all_info["seg_instance_id"]
     assert set(int(x.item()) for x in th.unique(seg_instance_id)) == set(seg_instance_id_info.keys())
     expected_dict = {
-        3: "/World/robot0/gripper_link/visuals",
-        4: "/World/robot0/wrist_roll_link/visuals",
-        5: "/World/robot0/forearm_roll_link/visuals",
-        6: "/World/robot0/wrist_flex_link/visuals",
+        3: f"/World/{env.robots[0].name}/gripper_link/visuals",
+        4: f"/World/{env.robots[0].name}/wrist_roll_link/visuals",
+        5: f"/World/{env.robots[0].name}/forearm_roll_link/visuals",
+        6: f"/World/{env.robots[0].name}/wrist_flex_link/visuals",
         8: "/World/groundPlane/geom",
         9: "/World/dishtowel/base_link_cloth",
-        10: "/World/robot0/r_gripper_finger_link/visuals",
-        11: "/World/robot0/l_gripper_finger_link/visuals",
+        10: f"/World/{env.robots[0].name}/r_gripper_finger_link/visuals",
+        11: f"/World/{env.robots[0].name}/l_gripper_finger_link/visuals",
         12: "/World/breakfast_table/base_link/visuals",
         13: "stain",
         14: "white_rice",
@@ -134,15 +134,15 @@ def test_bbox_modalities(env):
     bbox_2d_loose = all_observation["bbox_2d_loose"]
     bbox_3d = all_observation["bbox_3d"]
 
-    assert bbox_2d_tight.shape[0] == 4
-    assert bbox_2d_loose.shape[0] == 4
-    assert bbox_3d.shape[0] == 3
+    assert len(bbox_2d_tight) == 4
+    assert len(bbox_2d_loose) == 4
+    assert len(bbox_3d) == 3
 
     bbox_2d_expected_objs = set(["floors", "agent", "breakfast_table", "dishtowel"])
     bbox_3d_expected_objs = set(["agent", "breakfast_table", "dishtowel"])
 
-    bbox_2d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_2d_tight])
-    bbox_3d_objs = set([semantic_class_id_to_name()[bbox["semanticId"]] for bbox in bbox_3d])
+    bbox_2d_objs = set([semantic_class_id_to_name()[bbox[0]] for bbox in bbox_2d_tight])
+    bbox_3d_objs = set([semantic_class_id_to_name()[bbox[0]] for bbox in bbox_3d])
 
     assert bbox_2d_objs == bbox_2d_expected_objs
     assert bbox_3d_objs == bbox_3d_expected_objs

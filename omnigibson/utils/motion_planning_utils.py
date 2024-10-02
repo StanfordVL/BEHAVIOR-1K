@@ -10,8 +10,11 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import GripperRigidContactAPI
 
+# Create module logger
+logger = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
 m.DIST_DIFF = 0.1
@@ -106,6 +109,7 @@ def plan_base_motion(
             segment = []
             segment.append(p2[0] - p1[0])
             segment.append(p2[1] - p1[1])
+            segment = th.tensor(segment, dtype=th.float32)
             return th.arctan2(segment[1], segment[0])
 
     def create_state(space, x, y, yaw):
@@ -118,12 +122,17 @@ def plan_base_motion(
         state().setYaw(_wrap_angle(yaw))
         return state
 
-    def state_valid_fn(q):
+    def state_valid_fn(q, verbose=False):
+        """
+        returns if the input pose is in collision with any objects within the context
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
+        """
+
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
-        pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
-        return not set_base_and_detect_collision(context, pose)
+        pose = (th.tensor([x, y, 0.0], dtype=th.float32), T.euler2quat(th.tensor([0, 0, yaw], dtype=th.float32)))
+        return not set_base_and_detect_collision(context, pose, verbose=verbose)
 
     def remove_unnecessary_rotations(path):
         """
@@ -188,13 +197,10 @@ def plan_base_motion(
     ss.setPlanner(planner)
 
     start = create_state(space, start_conf[0], start_conf[1], start_conf[2])
-    print(start)
-
     goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
-    print(goal)
 
     ss.setStartAndGoalStates(start, goal)
-    if not state_valid_fn(start()) or not state_valid_fn(goal()):
+    if not state_valid_fn(start(), verbose=True) or not state_valid_fn(goal(), verbose=True):
         return
 
     solved = ss.solve(planning_time)
@@ -213,13 +219,7 @@ def plan_base_motion(
     return None
 
 
-def plan_arm_motion(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True,
-):
+def plan_arm_motion(robot, end_conf, context, planning_time=15.0, torso_fixed=True):
     """
     Plans an arm motion to a final joint position
 
@@ -238,7 +238,7 @@ def plan_arm_motion(
     if torso_fixed:
         joint_control_idx = robot.arm_control_idx[robot.default_arm]
         dim = len(joint_control_idx)
-        initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
+        initial_joint_pos = robot.get_joint_positions()[joint_control_idx]
         control_idx_in_joint_pos = th.arange(dim)
     else:
         joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
@@ -251,18 +251,18 @@ def plan_arm_motion(
             initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
             control_idx_in_joint_pos = th.arange(dim)
 
-    def state_valid_fn(q):
+    def state_valid_fn(q, verbose=False):
         joint_pos = initial_joint_pos
-        joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
-        return not set_arm_and_detect_collision(context, joint_pos)
+        joint_pos[control_idx_in_joint_pos] = th.tensor([q[i] for i in range(dim)])
+        return not set_arm_and_detect_collision(context, joint_pos, verbose=verbose)
 
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(dim)
-    joints = th.tensor([joint for joint in robot.joints.values()])
-    arm_joints = joints[joint_control_idx]
+    all_joints = list(robot.joints.values())
+    arm_joints = [all_joints[i] for i in joint_control_idx.tolist()]
     for i, joint in enumerate(arm_joints):
         if end_conf[i] > joint.upper_limit:
             end_conf[i] = joint.upper_limit
@@ -290,7 +290,8 @@ def plan_arm_motion(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
-    if not state_valid_fn(start) or not state_valid_fn(goal):
+    # if the start pose or the goal pose collides, abort
+    if not state_valid_fn(start, verbose=True) or not state_valid_fn(goal, verbose=True):
         return
 
     # this will automatically choose a default planner with
@@ -304,19 +305,13 @@ def plan_arm_motion(
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
-            joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
+            joint_pos = th.tensor([sol_path.getState(i)[j] for j in range(dim)], dtype=th.float32)
             return_path.append(joint_pos)
         return return_path
     return None
 
 
-def plan_arm_motion_ik(
-    robot,
-    end_conf,
-    context,
-    planning_time=15.0,
-    torso_fixed=True,
-):
+def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed=True):
     """
     Plans an arm motion to a final end effector pose
 
@@ -327,7 +322,7 @@ def plan_arm_motion_ik(
         planning_time (float): Time to plan for
 
     Returns:
-        Array of arrays: Array of end effector pose that the robot should navigate to
+        th.tensor or None: Tensors of end effector pose that the robot should navigate to, if available
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
@@ -359,9 +354,9 @@ def plan_arm_motion_ik(
         eef_name=robot.eef_link_names[robot.default_arm],
     )
 
-    def state_valid_fn(q):
+    def state_valid_fn(q, verbose=False):
         joint_pos = initial_joint_pos
-        eef_pose = [q[i] for i in range(6)]
+        eef_pose = th.tensor([q[i] for i in range(6)], dtype=th.float32)
         control_joint_pos = ik_solver.solve(
             target_pos=eef_pose[:3],
             target_quat=T.axisangle2quat(eef_pose[3:]),
@@ -371,7 +366,7 @@ def plan_arm_motion_ik(
         if control_joint_pos is None:
             return False
         joint_pos[control_idx_in_joint_pos] = control_joint_pos
-        return not set_arm_and_detect_collision(context, joint_pos)
+        return not set_arm_and_detect_collision(context, joint_pos, verbose=verbose)
 
     # create an SE2 state space
     space = ob.RealVectorStateSpace(DOF)
@@ -414,7 +409,7 @@ def plan_arm_motion_ik(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
-    if not state_valid_fn(start) or not state_valid_fn(goal):
+    if not state_valid_fn(start, verbose=True) or not state_valid_fn(goal, verbose=True):
         return
 
     # this will automatically choose a default planner with
@@ -423,47 +418,49 @@ def plan_arm_motion_ik(
 
     if solved:
         # try to shorten the path
-        # ss.simplifySolution()
+        ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
-            eef_pose = [sol_path.getState(i)[j] for j in range(DOF)]
+            eef_pose = th.tensor([sol_path.getState(i)[j] for j in range(DOF)], dtype=th.float32)
             return_path.append(eef_pose)
         return return_path
     return None
 
 
-def set_base_and_detect_collision(context, pose):
+def set_base_and_detect_collision(context, pose, verbose=False):
     """
     Moves the robot and detects robot collisions with the environment and itself
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
         pose (Array): Pose in the world frame to check for collisions at
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         bool: Whether the robot is in collision
     """
+    # make a copy of the robot, set it to the goal pose, and check for possible collision
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(*th.tensor(pose[0], dtype=th.float32).tolist())
+    translation = lazy.pxr.Gf.Vec3d(pose[0].tolist())
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = th.tensor(pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+    orientation = pose[1][[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
+    return detect_robot_collision(context, verbose=verbose)
 
-    return detect_robot_collision(context)
 
-
-def set_arm_and_detect_collision(context, joint_pos):
+def set_arm_and_detect_collision(context, joint_pos, verbose=False):
     """
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
         joint_pos (Array): Joint positions to set the robot to
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
         bool: Whether the robot is in a valid state i.e. not in collision
@@ -480,23 +477,24 @@ def set_arm_and_detect_collision(context, joint_pos):
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = lazy.pxr.Gf.Vec3d(*th.tensor(mesh_pose[0], dtype=th.float32).tolist())
+                translation = lazy.pxr.Gf.Vec3d(*mesh_pose[0].tolist())
                 mesh.GetAttribute("xformOp:translate").Set(translation)
-                orientation = th.tensor(mesh_pose[1], dtype=th.float32)[[3, 0, 1, 2]]
+                orientation = mesh_pose[1][[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
 
-    return detect_robot_collision(context)
+    return detect_robot_collision(context, verbose=verbose)
 
 
-def detect_robot_collision(context):
+def detect_robot_collision(context, verbose=False):
     """
     Detects robot collisions
 
     Args:
         context (PlanningContext): Context to plan in that includes the robot copy
+        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
     Returns:
-        bool: Whether the robot is in collision
+        valid_hit(bool): Whether the robot is in collision
     """
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
@@ -509,6 +507,12 @@ def detect_robot_collision(context):
         nonlocal valid_hit
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+
+        # if verbose mode is on and overlap is detected, output a warning on the colliding object and robot mesh_path
+        if valid_hit and verbose:
+            logger.warning(
+                f"Could not make a plan to get to the target position, colliding objects: {hit.rigid_body} and {mesh_path}",
+            )
 
         return not valid_hit
 

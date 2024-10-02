@@ -23,7 +23,7 @@ def main():
         print(
             f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun omnigibson/download_datasets.py."
         )
-        if click.confirm("Do you want to continue?"):
+        if click.confirm("Do you want to continue?", default=True):
             # Only download if the dataset path doesn't exist
             if not dataset_exists:
                 print("Downloading dataset...")

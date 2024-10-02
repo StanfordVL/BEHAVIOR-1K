@@ -13,11 +13,13 @@
 -------
 
 ### Latest Updates
+- [10/01/24] **v1.1.0**: Major improvements, stability fixes, pip installation, and much more! [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v1.1.0)
+
 - [03/17/24] **v1.0.0**: First full release with 1,004 pre-sampled tasks, all 50 scenes, and many new objects! [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v1.0.0)
 
 - [08/04/23] **v0.2.0**: More assets! 600 pre-sampled tasks, 7 new scenes, and many new objects 📈 [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.2.0)
 
-- [04/10/22] **v0.1.0**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.1.0)
+- [04/10/23] **v0.1.0**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.1.0)
 
 -------
 

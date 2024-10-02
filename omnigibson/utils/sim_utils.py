@@ -55,34 +55,6 @@ def set_carb_setting(carb_settings, setting, value):
         raise TypeError(f"Value of type {type(value)} is not supported.")
 
 
-def check_deletable_prim(prim_path):
-    """
-    Checks whether the prim defined at @prim_path can be deleted.
-
-    Args:
-        prim_path (str): Path defining which prim should be checked for deletion
-
-    Returns:
-        bool: Whether the prim can be deleted or not
-    """
-    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
-        return False
-    if prim_path == "/World":
-        return False
-    if prim_path == "/":
-        return False
-    # Don't remove any /Render prims as that can cause crashes
-    if prim_path.startswith("/Render"):
-        return False
-    return True
-
-
 def prims_to_rigid_prim_set(inp_prims):
     """
     Converts prims @inp_prims into its corresponding set of rigid prims

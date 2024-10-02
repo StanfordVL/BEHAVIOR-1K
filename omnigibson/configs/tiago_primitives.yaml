@@ -1,4 +1,6 @@
 env:
+  action_frequency: 30                  # (int): environment executes action at the action_frequency rate
+  physics_frequency: 120                # (int): physics frequency (1 / physics_timestep for physx)
   device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
   automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
@@ -23,51 +25,58 @@ scene:
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
+  load_task_relevant_only: false
   seg_map_resolution: 0.1
   scene_source: OG
-  include_robots: true
+  include_robots: false
 
 robots:
-  - type: Turtlebot
-    obs_modalities: [scan, rgb, depth]
+  - type: Tiago
+    obs_modalities: [rgb, depth, seg_semantic, normal, seg_instance, seg_instance_id]
     scale: 1.0
-    self_collision: false
-    action_normalize: true
+    self_collisions: true
+    action_normalize: false
     action_type: continuous
+    grasping_mode: sticky
+    rigid_trunk: false
+    default_trunk_offset: 0.15
+    default_arm_pose: vertical
     sensor_config:
       VisionSensor:
         sensor_kwargs:
           image_height: 128
           image_width: 128
-      ScanSensor:
-          sensor_kwargs:
-            min_range: 0.05
-            max_range: 10.0
     controller_config:
       base:
-        name: DifferentialDriveController
+        name: JointController
+      arm_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      arm_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: false
+      camera:
+        name: JointController
 
 objects: []
 
 task:
-  type: PointNavigationTask
-  robot_idn: 0
-  floor: 0
-  initial_pos: null
-  initial_quat: null
-  goal_pos: null
-  goal_tolerance: 0.36    # turtlebot bodywidth
-  goal_in_polar: false
-  path_range: [1.0, 10.0]
-  visualize_goal: true
-  visualize_path: false
-  n_vis_waypoints: 25
-  reward_type: geodesic
-  termination_config:
-    max_collisions: 500
-    max_steps: 500
-    fall_height: 0.03
-  reward_config:
-    r_potential: 1.0
-    r_collision: 0.1
-    r_pointgoal: 10.0
+  type: DummyTask

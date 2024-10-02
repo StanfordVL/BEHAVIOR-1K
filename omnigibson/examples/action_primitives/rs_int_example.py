@@ -23,7 +23,7 @@ def main():
     """
     Demonstrates how to use the action primitives to pick and place an object in a crowded scene.
 
-    It loads Rs_int with a Fetch robot, and the robot picks and places an apple.
+    It loads Rs_int with a robot, and the robot picks and places an apple.
     """
     # Load the config
     config_filename = os.path.join(og.example_config_path, "fetch_primitives.yaml")

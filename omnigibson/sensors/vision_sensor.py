@@ -382,7 +382,7 @@ class VisionSensor(BaseSensor):
 
         image_keys = th.unique(img)
         if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
-            log.warning(
+            log.debug(
                 "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
             )
 
@@ -414,8 +414,7 @@ class VisionSensor(BaseSensor):
             key = int(key)
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
-            else:
-                assert "/" in value, f"Instance segmentation (ID) label {value} is not a valid prim path!"
+            elif "/" in value:
                 prim_name = value.split("/")[-1]
                 # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
                 # Remap instance segmentation and instance segmentation ID labels to system name
@@ -440,6 +439,9 @@ class VisionSensor(BaseSensor):
                     # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
                     else:
                         pass
+            else:
+                # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
+                value = "unlabelled"
 
             self._register_instance(value, id=id)
             replicator_mapping[key] = value
@@ -482,6 +484,8 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
             bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        # Replicator returns each box as a numpy.void; we convert them to tuples here
+        bboxes = [box.tolist() for box in bboxes]
         info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
         return bboxes, info
 
@@ -770,12 +774,12 @@ class VisionSensor(BaseSensor):
         horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
         vertical_fov = horizontal_fov * height / width
 
-        fx = (width / 2.0) / th.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / th.tan(vertical_fov / 2.0)
+        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 
-        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
         return intrinsic_matrix
 
     @property

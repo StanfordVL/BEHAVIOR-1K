@@ -566,9 +566,12 @@ class BDDLEntity(Wrapper):
 
 class BDDLSampler:
     def __init__(self, env, activity_conditions, object_scope, backend):
+        # Avoid circular imports here
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = self._env.scene.scene_model
+        self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
         self._backend = backend
         self._activity_conditions = activity_conditions

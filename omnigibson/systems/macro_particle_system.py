@@ -1,6 +1,4 @@
-import os
-
-import matplotlib.pyplot as plt
+import cv2
 import torch as th
 import trimesh
 
@@ -212,7 +210,7 @@ class MacroParticleSystem(BaseSystem):
             else:
                 diffuse_texture = self.particle_object.material.diffuse_texture
                 color = (
-                    plt.imread(diffuse_texture).mean(dim=(0, 1))
+                    cv2.imread(diffuse_texture).mean()
                     if diffuse_texture
                     else self.particle_object.material.diffuse_color_constant
                 )

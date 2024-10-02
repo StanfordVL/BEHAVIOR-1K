@@ -114,7 +114,7 @@ class DifferentialDriveController(LocomotionController):
         return dict(vel=th.zeros(2))
 
     def _compute_no_op_action(self, control_dict):
-        return self._goal["vel"]
+        return th.zeros(2, dtype=th.float32)
 
     def _get_goal_shapes(self):
         # Add (2, )-array representing linear, angular velocity

@@ -662,7 +662,7 @@ def test_on_fire(env):
 @og_test
 def test_toggled_on(env):
     stove = env.scene.object_registry("name", "stove")
-    robot = env.scene.object_registry("name", "robot0")
+    robot = env.robots[0]
 
     stove.set_position_orientation(
         [1.48, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, -math.pi / 2.0], dtype=th.float32))
@@ -716,19 +716,24 @@ def test_toggled_on(env):
     assert not stove.states[ToggledOn].get_value()
 
 
-@pytest.mark.skip(reason="skipping attachment for now")
 @og_test
 def test_attached_to(env):
     shelf_back_panel = env.scene.object_registry("name", "shelf_back_panel")
     shelf_shelf = env.scene.object_registry("name", "shelf_shelf")
     shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
 
+    # Lower the mass of the shelf - otherwise, the gravity will create enough torque to break the joint
+    shelf_shelf.root_link.mass = 0.1
+
     shelf_back_panel.set_position_orientation(position=[0, 0, 0.01], orientation=[0, 0, 0, 1])
     shelf_back_panel.keep_still()
     shelf_shelf.set_position_orientation(position=[0, 0.03, 0.17], orientation=[0, 0, 0, 1])
     shelf_shelf.keep_still()
 
+    og.sim.step()
+
     # The shelf should not be attached to the back panel (no contact yet)
+    assert not shelf_shelf.states[Touching].get_value(shelf_back_panel)
     assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
     # Let the shelf fall
@@ -736,16 +741,20 @@ def test_attached_to(env):
         og.sim.step()
 
     # The shelf should be attached to the back panel
+    assert shelf_shelf.states[Touching].get_value(shelf_back_panel)
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
+    # Try to attach again (should be no-op)
     assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
     # The shelf should still be attached to the back panel
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
+    # Detach
     assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, False)
     # The shelf should not be attached to the back panel
     assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
 
+    # Attach again
     assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
     # shelf should be attached to the back panel
     assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)

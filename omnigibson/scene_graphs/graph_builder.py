@@ -2,7 +2,6 @@ import itertools
 
 import networkx as nx
 import torch as th
-from matplotlib import pyplot as plt
 from PIL import Image
 
 from omnigibson import object_states
@@ -300,6 +299,8 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     figwidth = imgwidth / figdpi
 
     # Draw the graph onto the figure.
+    import matplotlib.pyplot as plt
+
     fig = plt.figure(figsize=(figwidth, figheight), dpi=figdpi)
     _draw_graph()
     fig.canvas.draw()
