@@ -3,7 +3,8 @@ from time import time
 
 import gymnasium as gym
 import psutil
-from pynvml.smi import nvidia_smi
+from wandb.sdk.internal.system.assets.gpu import gpu_in_use_by_this_process
+from wandb.vendor.pynvml import pynvml
 
 import omnigibson as og
 
@@ -64,21 +65,18 @@ class ProfilingEnv(og.Environment):
             # memory usage in GB
             memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
             # VRAM usage in GB
-            # Monkey patch the original __GetClocksThrottleReasons method
-            # Note that __GetClocksThrottleReasons is mangled as _nvidia_smi__GetClocksThrottleReasons
-            from omnigibson.utils.deprecated_utils import patched_GetClocksThrottleReasons
-
-            setattr(nvidia_smi, "_nvidia_smi__GetClocksThrottleReasons", patched_GetClocksThrottleReasons)
-
-            for gpu in nvidia_smi.getInstance().DeviceQuery()["gpu"]:
+            pynvml.nvmlInit()
+            device_count = pynvml.nvmlDeviceGetCount()
+            for i in range(device_count):
                 found = False
-                for process in gpu["processes"]:
-                    if process["pid"] == os.getpid():
-                        vram_usage = process["used_memory"] / 1024
-                        found = True
-                        break
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                if gpu_in_use_by_this_process(handle, os.getpid()):
+                    vram_usage = pynvml.nvmlDeviceGetMemoryInfo(handle).used / 1024**3
+                    found = True
+                    break
                 if found:
                     break
+            pynvml.nvmlShutdown()
 
             ret = [total_frame_time, omni_time, og_time, memory_usage, vram_usage]
             if self._current_step % 100 == 0:

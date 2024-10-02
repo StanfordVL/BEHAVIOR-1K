@@ -25,17 +25,6 @@ from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
 from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
-from pynvml.nvml import (
-    NVMLError,
-    nvmlClocksThrottleReasonApplicationsClocksSetting,
-    nvmlClocksThrottleReasonGpuIdle,
-    nvmlClocksThrottleReasonHwSlowdown,
-    nvmlClocksThrottleReasonSwPowerCap,
-    nvmlClocksThrottleReasonUserDefinedClocks,
-    nvmlDeviceGetCurrentClocksThrottleReasons,
-    nvmlDeviceGetSupportedClocksThrottleReasons,
-)
-from pynvml_utils import nvidia_smi as _nvidia_smi
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
@@ -1038,38 +1027,3 @@ def get_world_pose(fabric_prim):
     result_transform.Orthonormalize()
     result_transform = np.transpose(result_transform)
     return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()
-
-
-def patched_GetClocksThrottleReasons(handle):
-    throttleReasons = [
-        [nvmlClocksThrottleReasonGpuIdle, "clocks_throttle_reason_gpu_idle"],
-        [
-            nvmlClocksThrottleReasonUserDefinedClocks,
-            "clocks_throttle_reason_user_defined_clocks",
-        ],
-        [
-            nvmlClocksThrottleReasonApplicationsClocksSetting,
-            "clocks_throttle_reason_applications_clocks_setting",
-        ],
-        [nvmlClocksThrottleReasonSwPowerCap, "clocks_throttle_reason_sw_power_cap"],
-        [nvmlClocksThrottleReasonHwSlowdown, "clocks_throttle_reason_hw_slowdown"],
-        # THIS IS THE FIX: COMMENT OUT THE BELOW LINE
-        # [nvmlClocksThrottleReasonUnknown, "clocks_throttle_reason_unknown"],
-    ]
-
-    clockThrottleReasons = {}
-
-    try:
-        supportedClocksThrottleReasons = nvmlDeviceGetSupportedClocksThrottleReasons(handle)
-        clocksThrottleReasons = nvmlDeviceGetCurrentClocksThrottleReasons(handle)
-        for mask, name in throttleReasons:
-            if name != "clocks_throttle_reason_user_defined_clocks":
-                if mask & supportedClocksThrottleReasons:
-                    val = "Active" if mask & clocksThrottleReasons else "Not Active"
-                else:
-                    val = "N/A"  # nvidia_smi.__handleError(NVML_ERROR_NOT_SUPPORTED);
-                clockThrottleReasons[name] = val
-    except NVMLError as err:
-        clockThrottleReasons["Error"] = _nvidia_smi.__handleError(err)
-
-    return clockThrottleReasons if len(clockThrottleReasons.values()) > 0 else None
