@@ -1,7 +1,7 @@
 import os
 from time import time
 
-import gym
+import gymnasium as gym
 import psutil
 from pynvml.smi import nvidia_smi
 
@@ -64,6 +64,12 @@ class ProfilingEnv(og.Environment):
             # memory usage in GB
             memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
             # VRAM usage in GB
+            # Monkey patch the original __GetClocksThrottleReasons method
+            # Note that __GetClocksThrottleReasons is mangled as _nvidia_smi__GetClocksThrottleReasons
+            from omnigibson.utils.deprecated_utils import patched_GetClocksThrottleReasons
+
+            setattr(nvidia_smi, "_nvidia_smi__GetClocksThrottleReasons", patched_GetClocksThrottleReasons)
+
             for gpu in nvidia_smi.getInstance().DeviceQuery()["gpu"]:
                 found = False
                 for process in gpu["processes"]:
