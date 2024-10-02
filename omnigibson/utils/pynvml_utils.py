@@ -1,3 +1,5 @@
+# File copied from: https://github.com/wandb/wandb/blob/main/wandb/vendor/pynvml/pynvml.py
+
 #####
 #
 # Based on nvidia-ml-py version 11.515.48

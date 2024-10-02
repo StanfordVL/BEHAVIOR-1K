@@ -8,6 +8,7 @@ import omnigibson as og
 import omnigibson.utils.pynvml_utils as pynvml
 
 
+# Method copied from: https://github.com/wandb/wandb/blob/main/wandb/sdk/internal/system/assets/gpu.py
 def gpu_in_use_by_this_process(gpu_handle: "GPUHandle", pid: int) -> bool:
     if psutil is None:
         return False
