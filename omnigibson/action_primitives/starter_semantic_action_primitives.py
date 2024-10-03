@@ -1462,13 +1462,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
             if name in self._arm_targets:
                 if isinstance(controller, InverseKinematicsController):
-                    target_pose = self._arm_targets[name]
-                    target_orn_axisangle = target_pose[1]
-                    current_pose = self._get_pose_in_robot_frame(
-                        (self.robot.get_eef_position(self.arm), self.robot.get_eef_orientation(self.arm))
+                    arm = name.split("_")[-1]
+                    target_pos, target_orn_axisangle = self._arm_targets[name]
+                    current_pos, current_orn = self._get_pose_in_robot_frame(
+                        (self.robot.get_eef_position(arm), self.robot.get_eef_orientation(arm))
                     )
-                    delta_pos = target_pose[0] - current_pose[0]
-                    partial_action = th.cat((delta_pos, target_orn_axisangle))
+                    current_orn_axisangle = T.quat2axisangle(current_orn)
+                    delta_pos = target_pos - current_pos
+                    delta_orn = target_orn_axisangle - current_orn_axisangle
+                    if controller.mode == "pose_delta_ori":
+                        partial_action = th.cat((delta_pos, delta_orn))
+                    elif controller.mode == "pose_absolute_ori":
+                        partial_action = th.cat((delta_pos, target_orn_axisangle))
+                    else:
+                        partial_action = th.cat((target_pos, target_orn_axisangle))
                 else:
                     target_joint_pos = self._arm_targets[name]
                     current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
