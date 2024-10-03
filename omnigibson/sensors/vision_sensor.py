@@ -7,6 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
+from omnigibson.systems.system_base import get_all_system_names
 from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
@@ -353,9 +354,7 @@ class VisionSensor(BaseSensor):
             if "," in replicator_mapping[key]:
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
-                categories = [
-                    cat for cat in replicator_mapping[key].split(",") if cat in self.scene.available_systems.keys()
-                ]
+                categories = [cat for cat in replicator_mapping[key].split(",") if cat in get_all_system_names()]
                 assert (
                     len(categories) == 1
                 ), "There should be exactly one category that belongs to scene.system_registry"
@@ -415,30 +414,30 @@ class VisionSensor(BaseSensor):
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
             elif "/" in value:
-                prim_name = value.split("/")[-1]
-                # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
-                # Remap instance segmentation and instance segmentation ID labels to system name
-                if "Particle" in prim_name:
-                    category_name = prim_name.split("Particle")[0]
-                    assert (
-                        category_name in self.scene.available_systems.keys()
-                    ), f"System name {category_name} is not in the registered systems!"
-                    value = category_name
-                else:
+                if not id:
                     # Remap instance segmentation labels to object name
-                    if not id:
-                        # value is the prim path of the object
-                        if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
-                            value = "groundPlane"
-                        else:
-                            obj = self.scene.object_registry("prim_path", value)
-                            # Remap instance segmentation labels from prim path to object name
-                            assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
-                            value = obj.name
-
-                    # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
+                    if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
+                        value = "groundPlane"
                     else:
-                        pass
+                        obj = None
+                        if self.scene is not None:
+                            # If this is a camera within a scene, we check the object registry of the scene
+                            obj = self.scene.object_registry("prim_path", value)
+                        else:
+                            # If this is the viewer camera, we check each object registry
+                            for scene in og.sim.scenes:
+                                obj = scene.object_registry("prim_path", value)
+                                if obj:
+                                    break
+                        if obj is not None:
+                            # This is an object, so we remap the instance segmentation label to the object name
+                            value = obj.name
+                        else:
+                            # This is a particle system, we remap them to unlabelled (will fix this in a future release)
+                            value = "unlabelled"
+                # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
+                else:
+                    pass
             else:
                 # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
                 value = "unlabelled"
