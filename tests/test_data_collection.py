@@ -35,10 +35,9 @@ def test_data_collect_and_playback():
     }
 
     if og.sim is None:
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
         gm.ENABLE_OBJECT_STATES = True
         gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = True
         gm.ENABLE_TRANSITION_RULES = False
     else:
         # Make sure sim is stopped
