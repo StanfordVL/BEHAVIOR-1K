@@ -44,8 +44,7 @@ class VX300S(ManipulationRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -110,11 +109,9 @@ class VX300S(ManipulationRobot):
 
     @property
     def discrete_action_list(self):
-        # Not supported for this robot
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        # Fetch does not support discrete actions
         raise ValueError("VX300S does not support discrete actions!")
 
     @property
@@ -197,6 +194,10 @@ class VX300S(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
 
     @property
+    def curobo_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")
+
+    @property
     def eef_usd_path(self):
         # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
         raise NotImplementedError
@@ -209,7 +210,7 @@ class VX300S(ManipulationRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }
 
@@ -217,6 +218,6 @@ class VX300S(ManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=[0.0, 0.001, 0.057]),
+                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
             ]
         }

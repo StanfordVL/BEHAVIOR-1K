@@ -17,8 +17,11 @@ from omnigibson.utils.constants import (
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
-from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.ui_utils import create_module_logger, dock_window
 from omnigibson.utils.vision_utils import Remapper
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -378,9 +381,10 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
 
         image_keys = th.unique(img)
-        assert set(image_keys.tolist()).issubset(
-            set(replicator_mapping.keys())
-        ), "Semantic segmentation image does not match the original id_to_labels mapping."
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.debug(
+                "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
@@ -410,8 +414,7 @@ class VisionSensor(BaseSensor):
             key = int(key)
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
-            else:
-                assert "/" in value, f"Instance segmentation (ID) label {value} is not a valid prim path!"
+            elif "/" in value:
                 prim_name = value.split("/")[-1]
                 # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
                 # Remap instance segmentation and instance segmentation ID labels to system name
@@ -436,47 +439,29 @@ class VisionSensor(BaseSensor):
                     # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
                     else:
                         pass
+            else:
+                # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
+                value = "unlabelled"
 
             self._register_instance(value, id=id)
             replicator_mapping[key] = value
 
-        # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
-        # They show up in the image, but not in the info (id_to_labels).
-        # We identify these values, find the corresponding semantic label (system name), and add the mapping.
+        # This is a temporary fix for the problem where some small number of pixels show up in the image, but not in the info (id_to_labels).
+        # We identify these values and mark them as unlabelled.
         image_keys = th.unique(img)
         for key in image_keys:
             if str(key.item()) not in id_to_labels:
-                semantic_label = semantic_img[img == key].unique().item()
-                assert (
-                    semantic_label in semantic_labels
-                ), f"Semantic map value {semantic_label} is not in the semantic labels!"
-                category_name = semantic_labels[semantic_label]
-                if category_name in self.scene.available_systems.keys():
-                    value = category_name
-                    self._register_instance(value, id=id)
-                # If the category name is not in the registered systems,
-                # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
-                # we will label this as "unlabelled" for now
-                # This only happens with a very small number of pixels, e.g. 0.1% of the image
-                else:
-                    num_of_pixels = (img == key).sum().item()
-                    resolution = (self._load_config["image_width"], self._load_config["image_height"])
-                    percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
-                    if percentage > 2:
-                        og.log.warning(
-                            f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
-                            f"Percentage of pixels: {percentage}%"
-                        )
-                    value = "unlabelled"
-                    self._register_instance(value, id=id)
+                value = "unlabelled"
+                self._register_instance(value, id=id)
                 replicator_mapping[key.item()] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
 
-        assert set(image_keys.tolist()).issubset(
-            set(replicator_mapping.keys())
-        ), "Instance segmentation image does not match the original id_to_labels mapping."
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.warning(
+                "Some instance IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return remapper.remap(replicator_mapping, registry, img, image_keys)
 
@@ -499,6 +484,8 @@ class VisionSensor(BaseSensor):
         replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
             bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        # Replicator returns each box as a numpy.void; we convert them to tuples here
+        bboxes = [box.tolist() for box in bboxes]
         info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
         return bboxes, info
 
@@ -787,12 +774,12 @@ class VisionSensor(BaseSensor):
         horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
         vertical_fov = horizontal_fov * height / width
 
-        fx = (width / 2.0) / th.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / th.tan(vertical_fov / 2.0)
+        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 
-        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
         return intrinsic_matrix
 
     @property

@@ -88,6 +88,7 @@ class GeomPrim(XFormPrim):
         Args:
             3-array: The default RGB color used for this visual geom
         """
+        rgb = th.as_tensor(rgb)
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:

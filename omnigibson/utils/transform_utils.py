@@ -712,7 +712,7 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     # pose of C in B = pose of A in B * pose of C in A
     # take a point in C, transform it to A, then to B
     # T_B^C = T_A^C * T_B^A
-    return pose_A_in_B.dot(pose_A)
+    return th.matmul(pose_A_in_B, pose_A)
 
 
 @th.jit.script

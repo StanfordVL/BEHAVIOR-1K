@@ -72,7 +72,6 @@ m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 m.KIT_FILES = {
     (4, 0, 0): "omnigibson_4_0_0.kit",
     (4, 1, 0): "omnigibson_4_1_0.kit",
-    (2023, 1, 1): "omnigibson_2023_1_1.kit",
 }
 
 
@@ -99,18 +98,23 @@ def _launch_app():
         import sys
         import warnings
 
-        from numba.core.errors import NumbaPerformanceWarning
+        try:
+            from numba.core.errors import NumbaPerformanceWarning
+
+            warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+        except ImportError:
+            pass
 
         # TODO: Find a more elegant way to prune omni logging
         # sys.argv.append("--/log/level=warning")
         # sys.argv.append("--/log/fileLogLevel=warning")
         # sys.argv.append("--/log/outputStreamLevel=error")
-        warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
 
     # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
     # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
     # On the regular omniverse launcher version this should not have any impact.
     try:
+        os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim  # noqa: F401
     except ImportError:
         isaacsim = None

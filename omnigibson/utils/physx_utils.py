@@ -262,10 +262,16 @@ def create_physx_particleset_pointinstancer(
 
 
 def apply_force_at_pos(prim, force, pos):
+    if isinstance(force, th.Tensor):
+        force = force.cpu().numpy()
+    if isinstance(pos, th.Tensor):
+        pos = pos.cpu().numpy()
     prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
     og.sim.psi.apply_force_at_pos(og.sim.stage_id, prim_id, force, pos)
 
 
 def apply_torque(prim, foward_vect, roll_torque_scalar):
+    if isinstance(foward_vect, th.Tensor):
+        foward_vect = foward_vect.cpu().numpy()
     prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
     og.sim.psi.apply_torque(og.sim.stage_id, prim_id, foward_vect * roll_torque_scalar)

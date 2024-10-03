@@ -43,15 +43,12 @@ class FKSolver:
             pose3_lula = self.kinematics.pose(joint_positions, link_name)
 
             # get position
-            link_position = pose3_lula.translation
+            link_position = th.tensor(pose3_lula.translation, dtype=th.float32)
 
             # get orientation
             rotation_lula = pose3_lula.rotation
-            link_orientation = (
-                rotation_lula.x(),
-                rotation_lula.y(),
-                rotation_lula.z(),
-                rotation_lula.w(),
+            link_orientation = th.tensor(
+                [rotation_lula.x(), rotation_lula.y(), rotation_lula.z(), rotation_lula.w()], dtype=th.float32
             )
             link_poses[link_name] = (link_position, link_orientation)
         return link_poses

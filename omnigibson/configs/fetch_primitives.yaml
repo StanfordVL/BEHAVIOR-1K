@@ -45,19 +45,16 @@ robots:
       base:
         name: DifferentialDriveController
       arm_0:
-        name: InverseKinematicsController
-        command_input_limits: default
-        command_output_limits:
-          - [-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]
-          - [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
-        mode: pose_absolute_ori
-        kp: 300.0
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
       gripper_0:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
-        use_delta_commands: true
+        use_delta_commands: false
       camera:
         name: JointController
         use_delta_commands: False

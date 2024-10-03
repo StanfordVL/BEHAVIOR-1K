@@ -261,6 +261,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "dof_idx": self.gripper_control_idx[arm],
                 "command_input_limits": None,
                 "mode": "independent",
+                "inverted": True,
             }
         return dic
 

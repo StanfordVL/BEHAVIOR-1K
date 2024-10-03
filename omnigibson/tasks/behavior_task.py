@@ -18,8 +18,8 @@ from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.scenes.scene_base import Scene
+from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
@@ -195,7 +195,7 @@ class BehaviorTask(BaseTask):
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
         # Store the scene name
-        self.scene_name = env.scene.scene_model
+        self.scene_name = env.scene.scene_model if isinstance(env.scene, TraversableScene) else None
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:

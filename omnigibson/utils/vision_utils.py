@@ -156,7 +156,7 @@ def randomize_colors(N, bright=True):
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
     colors = th.tensor(list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv)))
     colors = colors[th.randperm(colors.size(0))]
-    colors[0] = [0, 0, 0]  # First color is black
+    colors[0] = th.tensor([0, 0, 0], dtype=th.float32)  # First color is black
     return colors
 
 
@@ -173,7 +173,7 @@ def segmentation_to_rgb(seg_im, N, colors=None):
             to different segmentation IDs. Otherwise, will be generated randomly
     """
     # ensure all values lie within [0, N]
-    seg_im = th.fmod(seg_im, N)
+    seg_im = th.fmod(seg_im, N).cpu()
 
     if colors is None:
         use_colors = randomize_colors(N=N, bright=True)

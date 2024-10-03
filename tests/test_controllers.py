@@ -17,6 +17,7 @@ def test_arm_control():
         "robots": [
             {
                 "type": "FrankaPanda",
+                "name": "robot0",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -24,7 +25,7 @@ def test_arm_control():
             },
             {
                 "type": "Fetch",
-                "default_trunk_offset": 0.2,
+                "name": "robot1",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
@@ -32,13 +33,31 @@ def test_arm_control():
             },
             {
                 "type": "Tiago",
+                "name": "robot2",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 110],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
             },
+            {
+                "type": "A1",
+                "name": "robot3",
+                "obs_modalities": "rgb",
+                "position": [150, 150, 115],
+                "orientation": [0, 0, 0, 1],
+                "action_normalize": False,
+            },
+            {
+                "type": "R1",
+                "name": "robot4",
+                "obs_modalities": "rgb",
+                "position": [150, 150, 120],
+                "orientation": [0, 0, 0, 1],
+                "action_normalize": False,
+            },
         ],
     }
+
     env = og.Environment(configs=cfg)
 
     # Define error functions to use
@@ -103,19 +122,19 @@ def test_arm_control():
         "absolute_pose": {
             "zero": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(curr, init),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "forward": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(curr, init),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "side": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(curr, init),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "up": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(curr, init),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
             "rotate": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
@@ -123,7 +142,7 @@ def test_arm_control():
             },
             "base_move": {
                 "pos": lambda target, curr, init: check_zero_error(target, curr, tol=5e-3),
-                "ori": lambda target, curr, init: check_ori_error(curr, init),
+                "ori": lambda target, curr, init: check_ori_error(target, curr),
             },
         },
     }
@@ -147,8 +166,32 @@ def test_arm_control():
         },
     }
 
-    for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
+    # Position the robots, reset them, and keep them still
+    for i, robot in enumerate(env.robots):
+        robot.set_position_orientation(
+            position=th.tensor([0.0, i * 5.0, 0.0]), orientation=T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
+        )
+        robot.reset()
+        robot.keep_still()
 
+    # Take 10 steps to stabilize
+    for _ in range(10):
+        og.sim.step()
+
+    # Update initial state
+    env.scene.update_initial_state()
+
+    # Reset the environment and keep all robots still
+    env.reset()
+    for i, robot in enumerate(env.robots):
+        robot.keep_still()
+
+    # Record initial eef pose of all robots
+    initial_eef_pose = dict()
+    for i, robot in enumerate(env.robots):
+        initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names}
+
+    for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
         for controller_mode in ["pose_delta_ori", "absolute_pose"]:
             controller_kwargs = {
                 "mode": controller_mode,
@@ -165,17 +208,12 @@ def test_arm_control():
                 "base_move": dict(),
             }
 
+            # Load the initial state without stepping physics
+            env.scene.load_state(env.scene._initial_state)
+
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
-                robot.set_position_orientation(
-                    position=th.tensor([0.0, i * 5.0, 0.0]), orientation=T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
-                )
-                robot.reset()
-                robot.keep_still()
                 robot.reload_controllers(controller_config)
-
-                for _ in range(10):
-                    og.sim.step_physics()
 
                 # Define actions to use
                 zero_action = th.zeros(robot.action_dim)
@@ -188,7 +226,7 @@ def test_arm_control():
                 for arm in robot.arm_names:
                     c_name = f"arm_{arm}"
                     start_idx = 0
-                    init_eef_pos, init_eef_quat = robot.get_relative_eef_pose(arm)
+                    init_eef_pos, init_eef_quat = initial_eef_pose[robot.name][arm]
                     for c in robot.controller_order:
                         if c == c_name:
                             break
@@ -229,35 +267,24 @@ def test_arm_control():
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
-            # Take 5 steps
-            for _ in range(5):
-                env.step(actions["zero"])
-
-            # Update initial state
+            # Update the state (e.g. goal) of the new controllers to the initial state
+            # This step is crucial because if env.reset() is called directly, we will load the state of the old controllers and step physics,
+            # which causes can cause errors because the goal is obsolete.
             env.scene.update_initial_state()
 
             # For each action set, reset all robots, then run actions and see if arm moves in expected way
             for action_name, action in actions.items():
-
-                # Reset env
+                # Reset the environment and keep all robots still
                 env.reset()
-                for robot in env.robots:
+                for i, robot in enumerate(env.robots):
                     robot.keep_still()
 
-                # Record initial poses
-                initial_eef_pose = dict()
-                for i, robot in enumerate(env.robots):
-                    initial_eef_pose[robot.name] = {
-                        arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names
-                    }
-
-                # Take 10 steps with given action and check for error
+                # Take N steps with given action and check for error
                 for _ in range(n_steps[controller_mode][action_name]):
                     env.step(action)
 
                 for i, robot in enumerate(env.robots):
                     for arm in robot.arm_names:
-
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
                         assert not th.any(th.abs(normalized_qpos) == 1.0), (

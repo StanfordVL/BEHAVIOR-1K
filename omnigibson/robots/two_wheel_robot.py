@@ -165,5 +165,5 @@ class TwoWheelRobot(LocomotionRobot):
         assert isinstance(
             self._controllers["base"], DifferentialDriveController
         ), "Only DifferentialDriveController is supported!"
-        action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]) * 0.3
+        action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
         return action

@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="1.0.0",
+    version="1.1.1",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -22,7 +22,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "gymnasium>=0.28.1",
-        "numpy>=1.23.5",
+        "numpy<2.0.0,>=1.23.5",
         "scipy>=1.10.1",
         "GitPython~=3.1.40",
         "transforms3d~=0.4.1",
@@ -46,11 +46,9 @@ setup(
         "aenum~=3.1.15",
         "rtree~=1.2.0",
         "graphviz~=0.20",
-        "numba>=0.60.0",
+        "matplotlib>=3.0.0",
     ],
-    extras_require={
-        "isaac": ["isaacsim-for-omnigibson>=4.1.0"],
-    },
+    extras_require={},
     tests_require=[],
     python_requires=">=3",
     include_package_data=True,
