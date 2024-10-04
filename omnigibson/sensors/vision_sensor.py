@@ -414,6 +414,7 @@ class VisionSensor(BaseSensor):
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
             elif "/" in value:
+                # Instance Segmentation
                 if not id:
                     # Remap instance segmentation labels to object name
                     if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
@@ -433,11 +434,36 @@ class VisionSensor(BaseSensor):
                             # This is an object, so we remap the instance segmentation label to the object name
                             value = obj.name
                         else:
-                            # This is a particle system, we remap them to unlabelled (will fix this in a future release)
-                            value = "unlabelled"
-                # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
+                            # This is a particle system
+                            path_split = value.split("/")
+                            prim_name = path_split[-1]
+                            system_matched = False
+                            # Step 1: Filter out macro particle systems
+                            if "Particle" in prim_name:
+                                macro_system_name = prim_name.split("Particle")[0]
+                                if macro_system_name in get_all_system_names():
+                                    system_matched = True
+                                    value = macro_system_name
+                            # Step 2: Filter out micro particle systems
+                            else:
+                                # If anything in path_split is within get_all_system_names(), we use that
+                                for path in path_split:
+                                    if path in get_all_system_names():
+                                        system_matched = True
+                                        value = path
+                                        break
+                            # Step 3: If nothing matched, we label it as unlabelled
+                            if not system_matched:
+                                value = "unlabelled"
+                # Instance ID Segmentation
                 else:
-                    pass
+                    # The only thing we do here is for micro particle system, we clean its name
+                    # e.g. a raw path looks like '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0'
+                    # we clean it to '/World/scene_0/water/waterInstancer0/prototype0'
+                    if "Instancer" in value and "." in value:
+                        # This is a micro particle system
+                        value = value[: value.rfind(".")]
+                    # If this is not a micro particle system, we keep the name as is
             else:
                 # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
                 value = "unlabelled"
