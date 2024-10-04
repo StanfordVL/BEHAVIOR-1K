@@ -1,5 +1,6 @@
 import json
 import os
+from functools import cache
 
 import torch as th
 
@@ -957,6 +958,7 @@ class PhysicalParticleSystem(BaseSystem):
         return success
 
 
+@cache
 def get_all_system_names():
     """
     Gets all available systems from the OmniGibson dataset
