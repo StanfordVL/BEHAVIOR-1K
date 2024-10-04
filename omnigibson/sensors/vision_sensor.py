@@ -7,6 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
+from omnigibson.systems.system_base import get_all_system_names
 from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
@@ -353,9 +354,7 @@ class VisionSensor(BaseSensor):
             if "," in replicator_mapping[key]:
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
-                categories = [
-                    cat for cat in replicator_mapping[key].split(",") if cat in self.scene.available_systems.keys()
-                ]
+                categories = [cat for cat in replicator_mapping[key].split(",") if cat in get_all_system_names()]
                 assert (
                     len(categories) == 1
                 ), "There should be exactly one category that belongs to scene.system_registry"
@@ -415,30 +414,79 @@ class VisionSensor(BaseSensor):
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
             elif "/" in value:
-                prim_name = value.split("/")[-1]
-                # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
-                # Remap instance segmentation and instance segmentation ID labels to system name
-                if "Particle" in prim_name:
-                    category_name = prim_name.split("Particle")[0]
-                    assert (
-                        category_name in self.scene.available_systems.keys()
-                    ), f"System name {category_name} is not in the registered systems!"
-                    value = category_name
-                else:
-                    # Remap instance segmentation labels to object name
-                    if not id:
-                        # value is the prim path of the object
-                        if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
-                            value = "groundPlane"
-                        else:
-                            obj = self.scene.object_registry("prim_path", value)
-                            # Remap instance segmentation labels from prim path to object name
-                            assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
-                            value = obj.name
-
-                    # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
+                # Instance Segmentation
+                if not id:
+                    # Case 1: This is the ground plane
+                    if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
+                        value = "groundPlane"
                     else:
-                        pass
+                        # Case 2: Check if this is an object, e.g. '/World/scene_0/breakfast_table', '/World/scene_0/dishtowel'
+                        obj = None
+                        if self.scene is not None:
+                            # If this is a camera within a scene, we check the object registry of the scene
+                            obj = self.scene.object_registry("prim_path", value)
+                        else:
+                            # If this is the viewer camera, we check each object registry
+                            for scene in og.sim.scenes:
+                                obj = scene.object_registry("prim_path", value)
+                                if obj:
+                                    break
+                        if obj is not None:
+                            # This is an object, so we remap the instance segmentation label to the object name
+                            value = obj.name
+                        # Case 3: Check if this is a particle system
+                        else:
+                            # This is a particle system
+                            path_split = value.split("/")
+                            prim_name = path_split[-1]
+                            system_matched = False
+                            # Case 3.1: Filter out macro particle systems
+                            # e.g. '/World/scene_0/diced__apple/particles/diced__appleParticle0', '/World/scene_0/breakfast_table/base_link/stainParticle0'
+                            if "Particle" in prim_name:
+                                macro_system_name = prim_name.split("Particle")[0]
+                                if macro_system_name in get_all_system_names():
+                                    system_matched = True
+                                    value = macro_system_name
+                            # Case 3.2: Filter out micro particle systems
+                            # e.g. '/World/scene_0/water/waterInstancer0/prototype0_1', '/World/scene_0/white_rice/white_riceInstancer0/prototype0'
+                            else:
+                                # If anything in path_split has "Instancer" in it, we know it's a micro particle system
+                                for path in path_split:
+                                    if "Instancer" in path:
+                                        # This is a micro particle system
+                                        system_matched = True
+                                        value = path.split("Instancer")[0]
+                                        break
+                            # Case 4: If nothing matched, we label it as unlabelled
+                            if not system_matched:
+                                value = "unlabelled"
+                # Instance ID Segmentation
+                else:
+                    # The only thing we do here is for micro particle system, we clean its name
+                    # e.g. a raw path looks like '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0'
+                    # we clean it to '/World/scene_0/water/waterInstancer0/prototype0'
+                    # Case 1: This is a micro particle system
+                    # e.g. '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0'
+                    if "Instancer" in value and "." in value:
+                        # This is a micro particle system
+                        value = value[: value.rfind(".")]
+                    # Case 2: For everything else, we keep the name as is
+                    """
+                    e.g. 
+                    {
+                        '54': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '60': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '30': '/World/scene_0/breakfast_table/base_link/stainParticle1', 
+                        '27': '/World/scene_0/diced__apple/particles/diced__appleParticle0', 
+                        '58': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '64': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '40': '/World/scene_0/diced__apple/particles/diced__appleParticle1', 
+                        '48': '/World/scene_0/breakfast_table/base_link/stainParticle0', 
+                        '1': '/World/ground_plane/geom', 
+                        '19': '/World/scene_0/dishtowel/base_link_cloth', 
+                        '6': '/World/scene_0/breakfast_table/base_link/visuals'
+                    }
+                    """
             else:
                 # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
                 value = "unlabelled"
