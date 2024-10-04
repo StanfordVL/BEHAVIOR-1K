@@ -36,7 +36,7 @@ from omnigibson.robots import *
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
-from omnigibson.utils.control_utils import FKSolver, IKSolver
+from omnigibson.utils.control_utils import FKSolver, IKSolver, orientation_error
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import (
     detect_robot_collision_in_sim,
@@ -1462,20 +1462,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
             if name in self._arm_targets:
                 if isinstance(controller, InverseKinematicsController):
-                    arm = name.split("_")[-1]
+                    arm = name.replace("arm_", "")
                     target_pos, target_orn_axisangle = self._arm_targets[name]
                     current_pos, current_orn = self._get_pose_in_robot_frame(
                         (self.robot.get_eef_position(arm), self.robot.get_eef_orientation(arm))
                     )
-                    current_orn_axisangle = T.quat2axisangle(current_orn)
                     delta_pos = target_pos - current_pos
-                    delta_orn = target_orn_axisangle - current_orn_axisangle
+                    delta_orn = orientation_error(T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn))
                     if controller.mode == "pose_delta_ori":
                         partial_action = th.cat((delta_pos, delta_orn))
-                    elif controller.mode == "pose_absolute_ori":
+                    elif controller.mode in "pose_absolute_ori":
                         partial_action = th.cat((delta_pos, target_orn_axisangle))
+                    elif controller.mode == "absolute_pose":
+                         partial_action = th.cat((target_pos, target_orn_axisangle))
                     else:
-                        partial_action = th.cat((target_pos, target_orn_axisangle))
+                        raise ValueError("Unexpected IK control mode")
                 else:
                     target_joint_pos = self._arm_targets[name]
                     current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
