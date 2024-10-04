@@ -106,6 +106,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene with a light and table
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
         },

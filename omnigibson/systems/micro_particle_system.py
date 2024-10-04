@@ -54,19 +54,22 @@ def set_carb_settings_for_fluid_isosurface():
     """
     Sets relevant rendering settings in the carb settings in order to use isosurface effectively
     """
+    min_frame_rate = 60
+    # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
+    assert (
+        1 / og.sim.get_rendering_dt()
+    ) >= min_frame_rate, f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
+
     # Settings for Isosurface
     isregistry = lazy.carb.settings.acquire_settings_interface()
     # disable grid and lights
     dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
     dOptions &= ~(1 << 6 | 1 << 8)
     isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_TO_USD, True)
     isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 8)
     isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_VELOCITIES_TO_USD, True)
-    isregistry.set_bool(
-        lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True
-    )  # TODO: Why does setting this value --> True result in no isosurface being rendered?
-    isregistry.set_int("persistent/simulation/minFrameRate", 60)
+    isregistry.set_bool(lazy.omni.physx.bindings._physx.SETTING_UPDATE_PARTICLES_TO_USD, True)
+    isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, min_frame_rate)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
     isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
@@ -483,14 +486,10 @@ class MicroParticleSystem(BaseSystem):
         super().initialize(scene)
 
         # Run sanity checks
-        if not gm.USE_GPU_DYNAMICS:
-            raise ValueError(f"Failed to initialize {self.name} system. Please set gm.USE_GPU_DYNAMICS to be True.")
-
-        # Make sure flatcache is not being used OR isosurface is enabled -- otherwise, raise an error, since
-        # non-isosurface particles don't get rendered properly when flatcache is enabled
-        assert (
-            self.use_isosurface or not gm.ENABLE_FLATCACHE
-        ), f"Cannot use flatcache with MicroParticleSystem {self.name} when no isosurface is used!"
+        if not gm.USE_GPU_DYNAMICS or gm.ENABLE_FLATCACHE:
+            raise ValueError(
+                f"Failed to initialize {self.name} system. Please set gm.USE_GPU_DYNAMICS=True and gm.ENABLE_FLATCACHE=False."
+            )
 
         self.system_prim = self._create_particle_system()
         # Get material

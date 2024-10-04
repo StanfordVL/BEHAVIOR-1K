@@ -31,9 +31,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
-        }
+        },
     }
 
     # Define objects to load into the environment

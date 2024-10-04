@@ -171,7 +171,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         colors = []
 
         for system_name in self._limits.keys():
-            system = self.obj.scene.get_system(system_name)
+            system = self.obj.scene.get_system(system_name, force_init=False)
             if self.get_value(system):
                 colors.append(system.color)
 

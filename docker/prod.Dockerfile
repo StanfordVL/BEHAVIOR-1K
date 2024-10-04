@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:4.0.0
+FROM nvcr.io/nvidia/isaac-sim:4.1.0
 
 # Set up all the prerequisites.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -21,7 +21,7 @@ ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C / bin/micromamba
 ENV MAMBA_ROOT_PREFIX /micromamba
 RUN micromamba create -n omnigibson -c conda-forge python=3.10
-RUN micromamba shell init --shell=bash --prefix=/micromamba
+RUN micromamba shell init --shell=bash
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
 ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"

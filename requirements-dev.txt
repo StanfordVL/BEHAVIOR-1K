@@ -1,5 +1,6 @@
 pytest>=6.2.3
 pytest-cov>=3.0.0
+pytest_rerunfailures
 mkdocs
 mkdocs-autorefs
 mkdocs-gen-files
@@ -8,5 +9,4 @@ mkdocs-material-extensions
 mkdocstrings[python]
 mkdocs-section-index
 mkdocs-literate-nav
-pynvml
 telemoma~=0.1.2
