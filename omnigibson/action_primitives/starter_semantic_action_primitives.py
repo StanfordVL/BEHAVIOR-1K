@@ -1468,13 +1468,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         (self.robot.get_eef_position(arm), self.robot.get_eef_orientation(arm))
                     )
                     delta_pos = target_pos - current_pos
-                    delta_orn = orientation_error(T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn))
+                    delta_orn = orientation_error(
+                        T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
+                    )
                     if controller.mode == "pose_delta_ori":
                         partial_action = th.cat((delta_pos, delta_orn))
                     elif controller.mode in "pose_absolute_ori":
                         partial_action = th.cat((delta_pos, target_orn_axisangle))
                     elif controller.mode == "absolute_pose":
-                         partial_action = th.cat((target_pos, target_orn_axisangle))
+                        partial_action = th.cat((target_pos, target_orn_axisangle))
                     else:
                         raise ValueError("Unexpected IK control mode")
                 else:
