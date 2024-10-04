@@ -416,10 +416,11 @@ class VisionSensor(BaseSensor):
             elif "/" in value:
                 # Instance Segmentation
                 if not id:
-                    # Remap instance segmentation labels to object name
+                    # Case 1: This is the ground plane
                     if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
                         value = "groundPlane"
                     else:
+                        # Case 2: Check if this is an object, e.g. '/World/scene_0/breakfast_table', '/World/scene_0/dishtowel'
                         obj = None
                         if self.scene is not None:
                             # If this is a camera within a scene, we check the object registry of the scene
@@ -433,26 +434,30 @@ class VisionSensor(BaseSensor):
                         if obj is not None:
                             # This is an object, so we remap the instance segmentation label to the object name
                             value = obj.name
+                        # Case 3: Check if this is a particle system
                         else:
                             # This is a particle system
                             path_split = value.split("/")
                             prim_name = path_split[-1]
                             system_matched = False
-                            # Step 1: Filter out macro particle systems
+                            # Case 3.1: Filter out macro particle systems
+                            # e.g. '/World/scene_0/diced__apple/particles/diced__appleParticle0', '/World/scene_0/breakfast_table/base_link/stainParticle0'
                             if "Particle" in prim_name:
                                 macro_system_name = prim_name.split("Particle")[0]
                                 if macro_system_name in get_all_system_names():
                                     system_matched = True
                                     value = macro_system_name
-                            # Step 2: Filter out micro particle systems
+                            # Case 3.2: Filter out micro particle systems
+                            # e.g. '/World/scene_0/water/waterInstancer0/prototype0_1', '/World/scene_0/white_rice/white_riceInstancer0/prototype0'
                             else:
-                                # If anything in path_split is within get_all_system_names(), we use that
+                                # If anything in path_split has "Instancer" in it, we know it's a micro particle system
                                 for path in path_split:
-                                    if path in get_all_system_names():
+                                    if "Instancer" in path:
+                                        # This is a micro particle system
                                         system_matched = True
-                                        value = path
+                                        value = path.split("Instancer")[0]
                                         break
-                            # Step 3: If nothing matched, we label it as unlabelled
+                            # Case 4: If nothing matched, we label it as unlabelled
                             if not system_matched:
                                 value = "unlabelled"
                 # Instance ID Segmentation
@@ -460,10 +465,28 @@ class VisionSensor(BaseSensor):
                     # The only thing we do here is for micro particle system, we clean its name
                     # e.g. a raw path looks like '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0'
                     # we clean it to '/World/scene_0/water/waterInstancer0/prototype0'
+                    # Case 1: This is a micro particle system
+                    # e.g. '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0'
                     if "Instancer" in value and "." in value:
                         # This is a micro particle system
                         value = value[: value.rfind(".")]
-                    # If this is not a micro particle system, we keep the name as is
+                    # Case 2: For everything else, we keep the name as is
+                    """
+                    e.g. 
+                    {
+                        '54': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '60': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '30': '/World/scene_0/breakfast_table/base_link/stainParticle1', 
+                        '27': '/World/scene_0/diced__apple/particles/diced__appleParticle0', 
+                        '58': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '64': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '40': '/World/scene_0/diced__apple/particles/diced__appleParticle1', 
+                        '48': '/World/scene_0/breakfast_table/base_link/stainParticle0', 
+                        '1': '/World/ground_plane/geom', 
+                        '19': '/World/scene_0/dishtowel/base_link_cloth', 
+                        '6': '/World/scene_0/breakfast_table/base_link/visuals'
+                    }
+                    """
             else:
                 # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
                 value = "unlabelled"
