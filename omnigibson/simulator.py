@@ -54,6 +54,7 @@ from omnigibson.utils.usd_utils import (
     RigidContactAPI,
 )
 from omnigibson.utils.usd_utils import clear as clear_usd_utils
+from omnigibson.utils.usd_utils import triangularize_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -601,6 +602,8 @@ def _launch_simulator(*args, **kwargs):
                 # dynamic_friction=dynamic_friction,
                 # restitution=restitution,
             )
+
+            triangularize_mesh(lazy.pxr.UsdGeom.Mesh.Define(self.stage, plane.prim.GetChildren()[0].GetPath()))
 
             self._floor_plane = XFormPrim(
                 relative_prim_path=ground_plane_relative_path,

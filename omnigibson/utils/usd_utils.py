@@ -1613,13 +1613,25 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         )
     )
 
-    # Modify values so that all faces are triangular
+    return triangularize_mesh(mesh)
+
+
+def triangularize_mesh(mesh):
+    """
+    Triangulates the mesh @mesh, modification in-place
+    """
     tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+
     face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
     mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
     mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
     mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
-    mesh.GetPrim().GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()]))
+
+    # Modify the UV mapping if it exists
+    if isinstance(tm.visual, trimesh.visual.TextureVisuals):
+        mesh.GetPrim().GetAttribute("primvars:st").Set(
+            lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()])
+        )
 
     return mesh
 
