@@ -1468,10 +1468,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         (self.robot.get_eef_position(arm), self.robot.get_eef_orientation(arm))
                     )
                     delta_pos = target_pos - current_pos
-                    delta_orn = orientation_error(
-                        T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
-                    )
                     if controller.mode == "pose_delta_ori":
+                        delta_orn = orientation_error(
+                            T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
+                        )
                         partial_action = th.cat((delta_pos, delta_orn))
                     elif controller.mode in "pose_absolute_ori":
                         partial_action = th.cat((delta_pos, target_orn_axisangle))
