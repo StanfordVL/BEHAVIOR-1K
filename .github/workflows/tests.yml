@@ -83,7 +83,7 @@ jobs:
 
   upload_report:
     name: Compile Report
-    runs-on: [self-hosted, linux]
+    runs-on: [linux]
     defaults:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
