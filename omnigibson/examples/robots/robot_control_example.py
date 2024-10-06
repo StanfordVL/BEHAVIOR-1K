@@ -44,15 +44,19 @@ def choose_controllers(robot, random_selection=False):
     default_config = robot._default_controller_config
 
     # Iterate over all components in robot
-    for component, controller_options in default_config.items():
+    controller_names = robot.controller_order
+    for controller_name in controller_names:
+        controller_options = default_config[controller_name]
         # Select controller
         options = list(sorted(controller_options.keys()))
         choice = choose_from_options(
-            options=options, name="{} controller".format(component), random_selection=random_selection
+            options=options,
+            name=f"{controller_name} controller",
+            random_selection=random_selection,
         )
 
         # Add to user responses
-        controller_choices[component] = choice
+        controller_choices[controller_name] = choice
 
     return controller_choices
 
