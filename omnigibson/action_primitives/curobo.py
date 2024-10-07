@@ -130,6 +130,7 @@ class CuRoboMotionGenerator:
         self,
         robot,
         robot_cfg_path=None,
+        robot_usd_path=None,
         ee_link=None,
         device="cuda:0",
         motion_cfg_kwargs=None,
@@ -140,6 +141,8 @@ class CuRoboMotionGenerator:
         Args:
             robot (BaseRobot): Robot for which to generate motion plans
             robot_cfg_path (None or str): If specified, the path to the robot configuration to use. If None, will
+                try to use a pre-configured one directly from curobo based on the robot class of @robot
+            robot_usd_path (None or str): If specified, the path to the robot USD file to use. If None, will
                 try to use a pre-configured one directly from curobo based on the robot class of @robot
             ee_link (None or str): If specified, the link name representing the end-effector to track. None defaults to
                 value already set in the config from @robot_cfg
@@ -156,11 +159,15 @@ class CuRoboMotionGenerator:
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
 
-        # Load robot config and make sure paths point correctly
+        # Load robot config and usd paths and make sure paths point correctly
         robot_cfg_path = robot.curobo_path if robot_cfg_path is None else robot_cfg_path
-        robot_cfg = lazy.curobo.util_file.load_yaml(robot_cfg_path)["robot_cfg"]
-        robot_cfg["kinematics"]["external_asset_path"] = gm.ASSET_PATH
-        robot_cfg["kinematics"]["external_robot_configs_path"] = robot_cfg_path
+        robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
+
+        content_path = lazy.curobo.types.file_path.ContentPath(
+            robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
+        )
+        robot_cfg = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
+        robot_cfg["kinematics"]["use_usd_kinematics"] = True
 
         # Possibly update ee_link
         if ee_link is not None:
@@ -337,8 +344,8 @@ class CuRoboMotionGenerator:
             finetune_attempts (int): Number of attempts to run finetuning trajectory optimization. Every attempt will
                 increase the `MotionGenPlanConfig.finetune_dt_scale` by `MotionGenPlanConfig.finetune_dt_decay` as a
                 path couldn't be found with the previous smaller dt
-            return_full_result (bool): Whether to return the full result or not. If False, will randomly sample a single
-                (successful) trajectory to return
+            return_full_result (bool): Whether to return a list of raw MotionGenResult object(s) or a 2-tuple of
+                (success, results); the default is the latter
             success_ratio (None or float): If set, specifies the fraction of successes necessary given self.batch_size.
                 If None, will automatically be the smallest ratio (1 / self.batch_size), i.e: any nonzero number of
                 successes
@@ -346,8 +353,8 @@ class CuRoboMotionGenerator:
                 solving for this trajectory
 
         Returns:
-            2-tuple or list of MotionGenResult: If @return_all is set, will return the raw MotionGenResult
-                object(s) computed from internal batch trajectory computations. If not set, will return 2-tuple
+            2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
+                object(s) computed from internal batch trajectory computations. If it is False, will return 2-tuple
                 (success, results), where success is a (N,)-shaped boolean tensor representing whether each requested
                 target pos / quat successfully generated a motion plan, and results is a (N,)-shaped array of
                 corresponding JointState objects.
