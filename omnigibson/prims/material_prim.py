@@ -70,6 +70,7 @@ class MaterialPrim(BasePrim):
     ):
         # Other values that will be filled in at runtime
         self._shader = None
+        self._shader_node = None
 
         # Users of this material: should be a set of BaseObject and BaseSystem
         self._users = set()
@@ -148,6 +149,7 @@ class MaterialPrim(BasePrim):
 
         # Generate shader reference
         self._shader = lazy.omni.usd.get_shader_from_material(self._prim)
+        self._shader_node = lazy.usd.mdl.RegistryUtils.GetShaderNodeForPrim(self._shader.GetPrim())
 
     def bind(self, target_prim_path):
         """
@@ -216,7 +218,11 @@ class MaterialPrim(BasePrim):
         Returns:
             any: value of the requested @inp
         """
-        return self._shader.GetInput(inp).Get()
+        non_default_inp = self._shader.GetInput(inp).Get()
+        if non_default_inp is not None:
+            return non_default_inp
+
+        return self._shader_node.GetInput(inp).GetDefaultValue()
 
     def set_input(self, inp, val):
         """
