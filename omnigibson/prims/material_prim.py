@@ -194,7 +194,7 @@ class MaterialPrim(BasePrim):
             root_path (str): root to be pre-appended to the original asset paths
         """
 
-        for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
+        for inp_name in self.get_shader_input_names_by_type("SdfAssetPath", include_default=True):
             inp = self.get_input(inp_name)
             # If the input doesn't have any path, skip
             if inp is None:
@@ -273,7 +273,7 @@ class MaterialPrim(BasePrim):
         """
         return set(self._shader_node.GetInputNames())
 
-    def shader_input_names_by_type(self, input_type, include_default=False):
+    def get_shader_input_names_by_type(self, input_type, include_default=False):
         """
         Args:
             input_type (str): input type
