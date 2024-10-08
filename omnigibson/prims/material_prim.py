@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
-from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, get_sdf_value_type_name
 
 
 class MaterialPrim(BasePrim):
@@ -232,11 +232,14 @@ class MaterialPrim(BasePrim):
             inp (str): Name of the shader input whose value will be set
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
-        # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
-        assert (
-            inp in self.shader_input_names
-        ), f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
-        self._shader.GetInput(inp).Set(val)
+        # # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
+        if inp in self.shader_input_names:
+            self._shader.GetInput(inp).Set(val)
+        elif inp in self.shader_default_input_names:
+            input_type = get_sdf_value_type_name(val)
+            self._shader.CreateInput(inp, input_type).Set(val)
+        else:
+            raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
     def is_glass(self):
@@ -244,7 +247,7 @@ class MaterialPrim(BasePrim):
         Returns:
             bool: Whether this material is a glass material or not
         """
-        return "glass_color" in self.shader_input_names
+        return "glass_color" in self.shader_input_names | self.shader_default_input_names
 
     @property
     def shader(self):
@@ -262,15 +265,34 @@ class MaterialPrim(BasePrim):
         """
         return {inp.GetBaseName() for inp in self._shader.GetInputs()}
 
-    def shader_input_names_by_type(self, input_type):
+    @property
+    def shader_default_input_names(self):
+        """
+        Returns:
+            set: All the shader input names associated with this material that have default values
+        """
+        return set(self._shader_node.GetInputNames())
+
+    def shader_input_names_by_type(self, input_type, include_default=False):
         """
         Args:
             input_type (str): input type
+            include_default (bool): whether to include default inputs
 
         Returns:
             set: All the shader input names associated with this material that match the given input type
         """
-        return {inp.GetBaseName() for inp in self._shader.GetInputs() if inp.GetTypeName().cppTypeName == input_type}
+        shader_input_names = {
+            inp.GetBaseName() for inp in self._shader.GetInputs() if inp.GetTypeName().cppTypeName == input_type
+        }
+        if not include_default:
+            return shader_input_names
+        shader_default_input_names = {
+            inp_name
+            for inp_name in self.shader_default_input_names
+            if self._shader_node.GetInput(inp_name).GetType() == input_type
+        }
+        return shader_input_names | shader_default_input_names
 
     @property
     def diffuse_color_constant(self):
