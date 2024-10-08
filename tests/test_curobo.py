@@ -67,7 +67,8 @@ def test_curobo():
     floor_plane_prim_paths = {child.GetPath().pathString for child in og.sim.floor_plane._prim.GetChildren()}
 
     # View results
-    n_mismatch = 0
+    false_positive = 0
+    false_negative = 0
     for i, (q, result) in enumerate(zip(random_qs, collision_results)):
         # Set robot to desired qpos
         robot.set_joint_positions(q)
@@ -83,24 +84,43 @@ def test_curobo():
 
         true_result = touching_objcet or touching_floor
 
-        if result.item() != true_result:
-            n_mismatch += 1
+        # cuRobo reports contact, but physx reports no contact
+        if result.item() and not true_result:
+            false_positive += 1
             print(
-                f"Mismatch {i}: {result.item()} vs. {true_result} (touching_objcet: {touching_objcet}, touching_floor: {touching_floor})"
+                f"False positive {i}: {result.item()} vs. {true_result} (touching_objcet: {touching_objcet}, touching_floor: {touching_floor})"
             )
 
-        # If we're collision-free, record this pose so that we can test trajectory planning afterwards
+        # physx reports contact, but cuRobo reports no contact (this should not happen!)
+        elif not result.item() and true_result:
+            false_negative += 1
+            print(
+                f"False negative {i}: {result.item()} vs. {true_result} (touching_objcet: {touching_objcet}, touching_floor: {touching_floor})"
+            )
+
+        # If we're collision-free (both cuRobo and physx), record this pose so that we can test trajectory planning afterwards
         if not result and len(robot.contact_list()) == 0:
             eef_pos, eef_quat = robot.get_relative_eef_pose()
             eef_positions.append(eef_pos)
             eef_quats.append(eef_quat)
 
-    assert n_mismatch / n_samples == 0.0, f"Check collision mismatch rate: {n_mismatch / n_samples}"
+    assert (
+        false_positive / n_samples == 0.0
+    ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
+    assert (
+        false_negative / n_samples == 0.0
+    ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
+
+    print(
+        f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
+    )
 
     # Test trajectories
     robot.reset()
     robot.keep_still()
     og.sim.step()
+
+    print(f"Planning for {len(eef_positions)} eef targets...")
 
     # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
     successes, traj_paths = cmg.compute_trajectories(
@@ -129,3 +149,9 @@ def test_curobo():
             robot.keep_still()
             og.sim.step()
             assert len(robot.contact_list()) == 0
+
+    og.shutdown()
+
+
+if __name__ == "__main__":
+    test_curobo()
