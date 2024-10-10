@@ -233,8 +233,16 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/r1/r1.usd")
 
     @property
+    def curobo_path(self):
+        return os.path.join(gm.ASSET_PATH, f"models/r1/r1_description_curobo.yaml")
+
+    @property
     def robot_arm_descriptor_yamls(self):
-        return {arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names}
+        descriptor_yamls = {
+            arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names
+        }
+        descriptor_yamls["combined"]: os.path.join(gm.ASSET_PATH, "models/r1/r1_combined_descriptor.yaml")
+        return descriptor_yamls
 
     @property
     def urdf_path(self):
@@ -254,4 +262,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return [
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
+            ["base_link", "wheel_link1"],
+            ["base_link", "wheel_link2"],
+            ["base_link", "wheel_link3"],
         ]
