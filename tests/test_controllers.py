@@ -17,6 +17,7 @@ def test_arm_control():
         "robots": [
             {
                 "type": "FrankaPanda",
+                "name": "robot0",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -24,6 +25,7 @@ def test_arm_control():
             },
             {
                 "type": "Fetch",
+                "name": "robot1",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
@@ -31,6 +33,7 @@ def test_arm_control():
             },
             {
                 "type": "Tiago",
+                "name": "robot2",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 110],
                 "orientation": [0, 0, 0, 1],
@@ -38,6 +41,7 @@ def test_arm_control():
             },
             {
                 "type": "A1",
+                "name": "robot3",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 115],
                 "orientation": [0, 0, 0, 1],
@@ -45,6 +49,7 @@ def test_arm_control():
             },
             {
                 "type": "R1",
+                "name": "robot4",
                 "obs_modalities": "rgb",
                 "position": [150, 150, 120],
                 "orientation": [0, 0, 0, 1],
@@ -52,6 +57,7 @@ def test_arm_control():
             },
         ],
     }
+
     env = og.Environment(configs=cfg)
 
     # Define error functions to use
@@ -202,6 +208,9 @@ def test_arm_control():
                 "base_move": dict(),
             }
 
+            # Load the initial state without stepping physics
+            env.scene.load_state(env.scene._initial_state)
+
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
                 robot.reload_controllers(controller_config)
@@ -257,6 +266,11 @@ def test_arm_control():
                         start_idx += robot.controllers[c].command_dim
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
+
+            # Update the state (e.g. goal) of the new controllers to the initial state
+            # This step is crucial because if env.reset() is called directly, we will load the state of the old controllers and step physics,
+            # which causes can cause errors because the goal is obsolete.
+            env.scene.update_initial_state()
 
             # For each action set, reset all robots, then run actions and see if arm moves in expected way
             for action_name, action in actions.items():

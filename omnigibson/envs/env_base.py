@@ -1,3 +1,5 @@
+import random
+import string
 from collections import OrderedDict
 from collections.abc import Iterable
 from copy import deepcopy
@@ -267,9 +269,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"robot{i}"
+                    robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
 
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
+                pose_frame = robot_config.pop("pose_frame", "scene")
                 if position is not None:
                     position = position if isinstance(position, th.Tensor) else th.tensor(position, dtype=th.float32)
                 if orientation is not None:
@@ -286,7 +289,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 )
                 # Import the robot into the simulator
                 self.scene.add_object(robot)
-                robot.set_position_orientation(position=position, orientation=orientation, frame="scene")
+                robot.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
@@ -328,12 +331,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "name" not in sensor_config:
                     sensor_config["name"] = f"external_sensor{i}"
                 # Determine prim path if not specified
-                if "prim_path" not in sensor_config:
+                if "relative_prim_path" not in sensor_config:
                     sensor_config["relative_prim_path"] = f"/{sensor_config['name']}"
                 # Pop the desired position and orientation
-                local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop(
-                    "local_orientation", None
-                )
+                position, orientation = sensor_config.pop("position", None), sensor_config.pop("orientation", None)
+                pose_frame = sensor_config.pop("pose_frame", "scene")
                 # Pop whether or not to include this sensor in the observation
                 include_in_obs = sensor_config.pop("include_in_obs", True)
                 # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
@@ -341,7 +343,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Load an initialize this sensor
                 sensor.load(self.scene)
                 sensor.initialize()
-                sensor.set_position_orientation(position=local_position, orientation=local_orientation, frame="scene")
+                sensor.set_position_orientation(position=position, orientation=orientation, frame=pose_frame)
                 self._external_sensors[sensor.name] = sensor
                 self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 
@@ -470,11 +472,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task(task_config=task_config)
         og.sim.play()
 
-        # Load obs / action spaces
-        self.load_observation_space()
-        self._load_action_space()
-
-        self.reset()
+        # Run post play logic again
+        self.post_play_load()
 
         # Scene is now loaded again
         self._loaded = True
@@ -622,7 +621,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if isinstance(action, Iterable) and not isinstance(action, (dict, OrderedDict)):
             # Convert numpy arrays and lists to tensors
             # Skip dict action
-            action = th.as_tensor(action).flatten()
+            action = th.as_tensor(action, dtype=th.float).flatten()
         self._pre_step(action)
 
         # Step simulation

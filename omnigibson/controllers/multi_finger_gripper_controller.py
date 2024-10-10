@@ -271,7 +271,25 @@ class MultiFingerGripperController(GripperController):
         return dict(target=th.zeros(self.command_dim))
 
     def _compute_no_op_action(self, control_dict):
-        return self._goal["target"]
+        # Take care of the special case of binary control
+        if self._mode == "binary":
+            command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
+            if self._inverted:
+                command_val = -1 * command_val
+            return th.tensor([command_val], dtype=th.float32)
+
+        if self._motor_type == "position":
+            command = control_dict[f"joint_position"][self.dof_idx]
+        elif self._motor_type == "velocity":
+            command = th.zeros(self.command_dim)
+        else:
+            raise ValueError("Cannot compute noop action for effort motor type.")
+
+        # Convert to binary / smooth mode if necessary
+        if self._mode == "smooth":
+            command = th.mean(command, dim=-1, keepdim=True)
+
+        return command
 
     def _get_goal_shapes(self):
         return dict(target=(self.command_dim,))

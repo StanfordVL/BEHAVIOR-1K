@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="1.1.0",
+    version="1.1.1",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -46,7 +46,6 @@ setup(
         "aenum~=3.1.15",
         "rtree~=1.2.0",
         "graphviz~=0.20",
-        "numba>=0.60.0",
         "matplotlib>=3.0.0",
     ],
     extras_require={},

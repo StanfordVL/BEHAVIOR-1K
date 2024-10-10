@@ -363,15 +363,19 @@ class TouchingAnyCondition(RuleCondition):
     def refresh(self, object_candidates):
         # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
         # in our collision set are kinematic only
-        self._optimized = not th.any(
-            th.tensor(
-                [
-                    obj.kinematic_only or obj.prim_type == PrimType.CLOTH
-                    for f in (self._filter_1_name, self._filter_2_name)
-                    for obj in object_candidates[f]
-                ]
-            )
-        )
+        # self._optimized = not th.any(
+        #     th.tensor(
+        #         [
+        #             obj.kinematic_only or obj.prim_type == PrimType.CLOTH
+        #             for f in (self._filter_1_name, self._filter_2_name)
+        #             for obj in object_candidates[f]
+        #         ]
+        #     )
+        # )
+
+        # TODO: RigidContactAPI sometimes has false negatives (returning zero impulses when there are contacts), so we will stick
+        # with the non-optimized version for now. We will fix this in a future release.
+        self._optimized = False
 
         if self._optimized:
             # Register idx mappings

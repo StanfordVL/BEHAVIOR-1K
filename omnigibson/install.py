@@ -82,8 +82,13 @@ def _rename_if_necessary(filename: Path):
     This is permissible because the manylinux wheels are compatible with older GLIBC versions even though
     the filename suggests not - so we apply this hacky workaround. This allows pip to try to install them.
     """
+    # Rename the file if the system's GLIBC version is older than the one used in the NVIDIA PyPI packages
     if platform.system() == "Linux" and _is_glibc_older():
-        return filename.with_name(filename.name.replace("manylinux_2_34", "manylinux_2_31"))
+        new_filename = filename.with_name(filename.name.replace("manylinux_2_34", "manylinux_2_31"))
+        shutil.move(filename, new_filename)
+        return new_filename
+
+    # If the file is not renamed, return the original filename
     return filename
 
 
@@ -278,7 +283,9 @@ def attempt_pip_install():
 
 @click.command()
 @click.option(
-    "--install-datasets", default=True, help="Install the OmniGibson dataset and assets after installing Isaac Sim"
+    "--install-datasets/--no-install-datasets",
+    default=True,
+    help="Install the OmniGibson dataset and assets after installing Isaac Sim",
 )
 @click.option(
     "--launcher-install/--pip-install",

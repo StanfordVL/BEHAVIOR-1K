@@ -14,6 +14,9 @@ gm.ENABLE_HQ_RENDERING = True
 def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene plus a cabinet
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
             "floor_plane_visible": True,
