@@ -101,12 +101,12 @@ def import_asset(
 
     # Generate the URDF
     click.echo(f"Generating URDF for {category}/{model}...")
-    og.launch()
     generate_urdf_for_obj(visual_mesh, collision_meshes, category, model)
     click.echo("URDF generation complete!")
 
     # Convert to USD
     click.echo("Converting to USD...")
+    og.launch()
     import_obj_urdf(
         obj_category=category,
         obj_model=model,

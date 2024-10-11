@@ -1842,6 +1842,22 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
             with open(temp_dir_path / original_material_filename, "r") as f:
                 new_lines = []
                 for line in f.readlines():
+                    if "map_" in line:
+                        map_kind, texture_filename = line.split(" ")
+                        texture_filename = texture_filename.strip()
+                        map_kind = map_kind.strip().replace("map_", "")
+                        new_filename = f"../../material/{obj_name}-base_link-{map_kind}.png"
+
+                        # Copy from the texture_filename relative to the original path, to the new path relative to the target path
+                        texture_from_path = temp_dir_path / texture_filename
+                        assert texture_from_path.exists(), f"Texture file {texture_from_path} does not exist!"
+                        texture_to_path = obj_link_visual_mesh_folder / new_filename
+                        assert not texture_to_path.exists(), f"Texture file {texture_to_path} already exists!"
+                        shutil.copy2(texture_from_path, texture_to_path)
+
+                        # Change the line to point to the new path
+                        line = line.replace(texture_filename, new_filename)
+
                     # We temporarily disable this material renaming.
                     # if "map_Kd material_0.png" in line:
                     #     line = ""
