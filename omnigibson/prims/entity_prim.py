@@ -21,7 +21,7 @@ from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_rela
 m = create_module_macros(module_path=__file__)
 
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
-m.DEFAULT_SLEEP_THRESHOLD = 0.001
+m.DEFAULT_SLEEP_THRESHOLD = 0.00005
 
 
 class EntityPrim(XFormPrim):

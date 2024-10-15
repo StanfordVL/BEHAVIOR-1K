@@ -496,7 +496,6 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateResiduals", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUseGPUInterop", True)
-            # lazy.carb.settings.get_settings().set_bool("/physics/disableSleeping", True)
 
         def _validate_dts(self, physics_dt, rendering_dt, sim_step_dt):
             """
