@@ -1,3 +1,5 @@
+import math
+import os
 from collections.abc import Iterable
 
 import torch as th  # MUST come before importing omni!!!
@@ -7,6 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
+from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import GROUND_CATEGORIES
 from omnigibson.utils.control_utils import FKSolver
 
@@ -173,14 +176,26 @@ class CuRoboMotionGenerator:
         if ee_link is not None:
             robot_cfg["kinematics"]["ee_link"] = ee_link
 
+        robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg, self._tensor_args)
+
+        if isinstance(robot, HolonomicBaseRobot):
+            # Manually specify joint limits for the base_footprint_x/y/z/rx/ry_rz
+            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[0][0:2] = -5.0
+            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[1][0:2] = 5.0
+
+            # Needs to be -2pi to 2pi, instead of -pi to pi, otherwise the planning success rate is much lower
+            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[0][2] = -math.pi * 2
+            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[1][2] = math.pi * 2
+
         motion_kwargs = dict(
             trajopt_tsteps=32,
             collision_checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
             use_cuda_graph=True,
-            num_ik_seeds=12,
-            num_batch_ik_seeds=12,
+            num_ik_seeds=32,
+            num_batch_ik_seeds=32,
             num_batch_trajopt_seeds=1,
-            ik_opt_iters=60,
+            num_trajopt_noisy_seeds=1,
+            ik_opt_iters=100,
             optimize_dt=True,
             num_trajopt_seeds=4,
             num_graph_seeds=4,
@@ -188,33 +203,45 @@ class CuRoboMotionGenerator:
             collision_cache={"obb": 10, "mesh": 1024},
             collision_max_outside_distance=0.05,
             collision_activation_distance=0.025,
-            acceleration_scale=1.0,
             self_collision_check=True,
             maximum_trajectory_dt=None,
             fixed_iters_trajopt=True,
             finetune_trajopt_iters=100,
             finetune_dt_scale=1.05,
-            velocity_scale=[1.0] * robot.n_joints,
         )
         if motion_cfg_kwargs is not None:
             motion_kwargs.update(motion_cfg_kwargs)
         motion_gen_config = lazy.curobo.wrap.reacher.motion_gen.MotionGenConfig.load_from_robot_config(
-            robot_cfg,
+            robot_cfg_obj,
             lazy.curobo.geom.types.WorldConfig(),
             self._tensor_args,
             store_trajopt_debug=self.debug,
             **motion_kwargs,
         )
+
         self.mg = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         # Store internal variables
         self.robot = robot
+        self.robot_joint_names = list(robot.joints.keys())
+        self.robot_cfg = robot_cfg
         self.ee_link = robot_cfg["kinematics"]["ee_link"]
         self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self._usd_help = lazy.curobo.util.usd_helper.UsdHelper()
         self._usd_help.stage = og.sim.stage
         assert batch_size >= 2, f"batch_size must be >= 2! Got: {batch_size}"
         self.batch_size = batch_size
+
+    def save_visualization(self, q, directory_path):
+        cu_js = lazy.curobo.types.state.JointState(
+            position=self.tensor_args.to_device(q),
+            joint_names=self.robot_joint_names,
+        ).get_ordered_joint_state(self.mg.kinematics.joint_names)
+        sph = self.mg.kinematics.get_robot_as_spheres(cu_js.position)
+        robot_world = lazy.curobo.geom.types.WorldConfig(sphere=sph[0])
+        mesh_world = self.mg.world_model.get_mesh_world(merge_meshes=True)
+        robot_world.add_obstacle(mesh_world.mesh[0])
+        robot_world.save_world_as_mesh(os.path.join(directory_path, "world.obj"))
 
     def update_obstacles(self, ignore_paths=None):
         """
@@ -275,9 +302,13 @@ class CuRoboMotionGenerator:
         self.update_obstacles()
 
         # Compute kinematics to get corresponding sphere representation
-        cu_js = lazy.curobo.types.state.JointState(position=self.tensor_args.to_device(q))
+        cu_js = lazy.curobo.types.state.JointState(
+            position=self.tensor_args.to_device(q),
+            joint_names=self.robot_joint_names,
+        ).get_ordered_joint_state(self.mg.kinematics.joint_names)
+
         robot_spheres = self.mg.compute_kinematics(cu_js).robot_spheres
-        # (N_samples, n_obs_spheres, 4) --> (N_samples, 1, n_spheres, 4)
+        # (N_samples, n_spheres, 4) --> (N_samples, 1, n_spheres, 4)
         robot_spheres = robot_spheres.unsqueeze(dim=1)
 
         # Run direct collision check
@@ -313,6 +344,8 @@ class CuRoboMotionGenerator:
         self,
         target_pos,
         target_quat,
+        right_target_pos,
+        right_target_quat,
         is_local=False,
         max_attempts=5,
         timeout=2.0,
@@ -361,9 +394,18 @@ class CuRoboMotionGenerator:
         """
         # Previously, this would silently fail so we explicitly check for out-of-range joint limits here
         # This may be fixed in a recent version of CuRobo? See https://github.com/NVlabs/curobo/discussions/288
-        if not th.all(th.abs(self.robot.get_joint_positions(normalized=True))[:-2] < 0.99):
+        relevant_joint_positions_normalized = (
+            lazy.curobo.types.state.JointState(
+                position=self.tensor_args.to_device(self.robot.get_joint_positions(normalized=True)),
+                joint_names=self.robot_joint_names,
+            )
+            .get_ordered_joint_state(self.mg.kinematics.joint_names)
+            .position
+        )
+
+        if not th.all(th.abs(relevant_joint_positions_normalized) < 0.99):
             print("Robot is near joint limits! No trajectory will be computed")
-            return None
+            return None, None if not return_full_result else None
 
         # Make sure a valid (>1) number of entries were submitted
         for tensor in (target_pos, target_quat):
@@ -387,16 +429,13 @@ class CuRoboMotionGenerator:
         self.update_obstacles()
 
         # Make sure the specified target pose is in the robot frame
-        robot_pos, robot_quat = self.robot.get_position_orientation()
         if not is_local:
-            target_pose = th.zeros((self.batch_size, 4, 4))
+            robot_pos, robot_quat = self.robot.get_position_orientation()
+            target_pose = th.zeros((target_pos.shape[0], 4, 4))
             target_pose[:, 3, 3] = 1.0
             target_pose[:, :3, :3] = T.quat2mat(target_quat)
             target_pose[:, :3, 3] = target_pos
-            inv_robot_pose = th.eye(4)
-            inv_robot_ori = T.quat2mat(robot_quat).T
-            inv_robot_pose[:3, :3] = inv_robot_ori
-            inv_robot_pose[:3, 3] = -inv_robot_ori @ robot_pos
+            inv_robot_pose = T.pose_inv(T.pose2mat((robot_pos, robot_quat)))
             target_pose = inv_robot_pose.view(1, 4, 4) @ target_pose
             target_pos = target_pose[:, :3, 3]
             target_quat = T.mat2quat(target_pose[:, :3, :3])
@@ -407,6 +446,26 @@ class CuRoboMotionGenerator:
         # Make sure tensors are on device and contiguous
         target_pos = self._tensor_args.to_device(target_pos).contiguous()
         target_quat = self._tensor_args.to_device(target_quat).contiguous()
+
+        if right_target_pos is not None:
+            # Make sure the specified target pose is in the robot frame
+            if not is_local:
+                robot_pos, robot_quat = self.robot.get_position_orientation()
+                right_target_pose = th.zeros((right_target_pos.shape[0], 4, 4))
+                right_target_pose[:, 3, 3] = 1.0
+                right_target_pose[:, :3, :3] = T.quat2mat(right_target_quat)
+                right_target_pose[:, :3, 3] = right_target_pos
+                inv_robot_pose = T.pose_inv(T.pose2mat((robot_pos, robot_quat)))
+                right_target_pose = inv_robot_pose.view(1, 4, 4) @ right_target_pose
+                right_target_pos = right_target_pose[:, :3, 3]
+                right_target_quat = T.mat2quat(right_target_pose[:, :3, :3])
+
+            # Map xyzw -> wxyz quat
+            right_target_quat = right_target_quat[:, [3, 0, 1, 2]]
+
+            # Make sure tensors are on device and contiguous
+            right_target_pos = self._tensor_args.to_device(right_target_pos).contiguous()
+            right_target_quat = self._tensor_args.to_device(right_target_quat).contiguous()
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -445,6 +504,10 @@ class CuRoboMotionGenerator:
             batch_target_pos = target_pos[offset_idx : offset_idx + end_idx]
             batch_target_quat = target_quat[offset_idx : offset_idx + end_idx]
 
+            if right_target_pos is not None:
+                batch_right_target_pos = right_target_pos[offset_idx : offset_idx + end_idx]
+                batch_right_target_quat = right_target_quat[offset_idx : offset_idx + end_idx]
+
             # Pad the goal if we're in our final batch
             if using_remainder:
                 new_batch_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
@@ -456,17 +519,34 @@ class CuRoboMotionGenerator:
                 new_batch_target_quat[end_idx:] = batch_target_quat[-1]
                 batch_target_quat = new_batch_target_quat
 
+                if right_target_pos is not None:
+                    new_batch_right_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
+                    new_batch_right_target_pos[:end_idx] = batch_right_target_pos
+                    new_batch_right_target_pos[end_idx:] = batch_right_target_pos[-1]
+                    batch_right_target_pos = new_batch_right_target_pos
+                    new_batch_right_target_quat = self._tensor_args.to_device(th.zeros((self.batch_size, 4)))
+                    new_batch_right_target_quat[:end_idx] = batch_right_target_quat
+                    new_batch_right_target_quat[end_idx:] = batch_right_target_quat[-1]
+                    batch_right_target_quat = new_batch_right_target_quat
+
             # Create IK goal
             ik_goal_batch = lazy.curobo.types.math.Pose(
                 position=batch_target_pos,
                 quaternion=batch_target_quat,
             )
 
+            if right_target_pos is not None:
+                right_ik_goal_batch = lazy.curobo.types.math.Pose(
+                    position=batch_right_target_pos,
+                    quaternion=batch_right_target_quat,
+                )
+
             # Run batched planning
             if self.debug:
                 self.mg.store_debug_in_result = True
 
-            result = self.mg.plan_batch(cu_js_batch, ik_goal_batch, plan_cfg)
+            link_poses = {"right_hand": right_ik_goal_batch} if right_target_pos is not None else None
+            result = self.mg.plan_batch(cu_js_batch, ik_goal_batch, plan_cfg, link_poses=link_poses)
 
             if self.debug:
                 breakpoint()
