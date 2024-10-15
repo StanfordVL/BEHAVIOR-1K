@@ -48,7 +48,22 @@ setup(
         "graphviz~=0.20",
         "matplotlib>=3.0.0",
     ],
-    extras_require={},
+    extras_require={
+        "dev": [
+            "pytest>=6.2.3",
+            "pytest-cov>=3.0.0",
+            "pytest_rerunfailures",
+            "mkdocs",
+            "mkdocs-autorefs",
+            "mkdocs-gen-files",
+            "mkdocs-material",
+            "mkdocs-material-extensions",
+            "mkdocstrings[python]",
+            "mkdocs-section-index",
+            "mkdocs-literate-nav",
+            "telemoma~=0.1.2",
+        ]
+    },
     tests_require=[],
     python_requires=">=3",
     include_package_data=True,

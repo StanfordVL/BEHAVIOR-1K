@@ -67,8 +67,12 @@ WORKDIR /omnigibson-src
 
 SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
 
-# Install OmniGibson
-RUN micromamba run -n omnigibson pip install -e .
+# Optionally install OmniGibson (e.g. unless the DEV_MODE flag is set)
+ARG DEV_MODE
+ENV DEV_MODE=${DEV_MODE}
+RUN if [ "$DEV_MODE" != "1" ]; then \
+    micromamba run -n omnigibson pip install -e .[dev]; \
+    fi
 
-ENTRYPOINT ["micromamba", "run", "-n", "omnigibson"]
+    ENTRYPOINT ["micromamba", "run", "-n", "omnigibson"]
 CMD ["/bin/bash"]
