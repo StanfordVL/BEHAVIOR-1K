@@ -347,78 +347,22 @@ class TouchingAnyCondition(RuleCondition):
         self._filter_1_name = filter_1_name
         self._filter_2_name = filter_2_name
 
-        # Will be filled in during self.initialize
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 1
-        self._filter_1_idxs = None
-
-        # If optimized, filter_2_idxs will be used, otherwise filter_2_bodies will be used!
-        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 2
-        self._filter_2_idxs = None
         # Maps object to set of rigid bodies corresponding to filter 2
         self._filter_2_bodies = None
 
-        # Flag whether optimized call can be used
-        self._optimized = None
-
     def refresh(self, object_candidates):
-        # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
-        # in our collision set are kinematic only
-        # self._optimized = not th.any(
-        #     th.tensor(
-        #         [
-        #             obj.kinematic_only or obj.prim_type == PrimType.CLOTH
-        #             for f in (self._filter_1_name, self._filter_2_name)
-        #             for obj in object_candidates[f]
-        #         ]
-        #     )
-        # )
-
-        # TODO: RigidContactAPI sometimes has false negatives (returning zero impulses when there are contacts), so we will stick
-        # with the non-optimized version for now. We will fix this in a future release.
-        self._optimized = False
-
-        if self._optimized:
-            # Register idx mappings
-            self._filter_1_idxs = {
-                obj: [RigidContactAPI.get_body_row_idx(link.prim_path)[1] for link in obj.links.values()]
-                for obj in object_candidates[self._filter_1_name]
-            }
-            self._filter_2_idxs = {
-                obj: th.tensor(
-                    [RigidContactAPI.get_body_col_idx(link.prim_path)[1] for link in obj.links.values()],
-                    dtype=th.float32,
-                )
-                for obj in object_candidates[self._filter_2_name]
-            }
-        else:
-            # Register body mappings
-            self._filter_2_bodies = {obj: set(obj.links.values()) for obj in object_candidates[self._filter_2_name]}
+        # Register body mappings
+        self._filter_2_bodies = {obj: set(obj.links.values()) for obj in object_candidates[self._filter_2_name]}
 
     def __call__(self, object_candidates):
-        # Keep any object that has non-zero impulses between itself and any of the @filter_2_name's objects
+        # Keep any of the @filter_2_name's objects
         objs = []
 
-        if self._optimized:
-            # Batch check for each object
-            for obj in object_candidates[self._filter_1_name]:
-                # Get all impulses between @obj and any object in @filter_2_name that are in the same scene
-                idxs_to_check = th.cat(
-                    [
-                        self._filter_2_idxs[obj2]
-                        for obj2 in object_candidates[self._filter_2_name]
-                        if obj2.scene == obj.scene
-                    ]
-                )
-                if th.any(
-                    RigidContactAPI.get_all_impulses(obj.scene.idx)[self._filter_1_idxs[obj]][:, idxs_to_check.tolist()]
-                ):
-                    objs.append(obj)
-        else:
-            # Manually check contact
-            filter_2_bodies = set.union(*(self._filter_2_bodies[obj] for obj in object_candidates[self._filter_2_name]))
-            for obj in object_candidates[self._filter_1_name]:
-                if len(obj.states[ContactBodies].get_value().intersection(filter_2_bodies)) > 0:
-                    objs.append(obj)
+        # Manually check contact
+        filter_2_bodies = set.union(*(self._filter_2_bodies[obj] for obj in object_candidates[self._filter_2_name]))
+        for obj in object_candidates[self._filter_1_name]:
+            if len(obj.states[ContactBodies].get_value().intersection(filter_2_bodies)) > 0:
+                objs.append(obj)
 
         # Update candidates
         object_candidates[self._filter_1_name] = objs
