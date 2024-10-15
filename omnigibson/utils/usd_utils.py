@@ -230,7 +230,7 @@ class RigidContactAPIImpl:
 
     @classmethod
     def get_max_contact_data_count(cls):
-        return 0
+        return 256
 
     def initialize_view(self):
         """

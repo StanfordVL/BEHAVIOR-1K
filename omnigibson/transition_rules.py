@@ -25,7 +25,6 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory, torch_delete
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger, disclaimer
-from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
