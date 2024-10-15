@@ -115,11 +115,12 @@ class RigidPrim(XFormPrim):
 
         # Only create contact report api if we're not visual only
         if not self._visual_only:
-            (
+            contact_api = (
                 lazy.pxr.PhysxSchema.PhysxContactReportAPI(self._prim)
                 if self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
                 else lazy.pxr.PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
             )
+            contact_api.GetThresholdAttr().Set(0.0)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
