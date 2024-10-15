@@ -257,6 +257,8 @@ class RigidPrim(XFormPrim):
     def contact_list(self):
         """
         Get list of all current contacts with this rigid body
+        NOTE: This method is slow and uncached, but it works even for sleeping objects.
+        For frequent contact checks, consider using RigidContactAPI for performance.
 
         Returns:
             list of CsRawData: raw contact info for this rigid body
