@@ -403,6 +403,9 @@ def _launch_simulator(*args, **kwargs):
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
 
+            # Acquire contact sensor interface
+            self._contact_sensor = lazy.omni.isaac.sensor._sensor.acquire_contact_sensor_interface()
+
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
             Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
@@ -493,6 +496,7 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateJointStates", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUpdateResiduals", False)
             lazy.carb.settings.get_settings().set_bool("/physics/fabricUseGPUInterop", True)
+            # lazy.carb.settings.get_settings().set_bool("/physics/disableSleeping", True)
 
         def _validate_dts(self, physics_dt, rendering_dt, sim_step_dt):
             """
@@ -1732,6 +1736,14 @@ def _launch_simulator(*args, **kwargs):
                 float: Rendering timestep
             """
             return self._initial_rendering_dt
+
+        @property
+        def contact_sensor(self):
+            """
+            Returns:
+                ContactSensor: Contact sensor object
+            """
+            return self._contact_sensor
 
         def _dump_state(self):
             # Default state is from the scene
