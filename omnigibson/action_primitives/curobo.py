@@ -191,8 +191,8 @@ class CuRoboMotionGenerator:
             trajopt_tsteps=32,
             collision_checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
             use_cuda_graph=True,
-            num_ik_seeds=32,
-            num_batch_ik_seeds=32,
+            num_ik_seeds=128,
+            num_batch_ik_seeds=128,
             num_batch_trajopt_seeds=1,
             num_trajopt_noisy_seeds=1,
             ik_opt_iters=100,
@@ -220,6 +220,7 @@ class CuRoboMotionGenerator:
         )
 
         self.mg = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
+        self.mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
 
         # Store internal variables
         self.robot = robot
@@ -259,17 +260,12 @@ class CuRoboMotionGenerator:
         del ignore_scenes[self.robot.scene.idx]
         ignore_visual_only = [obj.prim_path for obj in self.robot.scene.objects if obj.visual_only]
 
-        # Filter out any objects corresponding to ground
-        ground_paths = {obj.prim_path for obj in self.robot.scene.objects if obj.category in GROUND_CATEGORIES}
-
         obstacles = self._usd_help.get_obstacles_from_stage(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
                 self.robot.prim_path,  # Don't include robot paths
                 "/curobo",  # Don't include curobo prim
                 "visual",  # Don't include any visuals
-                # "ground_plane",  # Don't include ground plane
-                # *ground_paths,  # Don't include collisions with any ground-related objects
                 *METALINK_PREFIXES,  # Don't include any metalinks
                 *ignore_scenes,  # Don't include any scenes the robot is not in
                 *ignore_visual_only,  # Don't include any visual-only objects
@@ -315,8 +311,7 @@ class CuRoboMotionGenerator:
         with th.no_grad():
             # Run the overlap check
             # Sphere shape should be (N_queries, 1, n_obs_spheres, 4), where 4 --> (x,y,z,radius)
-            coll_query_buffer = lazy.curobo.geom.sdf.world.CollisionQueryBuffer()
-            coll_query_buffer.update_buffer_shape(
+            coll_query_buffer = lazy.curobo.geom.sdf.world.CollisionQueryBuffer.initialize_from_shape(
                 shape=robot_spheres.shape,
                 tensor_args=self.tensor_args,
                 collision_types=self.mg.world_coll_checker.collision_types,
@@ -349,7 +344,6 @@ class CuRoboMotionGenerator:
         is_local=False,
         max_attempts=5,
         timeout=2.0,
-        enable_graph_attempt=3,
         ik_fail_return=5,
         enable_finetune_trajopt=True,
         finetune_attempts=1,
@@ -369,8 +363,6 @@ class CuRoboMotionGenerator:
                 global frame
             max_attempts (int): Maximum number of attempts for trying to compute a valid trajectory
             timeout (float): Maximum time in seconds allowed to solve the motion generation problem
-            enable_graph_attempt (None or int): Number of failed attempts at which to fallback to a graph planner
-                for obtaining trajectory seeds
             ik_fail_return (None or int): Number of IK attempts allowed before returning a failure. Set this to a
                 low value (5) to save compute time when an unreachable goal is given
             enable_finetune_trajopt (bool): Whether to enable timing reparameterization for a smoother trajectory
@@ -418,7 +410,7 @@ class CuRoboMotionGenerator:
             enable_graph=False,
             max_attempts=max_attempts,
             timeout=timeout,
-            enable_graph_attempt=enable_graph_attempt,
+            enable_graph_attempt=None,
             ik_fail_return=ik_fail_return,
             enable_finetune_trajopt=enable_finetune_trajopt,
             finetune_attempts=finetune_attempts,
@@ -475,6 +467,13 @@ class CuRoboMotionGenerator:
         cu_js_batch = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
             # TODO: Ideally these should be nonzero, but curobo fails to compute a solution if so
+            # See this note from https://curobo.org/get_started/2b_isaacsim_examples.html
+            # Motion generation only generates motions when the robot is static.
+            # cuRobo has an experimental mode to optimize from non-static states.
+            # You can try this by passing --reactive to motion_gen_reacher.py.
+            # This mode will have lower success than the static mode as now the optimization
+            # has to account for the robot’s current velocity and acceleration.
+            # The weights have also not been tuned for reactive mode.
             velocity=self._tensor_args.to_device(q_vel) * 0.0,
             acceleration=self._tensor_args.to_device(q_eff) * 0.0,
             jerk=self._tensor_args.to_device(q_eff) * 0.0,
@@ -580,18 +579,8 @@ class CuRoboMotionGenerator:
                 steps and D is the number of robot joints.
         """
         cmd_plan = self.mg.get_full_js(path)
-        # get only joint names that are in both:
-        idx_list = []
-        common_js_names = []
-        jnts_to_idx = {name: i for i, name in enumerate(self.robot.joints.keys())}
         joint_names = list(self.robot.joints.keys()) if joint_names is None else joint_names
-        for x in joint_names:
-            if x in cmd_plan.joint_names:
-                idx_list.append(jnts_to_idx[x])
-                common_js_names.append(x)
-
-        cmd_plan = cmd_plan.get_ordered_joint_state(common_js_names)
-        return cmd_plan.position
+        return cmd_plan.get_ordered_joint_state(joint_names).position
 
     def convert_q_to_eef_traj(self, traj, return_axisangle=False):
         """

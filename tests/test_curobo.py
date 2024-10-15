@@ -57,20 +57,20 @@ def test_curobo():
     }
 
     robot_cfgs = [
-        {
-            "type": "FrankaPanda",
-            "obs_modalities": "rgb",
-            "position": [0.7, -0.55, 0.0],
-            "orientation": [0, 0, 0.707, 0.707],
-            "self_collisions": True,
-        },
         # {
-        #     "type": "R1",
+        #     "type": "FrankaPanda",
         #     "obs_modalities": "rgb",
         #     "position": [0.7, -0.55, 0.0],
         #     "orientation": [0, 0, 0.707, 0.707],
         #     "self_collisions": True,
         # },
+        {
+            "type": "R1",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.55, 0.0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+        },
     ]
 
     for robot_cfg in robot_cfgs:
@@ -241,15 +241,17 @@ def test_curobo():
             ),
             is_local=True,
             max_attempts=1,
+            timeout=60.0,
+            ik_fail_return=5,
             enable_finetune_trajopt=True,
+            finetune_attempts=1,
             return_full_result=False,
             success_ratio=1.0,
             attached_obj=None,
-            timeout=60.0,
         )
 
         # Make sure collision-free trajectories are generated
-        success_rate = th.mean(successes)
+        success_rate = successes.double().mean().item()
         print(f"Collision-free trajectory generation success rate: {success_rate}")
         assert success_rate == 1.0, f"Collision-free trajectory generation success rate: {success_rate}"
 
