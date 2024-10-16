@@ -278,8 +278,7 @@ class CuRoboMotionGenerator:
     def check_collisions(
         self,
         q,
-        activation_distance=0.01,
-        weight=50000.0,
+        check_self_collision=True,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -287,9 +286,7 @@ class CuRoboMotionGenerator:
         Args:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
-            activation_distance (float): Safety buffer around robot mesh representation which will trigger a
-                collision check
-            weight (float): Loss weighting to apply during collision check optimization
+            check_self_collision (bool): Whether to check self-collisions or not
 
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
@@ -307,30 +304,15 @@ class CuRoboMotionGenerator:
         # (N_samples, n_spheres, 4) --> (N_samples, 1, n_spheres, 4)
         robot_spheres = robot_spheres.unsqueeze(dim=1)
 
-        # Run direct collision check
         with th.no_grad():
-            # Run the overlap check
-            # Sphere shape should be (N_queries, 1, n_obs_spheres, 4), where 4 --> (x,y,z,radius)
-            coll_query_buffer = lazy.curobo.geom.sdf.world.CollisionQueryBuffer.initialize_from_shape(
-                shape=robot_spheres.shape,
-                tensor_args=self.tensor_args,
-                collision_types=self.mg.world_coll_checker.collision_types,
-            )
-
-            dist = self.mg.world_coll_checker.get_sphere_collision(
-                robot_spheres,
-                coll_query_buffer,
-                weight=th.tensor([weight], device=self.tensor_args.device),
-                activation_distance=th.tensor([activation_distance], device=self.tensor_args.device),
-                env_query_idx=None,
-                return_loss=False,
-            ).squeeze(
-                dim=1
-            )  # shape (N_samples, n_spheres)
-
-            # Positive distances correspond to a collision detection (or close to a collision, within activation_distance
-            # So valid collision-free samples are those where max(n_obs_spheres) == 0 for a given sample
-            collision_results = dist.max(dim=-1).values != 0
+            collision_dist = self.mg.rollout_fn.primitive_collision_constraint.forward(robot_spheres).squeeze(1)
+            collision_results = collision_dist > 0.0
+            if check_self_collision:
+                self_collision_dist = self.mg.rollout_fn.robot_self_collision_constraint.forward(robot_spheres).squeeze(
+                    1
+                )
+                self_collision_results = self_collision_dist > 0.0
+                collision_results = collision_results | self_collision_results
 
         # Return results
         return collision_results  # shape (B,)

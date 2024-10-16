@@ -174,23 +174,23 @@ def test_curobo():
             touching_object = len(obj_contact_pairs) > 0
 
             curobo_has_contact = curobo_has_contact.item()
-            physx_has_ext_contact = touching_object or touching_floor
+            physx_has_contact = touching_itself or touching_floor or touching_object
 
             # cuRobo reports contact, but physx reports no contact
-            if curobo_has_contact and not physx_has_ext_contact:
+            if curobo_has_contact and not physx_has_contact:
                 false_positive += 1
                 print(
-                    f"False positive {i}: {curobo_has_contact} vs. {physx_has_ext_contact} (touching_object: {touching_object}, touching_floor: {touching_floor})"
+                    f"False positive {i}: {curobo_has_contact} vs. {physx_has_contact} (touching_itself/obj/floor: {touching_itself}/{touching_object}/{touching_floor})"
                 )
 
             # physx reports contact, but cuRobo reports no contact (this should not happen!)
-            elif not curobo_has_contact and physx_has_ext_contact:
+            elif not curobo_has_contact and physx_has_contact:
                 false_negative += 1
                 print(
-                    f"False negative {i}: {curobo_has_contact} vs. {physx_has_ext_contact} (touching_object: {touching_object}, touching_floor: {touching_floor})"
+                    f"False negative {i}: {curobo_has_contact} vs. {physx_has_contact} (touching_itself/obj/floor: {touching_itself}/{touching_object}/{touching_floor})"
                 )
 
-            if not curobo_has_contact and not physx_has_ext_contact and not touching_itself:
+            if not curobo_has_contact and not physx_has_contact:
                 absolute_eef_position = []
                 for arm_name in robot.arm_names:
                     # For holonomic base robots, we need to be in the frame of @robot.root_link, not @robot.base_footprint_link
