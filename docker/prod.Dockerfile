@@ -58,9 +58,6 @@ RUN micromamba run -n omnigibson /bin/bash --login -c 'source /isaac-sim/setup_c
 # Test OMPL
 RUN micromamba run -n omnigibson python -c "from ompl import base"
 
-# Add setup to be executed on bash launch
-RUN 
-
 # Copy over omnigibson source
 ADD . /omnigibson-src
 WORKDIR /omnigibson-src
