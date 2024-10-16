@@ -49,19 +49,9 @@ jobs:
           submodules: true
           path: omnigibson-src
 
-      # These are temporarily disabled due to some errors they cause where some
-      # unknown important dependency has its version changed and Isaac Sim will
-      # no longer launch properly. The result is that if dependencies change,
-      # the tests will stop working. This is a temporary fix until we can figure
-      # out how to fix this issue.
-
-      # - name: Install dev requirements
-      #   working-directory: omnigibson-src
-      #   run: pip install -r requirements-dev.txt
-
-      # - name: Install
-      #   working-directory: omnigibson-src
-      #   run: pip install -e .
+      - name: Install
+        working-directory: omnigibson-src
+        run: pip install -e .[dev]
 
       - name: Print env
         run: printenv
