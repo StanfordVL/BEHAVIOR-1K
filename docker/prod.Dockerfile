@@ -59,20 +59,30 @@ RUN micromamba run -n omnigibson /bin/bash --login -c 'source /isaac-sim/setup_c
 RUN micromamba run -n omnigibson python -c "from ompl import base"
 
 # Add setup to be executed on bash launch
-RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/download_datasets.py" >> /root/.bashrc
+RUN 
 
 # Copy over omnigibson source
 ADD . /omnigibson-src
 WORKDIR /omnigibson-src
 
+# Set the shell
 SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
 
-# Optionally install OmniGibson (e.g. unless the DEV_MODE flag is set)
+# Optionally install OmniGibson (e.g. unless the DEV_MODE flag is set) or
+# remove the OmniGibson source code if we are in dev mode and change the workdir
 ARG DEV_MODE
 ENV DEV_MODE=${DEV_MODE}
+ARG WORKDIR_PATH=/omnigibson-src
 RUN if [ "$DEV_MODE" != "1" ]; then \
-    micromamba run -n omnigibson pip install -e .[dev]; \
+      echo "OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/download_datasets.py" >> /root/.bashrc; \
+      micromamba run -n omnigibson pip install -e .[dev]; \
+    else \
+      WORKDIR_PATH=/; \
+      cd / && rm -rf /omnigibson-src; \
     fi
 
-    ENTRYPOINT ["micromamba", "run", "-n", "omnigibson"]
+# Reset the WORKDIR based on whether or not we are in dev mode
+WORKDIR ${WORKDIR_PATH}
+
+ENTRYPOINT ["micromamba", "run", "-n", "omnigibson"]
 CMD ["/bin/bash"]
