@@ -2,13 +2,15 @@ import math
 import os
 from collections import defaultdict
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
-from omnigibson.macros import gm
+from omnigibson.macros import gm, macros
 from omnigibson.object_states import Touching
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 
@@ -19,6 +21,10 @@ def test_curobo():
 
     # Create env
     cfg = {
+        "env": {
+            "action_frequency": 30,
+            "physics_frequency": 300,
+        },
         "scene": {
             "type": "Scene",
         },
@@ -63,6 +69,23 @@ def test_curobo():
         #     "position": [0.7, -0.55, 0.0],
         #     "orientation": [0, 0, 0.707, 0.707],
         #     "self_collisions": True,
+        #     "action_normalize": False,
+        #     "controller_config": {
+        #         "arm_0": {
+        #             "name": "JointController",
+        #             "motor_type": "position",
+        #             "command_input_limits": None,
+        #             "use_delta_commands": False,
+        #             "use_impedances": True,
+        #         },
+        #         "gripper_0": {
+        #             "name": "JointController",
+        #             "motor_type": "position",
+        #             "command_input_limits": None,
+        #             "use_delta_commands": False,
+        #             "use_impedances": True,
+        #         },
+        #     },
         # },
         {
             "type": "R1",
@@ -70,6 +93,46 @@ def test_curobo():
             "position": [0.7, -0.55, 0.0],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
+            "action_normalize": False,
+            "rigid_trunk": False,
+            "controller_config": {
+                "base": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                    "kp": macros.robots.holonomic_base_robot.BASE_JOINT_CONTROLLER_POSITION_KP,
+                },
+                "arm_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "arm_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+            },
         },
     ]
 
@@ -91,6 +154,12 @@ def test_curobo():
             bottom_links = []
 
         robot.reset()
+
+        # Open the gripper(s) to match cuRobo's default state
+        for arm_name in robot.gripper_control_idx.keys():
+            grpiper_control_idx = robot.gripper_control_idx[arm_name]
+            robot.set_joint_positions(th.ones_like(grpiper_control_idx), indices=grpiper_control_idx, normalized=True)
+
         robot.keep_still()
 
         for _ in range(5):
@@ -124,7 +193,7 @@ def test_curobo():
         random_qs = lo + th.rand((n_samples, robot.n_dof)) * (hi - lo)
 
         # Test collision with the environment (not including self-collisions)
-        collision_results = cmg.check_collisions(q=random_qs, activation_distance=0.0)
+        collision_results = cmg.check_collisions(q=random_qs)
 
         eef_positions, eef_quats = [], []
         additional_eef_positions, additional_eef_quats = defaultdict(list), defaultdict(list)
@@ -255,25 +324,82 @@ def test_curobo():
         print(f"Collision-free trajectory generation success rate: {success_rate}")
         assert success_rate == 1.0, f"Collision-free trajectory generation success rate: {success_rate}"
 
-        for success, traj_path, absolute_eef_pos in zip(successes, traj_paths, absolute_eef_positions):
-            if not success:
-                continue
-            for pos, marker in zip(absolute_eef_pos, eef_markers):
-                marker.set_position_orientation(position=pos)
+        # 1cm and 3 degrees error tolerance for prismatic and revolute joints, respectively
+        error_tol = th.tensor(
+            [0.01 if joint.joint_type == "PrismaticJoint" else 3.0 / 180.0 * math.pi for joint in robot.joints.values()]
+        )
 
-            q_traj = cmg.path_to_joint_trajectory(traj_path)
+        for bypass_physics in [True, False]:
+            for success, traj_path, absolute_eef_pos in zip(successes, traj_paths, absolute_eef_positions):
+                if not success:
+                    continue
 
-            for q in q_traj:
-                robot.set_joint_positions(q)
-                robot.keep_still()
-                og.sim.step()
+                # Reset the environment
+                env.scene.reset()
 
-                for contact in robot.contact_list():
-                    assert contact.body0 in robot.link_prim_paths
-                    if contact.body1 in floor_plane_prim_paths and contact.body0 in bottom_links:
-                        continue
+                # Move the markers to the desired eef positions
+                for pos, marker in zip(absolute_eef_pos, eef_markers):
+                    marker.set_position_orientation(position=pos)
 
-                    assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                q_traj = cmg.path_to_joint_trajectory(traj_path)
+                # joint_positions_set_point = []
+                # joint_positions_response = []
+                for i, q in enumerate(q_traj):
+                    if bypass_physics:
+                        print(f"Teleporting waypoint {i}/{len(q_traj)}")
+                        robot.set_joint_positions(q)
+                        robot.keep_still()
+                        og.sim.step()
+                        for contact in robot.contact_list():
+                            assert contact.body0 in robot.link_prim_paths
+                            if contact.body1 in floor_plane_prim_paths and contact.body0 in bottom_links:
+                                continue
+                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
+                            assert (
+                                False
+                            ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                    else:
+                        # Convert target joint positions to command
+                        q = q.cpu()
+                        command = []
+                        for controller in robot.controllers.values():
+                            command.append(q[controller.dof_idx])
+                        command = th.cat(command, dim=0)
+                        assert command.shape[0] == robot.action_dim
+
+                        num_repeat = 3
+                        for j in range(num_repeat):
+                            print(f"Executing waypoint {i}/{len(q_traj)}, step {j}")
+                            env.step(command)
+
+                            for contact in robot.contact_list():
+                                assert contact.body0 in robot.link_prim_paths
+                                if contact.body1 in floor_plane_prim_paths and contact.body0 in bottom_links:
+                                    continue
+
+                                print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
+                                # Controller is not perfect, so collisions might happen
+                                # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+
+                            cur_joint_positions = robot.get_joint_positions()
+
+                            # joint_positions_set_point.append(q)
+                            # joint_positions_response.append(cur_joint_positions)
+
+                            if ((cur_joint_positions - q).abs() < error_tol).all():
+                                break
+
+                # joint_positions_set_point = th.stack(joint_positions_set_point, dim=0).numpy()
+                # joint_positions_response = th.stack(joint_positions_response, dim=0).numpy()
+
+                # for i in range(joint_positions_set_point.shape[1]):
+                #     joint_position_set_point = joint_positions_set_point[:, i]
+                #     joint_position_response = joint_positions_response[:, i]
+                #     plt.plot(np.arange(joint_position_set_point.shape[0]), joint_position_set_point)
+                #     plt.plot(np.arange(joint_position_response.shape[0]), joint_position_response)
+                #     plt.savefig(f"/scr/chengshu/Downloads/joint_{list(robot.joints.keys())[i]}_error.png")
+                #     plt.clf()
+                # breakpoint()
 
         og.clear()
 

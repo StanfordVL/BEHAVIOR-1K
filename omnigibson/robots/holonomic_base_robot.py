@@ -14,6 +14,8 @@ from omnigibson.utils.python_utils import classproperty
 m = create_module_macros(module_path=__file__)
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
 m.MAX_ANGULAR_VELOCITY = th.pi  # angular velocity in radians/second
+m.MAX_EFFORT = 1000.0
+m.BASE_JOINT_CONTROLLER_POSITION_KP = 100.0
 
 
 class HolonomicBaseRobot(LocomotionRobot):
@@ -139,15 +141,24 @@ class HolonomicBaseRobot(LocomotionRobot):
         for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
             joint_name = f"base_footprint_{component}_joint"
             assert joint_name in self.joints, f"Missing base joint: {joint_name}"
+
+            # Set the linear and angular velocity limits for the base joints (the default value is too large)
             if i < 3:
                 self.joints[joint_name].max_velocity = m.MAX_LINEAR_VELOCITY
             else:
                 self.joints[joint_name].max_velocity = m.MAX_ANGULAR_VELOCITY
 
+            # Set the effort limits for the base joints (the default value is too small)
+            self.joints[joint_name].max_effort = m.MAX_EFFORT
+
         # Force the recomputation of this cached property
         del self.control_limits
 
-        # Reload the controllers to update command_output_limits, which read the updated control limits
+        # Overwrite with the new control limits
+        self._controller_config["base"]["control_limits"]["velocity"] = self.control_limits["velocity"]
+        self._controller_config["base"]["control_limits"]["effort"] = self.control_limits["effort"]
+
+        # Reload the controllers to update their command_output_limits and control_limits
         self.reload_controllers(self._controller_config)
 
     @property
