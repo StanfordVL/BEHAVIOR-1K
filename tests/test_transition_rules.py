@@ -466,7 +466,12 @@ def test_mixing_rule_failure_recipe_systems(env):
     assert lemonade.n_particles == 0
     assert sludge.n_particles == 0
 
-    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.08], orientation=[0, 0, 0, 1])
+    # Move the tablespoon to touch the bowl
+    tablespoon.set_position_orientation(
+        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, math.pi / 2, 0.0]))
+    )
+    tablespoon.keep_still()
+    tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
@@ -510,7 +515,12 @@ def test_mixing_rule_failure_nonrecipe_systems(env):
     assert lemonade.n_particles == 0
     assert sludge.n_particles == 0
 
-    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.08], orientation=[0, 0, 0, 1])
+    # Move the tablespoon to touch the bowl
+    tablespoon.set_position_orientation(
+        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, math.pi / 2, 0.0]))
+    )
+    tablespoon.keep_still()
+    tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
@@ -550,7 +560,12 @@ def test_mixing_rule_success(env):
 
     assert lemonade.n_particles == 0
 
-    tablespoon.set_position_orientation(position=[0.04, 0.0, 0.08], orientation=[0, 0, 0, 1])
+    # Move the tablespoon to touch the bowl
+    tablespoon.set_position_orientation(
+        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, math.pi / 2, 0.0]))
+    )
+    tablespoon.keep_still()
+    tablespoon.set_linear_velocity(th.tensor([-1.0, 0.0, 0.0]))
     og.sim.step()
 
     assert tablespoon.states[Touching].get_value(bowl)
