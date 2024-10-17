@@ -134,11 +134,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         )
 
     def _update_goal(self, command, control_dict):
-        # Compute the base value for the command
-        base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
-
         # If we're using delta commands, add this value
         if self._use_delta_commands:
+            # Compute the base value for the command
+            base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
 
             # Apply the command to the base value.
             target = base_value + command
