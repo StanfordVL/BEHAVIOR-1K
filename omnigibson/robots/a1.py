@@ -218,7 +218,7 @@ class A1(ManipulationRobot):
     @property
     def disabled_collision_pairs(self):
         # some dexhand has self collisions that needs to be filtered out
+        pairs = [["base_link", "connector"]]
         if self.end_effector == "inspire":
-            return [["base_link", "link12"]]
-        else:
-            return []
+            pairs.append(["base_link", "link12"])
+        return pairs
