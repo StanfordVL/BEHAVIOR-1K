@@ -404,43 +404,9 @@ class ManipulationRobot(BaseRobot):
         fcns = super().get_control_dict()
 
         for arm in self.arm_names:
-            self._add_arm_control_dict(fcns=fcns, arm=arm)
+            self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=self.eef_link_names[arm])
 
         return fcns
-
-    def _add_arm_control_dict(self, fcns, arm):
-        """
-        Internally helper function to generate per-arm control dictionary entries. Needed because otherwise generated
-        functions inadvertently point to the same arm, if directly iterated in a for loop!
-
-        Args:
-            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
-            arm (str): specific arm to generate necessary control dict entries for
-        """
-        fcns[f"_eef_{arm}_pos_quat_relative"] = (
-            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
-                self.articulation_root_path, self.eef_link_names[arm]
-            )
-        )
-        fcns[f"eef_{arm}_pos_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][0]
-        fcns[f"eef_{arm}_quat_relative"] = lambda: fcns[f"_eef_{arm}_pos_quat_relative"][1]
-        fcns[f"eef_{arm}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
-            self.articulation_root_path, self.eef_link_names[arm]
-        )
-        fcns[f"eef_{arm}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
-            self.articulation_root_path, self.eef_link_names[arm]
-        )
-        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
-        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
-        # see self.get_relative_jacobian() for more info
-        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
-        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
-        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
-        start_idx = 0 if self.fixed_base else 6
-        eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
-        fcns[f"eef_{arm}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
-            self.articulation_root_path
-        )[-(self.n_links - eef_link_idx), :, start_idx : start_idx + self.n_joints]
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
@@ -492,7 +458,7 @@ class ManipulationRobot(BaseRobot):
         return self._grasping_mode
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # Assumes we have arm(s) and corresponding gripper(s)
         controllers = []
         for arm in self.arm_names:
@@ -1037,9 +1003,6 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "InverseKinematicsController",
                 "task_name": f"eef_{arm}",
-                "robot_description_path": self.robot_arm_descriptor_yamls[arm],
-                "robot_urdf_path": self.urdf_path,
-                "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
                 "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,

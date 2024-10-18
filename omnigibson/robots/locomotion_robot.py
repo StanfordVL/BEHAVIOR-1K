@@ -56,7 +56,7 @@ class LocomotionRobot(BaseRobot):
         return obs_keys + ["base_qpos_sin", "base_qpos_cos", "robot_lin_vel", "robot_ang_vel"]
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # By default, only base is supported
         return ["base"]
 
