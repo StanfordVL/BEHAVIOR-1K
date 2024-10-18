@@ -38,14 +38,15 @@ robots:
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    rigid_trunk: false
-    default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     controller_config:
       base:
         name: DifferentialDriveController
+      trunk:
+        name: JointController
       arm_0:
         name: JointController
+        dependencies: [trunk]
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
