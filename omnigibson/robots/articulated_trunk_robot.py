@@ -29,7 +29,9 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         fcns = super().get_control_dict()
 
         # Add relevant trunk values
-        self._add_task_frame_control_dict(fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1])
+        self._add_task_frame_control_dict(
+            fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
+        )
 
         return fcns
 
