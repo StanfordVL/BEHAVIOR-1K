@@ -233,7 +233,7 @@ class ControllableObject(BaseObject):
         self._controllers = dict()
         # Keep track of any controllers that are dependencies of other controllers
         # We will not instantiate dependent controllers
-        controller_dependencies = dict()              # Maps independent controller name to list of dependencies
+        controller_dependencies = dict()  # Maps independent controller name to list of dependencies
         dependent_names = set()
         for name in self._raw_controller_order:
             # Make sure we have the valid controller name specified
@@ -243,15 +243,18 @@ class ControllableObject(BaseObject):
             # If this controller has dependencies, it cannot be a dependency for another controller
             # (i.e.: we don't allow nested / cyclical dependencies)
             if len(dependencies) > 0:
-                assert name not in dependent_names, \
-                    f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
+                assert (
+                    name not in dependent_names
+                ), f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
                 controller_dependencies[name] = dependencies
                 for dependent_name in dependencies:
                     # Make sure it doesn't already exist -- a controller should only be the dependency of up to one other
-                    assert dependent_name not in dependent_names, \
-                        f"Controller {dependent_name} cannot be a dependency of more than one other controller!"
-                    assert dependent_name not in controller_dependencies, \
-                        f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
+                    assert (
+                        dependent_name not in dependent_names
+                    ), f"Controller {dependent_name} cannot be a dependency of more than one other controller!"
+                    assert (
+                        dependent_name not in controller_dependencies
+                    ), f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
                     dependent_names.add(dependent_name)
 
         # Loop over all controllers, in the order corresponding to @action dim
@@ -664,11 +667,19 @@ class ControllableObject(BaseObject):
             task_name (str): name to assign for this task_frame. It will be prepended to all fcns generated
             link_name (str): the corresponding link name from this controllable object that @task_name is referencing
         """
-        fcns[f"_{task_name}_pos_quat_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(self.articulation_root_path, link_name)
+        fcns[f"_{task_name}_pos_quat_relative"] = (
+            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, link_name
+            )
+        )
         fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
         fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
-        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(self.articulation_root_path, link_name)
-        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(self.articulation_root_path, link_name)
+        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
+            self.articulation_root_path, link_name
+        )
+        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
+            self.articulation_root_path, link_name
+        )
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
         # see self.get_relative_jacobian() for more info
