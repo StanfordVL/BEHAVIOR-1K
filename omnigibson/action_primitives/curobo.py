@@ -230,7 +230,6 @@ class CuRoboMotionGenerator:
         self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self._usd_help = lazy.curobo.util.usd_helper.UsdHelper()
         self._usd_help.stage = og.sim.stage
-        assert batch_size >= 2, f"batch_size must be >= 2! Got: {batch_size}"
         self.batch_size = batch_size
 
     def save_visualization(self, q, directory_path):
@@ -381,11 +380,11 @@ class CuRoboMotionGenerator:
             print("Robot is near joint limits! No trajectory will be computed")
             return None, None if not return_full_result else None
 
-        # Make sure a valid (>1) number of entries were submitted
+        # Make sure the input shape matches the expected shape
         for tensor in (target_pos, target_quat):
             assert (
-                len(tensor.shape) == 2 and tensor.shape[0] > 1
-            ), f"Expected inputted target tensors to have shape (N,3) or (N,4), where N>1! Got: {tensor.shape}"
+                len(tensor.shape) == 2
+            ), f"Expected inputted target tensors to have shape (N,3) or (N,4)! Got: {tensor.shape}"
 
         # Define the plan config
         plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
@@ -535,7 +534,17 @@ class CuRoboMotionGenerator:
             # Append results
             results.append(result)
             successes = th.concatenate([successes, result.success[:end_idx]])
-            paths += result.get_paths()[:end_idx]
+
+            # If no successes at all, calling result.get_paths() will fail because result.interpolated_plan is None.
+            # This is because retime_trajectory will not be called at all.
+            if result.success[:end_idx].count_nonzero() == 0:
+                paths += [None] * end_idx
+            # If batch size is 1, result.interpolated_plan is just a single plan, not a list of plans.
+            # Therefore, calling result.get_paths() will also fail because result.interpolated_plan is not a list.
+            elif self.batch_size == 1:
+                paths += [result.interpolated_plan.trim_trajectory(0, result.path_buffer_last_tstep[0])]
+            else:
+                paths += result.get_paths()[:end_idx]
 
         # Detach attached object if it was attached
         if attached_obj is not None:
