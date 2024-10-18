@@ -46,6 +46,12 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
+    def trunk_action_idx(self):
+        controller_idx = self.controller_order.index("trunk")
+        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+        return th.arange(action_start_idx, action_start_idx + self.controllers["trunk"].command_dim)
+
+    @property
     def _default_controllers(self):
         # Always call super first
         controllers = super()._default_controllers
