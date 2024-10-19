@@ -320,8 +320,6 @@ class CuRoboMotionGenerator:
         self,
         target_pos,
         target_quat,
-        right_target_pos,
-        right_target_quat,
         is_local=False,
         max_attempts=5,
         timeout=2.0,
@@ -336,10 +334,14 @@ class CuRoboMotionGenerator:
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
 
         Args:
-            target_pos ((N,3)-tensor): (N, 3)-shaped tensor, where each entry is an individual (x,y,z)
-                position to reach. A single (3,) array can also be given
-            target_quat ((N,4)-tensor): (N, 4) or (4,)-shaped tensor, where each entry is an individual (x,y,z,w)
-                quaternion orientation to reach. A single (4,) array can also be given
+            target_pos (Dict[str, th.Tensor] or th.Tensor): The torch tensor shape is either (3,) or (N, 3)
+                where each entry is an individual (x,y,z) position to reach with the default end-effector link specified
+                @self.ee_link. If a dictionary is given, the keys should be the end-effector links and
+                the values should be the corresponding (N, 3) tensors
+            target_quat (Dict[str, th.Tensor] or th.Tensor): The torch tensor shape is either (4,) or (N, 4)
+                where each entry is an individual (x,y,z,w) quaternion to reach with the default end-effector link specified
+                @self.mg.kinematics.ee_link. If a dictionary is given, the keys should be the end-effector links and
+                the values should be the corresponding (N, 4) tensors
             is_local (bool): Whether @target_pos and @target_quat are specified in the robot's local frame or the world
                 global frame
             max_attempts (int): Maximum number of attempts for trying to compute a valid trajectory
@@ -380,11 +382,27 @@ class CuRoboMotionGenerator:
             print("Robot is near joint limits! No trajectory will be computed")
             return None, None if not return_full_result else None
 
-        # Make sure the input shape matches the expected shape
-        for tensor in (target_pos, target_quat):
+        # If target_pos and target_quat are torch tensors, it's assumed that they correspond to the default ee_link
+        if isinstance(target_pos, th.Tensor):
+            target_pos = {self.ee_link: target_pos}
+        if isinstance(target_quat, th.Tensor):
+            target_quat = {self.ee_link: target_quat}
+
+        assert target_pos.keys() == target_quat.keys(), "Expected target_pos and target_quat to have the same keys!"
+
+        # Make sure tensor shapes are (N, 3) and (N, 4)
+        for link_name in target_pos.keys():
+            if len(target_pos[link_name].shape) == 1:
+                target_pos[link_name] = target_pos[link_name].unsqueeze(0)
+            if len(target_quat[link_name].shape) == 1:
+                target_quat[link_name] = target_quat[link_name].unsqueeze(0)
+
             assert (
-                len(tensor.shape) == 2
-            ), f"Expected inputted target tensors to have shape (N,3) or (N,4)! Got: {tensor.shape}"
+                len(target_pos[link_name].shape) == 2 and target_pos[link_name].shape[1] == 3
+            ), f"Expected target_pos to have shape (N,3)! Got: {target_pos[link_name].shape}"
+            assert (
+                len(target_quat[link_name].shape) == 2 and target_quat[link_name].shape[1] == 4
+            ), f"Expected target_quat to have shape (N,4)! Got: {target_quat[link_name].shape}"
 
         # Define the plan config
         plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
@@ -401,44 +419,30 @@ class CuRoboMotionGenerator:
         # Refresh the collision state
         self.update_obstacles()
 
-        # Make sure the specified target pose is in the robot frame
-        if not is_local:
-            robot_pos, robot_quat = self.robot.get_position_orientation()
-            target_pose = th.zeros((target_pos.shape[0], 4, 4))
-            target_pose[:, 3, 3] = 1.0
-            target_pose[:, :3, :3] = T.quat2mat(target_quat)
-            target_pose[:, :3, 3] = target_pos
-            inv_robot_pose = T.pose_inv(T.pose2mat((robot_pos, robot_quat)))
-            target_pose = inv_robot_pose.view(1, 4, 4) @ target_pose
-            target_pos = target_pose[:, :3, 3]
-            target_quat = T.mat2quat(target_pose[:, :3, :3])
-
-        # Map xyzw -> wxyz quat
-        target_quat = target_quat[:, [3, 0, 1, 2]]
-
-        # Make sure tensors are on device and contiguous
-        target_pos = self._tensor_args.to_device(target_pos).contiguous()
-        target_quat = self._tensor_args.to_device(target_quat).contiguous()
-
-        if right_target_pos is not None:
+        for link_name in target_pos.keys():
+            target_pos_link = target_pos[link_name]
+            target_quat_link = target_quat[link_name]
             # Make sure the specified target pose is in the robot frame
             if not is_local:
                 robot_pos, robot_quat = self.robot.get_position_orientation()
-                right_target_pose = th.zeros((right_target_pos.shape[0], 4, 4))
-                right_target_pose[:, 3, 3] = 1.0
-                right_target_pose[:, :3, :3] = T.quat2mat(right_target_quat)
-                right_target_pose[:, :3, 3] = right_target_pos
+                target_pose = th.zeros((target_pos_link.shape[0], 4, 4))
+                target_pose[:, 3, 3] = 1.0
+                target_pose[:, :3, :3] = T.quat2mat(target_quat_link)
+                target_pose[:, :3, 3] = target_pos_link
                 inv_robot_pose = T.pose_inv(T.pose2mat((robot_pos, robot_quat)))
-                right_target_pose = inv_robot_pose.view(1, 4, 4) @ right_target_pose
-                right_target_pos = right_target_pose[:, :3, 3]
-                right_target_quat = T.mat2quat(right_target_pose[:, :3, :3])
+                target_pose = inv_robot_pose.view(1, 4, 4) @ target_pose
+                target_pos_link = target_pose[:, :3, 3]
+                target_quat_link = T.mat2quat(target_pose[:, :3, :3])
 
             # Map xyzw -> wxyz quat
-            right_target_quat = right_target_quat[:, [3, 0, 1, 2]]
+            target_quat_link = target_quat_link[:, [3, 0, 1, 2]]
 
             # Make sure tensors are on device and contiguous
-            right_target_pos = self._tensor_args.to_device(right_target_pos).contiguous()
-            right_target_quat = self._tensor_args.to_device(right_target_quat).contiguous()
+            target_pos_link = self._tensor_args.to_device(target_pos_link).contiguous()
+            target_quat_link = self._tensor_args.to_device(target_quat_link).contiguous()
+
+            target_pos[link_name] = target_pos_link
+            target_quat[link_name] = target_quat_link
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -471,8 +475,8 @@ class CuRoboMotionGenerator:
             )
 
         # Determine how many internal batches we need to run based on submitted size
-        remainder = target_pos.shape[0] % self.batch_size
-        n_batches = int(th.ceil(th.tensor(target_pos.shape[0] / self.batch_size)).item())
+        remainder = target_pos[self.ee_link].shape[0] % self.batch_size
+        n_batches = int(th.ceil(th.tensor(target_pos[self.ee_link].shape[0] / self.batch_size)).item())
 
         # Run internal batched calls
         results, successes, paths = [], self._tensor_args.to_device(th.tensor([], dtype=th.bool)), []
@@ -481,52 +485,46 @@ class CuRoboMotionGenerator:
             using_remainder = (i == n_batches - 1) and remainder > 0
             offset_idx = self.batch_size * i
             end_idx = remainder if using_remainder else self.batch_size
-            batch_target_pos = target_pos[offset_idx : offset_idx + end_idx]
-            batch_target_quat = target_quat[offset_idx : offset_idx + end_idx]
 
-            if right_target_pos is not None:
-                batch_right_target_pos = right_target_pos[offset_idx : offset_idx + end_idx]
-                batch_right_target_quat = right_target_quat[offset_idx : offset_idx + end_idx]
+            ik_goal_batch_by_link = dict()
+            for link_name in target_pos.keys():
+                target_pos_link = target_pos[link_name]
+                target_quat_link = target_quat[link_name]
 
-            # Pad the goal if we're in our final batch
-            if using_remainder:
-                new_batch_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
-                new_batch_target_pos[:end_idx] = batch_target_pos
-                new_batch_target_pos[end_idx:] = batch_target_pos[-1]
-                batch_target_pos = new_batch_target_pos
-                new_batch_target_quat = self._tensor_args.to_device(th.zeros((self.batch_size, 4)))
-                new_batch_target_quat[:end_idx] = batch_target_quat
-                new_batch_target_quat[end_idx:] = batch_target_quat[-1]
-                batch_target_quat = new_batch_target_quat
+                batch_target_pos = target_pos_link[offset_idx : offset_idx + end_idx]
+                batch_target_quat = target_quat_link[offset_idx : offset_idx + end_idx]
 
-                if right_target_pos is not None:
-                    new_batch_right_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
-                    new_batch_right_target_pos[:end_idx] = batch_right_target_pos
-                    new_batch_right_target_pos[end_idx:] = batch_right_target_pos[-1]
-                    batch_right_target_pos = new_batch_right_target_pos
-                    new_batch_right_target_quat = self._tensor_args.to_device(th.zeros((self.batch_size, 4)))
-                    new_batch_right_target_quat[:end_idx] = batch_right_target_quat
-                    new_batch_right_target_quat[end_idx:] = batch_right_target_quat[-1]
-                    batch_right_target_quat = new_batch_right_target_quat
+                # Pad the goal if we're in our final batch
+                if using_remainder:
+                    new_batch_target_pos = self._tensor_args.to_device(th.zeros((self.batch_size, 3)))
+                    new_batch_target_pos[:end_idx] = batch_target_pos
+                    new_batch_target_pos[end_idx:] = batch_target_pos[-1]
+                    batch_target_pos = new_batch_target_pos
+                    new_batch_target_quat = self._tensor_args.to_device(th.zeros((self.batch_size, 4)))
+                    new_batch_target_quat[:end_idx] = batch_target_quat
+                    new_batch_target_quat[end_idx:] = batch_target_quat[-1]
+                    batch_target_quat = new_batch_target_quat
 
-            # Create IK goal
-            ik_goal_batch = lazy.curobo.types.math.Pose(
-                position=batch_target_pos,
-                quaternion=batch_target_quat,
-            )
-
-            if right_target_pos is not None:
-                right_ik_goal_batch = lazy.curobo.types.math.Pose(
-                    position=batch_right_target_pos,
-                    quaternion=batch_right_target_quat,
+                # Create IK goal
+                ik_goal_batch = lazy.curobo.types.math.Pose(
+                    position=batch_target_pos,
+                    quaternion=batch_target_quat,
                 )
+
+                ik_goal_batch_by_link[link_name] = ik_goal_batch
 
             # Run batched planning
             if self.debug:
                 self.mg.store_debug_in_result = True
 
-            link_poses = {"right_hand": right_ik_goal_batch} if right_target_pos is not None else None
-            result = self.mg.plan_batch(cu_js_batch, ik_goal_batch, plan_cfg, link_poses=link_poses)
+            # Pop the main ee_link goal
+            main_ik_goal_batch = ik_goal_batch_by_link.pop(self.ee_link)
+
+            # If no other goals (e.g. no second end-effector), set to None
+            if len(ik_goal_batch_by_link) == 0:
+                ik_goal_batch_by_link = None
+
+            result = self.mg.plan_batch(cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link)
 
             if self.debug:
                 breakpoint()

@@ -195,8 +195,7 @@ def test_curobo():
         # Test collision with the environment (not including self-collisions)
         collision_results = cmg.check_collisions(q=random_qs)
 
-        eef_positions, eef_quats = [], []
-        additional_eef_positions, additional_eef_quats = defaultdict(list), defaultdict(list)
+        target_pos, target_quat = defaultdict(list), defaultdict(list)
 
         floor_plane_prim_paths = {child.GetPath().pathString for child in og.sim.floor_plane._prim.GetChildren()}
 
@@ -204,7 +203,7 @@ def test_curobo():
         false_positive = 0
         false_negative = 0
 
-        absolute_eef_positions = []
+        target_pos_in_world_frame = defaultdict(list)
         for i, (q, curobo_has_contact) in enumerate(zip(random_qs, collision_results)):
             # Set robot to desired qpos
             robot.set_joint_positions(q)
@@ -260,7 +259,6 @@ def test_curobo():
                 )
 
             if not curobo_has_contact and not physx_has_contact:
-                absolute_eef_position = []
                 for arm_name in robot.arm_names:
                     # For holonomic base robots, we need to be in the frame of @robot.root_link, not @robot.base_footprint_link
                     if isinstance(robot, HolonomicBaseRobot):
@@ -270,16 +268,10 @@ def test_curobo():
                     else:
                         eef_pos, eef_quat = robot.get_relative_eef_pose(arm_name)
 
-                    if arm_name == robot.default_arm:
-                        eef_positions.append(eef_pos)
-                        eef_quats.append(eef_quat)
-                    else:
-                        additional_eef_positions[arm_name].append(eef_pos)
-                        additional_eef_quats[arm_name].append(eef_quat)
+                    target_pos[robot.eef_link_names[arm_name]].append(eef_pos)
+                    target_quat[robot.eef_link_names[arm_name]].append(eef_quat)
 
-                    absolute_eef_position.append(robot.get_eef_position(arm_name))
-
-                absolute_eef_positions.append(absolute_eef_position)
+                    target_pos_in_world_frame[robot.eef_link_names[arm_name]].append(robot.get_eef_position(arm_name))
 
         print(
             f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
@@ -293,21 +285,24 @@ def test_curobo():
 
         env.scene.reset()
 
-        print(f"Planning for {len(eef_positions)} eef targets...")
+        for arm_name in robot.arm_names:
+            target_pos[robot.eef_link_names[arm_name]] = th.stack(target_pos[robot.eef_link_names[arm_name]], dim=0)
+            target_quat[robot.eef_link_names[arm_name]] = th.stack(target_quat[robot.eef_link_names[arm_name]], dim=0)
+            target_pos_in_world_frame[robot.eef_link_names[arm_name]] = th.stack(
+                target_pos_in_world_frame[robot.eef_link_names[arm_name]], dim=0
+            )
 
-        # TODO: BoundCost needs to remove .clone() call for joint limits
-        # cmg.mg.kinematics.kinematics_config.joint_limits.position[:, 0] = 0.0
+        # Cast defaultdict to dict
+        target_pos = dict(target_pos)
+        target_quat = dict(target_quat)
+        target_pos_in_world_frame = dict(target_pos_in_world_frame)
+
+        print(f"Planning for {len(target_pos[robot.eef_link_names[robot.default_arm]])} eef targets...")
 
         # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
         successes, traj_paths = cmg.compute_trajectories(
-            target_pos=th.stack(eef_positions, dim=0),
-            target_quat=th.stack(eef_quats, dim=0),
-            right_target_pos=(
-                th.stack(additional_eef_positions["right"], dim=0) if "right" in additional_eef_positions else None
-            ),
-            right_target_quat=(
-                th.stack(additional_eef_quats["right"], dim=0) if "right" in additional_eef_quats else None
-            ),
+            target_pos=target_pos,
+            target_quat=target_quat,
             is_local=True,
             max_attempts=1,
             timeout=60.0,
@@ -330,7 +325,7 @@ def test_curobo():
         )
 
         for bypass_physics in [True, False]:
-            for success, traj_path, absolute_eef_pos in zip(successes, traj_paths, absolute_eef_positions):
+            for traj_idx, (success, traj_path) in enumerate(zip(successes, traj_paths)):
                 if not success:
                     continue
 
@@ -338,8 +333,9 @@ def test_curobo():
                 env.scene.reset()
 
                 # Move the markers to the desired eef positions
-                for pos, marker in zip(absolute_eef_pos, eef_markers):
-                    marker.set_position_orientation(position=pos)
+                for i, marker in enumerate(eef_markers):
+                    eef_link_name = robot.eef_link_names[robot.arm_names[i]]
+                    marker.set_position_orientation(position=target_pos_in_world_frame[eef_link_name][traj_idx])
 
                 q_traj = cmg.path_to_joint_trajectory(traj_path)
                 # joint_positions_set_point = []
