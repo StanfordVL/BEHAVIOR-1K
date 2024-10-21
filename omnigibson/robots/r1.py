@@ -27,7 +27,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -254,4 +254,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return [
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
+            ["base_link", "wheel_link1"],
+            ["base_link", "wheel_link2"],
+            ["base_link", "wheel_link3"],
         ]

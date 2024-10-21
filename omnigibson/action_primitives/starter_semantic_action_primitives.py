@@ -1450,9 +1450,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return [head1_joint_goal, head2_joint_goal]
 
-    def _empty_action(self):
+    def _empty_action(self, follow_arm_targets=True):
         """
         Generate a no-op action that will keep the robot still but aim to move the arms to the saved pose targets, if possible
+
+        Args:
+            follow_arm_targets (bool): Whether to move the arms to the saved pose targets or keep them still.
 
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
@@ -1460,7 +1463,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = th.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
             # if desired arm targets are available, generate an action that moves the arms to the saved pose targets
-            if name in self._arm_targets:
+            if follow_arm_targets and name in self._arm_targets:
                 if isinstance(controller, InverseKinematicsController):
                     arm = name.replace("arm_", "")
                     target_pos, target_orn_axisangle = self._arm_targets[name]
