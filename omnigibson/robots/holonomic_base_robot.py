@@ -282,11 +282,18 @@ class HolonomicBaseRobot(LocomotionRobot):
         base_orn = self.base_footprint_link.get_position_orientation()[1]
         root_link_orn = self.root_link.get_position_orientation()[1]
 
-        cur_orn = T.mat2quat(T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn))
+        cur_orn_mat = T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn)
+        cur_pose = th.zeros((2, 4, 4))
+        cur_pose[:, :3, :3] = cur_orn_mat
+        cur_pose[:, 3, 3] = 1.0
+
+        local_pose = th.zeros((2, 4, 4))
+        local_pose[:] = th.eye(4)
+        local_pose[:, :3, 3] = u_vec[self.base_idx].view(2, 3)
 
         # Rotate the linear and angular velocity to the desired frame
-        lin_vel_global, _ = T.pose_transform(th.zeros(3), cur_orn, u_vec[self.base_idx[:3]], th.tensor([0, 0, 0, 1]))
-        ang_vel_global, _ = T.pose_transform(th.zeros(3), cur_orn, u_vec[self.base_idx[3:]], th.tensor([0, 0, 0, 1]))
+        global_pose = cur_pose @ local_pose
+        lin_vel_global, ang_vel_global = global_pose[0, :3, 3], global_pose[1, :3, 3]
 
         u_vec[self.base_control_idx] = th.tensor([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
 
