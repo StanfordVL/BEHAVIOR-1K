@@ -21,22 +21,18 @@ jobs:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
-          path: omnigibson-src
              
       - name: Install
-        working-directory: omnigibson-src
         run: pip install -e .[dev]
 
       - name: Generate example tests
-        working-directory: omnigibson-src
         run: python tests/create_tests_of_examples.py
 
       - name: Get list of generated tests
         id: get-test-list
-        working-directory: omnigibson-src
         run: |
           echo "example_tests=$(cat tests/example_tests.json)" >> $GITHUB_OUTPUT
 
@@ -69,17 +65,14 @@ jobs:
         run: echo "HOME=/root" >> $GITHUB_ENV
 
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
-          path: omnigibson-src
 
       - name: Install
-        working-directory: omnigibson-src
         run: pip install -e .[dev]
 
       - name: Run tests
-        working-directory: omnigibson-src
         run: pytest -s tests/tests_of_examples/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
 
       - name: Deploy artifact
@@ -99,20 +92,12 @@ jobs:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
     needs: [run_test]
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v2
-        with:
-          submodules: true
-          path: omnigibson-src
       - name: Pull reports
         uses: actions/download-artifact@v3
-        with:
-          path: omnigibson-src
       - name: Example Test Report0
         uses: dorny/test-reporter@v1
         with:
           name: Example Test Results
-          working-directory: omnigibson-src
           path: ${{ github.run_id }}-tests-*/*_test.xml
           reporter: java-junit
           fail-on-error: 'true'
