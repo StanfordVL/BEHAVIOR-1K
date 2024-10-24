@@ -1,6 +1,7 @@
 import math
 import os
 from collections.abc import Iterable
+from enum import Enum
 
 import torch as th  # MUST come before importing omni!!!
 
@@ -9,6 +10,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
+from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import GROUND_CATEGORIES
 from omnigibson.utils.control_utils import FKSolver
@@ -17,6 +19,12 @@ from omnigibson.utils.control_utils import FKSolver
 th.backends.cudnn.benchmark = True
 th.backends.cuda.matmul.allow_tf32 = True
 th.backends.cudnn.allow_tf32 = True
+
+
+class CuroboEmbodimentSelection(str, Enum):
+    BASE = "base"
+    ARM = "arm"
+    BOTH = "both"
 
 
 def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
@@ -138,6 +146,7 @@ class CuRoboMotionGenerator:
         device="cuda:0",
         motion_cfg_kwargs=None,
         batch_size=2,
+        use_cuda_graph=True,
         debug=False,
     ):
         """
@@ -153,7 +162,8 @@ class CuRoboMotionGenerator:
             motion_cfg_kwargs (None or dict): If specified, keyward arguments to pass to
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
-            debug (bool): Whether to debug generation or not
+            use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
+            debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
@@ -187,10 +197,12 @@ class CuRoboMotionGenerator:
             robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[0][2] = -math.pi * 2
             robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[1][2] = math.pi * 2
 
+        self.joint_limits_position = robot_cfg_obj.kinematics.kinematics_config.joint_limits.position.clone()
+
         motion_kwargs = dict(
             trajopt_tsteps=32,
             collision_checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
-            use_cuda_graph=True,
+            use_cuda_graph=use_cuda_graph,
             num_ik_seeds=128,
             num_batch_ik_seeds=128,
             num_batch_trajopt_seeds=1,
@@ -329,6 +341,7 @@ class CuRoboMotionGenerator:
         return_full_result=False,
         success_ratio=None,
         attached_obj=None,
+        embodiment_selection=CuroboEmbodimentSelection.BOTH,
     ):
         """
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
@@ -391,18 +404,8 @@ class CuRoboMotionGenerator:
         assert target_pos.keys() == target_quat.keys(), "Expected target_pos and target_quat to have the same keys!"
 
         # Make sure tensor shapes are (N, 3) and (N, 4)
-        for link_name in target_pos.keys():
-            if len(target_pos[link_name].shape) == 1:
-                target_pos[link_name] = target_pos[link_name].unsqueeze(0)
-            if len(target_quat[link_name].shape) == 1:
-                target_quat[link_name] = target_quat[link_name].unsqueeze(0)
-
-            assert (
-                len(target_pos[link_name].shape) == 2 and target_pos[link_name].shape[1] == 3
-            ), f"Expected target_pos to have shape (N,3)! Got: {target_pos[link_name].shape}"
-            assert (
-                len(target_quat[link_name].shape) == 2 and target_quat[link_name].shape[1] == 4
-            ), f"Expected target_quat to have shape (N,4)! Got: {target_quat[link_name].shape}"
+        target_pos = {k: v if len(v.shape) == 2 else v.unsqueeze(0) for k, v in target_pos.items()}
+        target_quat = {k: v if len(v.shape) == 2 else v.unsqueeze(0) for k, v in target_quat.items()}
 
         # Define the plan config
         plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
@@ -424,7 +427,10 @@ class CuRoboMotionGenerator:
             target_quat_link = target_quat[link_name]
             # Make sure the specified target pose is in the robot frame
             if not is_local:
-                robot_pos, robot_quat = self.robot.get_position_orientation()
+                # Convert target pose to robot root link frame. We cannot just call
+                # self.robot.get_position_orientation() because for HolonomicBaseRobot,
+                # we need to conver to the frame of "base_footprint_x", not "base_link".
+                robot_pos, robot_quat = self.robot.root_link.get_position_orientation()
                 target_pose = th.zeros((target_pos_link.shape[0], 4, 4))
                 target_pose[:, 3, 3] = 1.0
                 target_pose[:, :3, :3] = T.quat2mat(target_quat_link)
@@ -464,6 +470,35 @@ class CuRoboMotionGenerator:
             jerk=self._tensor_args.to_device(q_eff) * 0.0,
             joint_names=sim_js_names,
         ).get_ordered_joint_state(self.mg.kinematics.joint_names)
+
+        # Set joint limits based on embodiment selection
+        if embodiment_selection == CuroboEmbodimentSelection.BASE:
+            assert isinstance(self.robot, HolonomicBaseRobot), "Expected robot to be a HolonomicBaseRobot"
+            joint_idx_used = [
+                self.mg.kinematics.joint_names.index(joint_name) for joint_name in self.robot.base_joint_names
+            ]
+        elif embodiment_selection == CuroboEmbodimentSelection.ARM:
+            joint_idx_used = [
+                self.mg.kinematics.joint_names.index(joint_name)
+                for joint_names in self.robot.arm_joint_names.values()
+                for joint_name in joint_names
+            ]
+            if isinstance(self.robot, ArticulatedTrunkRobot):
+                joint_idx_used += [
+                    self.mg.kinematics.joint_names.index(joint_name) for joint_name in self.robot.trunk_joint_names
+                ]
+        else:
+            joint_idx_used = list(range(len(self.mg.kinematics.joint_names)))
+        joint_idx_not_used = list(set(range(len(self.mg.kinematics.joint_names))) - set(joint_idx_used))
+
+        # Set the joint limits for the joints that are used to the current joint positions (with a small margin of 0.01)
+        if len(joint_idx_not_used) > 0:
+            self.mg.kinematics.kinematics_config.joint_limits.position[0, joint_idx_not_used] = (
+                cu_js_batch.position[0, joint_idx_not_used] - 0.01
+            )
+            self.mg.kinematics.kinematics_config.joint_limits.position[1, joint_idx_not_used] = (
+                cu_js_batch.position[0, joint_idx_not_used] + 0.01
+            )
 
         # Attach object to robot if requested
         if attached_obj is not None:
@@ -547,6 +582,9 @@ class CuRoboMotionGenerator:
         # Detach attached object if it was attached
         if attached_obj is not None:
             self.mg.detach_object_from_robot()
+
+        # Restore joint limits
+        self.mg.kinematics.kinematics_config.joint_limits.position = self.joint_limits_position.clone()
 
         if return_full_result:
             return results
