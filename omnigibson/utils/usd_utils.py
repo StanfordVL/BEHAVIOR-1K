@@ -185,6 +185,8 @@ def create_joint(
 class RigidContactAPIImpl:
     """
     Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
+
+    NOTE: The RigidContactAPI only works when the contacting objects are awake. If the objects could be asleep, use ContactBodies instead.
     """
 
     def __init__(self):
@@ -230,7 +232,7 @@ class RigidContactAPIImpl:
 
     @classmethod
     def get_max_contact_data_count(cls):
-        return 0
+        return 256
 
     def initialize_view(self):
         """
