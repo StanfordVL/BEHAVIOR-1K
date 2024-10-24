@@ -333,8 +333,8 @@ def test_curobo():
                 env.scene.reset()
 
                 # Move the markers to the desired eef positions
-                for i, marker in enumerate(eef_markers):
-                    eef_link_name = robot.eef_link_names[robot.arm_names[i]]
+                for marker, arm_name in zip(eef_markers, robot.arm_names):
+                    eef_link_name = robot.eef_link_names[arm_name]
                     marker.set_position_orientation(position=target_pos_in_world_frame[eef_link_name][traj_idx])
 
                 q_traj = cmg.path_to_joint_trajectory(traj_path)
