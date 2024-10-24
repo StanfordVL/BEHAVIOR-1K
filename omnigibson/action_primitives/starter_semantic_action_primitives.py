@@ -491,7 +491,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
 
-    def apply_ref(self, prim, *args, attempts=3):
+    def apply_ref(self, prim, *args, attempts=5):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
