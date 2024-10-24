@@ -329,8 +329,6 @@ class VisionSensor(BaseSensor):
             obs[modality], info[modality] = self._remap_instance_segmentation(
                 obs[modality],
                 id_to_labels,
-                obs["seg_semantic"],
-                info["seg_semantic"],
                 id=(modality == "seg_instance_id"),
             )
         elif "bbox" in modality:
@@ -387,7 +385,7 @@ class VisionSensor(BaseSensor):
 
         return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
-    def _remap_instance_segmentation(self, img, id_to_labels, semantic_img, semantic_labels, id=False):
+    def _remap_instance_segmentation(self, img, id_to_labels, id=False):
         """
         Remap the instance segmentation image to our own instance IDs.
         Also, correct the id_to_labels input with our new labels and return it.
@@ -395,8 +393,6 @@ class VisionSensor(BaseSensor):
         Args:
             img (th.tensor): Instance segmentation image to remap
             id_to_labels (dict): Dictionary of instance IDs to class labels
-            semantic_img (th.tensor): Semantic segmentation image to use for instance registry
-            semantic_labels (dict): Dictionary of semantic IDs to class labels
             id (bool): Whether to remap for instance ID segmentation
         Returns:
             th.tensor: Remapped instance segmentation image
