@@ -5,6 +5,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
@@ -234,7 +235,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def curobo_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/r1/r1_description_curobo.yaml")
+        return {
+            emb_sel: os.path.join(gm.ASSET_PATH, f"models/r1/r1_description_curobo_{emb_sel.value}.yaml")
+            for emb_sel in CuroboEmbodimentSelection
+        }
 
     @property
     def robot_arm_descriptor_yamls(self):

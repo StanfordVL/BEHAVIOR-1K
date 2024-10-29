@@ -8,11 +8,11 @@ import torch as th  # MUST come before importing omni!!!
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm, macros
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.utils.constants import GROUND_CATEGORIES
+from omnigibson.utils.constants import GROUND_CATEGORIES, JointType
 from omnigibson.utils.control_utils import FKSolver
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
@@ -20,11 +20,17 @@ th.backends.cudnn.benchmark = True
 th.backends.cuda.matmul.allow_tf32 = True
 th.backends.cudnn.allow_tf32 = True
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.HOLONOMIC_BASE_PRISMATIC_JOINT_LIMIT = 5.0  # meters
+m.HOLONOMIC_BASE_REVOLUTE_JOINT_LIMIT = math.pi * 2  # radians
+
 
 class CuroboEmbodimentSelection(str, Enum):
     BASE = "base"
     ARM = "arm"
-    BOTH = "both"
+    DEFAULT = "default"
 
 
 def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
@@ -142,12 +148,12 @@ class CuRoboMotionGenerator:
         robot,
         robot_cfg_path=None,
         robot_usd_path=None,
-        ee_link=None,
         device="cuda:0",
         motion_cfg_kwargs=None,
         batch_size=2,
         use_cuda_graph=True,
         debug=False,
+        use_default_embodiment_only=False,
     ):
         """
         Args:
@@ -156,106 +162,118 @@ class CuRoboMotionGenerator:
                 try to use a pre-configured one directly from curobo based on the robot class of @robot
             robot_usd_path (None or str): If specified, the path to the robot USD file to use. If None, will
                 try to use a pre-configured one directly from curobo based on the robot class of @robot
-            ee_link (None or str): If specified, the link name representing the end-effector to track. None defaults to
-                value already set in the config from @robot_cfg
             device (str): Which device to use for curobo
             motion_cfg_kwargs (None or dict): If specified, keyward arguments to pass to
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
+            use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
 
-        # Define arguments to pass to motion gen config
+        # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
-
-        # Load robot config and usd paths and make sure paths point correctly
-        robot_cfg_path = robot.curobo_path if robot_cfg_path is None else robot_cfg_path
-        robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
-
-        content_path = lazy.curobo.types.file_path.ContentPath(
-            robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
-        )
-        robot_cfg = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
-        robot_cfg["kinematics"]["use_usd_kinematics"] = True
-
-        # Possibly update ee_link
-        if ee_link is not None:
-            robot_cfg["kinematics"]["ee_link"] = ee_link
-
-        robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg, self._tensor_args)
-
-        if isinstance(robot, HolonomicBaseRobot):
-            # Manually specify joint limits for the base_footprint_x/y/z/rx/ry_rz
-            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[0][0:2] = -5.0
-            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[1][0:2] = 5.0
-
-            # Needs to be -2pi to 2pi, instead of -pi to pi, otherwise the planning success rate is much lower
-            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[0][2] = -math.pi * 2
-            robot_cfg_obj.kinematics.kinematics_config.joint_limits.position[1][2] = math.pi * 2
-
-        self.joint_limits_position = robot_cfg_obj.kinematics.kinematics_config.joint_limits.position.clone()
-
-        motion_kwargs = dict(
-            trajopt_tsteps=32,
-            collision_checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
-            use_cuda_graph=use_cuda_graph,
-            num_ik_seeds=128,
-            num_batch_ik_seeds=128,
-            num_batch_trajopt_seeds=1,
-            num_trajopt_noisy_seeds=1,
-            ik_opt_iters=100,
-            optimize_dt=True,
-            num_trajopt_seeds=4,
-            num_graph_seeds=4,
-            interpolation_dt=0.03,
-            collision_cache={"obb": 10, "mesh": 1024},
-            collision_max_outside_distance=0.05,
-            collision_activation_distance=0.025,
-            self_collision_check=True,
-            maximum_trajectory_dt=None,
-            fixed_iters_trajopt=True,
-            finetune_trajopt_iters=100,
-            finetune_dt_scale=1.05,
-        )
-        if motion_cfg_kwargs is not None:
-            motion_kwargs.update(motion_cfg_kwargs)
-        motion_gen_config = lazy.curobo.wrap.reacher.motion_gen.MotionGenConfig.load_from_robot_config(
-            robot_cfg_obj,
-            lazy.curobo.geom.types.WorldConfig(),
-            self._tensor_args,
-            store_trajopt_debug=self.debug,
-            **motion_kwargs,
-        )
-
-        self.mg = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
-        self.mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
-
-        # Store internal variables
         self.robot = robot
         self.robot_joint_names = list(robot.joints.keys())
-        self.robot_cfg = robot_cfg
-        self.ee_link = robot_cfg["kinematics"]["ee_link"]
         self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self._usd_help = lazy.curobo.util.usd_helper.UsdHelper()
         self._usd_help.stage = og.sim.stage
         self.batch_size = batch_size
 
-    def save_visualization(self, q, directory_path):
+        # Load robot config and usd paths and make sure paths point correctly
+        robot_cfg_path_dict = robot.curobo_path if robot_cfg_path is None else robot_cfg_path
+        if not isinstance(robot_cfg_path_dict, dict):
+            robot_cfg_path_dict = {CuroboEmbodimentSelection.DEFAULT: robot_cfg_path_dict}
+        if use_default_embodiment_only:
+            robot_cfg_path_dict = {
+                CuroboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuroboEmbodimentSelection.DEFAULT]
+            }
+        robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
+
+        self.mg = dict()
+        self.ee_link = dict()
+        self.base_link = dict()
+        for emb_sel, robot_cfg_path in robot_cfg_path_dict.items():
+            content_path = lazy.curobo.types.file_path.ContentPath(
+                robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
+            )
+            robot_cfg_dict = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
+            robot_cfg_dict["kinematics"]["use_usd_kinematics"] = True
+
+            robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg_dict, self._tensor_args)
+
+            if isinstance(robot, HolonomicBaseRobot):
+                self.update_joint_limits(robot_cfg_obj, emb_sel)
+
+            motion_kwargs = dict(
+                trajopt_tsteps=32,
+                collision_checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
+                use_cuda_graph=use_cuda_graph,
+                num_ik_seeds=128,
+                num_batch_ik_seeds=128,
+                num_batch_trajopt_seeds=1,
+                num_trajopt_noisy_seeds=1,
+                ik_opt_iters=100,
+                optimize_dt=True,
+                num_trajopt_seeds=4,
+                num_graph_seeds=4,
+                interpolation_dt=0.03,
+                collision_cache={"obb": 10, "mesh": 1024},
+                collision_max_outside_distance=0.05,
+                collision_activation_distance=0.025,
+                self_collision_check=True,
+                maximum_trajectory_dt=None,
+                fixed_iters_trajopt=True,
+                finetune_trajopt_iters=100,
+                finetune_dt_scale=1.05,
+            )
+            if motion_cfg_kwargs is not None:
+                motion_kwargs.update(motion_cfg_kwargs)
+            motion_gen_config = lazy.curobo.wrap.reacher.motion_gen.MotionGenConfig.load_from_robot_config(
+                robot_cfg_obj,
+                lazy.curobo.geom.types.WorldConfig(),
+                self._tensor_args,
+                store_trajopt_debug=self.debug,
+                **motion_kwargs,
+            )
+
+            self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
+            # self.mg[emb_sel].warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
+            self.ee_link[emb_sel] = robot_cfg_dict["kinematics"]["ee_link"]
+            self.base_link[emb_sel] = robot_cfg_dict["kinematics"]["base_link"]
+
+        for mg in self.mg.values():
+            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
+
+    def update_joint_limits(self, robot_cfg_obj, emb_sel):
+        joint_limits = robot_cfg_obj.kinematics.kinematics_config.joint_limits
+        for joint_name in self.robot.base_joint_names:
+            if joint_name in joint_limits.joint_names:
+                joint_idx = joint_limits.joint_names.index(joint_name)
+                # Manually specify joint limits for the base_footprint_x/y/rz
+                if self.robot.joints[joint_name].joint_type == JointType.JOINT_PRISMATIC:
+                    joint_limits.position[0][joint_idx] = -m.HOLONOMIC_BASE_PRISMATIC_JOINT_LIMIT
+                else:
+                    # Needs to be -2pi to 2pi, instead of -pi to pi, otherwise the planning success rate is much lower
+                    joint_limits.position[0][joint_idx] = -m.HOLONOMIC_BASE_REVOLUTE_JOINT_LIMIT
+
+                joint_limits.position[1][joint_idx] = -joint_limits.position[0][joint_idx]
+
+    def save_visualization(self, q, file_path, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         cu_js = lazy.curobo.types.state.JointState(
             position=self.tensor_args.to_device(q),
             joint_names=self.robot_joint_names,
-        ).get_ordered_joint_state(self.mg.kinematics.joint_names)
-        sph = self.mg.kinematics.get_robot_as_spheres(cu_js.position)
+        ).get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
+        sph = self.mg[emb_sel].kinematics.get_robot_as_spheres(cu_js.position)
         robot_world = lazy.curobo.geom.types.WorldConfig(sphere=sph[0])
-        mesh_world = self.mg.world_model.get_mesh_world(merge_meshes=True)
+        mesh_world = self.mg[emb_sel].world_model.get_mesh_world(merge_meshes=True)
         robot_world.add_obstacle(mesh_world.mesh[0])
-        robot_world.save_world_as_mesh(os.path.join(directory_path, "world.obj"))
+        robot_world.save_world_as_mesh(file_path)
 
-    def update_obstacles(self, ignore_paths=None):
+    def update_obstacles(self, ignore_paths=None, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         """
         Updates internal world collision cache representation based on sim state
 
@@ -283,13 +301,14 @@ class CuRoboMotionGenerator:
                 *ignore_paths,  # Don't include any additional specified paths
             ],
         ).get_collision_check_world()
-        self.mg.update_world(obstacles)
+        self.mg[emb_sel].update_world(obstacles)
         print("Synced CuRobo world from stage.")
 
     def check_collisions(
         self,
         q,
         check_self_collision=True,
+        emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -298,35 +317,56 @@ class CuRoboMotionGenerator:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
             check_self_collision (bool): Whether to check self-collisions or not
+            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for checking collisions
 
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
         """
         # Update obstacles
-        self.update_obstacles()
+        self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
 
         # Compute kinematics to get corresponding sphere representation
         cu_js = lazy.curobo.types.state.JointState(
             position=self.tensor_args.to_device(q),
             joint_names=self.robot_joint_names,
-        ).get_ordered_joint_state(self.mg.kinematics.joint_names)
+        ).get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
-        robot_spheres = self.mg.compute_kinematics(cu_js).robot_spheres
+        robot_spheres = self.mg[emb_sel].compute_kinematics(cu_js).robot_spheres
         # (N_samples, n_spheres, 4) --> (N_samples, 1, n_spheres, 4)
         robot_spheres = robot_spheres.unsqueeze(dim=1)
 
         with th.no_grad():
-            collision_dist = self.mg.rollout_fn.primitive_collision_constraint.forward(robot_spheres).squeeze(1)
+            collision_dist = (
+                self.mg[emb_sel].rollout_fn.primitive_collision_constraint.forward(robot_spheres).squeeze(1)
+            )
             collision_results = collision_dist > 0.0
             if check_self_collision:
-                self_collision_dist = self.mg.rollout_fn.robot_self_collision_constraint.forward(robot_spheres).squeeze(
-                    1
+                self_collision_dist = (
+                    self.mg[emb_sel].rollout_fn.robot_self_collision_constraint.forward(robot_spheres).squeeze(1)
                 )
                 self_collision_results = self_collision_dist > 0.0
                 collision_results = collision_results | self_collision_results
 
         # Return results
         return collision_results  # shape (B,)
+
+    def update_locked_joints(self, cu_joint_state, emb_sel):
+        kc = self.mg[emb_sel].kinematics.kinematics_config
+        # Update the lock joint state position
+        kc.lock_jointstate.position = cu_joint_state.get_ordered_joint_state(kc.lock_jointstate.joint_names).position[0]
+        # Uodate all the fixed transforms between the parent links and the child links of these joints
+        for joint_name in kc.lock_jointstate.joint_names:
+            joint = self.robot.joints[joint_name]
+            parent_link_name, child_link_name = joint.body0.split("/")[-1], joint.body1.split("/")[-1]
+            parent_link = self.robot.links[parent_link_name]
+            child_link = self.robot.links[child_link_name]
+            relative_pose = T.pose2mat(
+                T.relative_pose_transform(
+                    *child_link.get_position_orientation(), *parent_link.get_position_orientation()
+                )
+            )
+            link_idx = kc.link_name_to_idx_map[child_link_name]
+            kc.fixed_transforms[link_idx] = relative_pose
 
     def compute_trajectories(
         self,
@@ -341,7 +381,7 @@ class CuRoboMotionGenerator:
         return_full_result=False,
         success_ratio=None,
         attached_obj=None,
-        embodiment_selection=CuroboEmbodimentSelection.BOTH,
+        emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
@@ -349,11 +389,11 @@ class CuRoboMotionGenerator:
         Args:
             target_pos (Dict[str, th.Tensor] or th.Tensor): The torch tensor shape is either (3,) or (N, 3)
                 where each entry is an individual (x,y,z) position to reach with the default end-effector link specified
-                @self.ee_link. If a dictionary is given, the keys should be the end-effector links and
+                @self.ee_link[emb_sel]. If a dictionary is given, the keys should be the end-effector links and
                 the values should be the corresponding (N, 3) tensors
             target_quat (Dict[str, th.Tensor] or th.Tensor): The torch tensor shape is either (4,) or (N, 4)
                 where each entry is an individual (x,y,z,w) quaternion to reach with the default end-effector link specified
-                @self.mg.kinematics.ee_link. If a dictionary is given, the keys should be the end-effector links and
+                @self.ee_link[emb_sel]. If a dictionary is given, the keys should be the end-effector links and
                 the values should be the corresponding (N, 4) tensors
             is_local (bool): Whether @target_pos and @target_quat are specified in the robot's local frame or the world
                 global frame
@@ -387,7 +427,7 @@ class CuRoboMotionGenerator:
                 position=self.tensor_args.to_device(self.robot.get_joint_positions(normalized=True)),
                 joint_names=self.robot_joint_names,
             )
-            .get_ordered_joint_state(self.mg.kinematics.joint_names)
+            .get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
             .position
         )
 
@@ -397,9 +437,9 @@ class CuRoboMotionGenerator:
 
         # If target_pos and target_quat are torch tensors, it's assumed that they correspond to the default ee_link
         if isinstance(target_pos, th.Tensor):
-            target_pos = {self.ee_link: target_pos}
+            target_pos = {self.ee_link[emb_sel]: target_pos}
         if isinstance(target_quat, th.Tensor):
-            target_quat = {self.ee_link: target_quat}
+            target_quat = {self.ee_link[emb_sel]: target_quat}
 
         assert target_pos.keys() == target_quat.keys(), "Expected target_pos and target_quat to have the same keys!"
 
@@ -420,17 +460,17 @@ class CuRoboMotionGenerator:
         )
 
         # Refresh the collision state
-        self.update_obstacles()
+        self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
 
         for link_name in target_pos.keys():
             target_pos_link = target_pos[link_name]
             target_quat_link = target_quat[link_name]
-            # Make sure the specified target pose is in the robot frame
             if not is_local:
-                # Convert target pose to robot root link frame. We cannot just call
-                # self.robot.get_position_orientation() because for HolonomicBaseRobot,
-                # we need to conver to the frame of "base_footprint_x", not "base_link".
-                robot_pos, robot_quat = self.robot.root_link.get_position_orientation()
+                # Convert target pose to base link *in the eyes of curobo*.
+                # For stationary arms (e.g. Franka), it is @robot.root_link / @robot.base_footprint_link_name ("base_link")
+                # For holonomic robots (e.g. Tiago, R1), it is @robot.root_link ("base_footprint_x"), not @robot.base_footprint_link_name ("base_link")
+                curobo_base_link_name = self.base_link[emb_sel]
+                robot_pos, robot_quat = self.robot.links[curobo_base_link_name].get_position_orientation()
                 target_pose = th.zeros((target_pos_link.shape[0], 4, 4))
                 target_pose[:, 3, 3] = 1.0
                 target_pose[:, :3, :3] = T.quat2mat(target_quat_link)
@@ -455,7 +495,7 @@ class CuRoboMotionGenerator:
         q_vel = th.stack([self.robot.get_joint_velocities()] * self.batch_size, axis=0)
         q_eff = th.stack([self.robot.get_joint_efforts()] * self.batch_size, axis=0)
         sim_js_names = list(self.robot.joints.keys())
-        cu_js_batch = lazy.curobo.types.state.JointState(
+        cu_joint_state = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
             # TODO: Ideally these should be nonzero, but curobo fails to compute a solution if so
             # See this note from https://curobo.org/get_started/2b_isaacsim_examples.html
@@ -469,49 +509,25 @@ class CuRoboMotionGenerator:
             acceleration=self._tensor_args.to_device(q_eff) * 0.0,
             jerk=self._tensor_args.to_device(q_eff) * 0.0,
             joint_names=sim_js_names,
-        ).get_ordered_joint_state(self.mg.kinematics.joint_names)
+        )
 
-        # Set joint limits based on embodiment selection
-        if embodiment_selection == CuroboEmbodimentSelection.BASE:
-            assert isinstance(self.robot, HolonomicBaseRobot), "Expected robot to be a HolonomicBaseRobot"
-            joint_idx_used = [
-                self.mg.kinematics.joint_names.index(joint_name) for joint_name in self.robot.base_joint_names
-            ]
-        elif embodiment_selection == CuroboEmbodimentSelection.ARM:
-            joint_idx_used = [
-                self.mg.kinematics.joint_names.index(joint_name)
-                for joint_names in self.robot.arm_joint_names.values()
-                for joint_name in joint_names
-            ]
-            if isinstance(self.robot, ArticulatedTrunkRobot):
-                joint_idx_used += [
-                    self.mg.kinematics.joint_names.index(joint_name) for joint_name in self.robot.trunk_joint_names
-                ]
-        else:
-            joint_idx_used = list(range(len(self.mg.kinematics.joint_names)))
-        joint_idx_not_used = list(set(range(len(self.mg.kinematics.joint_names))) - set(joint_idx_used))
+        cu_js_batch = cu_joint_state.get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
-        # Set the joint limits for the joints that are used to the current joint positions (with a small margin of 0.01)
-        if len(joint_idx_not_used) > 0:
-            self.mg.kinematics.kinematics_config.joint_limits.position[0, joint_idx_not_used] = (
-                cu_js_batch.position[0, joint_idx_not_used] - 0.01
-            )
-            self.mg.kinematics.kinematics_config.joint_limits.position[1, joint_idx_not_used] = (
-                cu_js_batch.position[0, joint_idx_not_used] + 0.01
-            )
+        # Update the locked joints with the current joint positions
+        self.update_locked_joints(cu_joint_state, emb_sel)
 
         # Attach object to robot if requested
         if attached_obj is not None:
             obj_paths = [geom.prim_path for geom in attached_obj.root_link.collision_meshes.values()]
             assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
-            self.mg.attach_objects_to_robot(
+            self.mg[emb_sel].attach_objects_to_robot(
                 joint_state=cu_js_batch,
                 object_names=obj_paths,
             )
 
         # Determine how many internal batches we need to run based on submitted size
-        remainder = target_pos[self.ee_link].shape[0] % self.batch_size
-        n_batches = int(th.ceil(th.tensor(target_pos[self.ee_link].shape[0] / self.batch_size)).item())
+        remainder = target_pos[self.ee_link[emb_sel]].shape[0] % self.batch_size
+        n_batches = int(th.ceil(th.tensor(target_pos[self.ee_link[emb_sel]].shape[0] / self.batch_size)).item())
 
         # Run internal batched calls
         results, successes, paths = [], self._tensor_args.to_device(th.tensor([], dtype=th.bool)), []
@@ -550,17 +566,18 @@ class CuRoboMotionGenerator:
 
             # Run batched planning
             if self.debug:
-                self.mg.store_debug_in_result = True
+                self.mg[emb_sel].store_debug_in_result = True
 
             # Pop the main ee_link goal
-            main_ik_goal_batch = ik_goal_batch_by_link.pop(self.ee_link)
+            main_ik_goal_batch = ik_goal_batch_by_link.pop(self.ee_link[emb_sel])
 
             # If no other goals (e.g. no second end-effector), set to None
             if len(ik_goal_batch_by_link) == 0:
                 ik_goal_batch_by_link = None
 
-            result = self.mg.plan_batch(cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link)
-
+            result = self.mg[emb_sel].plan_batch(
+                cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link
+            )
             if self.debug:
                 breakpoint()
 
@@ -581,46 +598,42 @@ class CuRoboMotionGenerator:
 
         # Detach attached object if it was attached
         if attached_obj is not None:
-            self.mg.detach_object_from_robot()
-
-        # Restore joint limits
-        self.mg.kinematics.kinematics_config.joint_limits.position = self.joint_limits_position.clone()
+            self.mg[emb_sel].detach_object_from_robot()
 
         if return_full_result:
             return results
         else:
             return successes, paths
 
-    def path_to_joint_trajectory(self, path, joint_names=None):
+    def path_to_joint_trajectory(self, path, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         """
         Converts raw path from motion generator into joint trajectory sequence
 
         Args:
             path (JointState): Joint state path to convert into joint trajectory
-            joint_names (None or list): If specified, the individual joints to use when constructing the joint
-                trajectory. If None, will use all joints.
+            emb_sel (CuroboEmbodimentSelection): Which embodiment to use for the robot
 
         Returns:
             torch.tensor: (T, D) tensor representing the interpolated joint trajectory
                 to reach the desired @target_pos, @target_quat configuration, where T is the number of interpolated
                 steps and D is the number of robot joints.
         """
-        cmd_plan = self.mg.get_full_js(path)
-        joint_names = list(self.robot.joints.keys()) if joint_names is None else joint_names
+        cmd_plan = self.mg[emb_sel].get_full_js(path)
+        joint_names = list(self.robot.joints.keys())
         return cmd_plan.get_ordered_joint_state(joint_names).position
 
-    def convert_q_to_eef_traj(self, traj, return_axisangle=False):
+    def convert_q_to_eef_traj(self, traj, return_axisangle=False, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         """
         Converts a joint trajectory @traj into an equivalent trajectory defined by end effector poses
 
         Args:
             traj (torch.Tensor): (T, D)-shaped joint trajectory
             return_axisangle (bool): Whether to return the interpolated orientations in quaternion or axis-angle representation
+            emb_sel (CuroboEmbodimentSelection): Which embodiment to use for the robot
 
         Returns:
-            torch.Tensor: (T, [6, 7])-shaped array where each entry is is the (x,y,z) position and (x,y,z,w)
-                quaternion (if @return_axisangle is False) or (ax, ay, az) axis-angle orientation, specified in the robot
-                frame.
+            torch.Tensor: (T, [6, 7])-shaped array where each entry is is the (x,y,z) position and (x,y,z,w) quaternion
+                (if @return_axisangle is False) or (ax, ay, az) axis-angle orientation, specified in the robot frame.
         """
         # Prune the relevant joints from the trajectory
         traj = traj[:, self.robot.arm_control_idx[self.robot.default_arm]]
@@ -633,9 +646,9 @@ class CuRoboMotionGenerator:
         )  # This will be quat initially but we may convert to aa representation
 
         for i, qpos in enumerate(traj):
-            pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link])
-            positions[i] = pose[self.ee_link][0]
-            orientations[i] = pose[self.ee_link][1]
+            pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link[emb_sel]])
+            positions[i] = pose[self.ee_link[emb_sel]][0]
+            orientations[i] = pose[self.ee_link[emb_sel]][1]
 
         # Possibly convert orientations to aa-representation
         if return_axisangle:
