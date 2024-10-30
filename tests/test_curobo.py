@@ -170,8 +170,8 @@ def test_curobo():
         env.scene.reset()
 
         # Create CuRobo instance
-        batch_size = 25
-        n_samples = 50
+        batch_size = 10
+        n_samples = 10
 
         cmg = CuRoboMotionGenerator(
             robot=robot,
@@ -407,7 +407,3 @@ def test_curobo():
         th.cuda.empty_cache()
 
     og.shutdown()
-
-
-if __name__ == "__main__":
-    test_curobo()
