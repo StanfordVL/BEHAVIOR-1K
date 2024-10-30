@@ -33,29 +33,26 @@ class CuroboEmbodimentSelection(str, Enum):
     DEFAULT = "default"
 
 
-def create_collision_world(tensor_args, cache_size=1024, max_distance=0.1):
+def create_world_mesh_collision(tensor_args, obb_cache_size=10, mesh_cache_size=2048, max_distance=0.05):
     """
-    Creates a CuRobo CollisionMeshWorld to use for collision checking
+    Creates a CuRobo WorldMeshCollision to use for collision checking
 
     Args:
         tensor_args (TensorDeviceType): Tensor device information
-        cache_size (int): Cache size for number of meshes supported in the collision world
+        obb_cache_size (int): Cache size for number of oriented bounding boxes supported in the collision world
+        mesh_cache_size (int): Cache size for number of meshes supported in the collision world
         max_distance (float): maximum distance when checking collisions (see curobo source code)
 
     Returns:
         MeshCollisionWorld: collision world used to check against for collisions
     """
-    # Checks objA inside objB
-    usd_help = lazy.curobo.util.usd_helper.UsdHelper()
-    usd_help.stage = og.sim.stage
     world_cfg = lazy.curobo.geom.sdf.world.WorldCollisionConfig.load_from_dict(
         dict(
-            cache={"obb": 10, "mesh": cache_size},
+            cache={"obb": obb_cache_size, "mesh": mesh_cache_size},
             n_envs=1,
             checker_type=lazy.curobo.geom.sdf.world.CollisionCheckerType.MESH,
             max_distance=max_distance,
         ),
-        # obstacles,
         tensor_args=tensor_args,
     )
 
@@ -193,6 +190,11 @@ class CuRoboMotionGenerator:
             }
         robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
 
+        # This will be shared across all MotionGen instances
+        world_coll_checker = create_world_mesh_collision(
+            self._tensor_args, obb_cache_size=10, mesh_cache_size=2048, max_distance=0.05
+        )
+
         self.mg = dict()
         self.ee_link = dict()
         self.base_link = dict()
@@ -221,8 +223,6 @@ class CuRoboMotionGenerator:
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
                 interpolation_dt=0.03,
-                collision_cache={"obb": 10, "mesh": 1024},
-                collision_max_outside_distance=0.05,
                 collision_activation_distance=0.025,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
@@ -232,16 +232,17 @@ class CuRoboMotionGenerator:
             )
             if motion_cfg_kwargs is not None:
                 motion_kwargs.update(motion_cfg_kwargs)
+
             motion_gen_config = lazy.curobo.wrap.reacher.motion_gen.MotionGenConfig.load_from_robot_config(
-                robot_cfg_obj,
-                lazy.curobo.geom.types.WorldConfig(),
-                self._tensor_args,
+                robot_cfg=robot_cfg_obj,
+                world_model=None,
+                world_coll_checker=world_coll_checker,
+                tensor_args=self._tensor_args,
                 store_trajopt_debug=self.debug,
                 **motion_kwargs,
             )
 
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
-            # self.mg[emb_sel].warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
             self.ee_link[emb_sel] = robot_cfg_dict["kinematics"]["ee_link"]
             self.base_link[emb_sel] = robot_cfg_dict["kinematics"]["base_link"]
 
