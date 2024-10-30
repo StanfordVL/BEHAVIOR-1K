@@ -49,13 +49,12 @@ jobs:
           submodules: true
           path: omnigibson-src
 
-      - name: Install dev requirements
-        working-directory: omnigibson-src
-        run: pip install -r requirements-dev.txt
-
       - name: Install
         working-directory: omnigibson-src
-        run: pip install -e .
+        run: pip install -e .[dev]
+
+      - name: Print env
+        run: printenv
 
       - name: Run tests
         working-directory: omnigibson-src

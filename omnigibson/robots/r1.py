@@ -28,7 +28,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,

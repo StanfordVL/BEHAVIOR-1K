@@ -4,6 +4,10 @@ from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims, prims_to_rigid
 
 
 class ContactBodies(AbsoluteObjectState):
+    """
+    NOTE: This is slow and uncached, but it works even for sleeping objects.
+    For frequent contact checks, consider using RigidContactAPI for performance.
+    """
 
     def _get_value(self, ignore_objs=None):
         # Compute bodies in contact, minus the self-owned bodies

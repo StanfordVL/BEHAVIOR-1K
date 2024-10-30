@@ -21,7 +21,8 @@ from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_rela
 m = create_module_macros(module_path=__file__)
 
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
-m.DEFAULT_SLEEP_THRESHOLD = 0.001
+# Mass-normalized kinetic energy threshold below which an actor may go to sleep
+m.DEFAULT_SLEEP_THRESHOLD = 0.00005
 
 
 class EntityPrim(XFormPrim):
@@ -613,6 +614,8 @@ class EntityPrim(XFormPrim):
     def contact_list(self):
         """
         Get list of all current contacts with this object prim
+        NOTE: This method is slow and uncached, but it works even for sleeping objects.
+        For frequent contact checks, consider using RigidContactAPI for performance.
 
         Returns:
             list of CsRawData: raw contact info for this rigid body

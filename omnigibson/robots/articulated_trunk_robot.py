@@ -34,7 +34,7 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         fixed_base=False,
         # Unique to USDObject hierarchy
