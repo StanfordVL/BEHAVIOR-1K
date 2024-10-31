@@ -194,6 +194,14 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         }
 
     @property
+    def base_link_names(self):
+        return ["base_link"] #, "wheel_link1", "wheel_link2", "wheel_link3"]
+
+    @property
+    def trunk_link_names(self):
+        return ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
+
+    @property
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
@@ -207,7 +215,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def arm_link_names(self):
-        return {arm: [f"{arm}_arm_link{i}" for i in range(1, 3)] for arm in self.arm_names}
+        return {arm: [f"{arm}_arm_link{i}" for i in range(1, 7)] for arm in self.arm_names}
 
     @property
     def arm_joint_names(self):
