@@ -57,7 +57,7 @@ robots:
         use_delta_commands: false
       arm_right:
         name: JointController
-        dependencies: [trunk]
+        subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         command_output_limits: null

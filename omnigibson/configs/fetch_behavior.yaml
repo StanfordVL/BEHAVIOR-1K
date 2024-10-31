@@ -63,7 +63,7 @@ robots:
         name: JointController
       arm_0:
         name: InverseKinematicsController
-        dependencies: [trunk]
+        subsume_controllers: [trunk]
       gripper_0:
         name: MultiFingerGripperController
         mode: binary

@@ -231,43 +231,43 @@ class ControllableObject(BaseObject):
 
         # Initialize controllers to create
         self._controllers = dict()
-        # Keep track of any controllers that are dependencies of other controllers
-        # We will not instantiate dependent controllers
-        controller_dependencies = dict()  # Maps independent controller name to list of dependencies
-        dependent_names = set()
+        # Keep track of any controllers that are subsumed by other controllers
+        # We will not instantiate subsumed controllers
+        controller_subsumes = dict()  # Maps independent controller name to list of subsumed controllers
+        subsume_names = set()
         for name in self._raw_controller_order:
             # Make sure we have the valid controller name specified
             assert_valid_key(key=name, valid_keys=self._controller_config, name="controller name")
             cfg = self._controller_config[name]
-            dependencies = cfg.pop("dependencies", [])
-            # If this controller has dependencies, it cannot be a dependency for another controller
-            # (i.e.: we don't allow nested / cyclical dependencies)
-            if len(dependencies) > 0:
+            subsume_controllers = cfg.pop("subsume_controllers", [])
+            # If this controller subsumes other controllers, it cannot be subsumed by another controller
+            # (i.e.: we don't allow nested / cyclical subsuming)
+            if len(subsume_controllers) > 0:
                 assert (
-                    name not in dependent_names
-                ), f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
-                controller_dependencies[name] = dependencies
-                for dependent_name in dependencies:
-                    # Make sure it doesn't already exist -- a controller should only be the dependency of up to one other
+                    name not in subsume_names
+                ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                controller_subsumes[name] = subsume_controllers
+                for subsume_name in subsume_controllers:
+                    # Make sure it doesn't already exist -- a controller should only be subsumed by up to one other
                     assert (
-                        dependent_name not in dependent_names
-                    ), f"Controller {dependent_name} cannot be a dependency of more than one other controller!"
+                        subsume_name not in subsume_names
+                    ), f"Controller {subsume_name} cannot be subsumed by more than one other controller!"
                     assert (
-                        dependent_name not in controller_dependencies
-                    ), f"Controller {name} has dependencies, and therefore cannot be a dependency for another controller!"
-                    dependent_names.add(dependent_name)
+                        subsume_name not in controller_subsumes
+                    ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                    subsume_names.add(subsume_name)
 
         # Loop over all controllers, in the order corresponding to @action dim
         for name in self._raw_controller_order:
-            # If this controller is a dependency, simply skip it
-            if name in dependent_names:
+            # If this controller is subsumed by another controller, simply skip it
+            if name in subsume_names:
                 continue
             cfg = self._controller_config[name]
-            # If we have dependencies, prepend the dependencies' dof idxs to this controller's idxs
-            if name in controller_dependencies:
-                for dependent_name in controller_dependencies[name]:
-                    dependent_cfg = self._controller_config[dependent_name]
-                    cfg["dof_idx"] = th.concatenate([dependent_cfg["dof_idx"], cfg["dof_idx"]])
+            # If we subsume other controllers, prepend the subsumed' dof idxs to this controller's idxs
+            if name in controller_subsumes:
+                for subsumed_name in controller_subsumes[name]:
+                    subsumed_cfg = self._controller_config[subsumed_name]
+                    cfg["dof_idx"] = th.concatenate([subsumed_cfg["dof_idx"], cfg["dof_idx"]])
 
             # If we're using normalized action space, override the inputs for all controllers
             if self._action_normalize:
