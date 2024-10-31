@@ -329,6 +329,7 @@ def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     random_angle = torch.rand(1) * angle_limit
     return random_axis, random_angle.item()
 
+
 @torch.compile
 def quat2mat(quaternion):
     """
