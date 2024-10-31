@@ -83,7 +83,6 @@ def test_curobo():
                         "command_input_limits": None,
                         "use_delta_commands": False,
                         "use_impedances": True,
-                        "kp": macros.robots.holonomic_base_robot.BASE_JOINT_CONTROLLER_POSITION_KP,
                     },
                     "arm_left": {
                         "name": "JointController",

@@ -122,6 +122,18 @@ class HolonomicBaseRobot(LocomotionRobot):
             **kwargs,
         )
 
+    @property
+    def _default_base_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default base joint controller config to control this robot's base. Uses velocity
+                control by default.
+        """
+        cfg = super()._default_base_joint_controller_config
+        # The default value is too small for the base joints
+        cfg["pos_kp"] = m.BASE_JOINT_CONTROLLER_POSITION_KP
+        return cfg
+
     def _post_load(self):
         super()._post_load()
 

@@ -103,7 +103,6 @@ def test_curobo():
                     "command_input_limits": None,
                     "use_delta_commands": False,
                     "use_impedances": True,
-                    "kp": macros.robots.holonomic_base_robot.BASE_JOINT_CONTROLLER_POSITION_KP,
                 },
                 "arm_left": {
                     "name": "JointController",
@@ -381,24 +380,8 @@ def test_curobo():
                                 # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
 
                             cur_joint_positions = robot.get_joint_positions()
-
-                            # joint_positions_set_point.append(q)
-                            # joint_positions_response.append(cur_joint_positions)
-
                             if ((cur_joint_positions - q).abs() < error_tol).all():
                                 break
-
-                # joint_positions_set_point = th.stack(joint_positions_set_point, dim=0).numpy()
-                # joint_positions_response = th.stack(joint_positions_response, dim=0).numpy()
-
-                # for i in range(joint_positions_set_point.shape[1]):
-                #     joint_position_set_point = joint_positions_set_point[:, i]
-                #     joint_position_response = joint_positions_response[:, i]
-                #     plt.plot(np.arange(joint_position_set_point.shape[0]), joint_position_set_point)
-                #     plt.plot(np.arange(joint_position_response.shape[0]), joint_position_response)
-                #     plt.savefig(f"/scr/chengshu/Downloads/joint_{list(robot.joints.keys())[i]}_error.png")
-                #     plt.clf()
-                # breakpoint()
 
         og.clear()
 
