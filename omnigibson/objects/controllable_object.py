@@ -288,8 +288,12 @@ class ControllableObject(BaseObject):
         Helper function to force the joints to use the internal specified control mode and gains
         """
         # Update the control modes of each joint based on the outputted control from the controllers
+        unused_dofs = {i for i in range(self.n_dof)}
         for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
+                # Make sure the DOF has not already been set yet, and remove it afterwards
+                assert dof.item() in unused_dofs
+                unused_dofs.remove(dof.item())
                 control_type = self._controllers[name].control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
@@ -300,6 +304,20 @@ class ControllableObject(BaseObject):
                         else None
                     ),
                 )
+
+        # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
+        # motion wrt a specific axis), so explicitly set kp / kd to 0 to avoid silent bugs when
+        # joint positions / velocities are set
+        for unused_dof in unused_dofs:
+            unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
+            assert not unused_joint.driven, \
+                (f"All unused joints not mapped to any controller should not have DriveAPI attached to it! "
+                 f"However, joint {unused_joint.name} is driven!")
+            unused_joint.set_control_type(
+                control_type=ControlType.NONE,
+                kp=None,
+                kd=None,
+            )
 
     def _generate_controller_config(self, custom_config=None):
         """
