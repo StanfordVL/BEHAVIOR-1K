@@ -36,6 +36,14 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         return fcns
 
     @property
+    def trunk_links(self):
+        return [self.links[name] for name in self.trunk_link_names]
+
+    @property
+    def trunk_link_names(self):
+        raise NotImplementedError
+
+    @property
     def trunk_joint_names(self):
         raise NotImplementedError("trunk_joint_names must be implemented in subclass")
 
@@ -110,7 +118,7 @@ class ArticulatedTrunkRobot(ManipulationRobot):
     def _default_trunk_joint_controller_config(self):
         """
         Returns:
-            dict: Default base joint controller config to control this robot's base. Uses velocity
+            dict: Default base joint controller config to control this robot's base. Uses position
                 control by default.
         """
         return {

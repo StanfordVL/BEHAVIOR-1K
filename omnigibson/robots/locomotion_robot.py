@@ -185,6 +185,14 @@ class LocomotionRobot(BaseRobot):
         self.set_position_orientation(orientation=quat)
 
     @property
+    def base_links(self):
+        return [self.links[name] for name in self.base_link_names]
+
+    @property
+    def base_link_names(self):
+        raise NotImplementedError
+
+    @property
     def base_action_idx(self):
         controller_idx = self.controller_order.index("base")
         action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
