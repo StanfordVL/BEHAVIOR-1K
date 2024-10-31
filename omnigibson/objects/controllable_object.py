@@ -310,9 +310,10 @@ class ControllableObject(BaseObject):
         # joint positions / velocities are set
         for unused_dof in unused_dofs:
             unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
-            assert not unused_joint.driven, \
-                (f"All unused joints not mapped to any controller should not have DriveAPI attached to it! "
-                 f"However, joint {unused_joint.name} is driven!")
+            assert not unused_joint.driven, (
+                f"All unused joints not mapped to any controller should not have DriveAPI attached to it! "
+                f"However, joint {unused_joint.name} is driven!"
+            )
             unused_joint.set_control_type(
                 control_type=ControlType.NONE,
                 kp=None,

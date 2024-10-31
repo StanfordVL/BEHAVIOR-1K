@@ -195,7 +195,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def base_link_names(self):
-        return ["base_link"] #, "wheel_link1", "wheel_link2", "wheel_link3"]
+        return ["base_link"]  # , "wheel_link1", "wheel_link2", "wheel_link3"]
 
     @property
     def trunk_link_names(self):
