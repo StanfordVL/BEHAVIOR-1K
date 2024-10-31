@@ -8,7 +8,6 @@ import math
 from typing import List, Optional, Tuple
 
 import torch
-import torch as th
 
 PI = math.pi
 EPS = torch.finfo(torch.float32).eps * 4.0
