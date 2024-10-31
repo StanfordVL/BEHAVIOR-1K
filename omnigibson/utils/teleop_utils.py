@@ -1,5 +1,5 @@
 import time
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, Literal
 
 import torch as th
 
@@ -9,6 +9,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.sensors import VisionSensor
+from omnigibson.utils.control_utils import IKSolver
 
 try:
     from telemoma.configs.base_config import teleop_config
@@ -119,9 +121,8 @@ class OVXRSystem(TeleopSystem):
         show_control_marker: bool = False,
         system: str = "SteamVR",
         disable_display_output: bool = False,
-        enable_touchpad_movement: bool = False,
-        align_anchor_to_robot_base: bool = False,
-        use_hand_tracking: bool = False,
+        eef_tracking_mode: Literal["controller", "hand", "disabled"] = "controller",
+        align_anchor_to: Literal["camera", "base", "touchpad"] = "camera",
     ) -> None:
         """
         Initializes the VR system
@@ -130,32 +131,22 @@ class OVXRSystem(TeleopSystem):
             show_control_marker (bool): whether to show a control marker
             system (str): the VR system to use, one of ["OpenXR", "SteamVR"], default is "SteamVR".
             disable_display_output (bool): whether we will not display output to the VR headset (only use controller tracking), default is False.
-            enable_touchpad_movement (bool): whether to enable VR system anchor movement by controller, default is False.
-            align_anchor_to_robot_base (bool): whether to align VR anchor to robot base, default is False.
-            use_hand_tracking (bool): whether to use hand tracking instead of controllers, default is False.
-            show_controller (bool): whether to show the controller model in the scene, default is False.
-
-        NOTE: enable_touchpad_movement and align_anchor_to_robot_base cannot be enabled at the same time.
-            The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
+            eef_tracking_mode (Literal): whether to use controller tracking or hand tracking, one of ["controller", "hand", "disabled"], default is controller.
+            align_anchor_to (Literal): specify where the VR view aligns to, one of ["camera", "base", "touchpad"], defaults to robot camera. 
+                The "touchpad" option enables free movement of the VR view (i.e. the user), while the other two constrain the VR view to the either the robot base or camera pose.
         """
+        assert align_anchor_to in ["camera", "base", "touchpad"], "align_anchor_to must be one of ['camera', 'base', 'touchpad']"
+        self.align_anchor_to = align_anchor_to
         self.raw_data = {}
         # enable xr extension
         lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
         # run super method
         super().__init__(teleop_config, robot, show_control_marker)
-        # we want to further slow down the movement speed if we are using touchpad movement
-        if enable_touchpad_movement:
-            self.movement_speed *= 0.3
         # get xr core and profile
         self.xr_core = lazy.omni.kit.xr.core.XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
         self.disable_display_output = disable_display_output
-        self.enable_touchpad_movement = enable_touchpad_movement
-        self.align_anchor_to_robot_base = align_anchor_to_robot_base
-        assert not (
-            self.enable_touchpad_movement and self.align_anchor_to_robot_base
-        ), "enable_touchpad_movement and align_anchor_to_robot_base cannot be True at the same time!"
         # set avatar
         if self.show_control_marker:
             self.vr_profile.set_avatar(
@@ -166,9 +157,7 @@ class OVXRSystem(TeleopSystem):
                 lazy.omni.kit.xr.ui.stage.common.XRAvatarManager.get_singleton().create_avatar("empty_avatar", {})
             )
         # set anchor mode to be custom anchor
-        lazy.carb.settings.get_settings().set(
-            self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene origin"
-        )
+        lazy.carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene_origin")
         # set vr system
         lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
         # set display mode
@@ -180,17 +169,30 @@ class OVXRSystem(TeleopSystem):
         self.hmd = None
         self.controllers = {}
         self.trackers = {}
-        self.xr2og_orn_offset = th.tensor([0.5, -0.5, -0.5, -0.5])
-        self.og2xr_orn_offset = th.tensor([-0.5, 0.5, 0.5, -0.5])
         # setup event subscriptions
         self.reset()
-        self.use_hand_tracking = use_hand_tracking
-        if use_hand_tracking:
+        self.eef_tracking_mode = eef_tracking_mode
+        if eef_tracking_mode == "hand":
             self.raw_data["hand_data"] = {}
             self.teleop_action.hand_data = {}
             self._hand_tracking_subscription = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
                 lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
+        self.robot_cameras = [s for s in self.robot.sensors.values() if isinstance(s, VisionSensor)]
+        if self.align_anchor_to == "camera" and len(self.robot_cameras) == 0:
+            raise ValueError("No camera found on robot, cannot align anchor to camera")
+        # we want to further slow down the movement speed if we are using touchpad movement
+        if self.align_anchor_to == "touchpad":
+            self.movement_speed *= 0.3
+        # self.global_ik_solver = {}
+        # for arm in self.robot_arms:
+        #     control_idx = self.robot.arm_control_idx[arm]
+        #     self.global_ik_solver[arm] = IKSolver(
+        #         robot_description_path=self.robot.robot_arm_descriptor_yamls[arm],
+        #         robot_urdf_path=self.robot.urdf_path,
+        #         reset_joint_pos=self.robot.get_joint_positions()[control_idx],
+        #         eef_name=self.robot.eef_link_names[arm],
+        #     )
 
     def xr2og(self, transform: th.tensor) -> Tuple[th.tensor, th.tensor]:
         """
@@ -203,7 +205,6 @@ class OVXRSystem(TeleopSystem):
             tuple(th.tensor, th.Tensor): the position and orientation in the OmniGibson coordinate system
         """
         pos, orn = T.mat2pose(th.tensor(transform).T)
-        orn = T.quat_multiply(orn, self.xr2og_orn_offset)
         return pos, orn
 
     def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.Tensor:
@@ -215,7 +216,6 @@ class OVXRSystem(TeleopSystem):
         Returns:
             th.tensor: the transform matrix in the Omniverse XR coordinate system
         """
-        orn = T.quat_multiply(self.og2xr_orn_offset, orn)
         return T.pose2mat((pos, orn)).T.double()
 
     def reset(self) -> None:
@@ -249,6 +249,13 @@ class OVXRSystem(TeleopSystem):
             print("[VRSys] Waiting for VR headset to become active...")
             self._update_devices()
             if self.hmd is not None:
+                print("[VRSys] VR headset connected")
+                # Note that stepping the vr system multiple times is necessary here due to a bug in OVXR plugin
+                for _ in range(20):
+                    self.update()
+                    og.sim.step()
+                self.reset_head_transform()
+                print("[VRSys] VR system is ready")
                 break
             time.sleep(1)
             og.sim.step()
@@ -269,23 +276,24 @@ class OVXRSystem(TeleopSystem):
         self._update_devices()
         self._update_device_transforms()
         self._update_button_data()
-        # Update teleop data based on controller input if not using hand tracking
-        if not self.use_hand_tracking:
-            self.teleop_action.base = th.zeros(3)
-            self.teleop_action.torso = 0.0
-            # update right hand related info
+        # Update teleop data based on controller input
+        if self.eef_tracking_mode == "controller":
+            # update eef related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
+                    controller_pose_in_robot_frame = self._pose_in_robot_frame(
+                        self.raw_data["transforms"]["controllers"][arm][0], self.raw_data["transforms"]["controllers"][arm][1]
+                    )
                     self.teleop_action[arm_name] = th.cat(
                         (
-                            self.raw_data["transforms"]["controllers"][arm][0],
-                            T.quat2euler(
+                            controller_pose_in_robot_frame[0],
+                            T.quat2axisangle(
                                 T.quat_multiply(
-                                    self.raw_data["transforms"]["controllers"][arm][1],
-                                    self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(arm)]],
+                                    controller_pose_in_robot_frame[1],
+                                    self.robot.teleop_rotation_offset[arm_name],
                                 )
                             ),
-                            [self.raw_data["button_data"][arm]["axis"]["trigger"]],
+                            th.tensor([self.raw_data["button_data"][arm]["axis"]["trigger"]], dtype=th.float32),
                         )
                     )
                     self.teleop_action.is_valid[arm_name] = self._is_valid_transform(
@@ -293,44 +301,47 @@ class OVXRSystem(TeleopSystem):
                     )
                 else:
                     self.teleop_action.is_valid[arm_name] = False
-            # update base and reset info
-            if "right" in self.controllers:
-                self.teleop_action.reset["right"] = self.raw_data["button_data"]["right"]["press"]["grip"]
-                right_axis = self.raw_data["button_data"]["right"]["axis"]
-                self.teleop_action.base[0] = right_axis["touchpad_y"] * self.movement_speed
-                self.teleop_action.torso = -right_axis["touchpad_x"] * self.movement_speed
-            if "left" in self.controllers:
-                self.teleop_action.reset["left"] = self.raw_data["button_data"]["left"]["press"]["grip"]
-                left_axis = self.raw_data["button_data"]["left"]["axis"]
-                self.teleop_action.base[1] = -left_axis["touchpad_x"] * self.movement_speed
-                self.teleop_action.base[2] = left_axis["touchpad_y"] * self.movement_speed
+
+            # update base, torso, and reset info
+            self.teleop_action.base = th.zeros(3)
+            self.teleop_action.torso = 0.0
+            for controller_name in self.controllers.keys():
+                self.teleop_action.reset[controller_name] = self.raw_data["button_data"][controller_name]["press"]["grip"]
+                axis = self.raw_data["button_data"][controller_name]["axis"]
+                if controller_name == "right":
+                    self.teleop_action.base[0] = axis["touchpad_y"] * self.movement_speed
+                    self.teleop_action.torso = -axis["touchpad_x"] * self.movement_speed
+                elif controller_name == "left":
+                    self.teleop_action.base[1] = -axis["touchpad_x"] * self.movement_speed
+                    self.teleop_action.base[2] = axis["touchpad_y"] * self.movement_speed
+        
         # update head related info
         self.teleop_action.head = th.cat(
-            (self.raw_data["transforms"]["head"][0], th.tensor(T.quat2euler(self.raw_data["transforms"]["head"][1])))
+            (self.raw_data["transforms"]["head"][0], T.quat2euler(self.raw_data["transforms"]["head"][1]))
         )
         self.teleop_action.is_valid["head"] = self._is_valid_transform(self.raw_data["transforms"]["head"])
-        # Optionally move anchor
-        if self.enable_touchpad_movement:
+        
+        # align anchor
+        if self.align_anchor_to == "touchpad":
             # we use x, y from right controller for 2d movement and y from left controller for z movement
             self._move_anchor(
                 pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
             )
-        if self.align_anchor_to_robot_base:
-            robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
-            self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
+        else:
+            reference_frame = self.robot if self.align_anchor_to == "base" else self.robot_cameras[0]
+            anchor_pos, anchor_orn = reference_frame.get_position_orientation()
+            anchor_pose = self.og2xr(anchor_pos, anchor_orn)
+            self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(anchor_pose.numpy(), self.hmd)
 
-    def teleop_data_to_action(self) -> th.Tensor:
+    def get_robot_teleop_action(self) -> th.Tensor:
         """
-        Generate action data from VR input for robot teleoperation
+        Get the robot teleop action
         Returns:
-            th.tensor: array of action data
+            th.tensor: the robot teleop action
         """
-        # optionally update control marker
-        if self.show_control_marker:
-            self.update_control_marker()
         return self.robot.teleop_data_to_action(self.teleop_action)
 
-    def reset_transform_mapping(self, arm: str = "right") -> None:
+    def snap_controller_to_eef(self, arm: str = "right") -> None:
         """
         Snap device to the robot end effector (ManipulationRobot only)
         Args:
@@ -342,21 +353,59 @@ class OVXRSystem(TeleopSystem):
         ].get_position_orientation()[0]
         target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-            target_transform, self.controllers[arm]
+            target_transform.numpy(), self.controllers[arm]
         )
-
-    def set_initial_transform(self, pos: Iterable[float], orn: Iterable[float] = [0, 0, 0, 1]) -> None:
+    
+    def snap_eef_to_controller(self, arm: str = "right") -> None:
         """
-        Function that sets the initial transform of the VR system (w.r.t.) head
-        Note that stepping the vr system multiple times is necessary here due to a bug in OVXR plugin
+        Snap robot end effector to the device (ManipulationRobot only)
         Args:
-            pos(Iterable[float]): initial position of the vr system
-            orn(Iterable[float]): initial orientation of the vr system
+            arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
-        for _ in range(10):
-            self.update()
-            og.sim.step()
-        self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(self.og2xr(pos, orn), self.hmd)
+        self.robot.keep_still()
+        pos, quat = self.raw_data["transforms"]["controllers"][arm]
+        ik_solver = self.global_ik_solver[arm]
+        control_idx = self.robot.arm_control_idx[arm]
+        joint_pos = ik_solver.solve(
+            target_pos=pos,
+            target_quat=quat,
+            tolerance_pos=0.01,
+            tolerance_quat=0.01,
+            weight_pos=20.0,
+            weight_quat=0.05,
+            max_iterations=100,
+            initial_joint_pos=self.robot.get_joint_positions()[control_idx],
+        )
+        if joint_pos is not None:
+            self.robot.set_joint_positions(joint_pos, indices=control_idx, drive=False)
+            print("Snap succeeded.")
+        else:
+            print("Snap failed. No IK solution found.")
+
+    def reset_head_transform(self) -> None:
+        """
+        Function that resets the transform of the VR system (w.r.t.) head
+        """
+        if self.align_anchor_to == "touchpad":
+            pos = th.tensor([0.0, 0.0, 1.0])
+            orn = th.tensor([0.0, 0.0, 0.0, 1.0])
+        else:
+            reference_frame = self.robot if self.align_anchor_to == "base" else self.robot_cameras[0]
+            pos, orn = reference_frame.get_position_orientation()
+        self.robot.keep_still()
+        self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(self.og2xr(pos, orn).numpy(), self.hmd)
+    
+    def _pose_in_robot_frame(self, pos: th.tensor, orn: th.tensor) -> Tuple[th.tensor, th.tensor]:
+        """
+        Get the pose in the robot frame
+        Args:
+            pos (th.tensor): the position in the world frame
+            orn (th.tensor): the orientation in the world frame
+        Returns:
+            tuple(th.tensor, th.tensor): the position and orientation in the robot frame
+        """
+        robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
+        return T.relative_pose_transform(pos, orn, robot_base_pos, robot_base_orn)
 
     def _move_anchor(
         self, pos_offset: Optional[Iterable[float]] = None, rot_offset: Optional[Iterable[float]] = None
@@ -369,62 +418,60 @@ class OVXRSystem(TeleopSystem):
         """
         if pos_offset is not None:
             # note that x is forward, y is down, z is left for ovxr, but x is forward, y is left, z is up for og
-            pos_offset = th.tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double()
+            pos_offset = th.tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double().tolist()
             self.vr_profile.add_move_physical_world_relative_to_device(pos_offset)
         if rot_offset is not None:
-            rot_offset = th.tensor(rot_offset).double()
+            rot_offset = th.tensor(rot_offset).double().tolist()
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
+    # TODO: check if this is necessary
     def _is_valid_transform(self, transform: Tuple[th.tensor, th.tensor]) -> bool:
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """
-        return th.any(transform[0] != th.zeros(3)) and th.any(transform[1] != self.og2xr_orn_offset)
+        return th.any(transform[0] != th.zeros(3))
 
     def _update_devices(self) -> None:
         """
         Update the VR device list
         """
         for device in self.vr_profile.get_device_list():
-            if device.get_class() == self.xr_device_class.xrdisplaydevice:
+            device_class = device.get_class()
+            if device_class == self.xr_device_class.xrdisplaydevice:
                 self.hmd = device
-            elif device.get_class() == self.xr_device_class.xrcontroller:
+            elif device_class == self.xr_device_class.xrcontroller:
                 # we want the first 2 controllers to be corresponding to the left and right hand
                 d_idx = device.get_index()
                 controller_name = ["left", "right"][d_idx] if d_idx < 2 else f"controller_{d_idx+1}"
                 self.controllers[controller_name] = device
-            elif device.get_class() == self.xr_device_class.xrtracker:
+            elif device_class == self.xr_device_class.xrtracker:
                 self.trackers[device.get_index()] = device
 
     def _update_device_transforms(self) -> None:
         """
         Get the transform matrix of each VR device *in world frame* and store in self.raw_data
         """
-        transforms = {}
-        transforms["head"] = self.xr2og(self.hmd.get_virtual_world_pose())
-        transforms["controllers"] = {}
-        transforms["trackers"] = {}
-        for controller_name in self.controllers:
-            transforms["controllers"][controller_name] = self.xr2og(
-                self.controllers[controller_name].get_virtual_world_pose()
-            )
-        for tracker_index in self.trackers:
-            transforms["trackers"][tracker_index] = self.xr2og(self.trackers[tracker_index].get_virtual_world_pose())
-        self.raw_data["transforms"] = transforms
+        assert self.hmd is not None, "VR headset device not found"
+        self.raw_data["transforms"] = {
+            "head": self.xr2og(self.hmd.get_virtual_world_pose()),
+            "controllers": {name: self.xr2og(controller.get_virtual_world_pose()) for name, controller in self.controllers.items()},
+            "trackers": {index: self.xr2og(tracker.get_virtual_world_pose()) for index, tracker in self.trackers.items()}
+        }
 
     def _update_button_data(self):
         """
         Get the button data for each controller and store in self.raw_data
-        Returns:
-            dict: a dictionary of whether each button is pressed or touched, and the axis state for touchpad and joysticks
         """
-        button_data = {}
-        for controller_name in self.controllers:
-            button_data[controller_name] = {}
-            button_data[controller_name]["press"] = self.controllers[controller_name].get_button_press_state()
-            button_data[controller_name]["touch"] = self.controllers[controller_name].get_button_touch_state()
-            button_data[controller_name]["axis"] = self.controllers[controller_name].get_axis_state()
-        self.raw_data["button_data"] = button_data
+        self.raw_data["button_data"] = {
+            name: {
+                "press": controller.get_button_press_state(),
+                "touch": controller.get_button_touch_state(),
+                "axis": controller.get_axis_state()
+            } for name, controller in self.controllers.items()
+        }
+        # if anything in either press or touch is True, we breakpoint
+        if any(v for v in self.raw_data["button_data"]["left"]["press"].values()):
+            breakpoint()
 
     def _update_hand_tracking_data(self, e) -> None:
         """
