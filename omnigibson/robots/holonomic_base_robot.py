@@ -9,6 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
 
 m = create_module_macros(module_path=__file__)
@@ -294,7 +295,7 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
+        action[self.base_action_idx] = teleop_action.base.float()
         return action
 
     @property
