@@ -10,6 +10,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
+from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import GROUND_CATEGORIES, JointType
@@ -223,7 +224,7 @@ class CuRoboMotionGenerator:
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
                 interpolation_dt=0.03,
-                collision_activation_distance=0.025,
+                collision_activation_distance=0.005,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
                 fixed_iters_trajopt=True,
@@ -411,9 +412,8 @@ class CuRoboMotionGenerator:
             success_ratio (None or float): If set, specifies the fraction of successes necessary given self.batch_size.
                 If None, will automatically be the smallest ratio (1 / self.batch_size), i.e: any nonzero number of
                 successes
-            attached_obj (None or BaseObject): If specified, the object to attach to the robot end-effector when
-                solving for this trajectory
-
+            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding BaseObject instances to attach to that link
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
                 object(s) computed from internal batch trajectory computations. If it is False, will return 2-tuple
@@ -423,18 +423,18 @@ class CuRoboMotionGenerator:
         """
         # Previously, this would silently fail so we explicitly check for out-of-range joint limits here
         # This may be fixed in a recent version of CuRobo? See https://github.com/NVlabs/curobo/discussions/288
-        relevant_joint_positions_normalized = (
-            lazy.curobo.types.state.JointState(
-                position=self.tensor_args.to_device(self.robot.get_joint_positions(normalized=True)),
-                joint_names=self.robot_joint_names,
-            )
-            .get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
-            .position
-        )
+        # relevant_joint_positions_normalized = (
+        #     lazy.curobo.types.state.JointState(
+        #         position=self.tensor_args.to_device(self.robot.get_joint_positions(normalized=True)),
+        #         joint_names=self.robot_joint_names,
+        #     )
+        #     .get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
+        #     .position
+        # )
 
-        if not th.all(th.abs(relevant_joint_positions_normalized) < 0.99):
-            print("Robot is near joint limits! No trajectory will be computed")
-            return None, None if not return_full_result else None
+        # if not th.all(th.abs(relevant_joint_positions_normalized) < 0.99):
+        #     print("Robot is near joint limits! No trajectory will be computed")
+        #     return None, None if not return_full_result else None
 
         # If target_pos and target_quat are torch tensors, it's assumed that they correspond to the default ee_link
         if isinstance(target_pos, th.Tensor):
@@ -519,12 +519,23 @@ class CuRoboMotionGenerator:
 
         # Attach object to robot if requested
         if attached_obj is not None:
-            obj_paths = [geom.prim_path for geom in attached_obj.root_link.collision_meshes.values()]
-            assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
-            self.mg[emb_sel].attach_objects_to_robot(
-                joint_state=cu_js_batch,
-                object_names=obj_paths,
-            )
+            for ee_link_name, obj in attached_obj.items():
+                assert isinstance(obj, RigidPrim), "attached_object should be a RigidPrim object"
+                obj_paths = [geom.prim_path for geom in obj.collision_meshes.values()]
+                assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
+
+                position, quaternion = self.robot.links[ee_link_name].get_position_orientation()
+                # xyzw to wxyz
+                quaternion = quaternion[[3, 0, 1, 2]]
+                ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
+
+                self.mg[emb_sel].attach_objects_to_robot(
+                    joint_state=cu_js_batch,
+                    object_names=obj_paths,
+                    ee_pose=ee_pose,
+                    link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
+                    scale=0.9,
+                )
 
         # Determine how many internal batches we need to run based on submitted size
         remainder = target_pos[self.ee_link[emb_sel]].shape[0] % self.batch_size
@@ -599,7 +610,11 @@ class CuRoboMotionGenerator:
 
         # Detach attached object if it was attached
         if attached_obj is not None:
-            self.mg[emb_sel].detach_object_from_robot()
+            for ee_link_name, obj in attached_obj.items():
+                self.mg[emb_sel].detach_object_from_robot(
+                    object_names=[geom.prim_path for geom in obj.collision_meshes.values()],
+                    link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
+                )
 
         if return_full_result:
             return results

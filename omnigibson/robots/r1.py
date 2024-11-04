@@ -241,6 +241,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         }
 
     @property
+    def curobo_attached_object_link_names(self):
+        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
+
+    @property
     def robot_arm_descriptor_yamls(self):
         descriptor_yamls = {
             arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names
