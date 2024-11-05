@@ -595,6 +595,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         raise NotImplementedError
 
+    @property
+    def curobo_attached_object_link_names(self):
+        """
+        Returns:
+            Dict[str, str]: mapping from robot eef link names to the link names of the attached objects
+        """
+        raise NotImplementedError
+
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
