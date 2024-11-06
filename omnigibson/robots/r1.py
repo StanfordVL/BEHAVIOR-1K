@@ -181,8 +181,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def assisted_grasp_start_points(self):
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.01])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.01])),
             ]
             for arm in self.arm_names
         }
@@ -191,8 +191,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([-0.032, 0.0, -0.01])),
+                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([0.025, 0.0, -0.01])),
             ]
             for arm in self.arm_names
         }
