@@ -281,7 +281,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             try:
                 # Make sure we retract the arm after every step
-                yield from self._reset_hand()
+                for arm in self.robot.arm_names:
+                    yield from self._reset_hand(arm)
             except ActionPrimitiveError:
                 pass
 
@@ -504,7 +505,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
         # It's okay if we can't go all the way because we run into the object.
         indented_print("Performing grasp approach")
-        yield from self._move_hand_linearly_cartesian(approach_pose, stop_on_contact=True)
+
+        # TODO: implement this linear motion better with curobo constrained planning
+        # yield from self._move_hand_linearly_cartesian(approach_pose, stop_on_contact=True)
+        yield from self._move_hand(approach_pose)
 
         # Step once to update
         empty_action = self._empty_action()
@@ -674,7 +678,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             bool: Whether eef can the reach target pose
         """
-        return self._ik_solver_cartesian_to_joint_space(relative_target_pose) is not None
+        # TODO: output may need to be a dictionary of arms and whether they can reach the target pose
+        for arm in self.robot.arm_names:
+            if self._ik_solver_cartesian_to_joint_space(relative_target_pose, arm=arm) is not None:
+                return True
+        return False
 
     @property
     def _manipulation_control_idx(self):
@@ -691,17 +699,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
 
-    @property
-    def _manipulation_descriptor_path(self):
-        """The appropriate manipulation descriptor for the current settings."""
-        if isinstance(self.robot, Tiago) and m.TIAGO_TORSO_FIXED:
-            assert self.arm == "left", "Fixed torso mode only supports left arm!"
-            return self.robot.robot_arm_descriptor_yamls["left_fixed"]
-
-        # Otherwise just return the default arm control idx
-        return self.robot.robot_arm_descriptor_yamls[self.arm]
-
-    def _ik_solver_cartesian_to_joint_space(self, relative_target_pose):
+    def _ik_solver_cartesian_to_joint_space(self, relative_target_pose, arm=None):
         """
         Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
 
@@ -713,8 +711,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach the target pose
                 - th.tensor: Indices for joints in the robot
         """
+        if arm is None:
+            arm = self.arm
         ik_solver = IKSolver(
-            robot_description_path=self._manipulation_descriptor_path,
+            robot_description_path=self.robot.robot_arm_descriptor_yamls[arm],
             robot_urdf_path=self.robot.urdf_path,
             reset_joint_pos=self.robot.reset_joint_pos[self._manipulation_control_idx],
             eef_name=self.robot.eef_link_names[self.arm],
@@ -752,18 +752,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.eef_link_names["left"]: left_hand_quat,
             self.robot.eef_link_names["right"]: right_hand_quat,
         }
+        yield from self._plan_and_execute_joint_motion(target_pos, target_quat, CuroboEmbodimentSelection.ARM)
+
+    def _plan_and_execute_joint_motion(
+        self, target_pos, target_quat, embodiment_selection=CuroboEmbodimentSelection.DEFAULT, ignore_failure=False
+    ):
         successes, traj_paths = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
             is_local=False,
-            max_attempts=5,
+            max_attempts=50,
             timeout=60.0,
             ik_fail_return=5,
             enable_finetune_trajopt=True,
             finetune_attempts=1,
             return_full_result=False,
             success_ratio=1.0,
-            emb_sel=CuroboEmbodimentSelection.ARM,
+            emb_sel=embodiment_selection,
         )
         success, traj_path = successes[0], traj_paths[0]
         if not success:
@@ -772,34 +777,48 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "There is no accessible path from where you are to the desired pose. Try again",
             )
 
-        q_traj = self._motion_generator.path_to_joint_trajectory(traj_path, CuroboEmbodimentSelection.ARM)
+        q_traj = self._motion_generator.path_to_joint_trajectory(traj_path, embodiment_selection)
 
-        # Follow the plan to move the eef
+        # Follow the joint motion plan
         indented_print(f"Plan has {len(q_traj)} steps")
         for i, joint_pos in enumerate(q_traj):
-            indented_print(f"Executing arm movement plan step {i + 1}/{len(q_traj)}")
-            yield from self._execute_joint_motion(joint_pos.cpu())
+            indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
+            desired_joint_pos = joint_pos.cpu()
+            # Convert target joint positions to command
+            action = []
+            for controller in self.robot.controllers.values():
+                action.append(desired_joint_pos[controller.dof_idx])
+            action = th.cat(action, dim=0)
+            assert action.shape[0] == self.robot.action_dim
 
-    def _execute_joint_motion(self, q, ignore_failure=False):
-        # Convert target joint positions to command
-        action = []
-        for controller in self.robot.controllers.values():
-            action.append(q[controller.dof_idx])
-        action = th.cat(action, dim=0)
-        assert action.shape[0] == self.robot.action_dim
+            base_target_reached = False
+            articulation_target_reached = False
 
-        for i in range(m.MAX_STEPS_FOR_JOINT_MOTION):
-            current_joint_pos = self.robot.get_joint_positions()
-            joint_pos_diff = q - current_joint_pos
-            if th.max(th.abs(joint_pos_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
-                return
-            yield self._postprocess_action(action)
+            for i in range(m.MAX_STEPS_FOR_JOINT_MOTION):
+                current_joint_pos = self.robot.get_joint_positions()
+                joint_pos_diff = desired_joint_pos - current_joint_pos
+                base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
+                articulation_joint_diff = joint_pos_diff[~self.robot.base_control_idx]  # Gets all non-base joints
+                if th.max(th.abs(articulation_joint_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
+                    articulation_target_reached = True
+                # TODO: genralize this to transaltion&rotation + high/low precision modes
+                if th.max(th.abs(base_joint_diff)).item() < m.DEFAULT_DIST_THRESHOLD:
+                    base_target_reached = True
+                if base_target_reached and articulation_target_reached:
+                    break
+                yield self._postprocess_action(action)
 
-        if not ignore_failure:
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not reach the target joint positions. Try again",
-            )
+            if not base_target_reached and not ignore_failure:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    "Could not reach the target base joint positions. Try again",
+                )
+
+            if not articulation_target_reached and not ignore_failure:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    "Could not reach the target articulation joint positions. Try again",
+                )
 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
         """
@@ -1243,15 +1262,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             arm = self.arm
         indented_print("Resetting hand")
         # TODO: make this work with both hands
-        reset_eef_pose = self._get_reset_eef_pose()
-        try:
-            yield from self._move_hand(reset_pose, arm=arm)
-        except ActionPrimitiveError:
-            indented_print("Could not do a planned reset of the hand - probably obj_in_hand collides with body")
-        yield from self._execute_joint_motion(reset_pose, ignore_failure=True)
+        reset_eef_pose = self._get_reset_eef_pose()[arm]
+        yield from self._move_hand(reset_eef_pose, arm=arm)
 
     def _get_reset_eef_pose(self):
-        # TODO: Add support for Fetch
+        # TODO: Define this for all robots
         if isinstance(self.robot, Tiago):
             return th.tensor([0.28493954, 0.37450749, 1.1512334]), th.tensor(
                 [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
@@ -1260,6 +1275,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return th.tensor([0.48688125, -0.12507881, 0.97888719]), th.tensor(
                 [0.61324748, 0.61305553, -0.35266518, 0.35173529]
             )
+        elif isinstance(self.robot, R1):
+            return {
+                self.robot.arm_names[0]: (
+                    th.tensor([0.4923, 0.4144, 1.4077]),
+                    th.tensor([0.7071, 0.0002, 0.7072, -0.0001]),
+                ),
+                self.robot.arm_names[1]: (
+                    th.tensor([0.4926, -0.4141, 1.4081]),
+                    th.tensor([-0.7072, -0.0001, -0.7070, 0.0001]),
+                ),
+            }
         else:
             raise ValueError(f"Unsupported robot: {type(self.robot)}")
 
@@ -1331,29 +1357,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
-        with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
-            plan = plan_base_motion(
-                robot=self.robot,
-                end_conf=pose_2d,
-                context=context,
-            )
 
-        if plan is None:
-            # TODO: Would be great to produce a more informative error.
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.PLANNING_ERROR,
-                "Could not make a navigation plan to get to the target position",
-            )
+        # TODO: Change curobo implementation so that base motion plannning take a 2D pose instead of 3D?
+        pose_3d = self._get_robot_pose_from_2d_pose(pose_2d)
+        # TODO: change defualt to 0.0? Why is it 0.1?
+        # TODO: do we still need high/low precision modes?
+        pose_3d[0][2] = 0.0
+        target_pos = {self.robot.base_footprint_link_name: pose_3d[0]}
+        target_quat = {self.robot.base_footprint_link_name: pose_3d[1]}
 
-        # Follow the plan to navigate.
-        # self._draw_plan(plan)
-        indented_print(f"Navigation plan has {len(plan)} steps")
-        for i, pose_2d in enumerate(plan):
-            indented_print(f"Executing navigation plan step {i + 1}/{len(plan)}")
-            low_precision = True if i < len(plan) - 1 else False
-            yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
+        yield from self._plan_and_execute_joint_motion(target_pos, target_quat, CuroboEmbodimentSelection.BASE)
 
-    # TODO: implement this for curobo
+    # TODO: implement this for curobo?
     def _draw_plan(self, plan):
         SEARCHED = []
         trav_map = self.robot.scene._trav_map
@@ -1530,49 +1545,48 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        with PlanningContext(self.env, self.robot, self.robot_copy, "simplified") as context:
-            for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
-                if pose_on_obj is None:
-                    pos_on_obj = self._sample_position_on_aabb_side(obj)
-                    pose_on_obj = [pos_on_obj, th.tensor([0, 0, 0, 1])]
+        for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
+            if pose_on_obj is None:
+                pos_on_obj = self._sample_position_on_aabb_side(obj)
+                pose_on_obj = [pos_on_obj, th.tensor([0, 0, 0, 1])]
 
-                distance_lo, distance_hi = 0.0, 5.0
-                distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
-                yaw_lo, yaw_hi = -math.pi, math.pi
-                yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
-                avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
-                pose_2d = th.cat(
-                    [
-                        pose_on_obj[0][0] + distance * th.cos(yaw),
-                        pose_on_obj[0][1] + distance * th.sin(yaw),
-                        yaw + math.pi - avg_arm_workspace_range,
-                    ]
-                )
-                # Check room
-                obj_rooms = (
-                    obj.in_rooms
-                    if obj.in_rooms
-                    else [self.robot.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
-                )
-                if self.robot.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
-                    indented_print("Candidate position is in the wrong room.")
-                    continue
-
-                if not self._test_pose(pose_2d, context, pose_on_obj=pose_on_obj, **kwargs):
-                    continue
-
-                indented_print("Found valid position near object.")
-                return pose_2d
-
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                "Could not find valid position near object.",
-                {
-                    "target object": obj.name,
-                    "target pos": obj.get_position_orientation()[0],
-                    "pose on target": pose_on_obj,
-                },
+            distance_lo, distance_hi = 0.0, 5.0
+            distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
+            yaw_lo, yaw_hi = -math.pi, math.pi
+            yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
+            avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
+            pose_2d = th.cat(
+                [
+                    pose_on_obj[0][0] + distance * th.cos(yaw),
+                    pose_on_obj[0][1] + distance * th.sin(yaw),
+                    yaw + math.pi - avg_arm_workspace_range,
+                ]
             )
+            # Check room
+            obj_rooms = (
+                obj.in_rooms
+                if obj.in_rooms
+                else [self.robot.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
+            )
+            if self.robot.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
+                indented_print("Candidate position is in the wrong room.")
+                continue
+
+            if not self._test_pose(pose_2d, pose_on_obj=pose_on_obj, **kwargs):
+                continue
+
+            indented_print("Found valid position near object.")
+            return pose_2d
+
+        raise ActionPrimitiveError(
+            ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            "Could not find valid position near object.",
+            {
+                "target object": obj.name,
+                "target pos": obj.get_position_orientation()[0],
+                "pose on target": pose_on_obj,
+            },
+        )
 
     @staticmethod
     def _sample_position_on_aabb_side(target_obj):
@@ -1673,14 +1687,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    # TODO: Why do we need to pass in the context here?
-    def _test_pose(self, pose_2d, context, pose_on_obj=None):
+    def _test_pose(self, pose_2d, pose_on_obj=None):
         """
         Determines whether the robot can reach the pose on the object and is not in collision at the specified 2d pose
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
-            context (Context): Planning context reference
             pose_on_obj (Iterable of arrays): Pose on the object in the world frame
 
         Returns:
@@ -1692,7 +1704,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if not self._target_in_reach_of_robot_relative(relative_pose):
                 return False
 
-        if set_base_and_detect_collision(context, pose):
+        joint_pos = self.robot.get_joint_positions()
+        joint_pos[self.robot.base_idx[:3]] = pose[0]
+        joint_pos[self.robot.base_idx[3:]] = T.quat2euler(pose[1])
+
+        collision_results = self._motion_generator.check_collisions(joint_pos, check_self_collision=False)
+
+        if collision_results[0].cpu().item():
             indented_print("Candidate position failed collision test.")
             return False
         return True
