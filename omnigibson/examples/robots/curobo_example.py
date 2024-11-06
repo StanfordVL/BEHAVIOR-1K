@@ -22,7 +22,7 @@ def plan_trajectory(cmg, target_pos, target_quat, emb_sel=CuroboEmbodimentSelect
         target_pos=target_pos,
         target_quat=target_quat,
         is_local=False,
-        max_attempts=1,
+        max_attempts=50,
         timeout=60.0,
         ik_fail_return=5,
         enable_finetune_trajopt=True,
@@ -43,21 +43,25 @@ def execute_trajectory(q_traj, env, robot, attached_obj):
 
         num_repeat = 5
         print(f"Executing waypoint {i}/{len(q_traj)}")
-        for j in range(num_repeat):
+        for _ in range(num_repeat):
             env.step(command)
 
 
-def plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot):
+def plan_and_execute_trajectory(
+    cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot, dry_run=False
+):
     successes, traj_paths = plan_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj)
     success, traj_path = successes[0], traj_paths[0]
     # Move the markers to the desired eef positions
     for marker in eef_markers:
-        marker.set_position_orientation(position=th.tensor([0, 0, 0]))
+        marker.set_position_orientation(position=th.tensor([100, 100, 100]))
     for target_link, marker in zip(target_pos.keys(), eef_markers):
         marker.set_position_orientation(position=target_pos[target_link])
     if success:
-        q_traj = cmg.path_to_joint_trajectory(traj_path, emb_sel)
-        execute_trajectory(q_traj, env, robot, attached_obj)
+        print("Successfully planned trajectory")
+        if not dry_run:
+            q_traj = cmg.path_to_joint_trajectory(traj_path, emb_sel)
+            execute_trajectory(q_traj, env, robot, attached_obj)
     else:
         print("Failed to plan trajectory")
 
@@ -73,15 +77,14 @@ def set_gripper_joint_positions(robot, q, attached_obj):
     return q
 
 
-# TODO: This shuold be per-hand
 def control_gripper(env, robot, attached_obj):
     # Control the gripper to open or close, while keeping the rest of the robot still
     q = robot.get_joint_positions()
     q = set_gripper_joint_positions(robot, q, attached_obj)
     command = q_to_command(q, robot)
     num_repeat = 30
-    for j in range(num_repeat):
-        print(f"Gripper (attached_obj={attached_obj}) step {j}")
+    print(f"Gripper (attached_obj={attached_obj})")
+    for _ in range(num_repeat):
         env.step(command)
 
 
@@ -160,7 +163,7 @@ def test_curobo():
                 "self_collisions": True,
                 "action_normalize": False,
                 "rigid_trunk": False,
-                "grasping_mode": "sticky",
+                "grasping_mode": "assisted",
                 "controller_config": {
                     "base": {
                         "name": "JointController",
@@ -188,14 +191,14 @@ def test_curobo():
                         "motor_type": "position",
                         "command_input_limits": None,
                         "use_delta_commands": False,
-                        "use_impedances": False,
+                        "use_impedances": True,
                     },
                     "gripper_right": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": None,
                         "use_delta_commands": False,
-                        "use_impedances": False,
+                        "use_impedances": True,
                     },
                 },
             }
@@ -239,11 +242,11 @@ def test_curobo():
         T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
     )
     fridge_door_open_local_pose = (th.tensor([0.35, -0.90, 0.15]), T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0])))
-    fridge_place_local_pose = (
+    fridge_place_local_pose_prepare = (
         th.tensor([-0.15 - 1.0, -0.25 - 1.0, 0.10]),
         T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
     )
-    fridge_place_local_pose_2 = (
+    fridge_place_local_pose = (
         th.tensor([-0.15, -0.20, 0.5]),
         T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
     )
@@ -273,6 +276,7 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
     attached_obj = {"left_hand": cologne.root_link}
     control_gripper(env, robot, attached_obj)
+    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
 
     # Reset to reset pose
     target_pos = {
@@ -305,6 +309,7 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
     attached_obj = {"left_hand": cologne.root_link, "right_hand": fridge.links["link_0"]}
     control_gripper(env, robot, attached_obj)
+    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == fridge
 
     # Pull fridge door
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_open_local_pose)
@@ -319,12 +324,11 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
     attached_obj = {"left_hand": cologne.root_link}
     control_gripper(env, robot, attached_obj)
-
-    # print("place one step")
-    # breakpoint()
+    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
 
     # Place the cologne (one step!)
-    left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose_2)
+    left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
+    # Unclear how to find this pose directly, I just run the two steps below and record the resulting robot.get_eef_pose("right")
     right_hand_pos, right_hand_quat = th.tensor([0.7825, 1.3466, 0.9568]), th.tensor(
         [-0.7083, -0.0102, -0.7058, 0.0070]
     )
@@ -335,9 +339,10 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
     attached_obj = None
     control_gripper(env, robot, attached_obj)
+    assert robot._ag_obj_in_hand["left"] == None and robot._ag_obj_in_hand["right"] == None
 
-    # # Navigate to fridge
-    # left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
+    # # Navigate to fridge (step 1)
+    # left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose_prepare)
     # rel_pos, rel_quat = th.tensor([0.0, 0.8, 0.0]), T.euler2quat(th.tensor([0.0, 0.0, 0.0]))
     # right_hand_pos, right_hand_quat = T.pose_transform(left_hand_pos, left_hand_quat, rel_pos, rel_quat)
     # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
@@ -346,8 +351,8 @@ def test_curobo():
     # attached_obj = {"left_hand": cologne.root_link}
     # plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
 
-    # # Place the cologne
-    # left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose_2)
+    # # Place the cologne (step 2)
+    # left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
     # target_pos = {robot.eef_link_names["left"]: left_hand_pos}
     # target_quat = {robot.eef_link_names["left"]: left_hand_quat}
     # emb_sel = CuroboEmbodimentSelection.DEFAULT
