@@ -534,7 +534,7 @@ class CuRoboMotionGenerator:
                     object_names=obj_paths,
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=0.9,
+                    scale=0.7,
                 )
 
         # Determine how many internal batches we need to run based on submitted size
