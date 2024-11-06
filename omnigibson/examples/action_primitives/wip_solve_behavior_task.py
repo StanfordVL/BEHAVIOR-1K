@@ -52,7 +52,7 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(robot, enable_head_tracking=False)
 
     # Grasp can of soda
     grasp_obj = env.task.object_scope["can__of__soda.n.01_2"]

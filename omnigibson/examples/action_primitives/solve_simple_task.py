@@ -60,7 +60,7 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(robot, enable_head_tracking=False)
 
     # Grasp of cologne
     grasp_obj = scene.object_registry("name", "cologne")

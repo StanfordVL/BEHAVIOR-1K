@@ -76,7 +76,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
         obj["object"].set_position_orientation(position=obj["position"], orientation=obj["orientation"])
         og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(env.robots[0], enable_head_tracking=False)
     try:
         for primitive, args in zip(primitives, primitives_args):
             execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)

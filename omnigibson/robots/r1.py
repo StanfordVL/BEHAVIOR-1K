@@ -1,3 +1,4 @@
+import math
 import os
 
 import torch as th
@@ -258,7 +259,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def arm_workspace_range(self):
-        return {arm: [th.deg2rad(-45), th.deg2rad(45)] for arm in self.arm_names}
+        return {arm: th.tensor([th.deg2rad(th.tensor(-45)), th.deg2rad(th.tensor(45))]) for arm in self.arm_names}
 
     @property
     def eef_usd_path(self):

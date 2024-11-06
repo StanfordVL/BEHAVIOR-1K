@@ -51,7 +51,7 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(robot, enable_head_tracking=False)
     cabinet = scene.object_registry("name", "bottom_cabinet_slgzfc_0")
     apple = scene.object_registry("name", "apple")
 
