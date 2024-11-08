@@ -254,7 +254,7 @@ def test_curobo():
     print("start")
     breakpoint()
 
-    # Navigate to table
+    # Navigate to table (base)
     table_nav_pos, table_nav_quat = T.pose_transform(*table.get_position_orientation(), *table_local_pose)
     target_pos = {robot.base_footprint_link_name: table_nav_pos}
     target_quat = {robot.base_footprint_link_name: table_nav_quat}
@@ -266,11 +266,13 @@ def test_curobo():
     left_hand_reset_pos, left_hand_reset_quat = robot.get_eef_pose(arm="left")
     right_hand_reset_pos, right_hand_reset_quat = robot.get_eef_pose(arm="right")
 
-    # Grasp cologne
+    # Grasp cologne (left hand)
     left_hand_pos, left_hand_quat = T.pose_transform(*cologne.get_position_orientation(), *cologne_local_pose)
     right_hand_pos, right_hand_quat = robot.get_eef_pose(arm="right")
-    target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
-    target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
+    # target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    target_pos = {robot.eef_link_names["left"]: left_hand_pos}
+    target_quat = {robot.eef_link_names["left"]: left_hand_quat}
     emb_sel = CuroboEmbodimentSelection.ARM
     attached_obj = None
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
@@ -278,7 +280,7 @@ def test_curobo():
     control_gripper(env, robot, attached_obj)
     assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
 
-    # Reset to reset pose
+    # Reset to reset pose (both hands)
     target_pos = {
         robot.eef_link_names["left"]: left_hand_reset_pos,
         robot.eef_link_names["right"]: right_hand_reset_pos,
@@ -291,7 +293,7 @@ def test_curobo():
     attached_obj = {"left_hand": cologne.root_link}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
 
-    # Navigate to fridge
+    # Navigate to fridge (base)
     fridge_nav_pos, fridge_nav_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_local_pose)
     target_pos = {robot.base_footprint_link_name: fridge_nav_pos}
     target_quat = {robot.base_footprint_link_name: fridge_nav_quat}
@@ -299,11 +301,13 @@ def test_curobo():
     attached_obj = {"left_hand": cologne.root_link}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
 
-    # Grasp fridge door
-    left_hand_pos, left_hand_quat = robot.get_eef_pose(arm="left")
+    # Grasp fridge door (right hand)
+    # left_hand_pos, left_hand_quat = robot.get_eef_pose(arm="left")
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_local_pose)
-    target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
-    target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
+    # target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    target_pos = {robot.eef_link_names["right"]: right_hand_pos}
+    target_quat = {robot.eef_link_names["right"]: right_hand_quat}
     emb_sel = CuroboEmbodimentSelection.ARM
     attached_obj = {"left_hand": cologne.root_link}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
@@ -311,14 +315,16 @@ def test_curobo():
     control_gripper(env, robot, attached_obj)
     assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == fridge
 
-    # Pull fridge door
+    # Pull fridge door (right hand)
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_open_local_pose)
-    rel_pos, rel_quat = T.relative_pose_transform(
-        left_hand_reset_pos, left_hand_reset_quat, right_hand_reset_pos, right_hand_reset_quat
-    )
-    left_hand_pos, left_hand_quat = T.pose_transform(right_hand_pos, right_hand_quat, rel_pos, rel_quat)
-    target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
-    target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    # rel_pos, rel_quat = T.relative_pose_transform(
+    #     left_hand_reset_pos, left_hand_reset_quat, right_hand_reset_pos, right_hand_reset_quat
+    # )
+    # left_hand_pos, left_hand_quat = T.pose_transform(right_hand_pos, right_hand_quat, rel_pos, rel_quat)
+    # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
+    # target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    target_pos = {robot.eef_link_names["right"]: right_hand_pos}
+    target_quat = {robot.eef_link_names["right"]: right_hand_quat}
     emb_sel = CuroboEmbodimentSelection.DEFAULT
     attached_obj = {"left_hand": cologne.root_link, "right_hand": fridge.links["link_0"]}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
@@ -326,14 +332,16 @@ def test_curobo():
     control_gripper(env, robot, attached_obj)
     assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
 
-    # Place the cologne (one step!)
+    # Place the cologne (left hand)
     left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
     # Unclear how to find this pose directly, I just run the two steps below and record the resulting robot.get_eef_pose("right")
-    right_hand_pos, right_hand_quat = th.tensor([0.7825, 1.3466, 0.9568]), th.tensor(
-        [-0.7083, -0.0102, -0.7058, 0.0070]
-    )
-    target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
-    target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    # right_hand_pos, right_hand_quat = th.tensor([0.7825, 1.3466, 0.9568]), th.tensor(
+    #     [-0.7083, -0.0102, -0.7058, 0.0070]
+    # )
+    # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
+    # target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
+    target_pos = {robot.eef_link_names["left"]: left_hand_pos}
+    target_quat = {robot.eef_link_names["left"]: left_hand_quat}
     emb_sel = CuroboEmbodimentSelection.DEFAULT
     attached_obj = {"left_hand": cologne.root_link}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
