@@ -550,12 +550,12 @@ class CuRoboMotionGenerator:
                     scale=0.7,
                 )
 
-        all_rollout_fns = (
-            self.mg[emb_sel].ik_solver.get_all_rollout_instances()
-            + self.mg[emb_sel].trajopt_solver.get_all_rollout_instances()
-            + self.mg[emb_sel].finetune_trajopt_solver.get_all_rollout_instances()
-        )
-        # all_rollout_fns = self.mg[emb_sel].get_all_rollout_instances()
+        all_rollout_fns = [
+            fn
+            for fn in self.mg[emb_sel].get_all_rollout_instances()
+            if isinstance(fn, lazy.curobo.rollout.arm_reacher.ArmReacher)
+        ]
+
         # Enable/disable costs based on whether the end-effector is in the target position
         for rollout_fn in all_rollout_fns:
             (
