@@ -66,6 +66,8 @@ m.KP_ANGLE_VEL = {
     R1: 0.2,
 }
 
+m.MAX_PLANNING_ATTEMPTS = 50
+
 m.MAX_STEPS_FOR_SETTLING = 500
 
 m.MAX_STEPS_FOR_JOINT_MOTION = 500
@@ -92,7 +94,7 @@ m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
 m.TIAGO_TORSO_FIXED = False
-m.JOINT_POS_DIFF_THRESHOLD = 0.01
+m.JOINT_POS_DIFF_THRESHOLD = 0.005
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
 m.TIME_BEFORE_JOINT_STUCK_CHECK = 1.0
@@ -487,8 +489,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
         grasp_pose, object_direction = random.choice(grasp_poses)
 
+        # Take into account the robot eef reset pose
+        reset_orientation = self._get_reset_eef_pose()[self.arm][1]
+        grasp_pose = (grasp_pose[0], T.quat_multiply(grasp_pose[1], reset_orientation))
+
         # Prepare data for the approach later.
-        approach_pos = grasp_pose[0] + object_direction * m.GRASP_APPROACH_DISTANCE
+        # TODO: fix this threshold
+        approach_pos = grasp_pose[0] + object_direction * 0.03  # m.GRASP_APPROACH_DISTANCE
         approach_pose = (approach_pos, grasp_pose[1])
 
         # If the grasp pose is too far, navigate.
@@ -496,23 +503,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
         indented_print("Moving hand to grasp pose")
-        yield from self._move_hand(grasp_pose)
+        yield from self._move_hand(grasp_pose, motion_constraint=[1, 1, 0, 0, 0, 0])
 
-        # We can pre-grasp in sticky grasping mode.
-        indented_print("Pregrasp squeeze")
-        yield from self._execute_grasp()
+        # # We can pre-grasp in sticky grasping mode.
+        # indented_print("Pregrasp squeeze")
+        # yield from self._execute_grasp()
 
         # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
         # It's okay if we can't go all the way because we run into the object.
         indented_print("Performing grasp approach")
 
-        # TODO: implement this linear motion better with curobo constrained planning
-        # yield from self._move_hand_linearly_cartesian(approach_pose, stop_on_contact=True)
-        yield from self._move_hand(approach_pose)
+        # TODO: implement linear cartesian motion with curobo constrained planning
+        yield from self._move_hand(approach_pose)  # motion_constraint=[0, 0, 0, 0, 0, 1]
 
-        # Step once to update
-        empty_action = self._empty_action()
-        yield self._postprocess_action(empty_action)
+        yield from self._execute_grasp()
 
         indented_print("Checking grasp")
         if self._get_obj_in_hand() is None:
@@ -523,7 +527,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         indented_print("Moving hand back")
-        yield from self._reset_hand()
+        # TODO: 1. default to attach in-hand object 2. this root link logic is bad, fix it
+        yield from self._reset_hand(attached_obj={self.robot.eef_link_names[self.arm]: obj.root_link})
 
         indented_print("Done with grasp")
 
@@ -728,7 +733,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return joint_pos
 
-    def _move_hand(self, target_pose, arm=None, stop_if_stuck=False):
+    def _move_hand(self, target_pose, arm=None, stop_if_stuck=False, attached_obj=None, motion_constraint=None):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
@@ -740,7 +745,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if arm is None:
             arm = self.arm
-        yield from self._settle_robot()
+        # TODO: this settle robot does not work because empty action doesn't work with the current controller modes
+        # yield from self._settle_robot()
         # curobo motion generator takes a pose but outputs joint positions
         left_hand_pos, left_hand_quat = target_pose if arm == "left" else self.robot.get_eef_pose(arm="left")
         right_hand_pos, right_hand_quat = target_pose if arm == "right" else self.robot.get_eef_pose(arm="right")
@@ -752,25 +758,45 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.eef_link_names["left"]: left_hand_quat,
             self.robot.eef_link_names["right"]: right_hand_quat,
         }
-        yield from self._plan_and_execute_joint_motion(target_pos, target_quat, CuroboEmbodimentSelection.ARM)
-
-    def _plan_and_execute_joint_motion(
-        self, target_pos, target_quat, embodiment_selection=CuroboEmbodimentSelection.DEFAULT, ignore_failure=False
-    ):
-        successes, traj_paths = self._motion_generator.compute_trajectories(
+        yield from self._plan_and_execute_joint_motion(
             target_pos=target_pos,
             target_quat=target_quat,
-            is_local=False,
-            max_attempts=50,
-            timeout=60.0,
-            ik_fail_return=5,
-            enable_finetune_trajopt=True,
-            finetune_attempts=1,
-            return_full_result=False,
-            success_ratio=1.0,
-            emb_sel=embodiment_selection,
+            embodiment_selection=CuroboEmbodimentSelection.ARM,
+            attached_obj=attached_obj,
+            motion_constraint=motion_constraint,
         )
-        success, traj_path = successes[0], traj_paths[0]
+
+    def _plan_and_execute_joint_motion(
+        self,
+        target_pos,
+        target_quat,
+        embodiment_selection=CuroboEmbodimentSelection.DEFAULT,
+        attached_obj=None,
+        motion_constraint=None,
+        ignore_failure=False,
+    ):
+        planning_attempts = 0
+        success = False
+        traj_path = None
+        while not success and planning_attempts < m.MAX_PLANNING_ATTEMPTS:
+            successes, traj_paths = self._motion_generator.compute_trajectories(
+                target_pos=target_pos,
+                target_quat=target_quat,
+                is_local=False,
+                max_attempts=1,
+                timeout=60.0,
+                ik_fail_return=5,
+                enable_finetune_trajopt=True,
+                finetune_attempts=1,
+                return_full_result=False,
+                success_ratio=1.0,
+                attached_obj=attached_obj,
+                motion_constraint=motion_constraint,
+                emb_sel=embodiment_selection,
+            )
+            success, traj_path = successes[0].item(), traj_paths[0]
+            planning_attempts += 1
+
         if not success:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -785,11 +811,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
             desired_joint_pos = joint_pos.cpu()
             # Convert target joint positions to command
-            action = []
-            for controller in self.robot.controllers.values():
-                action.append(desired_joint_pos[controller.dof_idx])
-            action = th.cat(action, dim=0)
-            assert action.shape[0] == self.robot.action_dim
+            action = self._q_to_action(desired_joint_pos)
 
             base_target_reached = False
             articulation_target_reached = False
@@ -819,6 +841,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     ActionPrimitiveError.Reason.EXECUTION_ERROR,
                     "Could not reach the target articulation joint positions. Try again",
                 )
+
+    def _q_to_action(self, q):
+        action = []
+        for controller in self.robot.controllers.values():
+            action.append(q[controller.dof_idx])
+        action = th.cat(action, dim=0)
+        assert action.shape[0] == self.robot.action_dim
+        return action
 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
         """
@@ -1081,43 +1111,53 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     "Your hand was obstructed from moving to the desired world position",
                 )
 
+    def _move_fingers_to_limit(self, limit_type):
+        """
+        Helper function to move the robot's fingers to their limit positions.
+
+        Args:
+            limit_type (str): Either 'lower' for grasping or 'upper' for releasing.
+
+        Yields:
+            th.tensor or None: Action array for one step for the robot to move fingers or None if done.
+        """
+        q = self.robot.get_joint_positions()
+        joint_names = list(self.robot.joints.keys())
+        for finger_joints in self.robot.finger_joints.values():
+            for finger_joint in finger_joints:
+                idx = joint_names.index(finger_joint.joint_name)
+                q[idx] = getattr(finger_joint, f"{limit_type}_limit")
+        action = self._q_to_action(q)
+        finger_joint_limits = getattr(self.robot, f"joint_{limit_type}_limits")[
+            self.robot.gripper_control_idx[self.arm]
+        ]
+
+        for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
+            finger_joint_positions = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
+            if th.allclose(finger_joint_positions, finger_joint_limits, atol=0.005):
+                break
+            elif limit_type == "lower" and self._get_obj_in_hand() is not None:
+                # If we are grasping an object, we should stop when object is detected in hand
+                break
+            yield self._postprocess_action(action)
+
     def _execute_grasp(self):
         """
-        Yields action for the robot to grasp
+        Yields action for the robot to grasp.
 
         Returns:
-            th.tensor or None: Action array for one step for the robot to grasp or None if its done grasping
+            th.tensor or None: Action array for one step for the robot to grasp or None if done grasping.
         """
-        for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
-            joint_lower_limit = self.robot.joint_lower_limits[self.robot.gripper_control_idx[self.arm]]
-
-            if th.allclose(joint_position, joint_lower_limit, atol=0.01):
-                break
-
-            action = self._empty_action()
-            controller_name = "gripper_{}".format(self.arm)
-            action[self.robot.controller_action_idx[controller_name]] = -1.0
-            yield self._postprocess_action(action)
+        yield from self._move_fingers_to_limit("lower")
 
     def _execute_release(self):
         """
-        Yields action for the robot to release its grasp
+        Yields action for the robot to release its grasp.
 
         Returns:
-            th.tensor or None: Action array for one step for the robot to release or None if its done releasing
+            th.tensor or None: Action array for one step for the robot to release or None if done releasing.
         """
-        for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            joint_position = self.robot.get_joint_positions()[self.robot.gripper_control_idx[self.arm]]
-            joint_upper_limit = self.robot.joint_upper_limits[self.robot.gripper_control_idx[self.arm]]
-
-            if th.allclose(joint_position, joint_upper_limit, atol=0.01):
-                break
-
-            action = self._empty_action()
-            controller_name = "gripper_{}".format(self.arm)
-            action[self.robot.controller_action_idx[controller_name]] = 1.0
-            yield self._postprocess_action(action)
+        yield from self._move_fingers_to_limit("upper")
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -1251,7 +1291,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[action_idx] = partial_action
         return action
 
-    def _reset_hand(self, arm=None):
+    def _reset_hand(self, arm=None, attached_obj=None):
         """
         Yields action to move the hand to the position optimal for executing subsequent action primitives
 
@@ -1263,29 +1303,32 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Resetting hand")
         # TODO: make this work with both hands
         reset_eef_pose = self._get_reset_eef_pose()[arm]
-        yield from self._move_hand(reset_eef_pose, arm=arm)
+        yield from self._move_hand(reset_eef_pose, arm=arm, attached_obj=attached_obj)
 
+    @property
     def _get_reset_eef_pose(self):
-        # TODO: Define this for all robots
-        if isinstance(self.robot, Tiago):
-            return th.tensor([0.28493954, 0.37450749, 1.1512334]), th.tensor(
-                [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
-            )
-        elif isinstance(self.robot, Fetch):
-            return th.tensor([0.48688125, -0.12507881, 0.97888719]), th.tensor(
-                [0.61324748, 0.61305553, -0.35266518, 0.35173529]
-            )
+        if isinstance(self.robot, Fetch):
+            return {
+                self.arm: (
+                    th.tensor([0.48688125, -0.12507881, 0.97888719]),
+                    th.tensor([0.61324748, 0.61305553, -0.35266518, 0.35173529]),
+                )
+            }
         elif isinstance(self.robot, R1):
             return {
                 self.robot.arm_names[0]: (
-                    th.tensor([0.4923, 0.4144, 1.4077]),
-                    th.tensor([0.7071, 0.0002, 0.7072, -0.0001]),
+                    th.tensor([0.43, 0.2, 1.2]),
+                    th.tensor([1.0, 0.0, 0.0, 0.0]),
                 ),
                 self.robot.arm_names[1]: (
-                    th.tensor([0.4926, -0.4141, 1.4081]),
-                    th.tensor([-0.7072, -0.0001, -0.7070, 0.0001]),
+                    th.tensor([0.43, -0.2, 1.2]),
+                    th.tensor([-1.0, 0.0, 0.0, 0.0]),
                 ),
             }
+        # TODO: Define this for Tiago
+        # th.tensor([0.28493954, 0.37450749, 1.1512334]), th.tensor(
+        #         [-0.21533823, 0.05361032, -0.08631776, 0.97123871]
+        #     )
         else:
             raise ValueError(f"Unsupported robot: {type(self.robot)}")
 
@@ -1550,7 +1593,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pos_on_obj = self._sample_position_on_aabb_side(obj)
                 pose_on_obj = [pos_on_obj, th.tensor([0, 0, 0, 1])]
 
-            distance_lo, distance_hi = 0.0, 5.0
+            distance_lo, distance_hi = 0.0, 1.0
             distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
             yaw_lo, yaw_hi = -math.pi, math.pi
             yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
