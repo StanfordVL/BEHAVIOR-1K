@@ -313,7 +313,6 @@ class CuRoboMotionGenerator:
         self,
         q,
         check_self_collision=True,
-        emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -327,8 +326,20 @@ class CuRoboMotionGenerator:
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
         """
+        # check_collisions only makes sense for the default embodiment where all the joints are actuated
+        emb_sel = CuroboEmbodimentSelection.DEFAULT
+
         # Update obstacles
         self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
+
+        q_pos = self.robot.get_joint_positions().unsqueeze(0)
+        cu_joint_state = lazy.curobo.types.state.JointState(
+            position=self._tensor_args.to_device(q_pos),
+            joint_names=self.robot_joint_names,
+        )
+
+        # Update the locked joints with the current joint positions
+        self.update_locked_joints(cu_joint_state, emb_sel)
 
         # Compute kinematics to get corresponding sphere representation
         cu_js = lazy.curobo.types.state.JointState(
@@ -498,7 +509,6 @@ class CuRoboMotionGenerator:
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
         q_vel = th.stack([self.robot.get_joint_velocities()] * self.batch_size, axis=0)
         q_eff = th.stack([self.robot.get_joint_efforts()] * self.batch_size, axis=0)
-        sim_js_names = list(self.robot.joints.keys())
         cu_joint_state = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
             # TODO: Ideally these should be nonzero, but curobo fails to compute a solution if so
@@ -512,13 +522,13 @@ class CuRoboMotionGenerator:
             velocity=self._tensor_args.to_device(q_vel) * 0.0,
             acceleration=self._tensor_args.to_device(q_eff) * 0.0,
             jerk=self._tensor_args.to_device(q_eff) * 0.0,
-            joint_names=sim_js_names,
+            joint_names=self.robot_joint_names,
         )
-
-        cu_js_batch = cu_joint_state.get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
         # Update the locked joints with the current joint positions
         self.update_locked_joints(cu_joint_state, emb_sel)
+
+        cu_js_batch = cu_joint_state.get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
         # Attach object to robot if requested
         if attached_obj is not None:
@@ -675,8 +685,7 @@ class CuRoboMotionGenerator:
                 steps and D is the number of robot joints.
         """
         cmd_plan = self.mg[emb_sel].get_full_js(path)
-        joint_names = list(self.robot.joints.keys())
-        return cmd_plan.get_ordered_joint_state(joint_names).position
+        return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
 
     def convert_q_to_eef_traj(self, traj, return_axisangle=False, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         """
