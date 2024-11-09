@@ -15,6 +15,7 @@ from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
 
 
 class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCameraRobot):
@@ -437,6 +438,18 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return os.path.join(
             gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd"
         )
+    
+    @property
+    def curobo_path(self):
+        return {
+            emb_sel: os.path.join(gm.ASSET_PATH, f"models/tiago/tiago_description_curobo_{emb_sel.value}.yaml")
+            for emb_sel in CuroboEmbodimentSelection
+        }
+    
+    @property
+    def curobo_attached_object_link_names(self):
+        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
+
 
     @property
     def simplified_mesh_usd_path(self):
