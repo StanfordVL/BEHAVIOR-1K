@@ -182,7 +182,7 @@ def test_curobo():
                     "use_impedances": True,
                 },
             },
-        }
+        },
     ]
 
     for robot_cfg in robot_cfgs:
@@ -202,7 +202,13 @@ def test_curobo():
         elif robot.model_name == "Tiago":
             bottom_links = [
                 os.path.join(robot.prim_path, bottom_link)
-                for bottom_link in ["base_link", "wheel_front_left_link", "wheel_front_right_link", "wheel_rear_left_link", "wheel_rear_right_link"]
+                for bottom_link in [
+                    "base_link",
+                    "wheel_front_left_link",
+                    "wheel_front_right_link",
+                    "wheel_rear_left_link",
+                    "wheel_rear_right_link",
+                ]
             ]
         else:
             bottom_links = []
@@ -268,7 +274,7 @@ def test_curobo():
 
             # To debug
             # cmg.save_visualization(robot.get_joint_positions(), "/home/arpit/Downloads/test.obj", emb_sel=emb_sel)
-            
+
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):
                 og.sim.render()
@@ -438,8 +444,8 @@ def test_curobo():
 
                             cur_joint_positions = robot.get_joint_positions()
                             if ((cur_joint_positions - q).abs() < error_tol).all():
-                                break  
-        
+                                break
+
         og.clear()
 
         del cmg

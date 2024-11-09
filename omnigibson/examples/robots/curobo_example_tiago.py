@@ -104,52 +104,52 @@ def test_curobo():
     ROBOT_TYPE = "Tiago"
     robot_cfg = {
         "R1": {
-                "type": "R1",
-                "obs_modalities": "rgb",
-                "position": [0, 0, 0],
-                "orientation": [0, 0, 0, 1],
-                "self_collisions": True,
-                "action_normalize": False,
-                "rigid_trunk": False,
-                "grasping_mode": "assisted",
-                "controller_config": {
-                    "base": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "use_delta_commands": False,
-                        "use_impedances": True,
-                    },
-                    "arm_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "use_delta_commands": False,
-                        "use_impedances": True,
-                    },
-                    "arm_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "use_delta_commands": False,
-                        "use_impedances": True,
-                    },
-                    "gripper_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "use_delta_commands": False,
-                        "use_impedances": True,
-                    },
-                    "gripper_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "use_delta_commands": False,
-                        "use_impedances": True,
-                    },
+            "type": "R1",
+            "obs_modalities": "rgb",
+            "position": [0, 0, 0],
+            "orientation": [0, 0, 0, 1],
+            "self_collisions": True,
+            "action_normalize": False,
+            "rigid_trunk": False,
+            "grasping_mode": "assisted",
+            "controller_config": {
+                "base": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "arm_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "arm_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
                 },
             },
+        },
         "Tiago": {
             "type": "Tiago",
             "obs_modalities": "rgb",
@@ -198,11 +198,11 @@ def test_curobo():
                     "use_impedances": True,
                 },
             },
-        }
+        },
     }
     robots = []
     robots.append(robot_cfg[ROBOT_TYPE])
-    
+
     # Create env
     cfg = {
         "env": {
@@ -258,7 +258,7 @@ def test_curobo():
                 "orientation": T.euler2quat(th.tensor([0, 0, -math.pi / 2])),
             },
         ],
-        "robots": robots
+        "robots": robots,
     }
 
     env = og.Environment(configs=cfg)
@@ -266,10 +266,10 @@ def test_curobo():
     eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 
     # Name of the eef
-    if ROBOT_TYPE == "R1": 
+    if ROBOT_TYPE == "R1":
         ee_link_left = "left_hand"
         ee_link_right = "right_hand"
-    elif ROBOT_TYPE == "Tiago": 
+    elif ROBOT_TYPE == "Tiago":
         ee_link_left = "gripper_left_grasping_frame"
         ee_link_right = "gripper_right_grasping_frame"
 
@@ -298,19 +298,19 @@ def test_curobo():
     table = env.scene.object_registry("name", "table")
     cologne = env.scene.object_registry("name", "cologne")
     fridge = env.scene.object_registry("name", "fridge")
-    
+
     # R1
     table_local_pose = (th.tensor([-0.8, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
     # Tiago
     table_local_pose = (th.tensor([-1.1, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    
+
     # R1
     cologne_local_pose = (th.tensor([-0.03, 0.0, 0.052]), T.euler2quat(th.tensor([math.pi, -math.pi / 2.0, 0.0])))
     # Tiago
     cologne_local_pose = (th.tensor([-0.03, 0.0, 0.102]), T.euler2quat(th.tensor([math.pi, math.pi / 2.0, 0.0])))
 
     fridge_local_pose = (th.tensor([-0.45, -1.2, -0.8576]), T.euler2quat(th.tensor([0.0, 0.0, math.pi / 2.0])))
-    
+
     # R1
     fridge_door_local_pose = (
         th.tensor([-0.28, -0.37, 0.15]),
@@ -328,7 +328,7 @@ def test_curobo():
     # Tiago
     # TODO: This pose is not correct. Orientation is definitely wrong
     fridge_door_open_local_pose = (th.tensor([0.35, -0.90, 0.15]), T.euler2quat(th.tensor([-math.pi / 2, 0.0, 0.0])))
-    
+
     fridge_place_local_pose_prepare = (
         th.tensor([-0.15 - 1.0, -0.25 - 1.0, 0.10]),
         T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
