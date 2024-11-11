@@ -313,6 +313,7 @@ class CuRoboMotionGenerator:
         self,
         q,
         check_self_collision=True,
+        skip_obstacle_update=False,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -330,7 +331,8 @@ class CuRoboMotionGenerator:
         emb_sel = CuroboEmbodimentSelection.DEFAULT
 
         # Update obstacles
-        self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
+        if not skip_obstacle_update:
+            self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
 
         q_pos = self.robot.get_joint_positions().unsqueeze(0)
         cu_joint_state = lazy.curobo.types.state.JointState(
@@ -398,6 +400,7 @@ class CuRoboMotionGenerator:
         success_ratio=None,
         attached_obj=None,
         motion_constraint=None,
+        skip_obstacle_update=False,
         emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -483,8 +486,9 @@ class CuRoboMotionGenerator:
         )
         plan_cfg.pose_cost_metric = pose_cost_metric
 
-        # Refresh the collision state
-        self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
+        if not skip_obstacle_update:
+            # Refresh the collision state
+            self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
 
         for link_name in target_pos.keys():
             target_pos_link = target_pos[link_name]
