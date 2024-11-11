@@ -177,8 +177,6 @@ class CuRoboMotionGenerator:
         self.robot = robot
         self.robot_joint_names = list(robot.joints.keys())
         self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
-        self._usd_help = lazy.curobo.util.usd_helper.UsdHelper()
-        self._usd_help.stage = og.sim.stage
         self.batch_size = batch_size
 
         # Load robot config and usd paths and make sure paths point correctly
@@ -268,17 +266,23 @@ class CuRoboMotionGenerator:
                 joint_limits.position[1][joint_idx] = -joint_limits.position[0][joint_idx]
 
     def save_visualization(self, q, file_path, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+        # Update obstacles
+        self.update_obstacles()
+
+        # Get robot collision spheres
         cu_js = lazy.curobo.types.state.JointState(
             position=self.tensor_args.to_device(q),
             joint_names=self.robot_joint_names,
         ).get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
         sph = self.mg[emb_sel].kinematics.get_robot_as_spheres(cu_js.position)
         robot_world = lazy.curobo.geom.types.WorldConfig(sphere=sph[0])
+
+        # Combine all obstacles into a single mesh
         mesh_world = self.mg[emb_sel].world_model.get_mesh_world(merge_meshes=True)
         robot_world.add_obstacle(mesh_world.mesh[0])
         robot_world.save_world_as_mesh(file_path)
 
-    def update_obstacles(self, ignore_paths=None, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+    def update_obstacles(self, ignore_paths=None):
         """
         Updates internal world collision cache representation based on sim state
 
@@ -287,6 +291,8 @@ class CuRoboMotionGenerator:
                 be ignored when updating obstacles
         """
         print("Updating CuRobo world, reading w.r.t.", self.robot.prim_path)
+        emb_sel = CuroboEmbodimentSelection.DEFAULT  # all embodiment selections share the same world collision checker
+
         ignore_paths = [] if ignore_paths is None else ignore_paths
 
         # Ignore any visual only objects and any objects not part of the robot's current scene
@@ -294,7 +300,7 @@ class CuRoboMotionGenerator:
         del ignore_scenes[self.robot.scene.idx]
         ignore_visual_only = [obj.prim_path for obj in self.robot.scene.objects if obj.visual_only]
 
-        obstacles = self._usd_help.get_obstacles_from_stage(
+        obstacles = get_obstacles(
             reference_prim_path=self.robot.root_link.prim_path,
             ignore_substring=[
                 self.robot.prim_path,  # Don't include robot paths
@@ -305,9 +311,27 @@ class CuRoboMotionGenerator:
                 *ignore_visual_only,  # Don't include any visual-only objects
                 *ignore_paths,  # Don't include any additional specified paths
             ],
-        ).get_collision_check_world()
+        )
         self.mg[emb_sel].update_world(obstacles)
         print("Synced CuRobo world from stage.")
+
+    def update_obstacles_fast(self):
+        emb_sel = CuroboEmbodimentSelection.DEFAULT
+        world_coll_checker = self.mg[emb_sel].world_coll_checker
+        for i, prim_path in enumerate(world_coll_checker._env_mesh_names[0]):
+            if prim_path is None:
+                continue
+            prim_path_tokens = prim_path.split("/")
+            obj_name = prim_path_tokens[3]
+            link_name = prim_path_tokens[4]
+            mesh_name = prim_path_tokens[-1]
+            mesh = self.robot.scene.object_registry("name", obj_name).links[link_name].collision_meshes[mesh_name]
+            pos, orn = mesh.get_position_orientation()
+            inv_pos, inv_orn = T.invert_pose_transform(pos, orn)
+            # xyzw -> wxyz
+            inv_orn = inv_orn[[3, 0, 1, 2]]
+            inv_pose = self._tensor_args.to_device(th.cat([inv_pos, inv_orn]))
+            world_coll_checker._mesh_tensor_list[1][0, i, :7] = inv_pose
 
     def check_collisions(
         self,
@@ -332,7 +356,7 @@ class CuRoboMotionGenerator:
 
         # Update obstacles
         if not skip_obstacle_update:
-            self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
+            self.update_obstacles()
 
         q_pos = self.robot.get_joint_positions().unsqueeze(0)
         cu_joint_state = lazy.curobo.types.state.JointState(
@@ -488,7 +512,7 @@ class CuRoboMotionGenerator:
 
         if not skip_obstacle_update:
             # Refresh the collision state
-            self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
+            self.update_obstacles()
 
         for link_name in target_pos.keys():
             target_pos_link = target_pos[link_name]
@@ -563,12 +587,12 @@ class CuRoboMotionGenerator:
                     scale=0.7,
                 )
 
-        all_rollout_fns = (
-            self.mg[emb_sel].ik_solver.get_all_rollout_instances()
-            + self.mg[emb_sel].trajopt_solver.get_all_rollout_instances()
-            + self.mg[emb_sel].finetune_trajopt_solver.get_all_rollout_instances()
-        )
-        # all_rollout_fns = self.mg[emb_sel].get_all_rollout_instances()
+        all_rollout_fns = [
+            fn
+            for fn in self.mg[emb_sel].get_all_rollout_instances()
+            if isinstance(fn, lazy.curobo.rollout.arm_reacher.ArmReacher)
+        ]
+
         # Enable/disable costs based on whether the end-effector is in the target position
         for rollout_fn in all_rollout_fns:
             (

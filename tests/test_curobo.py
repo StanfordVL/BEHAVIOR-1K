@@ -134,6 +134,55 @@ def test_curobo():
                 },
             },
         },
+        {
+            "type": "Tiago",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.85, 0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "rigid_trunk": False,
+            "controller_config": {
+                "base": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "camera": {
+                    "name": "JointController",
+                },
+                "arm_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "arm_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": [-1, 1],
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "gripper_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": [-1, 1],
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+            },
+        },
     ]
 
     for robot_cfg in robot_cfgs:
@@ -149,6 +198,17 @@ def test_curobo():
             bottom_links = [
                 os.path.join(robot.prim_path, bottom_link)
                 for bottom_link in ["wheel_link1", "wheel_link2", "wheel_link3"]
+            ]
+        elif robot.model_name == "Tiago":
+            bottom_links = [
+                os.path.join(robot.prim_path, bottom_link)
+                for bottom_link in [
+                    "base_link",
+                    "wheel_front_left_link",
+                    "wheel_front_right_link",
+                    "wheel_rear_left_link",
+                    "wheel_rear_right_link",
+                ]
             ]
         else:
             bottom_links = []
@@ -211,6 +271,9 @@ def test_curobo():
             robot.set_joint_positions(q)
             robot.keep_still()
             og.sim.step_physics()
+
+            # To debug
+            # cmg.save_visualization(robot.get_joint_positions(), "/home/arpit/Downloads/test.obj", emb_sel=emb_sel)
 
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):
