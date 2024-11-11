@@ -152,6 +152,10 @@ def test_curobo():
                 },
                 "camera": {
                     "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
                 },
                 "arm_left": {
                     "name": "JointController",
@@ -170,14 +174,14 @@ def test_curobo():
                 "gripper_left": {
                     "name": "JointController",
                     "motor_type": "position",
-                    "command_input_limits": [-1, 1],
+                    "command_input_limits": None,
                     "use_delta_commands": False,
                     "use_impedances": True,
                 },
                 "gripper_right": {
                     "name": "JointController",
                     "motor_type": "position",
-                    "command_input_limits": [-1, 1],
+                    "command_input_limits": None,
                     "use_delta_commands": False,
                     "use_impedances": True,
                 },
@@ -203,7 +207,6 @@ def test_curobo():
             bottom_links = [
                 os.path.join(robot.prim_path, bottom_link)
                 for bottom_link in [
-                    "base_link",
                     "wheel_front_left_link",
                     "wheel_front_right_link",
                     "wheel_rear_left_link",
@@ -273,7 +276,7 @@ def test_curobo():
             og.sim.step_physics()
 
             # To debug
-            # cmg.save_visualization(robot.get_joint_positions(), "/home/arpit/Downloads/test.obj", emb_sel=emb_sel)
+            # cmg.save_visualization(robot.get_joint_positions(), "/scr/chengshu/Downloads/test.obj")
 
             # Sanity check in the GUI that the robot pose makes sense
             for _ in range(10):
