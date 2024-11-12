@@ -131,7 +131,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # TODO: fix this later
         always_track_eef=True,
         task_relevant_objects_only=False,
-        planning_batch_size=5,
+        planning_batch_size=3,
         collision_check_batch_size=5,
         debug_visual_marker=None,
     ):
@@ -550,8 +550,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         indented_print("Moving hands back")
         # TODO: reset both hands with one call
-        for arm in self.robot.arm_names:
-            yield from self._reset_hand(arm)
+        yield from self._reset_hand(self.arm)
+        # for arm in self.robot.arm_names:
+        #     yield from self._reset_hand(arm)
 
         indented_print("Done with grasp")
 
