@@ -517,8 +517,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Moving hand to grasp pose")
         yield from self._move_hand(grasp_pose, motion_constraint=[0, 0, 0, 0, 0, 0])
 
-        # Pre-grasp in sticky grasping mode.
         if self.robot.grasping_mode == "sticky":
+            # Pre-grasp in sticky grasping mode.
             indented_print("Pregrasp squeeze")
             yield from self._execute_grasp()
 
@@ -533,6 +533,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # TODO: implement linear cartesian motion with curobo constrained planning
             yield from self._move_hand(approach_pose)  # motion_constraint=[0, 0, 0, 0, 0, 1]
             yield from self._execute_grasp()
+
+        # Move hand upwards a little to avoid getting stuck
+        indented_print("Moving hand upwards")
+        upward_pose = (self.robot.get_eef_position() - object_direction * 0.05, self.robot.get_eef_orientation())
+        yield from self._move_hand(upward_pose)
 
         # Step a few times to update
         yield from self._settle_robot()
