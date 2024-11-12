@@ -20,6 +20,8 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 m.DEFAULT_JOINT_POS_KP = 50.0
+m.DEFAULT_JOINT_POS_KI = 0.1
+m.DEFAULT_JOINT_MAX_INTEGRAL_ERROR = 1.0
 m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0  # critically damped
 m.DEFAULT_JOINT_VEL_KP = 2.0
 
@@ -45,6 +47,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         command_output_limits="default",
         pos_kp=None,
         pos_damping_ratio=None,
+        pos_ki=None,
+        max_integral_error=None,
         vel_kp=None,
         use_impedances=False,
         use_gravity_compensation=False,
@@ -102,6 +106,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         if self._motor_type == "position":
             pos_kp = m.DEFAULT_JOINT_POS_KP if pos_kp is None else pos_kp
             pos_damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if pos_damping_ratio is None else pos_damping_ratio
+            pos_ki = m.DEFAULT_JOINT_POS_KI if pos_ki is None else pos_ki
+            max_integral_error = (
+                m.DEFAULT_JOINT_MAX_INTEGRAL_ERROR if max_integral_error is None else max_integral_error
+            )
         elif self._motor_type == "velocity":
             vel_kp = m.DEFAULT_JOINT_VEL_KP if vel_kp is None else vel_kp
             assert (
@@ -113,6 +121,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             assert vel_kp is None, "Cannot set vel_kp for JointController with motor_type=effort!"
         self.pos_kp = pos_kp
         self.pos_kd = None if pos_kp is None or pos_damping_ratio is None else 2 * math.sqrt(pos_kp) * pos_damping_ratio
+        self.pos_ki = pos_ki
+        self._integral_error = th.zeros_like(dof_idx, dtype=th.float32)
+        self.max_integral_error = max_integral_error
         self.vel_kp = vel_kp
         self._use_impedances = use_impedances
         self._use_gravity_compensation = use_gravity_compensation
@@ -204,7 +215,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
                 vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
-                u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
+
+                # Update integral error
+                self._integral_error += position_error * (1.0 / self.control_freq)  # Integrate error over time
+                self._integral_error = self._integral_error.clip(-self.max_integral_error, self.max_integral_error)
+                u = position_error * self.pos_kp + vel_pos_error * self.pos_kd + self._integral_error * self.pos_ki
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
                 velocity_error = target - base_value
