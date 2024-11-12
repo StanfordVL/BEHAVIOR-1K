@@ -288,9 +288,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             #     #     pass
 
             try:
-                # Make sure we retract the arm after every step
-                for arm in self.robot.arm_names:
-                    yield from self._reset_hand(arm)
+                # Make sure we retract the arms after every step
+                yield from self._reset_robot()
             except ActionPrimitiveError:
                 pass
 
@@ -553,11 +552,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # TODO: reset density back when releasing
         obj_in_hand.root_link.density = 1.0
 
-        indented_print("Moving hands back")
-        # TODO: reset both hands with one call
+        indented_print("Moving hand back")
         yield from self._reset_hand(self.arm)
-        # for arm in self.robot.arm_names:
-        #     yield from self._reset_hand(arm)
 
         indented_print("Done with grasp")
 
@@ -1395,6 +1391,28 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action_idx = self.robot.controller_action_idx[name]
             action[action_idx] = partial_action
         return action
+
+    def _reset_robot(self, attached_obj=None):
+        """
+        Yields action to move both hands to the position optimal for executing subsequent action primitives
+
+        Returns:
+            th.tensor or None: Action array for one step for the robot to reset its hands or None if it is done resetting
+        """
+        target_pos = dict()
+        target_quat = dict()
+        for arm in self.robot.arm_names:
+            reset_eef_pose = self._get_reset_eef_pose("world")[arm]
+            target_pos[self.robot.eef_link_names[arm]] = reset_eef_pose[0]
+            target_quat[self.robot.eef_link_names[arm]] = reset_eef_pose[1]
+        q_traj = self._plan_joint_motion(
+            target_pos=target_pos,
+            target_quat=target_quat,
+            embodiment_selection=CuroboEmbodimentSelection.ARM,
+            attached_obj=attached_obj,
+        ).cpu()
+        indented_print(f"Plan has {len(q_traj)} steps")
+        yield from self._execute_motion_plan(q_traj)
 
     def _reset_hand(self, arm=None, attached_obj=None):
         """
