@@ -671,12 +671,12 @@ class CuRoboMotionGenerator:
             results.append(result)
             successes = th.concatenate([successes, result.success[:end_idx]])
 
-            # If no successes at all, calling result.get_paths() will fail because result.interpolated_plan is None.
-            # This is because retime_trajectory will not be called at all.
-            if result.success[:end_idx].count_nonzero() == 0:
+            # If there are no successes, result.interpolated_plan will be None because retime_trajectory is not called.
+            if not result.success[:end_idx].any():
+                assert result.interpolated_plan is None
                 paths += [None] * end_idx
-            # If batch size is 1, result.interpolated_plan is just a single plan, not a list of plans.
-            # Therefore, calling result.get_paths() will also fail because result.interpolated_plan is not a list.
+            # If batch size is 1, result.interpolated_plan is of shape (T, D) instead of (B, T, D),
+            # where B is batch_size, T is interpolation_steps and D is the number of robot joints.
             elif self.batch_size == 1:
                 paths += [result.interpolated_plan.trim_trajectory(0, result.path_buffer_last_tstep[0])]
             else:
