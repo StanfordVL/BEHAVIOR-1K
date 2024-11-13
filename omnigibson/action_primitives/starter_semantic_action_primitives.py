@@ -1345,7 +1345,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             head1_joint_goal = default_head_pos[0]
             head2_joint_goal = default_head_pos[1]
 
-        return [head1_joint_goal, head2_joint_goal]
+        return th.tensor([head1_joint_goal, head2_joint_goal])
 
     def _empty_action(self, follow_arm_targets=True):
         """
