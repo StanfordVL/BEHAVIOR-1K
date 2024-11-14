@@ -50,6 +50,9 @@ jobs:
           submodules: true
           path: omnigibson-src
 
+      - name: Install CUDA
+        run: micromamba install cuda
+
       - name: Install
         working-directory: omnigibson-src
         run: pip install -e .[dev] --no-build-isolation
