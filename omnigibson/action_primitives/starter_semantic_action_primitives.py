@@ -96,6 +96,7 @@ m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
 m.TIAGO_TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
+m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.1
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
 m.TIME_BEFORE_JOINT_STUCK_CHECK = 1.0
@@ -129,7 +130,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         robot,
         enable_head_tracking=True,
         # TODO: fix this later
-        always_track_eef=True,
+        always_track_eef=False,
         task_relevant_objects_only=False,
         planning_batch_size=3,
         collision_check_batch_size=5,
@@ -536,7 +537,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Move hand upwards a little to avoid getting stuck
         indented_print("Moving hand upwards")
         upward_pose = (self.robot.get_eef_position() - object_direction * 0.05, self.robot.get_eef_orientation())
-        yield from self._move_hand(upward_pose)
+        yield from self._move_hand(upward_pose, low_precision=True)
 
         # Step a few times to update
         yield from self._settle_robot()
@@ -789,7 +790,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return joint_pos
 
-    def _move_hand(self, target_pose, avoid_collision=True, arm=None, attached_obj=None, motion_constraint=None):
+    def _move_hand(
+        self,
+        target_pose,
+        avoid_collision=True,
+        arm=None,
+        attached_obj=None,
+        motion_constraint=None,
+        low_precision=False,
+    ):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
@@ -845,7 +854,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             single_traj[self._manipulation_control_idx(arm)] = arm_joint_pos
             q_traj = [single_traj]
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(q_traj, stop_on_contact=avoid_collision is False)
+        yield from self._execute_motion_plan(
+            q_traj, stop_on_contact=avoid_collision is False, low_precision=low_precision
+        )
 
     def _plan_joint_motion(
         self,
@@ -895,7 +906,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return self._motion_generator.path_to_joint_trajectory(traj_path, embodiment_selection)
 
-    def _execute_motion_plan(self, q_traj, stop_on_contact=False, ignore_failure=False):
+    def _execute_motion_plan(self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False):
         for i, joint_pos in enumerate(q_traj):
             indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
             # Convert target joint positions to command
@@ -912,6 +923,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 joint_pos_diff = joint_pos - current_joint_pos
                 base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
                 articulation_joint_diff = joint_pos_diff[articulation_control_idx]  # Gets all non-base joints
+                articulation_threshold = (
+                    m.JOINT_POS_DIFF_THRESHOLD if not low_precision else m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD
+                )
                 if th.max(th.abs(articulation_joint_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
                     articulation_target_reached = True
                 # TODO: genralize this to transaltion&rotation + high/low precision modes
@@ -1412,7 +1426,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             attached_obj=attached_obj,
         ).cpu()
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(q_traj)
+        yield from self._execute_motion_plan(q_traj, low_precision=True)
 
     def _reset_hand(self, arm=None, attached_obj=None):
         """
@@ -1428,7 +1442,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         reset_eef_pose = self._get_reset_eef_pose("world")[arm]
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*reset_eef_pose)
-        yield from self._move_hand(reset_eef_pose, arm=arm, attached_obj=attached_obj)
+        yield from self._move_hand(reset_eef_pose, arm=arm, attached_obj=attached_obj, low_precision=True)
 
     def _get_reset_eef_pose(self, frame="robot"):
         """
@@ -1550,7 +1564,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # TODO: Change curobo implementation so that base motion plannning take a 2D pose instead of 3D?
         pose_3d = self._get_robot_pose_from_2d_pose(pose_2d)
         # TODO: change defualt to 0.0? Why is it 0.1?
-        # TODO: do we still need high/low precision modes?
         pose_3d[0][2] = 0.0
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*pose_3d)
