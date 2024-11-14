@@ -674,10 +674,6 @@ class CuRoboMotionGenerator:
             # If result.interpolated_plan is be None (e.g. IK failure), return Nones
             if result.interpolated_plan is None:
                 paths += [None] * end_idx
-            # If batch size is 1, result.interpolated_plan is of shape (T, D) instead of (B, T, D),
-            # where B is batch_size, T is interpolation_steps and D is the number of robot joints.
-            elif self.batch_size == 1:
-                paths += [result.interpolated_plan.trim_trajectory(0, result.path_buffer_last_tstep[0])]
             else:
                 paths += result.get_paths()[:end_idx]
 
