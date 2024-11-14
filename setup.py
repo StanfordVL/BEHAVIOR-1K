@@ -47,7 +47,7 @@ setup(
         "rtree>=1.2.0",
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
-        "curobo @ git+https://github.com/StanfordVL/curobo@main",
+        "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@main",
     ],
     extras_require={
         "dev": [
