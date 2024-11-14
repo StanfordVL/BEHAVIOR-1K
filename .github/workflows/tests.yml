@@ -51,7 +51,7 @@ jobs:
           path: omnigibson-src
 
       - name: Install CUDA
-        run: micromamba install cuda
+        run: micromamba install cuda=12.3
 
       - name: Install
         working-directory: omnigibson-src
