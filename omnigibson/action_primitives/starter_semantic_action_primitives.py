@@ -42,7 +42,8 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 m = create_module_macros(module_path=__file__)
 
-m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
+# TODO: figure out why this was 0.01
+m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.0
 
 m.KP_LIN_VEL = {
     Tiago: 0.3,
@@ -176,6 +177,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._enable_head_tracking = enable_head_tracking
         self._always_track_eef = always_track_eef
         self._tracking_object = None
+        self._arm = self.robot.default_arm
 
         # Store the current position of the arm as the arm target
         control_dict = self.robot.get_control_dict()
@@ -202,7 +204,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def arm(self):
         if not isinstance(self.robot, ManipulationRobot):
             raise ValueError("Cannot use arm for non-manipulation robot")
-        return self.robot.default_arm
+        return self._arm
+
+    @arm.setter
+    def arm(self, value):
+        if not isinstance(self.robot, ManipulationRobot):
+            raise ValueError("Cannot use arm for non-manipulation robot")
+        if value not in self.robot.arm_names:
+            raise ValueError(f"Invalid arm name: {value}. Must be one of {self.robot.arm_names}")
+        self._arm = value
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking."""
@@ -1623,8 +1633,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action to navigate the robot to be in range of the pose
 
         Args:
-            obj (StatefulObject): object to be in range of
-            pose_on_obj (Iterable): (pos, quat) pose
+            obj (StatefulObject or list of StatefulObject): object(s) to be in range of
+            pose_on_obj (Iterable or list of Iterable): (pos, quat) Pose(s)
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
@@ -1742,8 +1752,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns a 2d pose for the robot within in the range of the object and where the robot is not in collision with anything
 
         Args:
-            obj (StatefulObject): Object to sample a 2d pose near
-            pose_on_obj (Iterable of arrays or None): The pose to sample near
+            obj (StatefulObject or list of StatefulObject): object(s) to sample a 2d pose near
+            pose_on_obj (Iterable or list of Iterable): (pos, quat) Pose(s) to sample near.
+                If provided, must match the length of obj list if obj is a list
 
         Returns:
             2-tuple:
@@ -1751,7 +1762,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
         # TODO: make this a macro
-        distance_lo, distance_hi = 0.0, 1.0
+        distance_lo, distance_hi = 0.0, 1.5
         yaw_lo, yaw_hi = -math.pi, math.pi
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 
@@ -1765,7 +1776,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         attempt = 0
         while attempt < m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT:
-
             candidate_poses = []
             for _ in range(self._collision_check_batch_size):
                 while True:
@@ -1906,19 +1916,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _validate_poses(self, candidate_poses, pose_on_obj=None, arm=None):
         """
-        Determines whether the robot can reach the pose on the object and is not in collision at the specified 2d poses
+        Determines whether the robot can reach all poses on the objects and is not in collision at the specified 2d poses
 
         Args:
-            list of arrays: Candidate 2d poses (x, y, yaw)
-            pose_on_obj (Iterable of arrays): Pose on the object in the world frame
+            candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
+            pose_on_obj (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
+                Can be a single pose or list of poses.
 
         Returns:
-            list of bool: Whether the robot can reach the pose on the object and is not in collision at the specified 2d poses
+            list of bool: Whether any robot arm can reach all poses on the objects and is not in collision
+                at the specified 2d poses
         """
         if arm is None:
             arm = self.arm
 
-        # result = [False] * len(candidate_poses)
+        # First check collisions for all candidate poses
         candidate_joint_positions = []
         current_joint_pos = self.robot.get_joint_positions()
         for pose in candidate_poses:
@@ -1926,13 +1938,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             joint_pos[self.robot.base_idx[:2]] = pose[:2]
             joint_pos[self.robot.base_idx[3:]] = th.tensor([0.0, 0.0, pose[2]])
             candidate_joint_positions.append(joint_pos)
+
         candidate_joint_positions = th.stack(candidate_joint_positions)
         invalid_results = self._motion_generator.check_collisions(
             candidate_joint_positions, check_self_collision=False
         ).cpu()
 
-        # Grab the candidates that passed that collision check and check if they are in reach
-        # TODO: iteratively call target_in_reach with LULA for now; change to curobo batched checking later for speed
+        # For each candidate that passed collision check, verify reachability
         for i in range(len(candidate_poses)):
             if invalid_results[i].item():
                 continue
