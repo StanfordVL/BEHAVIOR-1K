@@ -15,6 +15,25 @@ from omnigibson.macros import gm, macros
 from omnigibson.object_states import Touching
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 
+def correct_gripper_friction(robot):
+    state = og.sim.dump_state()
+    og.sim.stop()
+    # Set friction
+    from omni.isaac.core.materials import PhysicsMaterial
+    gripper_mat = PhysicsMaterial(
+        prim_path=f"{robot.prim_path}/gripper_mat",
+        name="gripper_material",
+        static_friction=50.0,
+        dynamic_friction=50.0,
+        restitution=None,
+    )
+    for arm, links in robot.finger_links.items():
+        for link in links:
+            for msh in link.collision_meshes.values():
+                msh.apply_physics_material(gripper_mat)
+
+    og.sim.play()
+    og.sim.load_state(state)
 
 def plan_trajectory(cmg, target_pos, target_quat, emb_sel=CuroboEmbodimentSelection.DEFAULT, attached_obj=None):
     # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
@@ -69,13 +88,13 @@ def plan_and_execute_trajectory(
 def set_gripper_joint_positions(robot, q, attached_obj):
     # Overwrite the gripper joint positions based on attached_obj
     joint_names = list(robot.joints.keys())
-    print("attached_obj: ", attached_obj)
+    # print("attached_obj: ", attached_obj)
     for arm, finger_joints in robot.finger_joints.items():
         close_gripper = attached_obj is not None and robot.eef_link_names[arm] in attached_obj
-        print("close_gripper: ", close_gripper)
         for finger_joint in finger_joints:
             idx = joint_names.index(finger_joint.joint_name)
             q[idx] = finger_joint.lower_limit if close_gripper else finger_joint.upper_limit
+            # print(f"finger_joint: {finger_joint.joint_name}, close_gripper: {close_gripper}, q[idx]: {q[idx]}")
     return q
 
 
@@ -84,7 +103,7 @@ def control_gripper(env, robot, attached_obj):
     q = robot.get_joint_positions()
     q = set_gripper_joint_positions(robot, q, attached_obj)
     command = q_to_command(q, robot)
-    num_repeat = 30
+    num_repeat = 100
     print(f"Gripper (attached_obj={attached_obj})")
     for _ in range(num_repeat):
         env.step(command)
@@ -100,56 +119,20 @@ def q_to_command(q, robot):
     return command
 
 
+def set_all_seeds(seed):
+    import random
+
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    th.cuda.manual_seed(seed)
+    th.backends.cudnn.deterministic = True
+
 def test_curobo():
+    set_all_seeds(seed=1)
     ROBOT_TYPE = "Tiago"
     robot_cfg = {
-        "R1": {
-            "type": "R1",
-            "obs_modalities": "rgb",
-            "position": [0, 0, 0],
-            "orientation": [0, 0, 0, 1],
-            "self_collisions": True,
-            "action_normalize": False,
-            "rigid_trunk": False,
-            "grasping_mode": "assisted",
-            "controller_config": {
-                "base": {
-                    "name": "JointController",
-                    "motor_type": "position",
-                    "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
-                },
-                "arm_left": {
-                    "name": "JointController",
-                    "motor_type": "position",
-                    "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
-                },
-                "arm_right": {
-                    "name": "JointController",
-                    "motor_type": "position",
-                    "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
-                },
-                "gripper_left": {
-                    "name": "JointController",
-                    "motor_type": "position",
-                    "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
-                },
-                "gripper_right": {
-                    "name": "JointController",
-                    "motor_type": "position",
-                    "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
-                },
-            },
-        },
         "Tiago": {
             "type": "Tiago",
             "obs_modalities": "rgb",
@@ -157,6 +140,7 @@ def test_curobo():
             "orientation": [0, 0, 0, 1],
             "self_collisions": True,
             "action_normalize": False,
+            "grasping_mode": "assisted",
             "rigid_trunk": False,
             "controller_config": {
                 "base": {
@@ -175,6 +159,7 @@ def test_curobo():
                     "command_input_limits": None,
                     "use_delta_commands": False,
                     "use_impedances": True,
+                    "pos_kp": 200.0,
                 },
                 "arm_right": {
                     "name": "JointController",
@@ -182,6 +167,7 @@ def test_curobo():
                     "command_input_limits": None,
                     "use_delta_commands": False,
                     "use_impedances": True,
+                    "pos_kp": 200.0,
                 },
                 "gripper_left": {
                     "name": "JointController",
@@ -189,6 +175,7 @@ def test_curobo():
                     "command_input_limits": [-1, 1],
                     "use_delta_commands": False,
                     "use_impedances": True,
+                    "pos_kp": 1500.0,
                 },
                 "gripper_right": {
                     "name": "JointController",
@@ -196,6 +183,7 @@ def test_curobo():
                     "command_input_limits": [-1, 1],
                     "use_delta_commands": False,
                     "use_impedances": True,
+                    "pos_kp": 1500.0,
                 },
             },
         },
@@ -265,13 +253,12 @@ def test_curobo():
     robot = env.robots[0]
     eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 
-    # Name of the eef
-    if ROBOT_TYPE == "R1":
-        ee_link_left = "left_hand"
-        ee_link_right = "right_hand"
-    elif ROBOT_TYPE == "Tiago":
-        ee_link_left = "gripper_left_grasping_frame"
-        ee_link_right = "gripper_right_grasping_frame"
+    correct_gripper_friction(robot)
+
+    og.sim.viewer_camera.set_position_orientation(position=[0.59, 2.31, 2.07], orientation=[-0.086, 0.434, 0.879, -0.175])
+
+    ee_link_left = "gripper_left_grasping_frame"
+    ee_link_right = "gripper_right_grasping_frame"
 
     # Stablize the robot and update the initial state
     robot.reset()
@@ -299,47 +286,26 @@ def test_curobo():
     cologne = env.scene.object_registry("name", "cologne")
     fridge = env.scene.object_registry("name", "fridge")
 
-    # R1
-    table_local_pose = (th.tensor([-0.8, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    # Tiago
     table_local_pose = (th.tensor([-1.1, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
 
-    # R1
-    cologne_local_pose = (th.tensor([-0.03, 0.0, 0.052]), T.euler2quat(th.tensor([math.pi, -math.pi / 2.0, 0.0])))
-    # Tiago
     cologne_local_pose = (th.tensor([-0.03, 0.0, 0.102]), T.euler2quat(th.tensor([math.pi, math.pi / 2.0, 0.0])))
 
-    fridge_local_pose = (th.tensor([-0.45, -1.2, -0.8576]), T.euler2quat(th.tensor([0.0, 0.0, math.pi / 2.0])))
+    fridge_local_pose = (th.tensor([-0.55, -1.25, -0.8576]), T.euler2quat(th.tensor([0.0, 0.0, math.pi / 2.0])))
 
-    # R1
     fridge_door_local_pose = (
-        th.tensor([-0.28, -0.37, 0.15]),
-        T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
-    )
-    # Tiago
-    # TODO: This pose is not correct. Orientation is definitely wrong
-    fridge_door_local_pose = (
-        th.tensor([-0.40, -0.37, 0.15]),
-        T.euler2quat(th.tensor([-math.pi / 2, math.pi / 2, 0.0])),
+        th.tensor([-0.28, -0.42, 0.15]),
+        T.euler2quat(th.tensor([math.pi, 0.0, math.pi / 2.0])),
     )
 
-    # R1
-    fridge_door_open_local_pose = (th.tensor([0.35, -0.90, 0.15]), T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0])))
-    # Tiago
-    # TODO: This pose is not correct. Orientation is definitely wrong
-    fridge_door_open_local_pose = (th.tensor([0.35, -0.90, 0.15]), T.euler2quat(th.tensor([-math.pi / 2, 0.0, 0.0])))
-
-    fridge_place_local_pose_prepare = (
-        th.tensor([-0.15 - 1.0, -0.25 - 1.0, 0.10]),
-        T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
-    )
+    fridge_door_open_local_pose = (th.tensor([0.35, -0.97, 0.15]), T.euler2quat(th.tensor([math.pi, 0.0, math.pi])))
+    
     fridge_place_local_pose = (
-        th.tensor([-0.15, -0.20, 0.5]),
-        T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
+        th.tensor([-0.10, -0.15, 0.5]),
+        T.euler2quat(th.tensor([math.pi, 0.0, math.pi / 2.0])),
     )
 
     print("start")
-    # breakpoint()
+    breakpoint()
 
     # Navigate to table (base)
     table_nav_pos, table_nav_quat = T.pose_transform(*table.get_position_orientation(), *table_local_pose)
@@ -367,6 +333,14 @@ def test_curobo():
     control_gripper(env, robot, attached_obj)
     # assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
 
+    # Move left hand up
+    target_pos = {robot.eef_link_names["left"]: left_hand_pos + th.tensor([0, 0, 0.1])}
+    target_quat = {robot.eef_link_names["left"]: left_hand_quat}
+    emb_sel = CuroboEmbodimentSelection.ARM
+    attached_obj = {ee_link_left: cologne.root_link}
+    # breakpoint()
+    plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
+
     # Reset to reset pose (both hands)
     target_pos = {
         robot.eef_link_names["left"]: left_hand_reset_pos,
@@ -381,6 +355,7 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
 
     # Navigate to fridge (base)
+    print("Navigate to fridge (base)")
     fridge_nav_pos, fridge_nav_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_local_pose)
     target_pos = {robot.base_footprint_link_name: fridge_nav_pos}
     target_quat = {robot.base_footprint_link_name: fridge_nav_quat}
@@ -389,13 +364,14 @@ def test_curobo():
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
 
     # Grasp fridge door (right hand)
+    print("Grasp fridge door (right hand)")
     # left_hand_pos, left_hand_quat = robot.get_eef_pose(arm="left")
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_local_pose)
     # target_pos = {robot.eef_link_names["left"]: left_hand_pos, robot.eef_link_names["right"]: right_hand_pos}
     # target_quat = {robot.eef_link_names["left"]: left_hand_quat, robot.eef_link_names["right"]: right_hand_quat}
     target_pos = {robot.eef_link_names["right"]: right_hand_pos}
     target_quat = {robot.eef_link_names["right"]: right_hand_quat}
-    emb_sel = CuroboEmbodimentSelection.DEFAULT
+    emb_sel = CuroboEmbodimentSelection.ARM
     attached_obj = {ee_link_left: cologne.root_link}
     plan_and_execute_trajectory(cmg, target_pos, target_quat, emb_sel, attached_obj, eef_markers, env, robot)
     attached_obj = {ee_link_left: cologne.root_link, ee_link_right: fridge.links["link_0"]}
@@ -403,6 +379,7 @@ def test_curobo():
     # assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == fridge
 
     # Pull fridge door (right hand)
+    print("Pull fridge door (right hand)")
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_open_local_pose)
     # rel_pos, rel_quat = T.relative_pose_transform(
     #     left_hand_reset_pos, left_hand_reset_quat, right_hand_reset_pos, right_hand_reset_quat
