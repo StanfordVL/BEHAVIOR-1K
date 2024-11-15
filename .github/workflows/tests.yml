@@ -51,7 +51,7 @@ jobs:
           path: omnigibson-src
 
       - name: Install CUDA and PyTorch
-        run: micromamba install cuda=11.8 -c nvidia -c conda-forge
+        run: micromamba install cuda=11.8 -c nvidia
 
       - name: Install
         working-directory: omnigibson-src
