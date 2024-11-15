@@ -15,11 +15,13 @@ from omnigibson.macros import gm, macros
 from omnigibson.object_states import Touching
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 
+
 def correct_gripper_friction(robot):
     state = og.sim.dump_state()
     og.sim.stop()
     # Set friction
     from omni.isaac.core.materials import PhysicsMaterial
+
     gripper_mat = PhysicsMaterial(
         prim_path=f"{robot.prim_path}/gripper_mat",
         name="gripper_material",
@@ -34,6 +36,7 @@ def correct_gripper_friction(robot):
 
     og.sim.play()
     og.sim.load_state(state)
+
 
 def plan_trajectory(cmg, target_pos, target_quat, emb_sel=CuroboEmbodimentSelection.DEFAULT, attached_obj=None):
     # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
@@ -128,6 +131,7 @@ def set_all_seeds(seed):
     th.manual_seed(seed)
     th.cuda.manual_seed(seed)
     th.backends.cudnn.deterministic = True
+
 
 def test_curobo():
     set_all_seeds(seed=1)
@@ -255,7 +259,9 @@ def test_curobo():
 
     correct_gripper_friction(robot)
 
-    og.sim.viewer_camera.set_position_orientation(position=[0.59, 2.31, 2.07], orientation=[-0.086, 0.434, 0.879, -0.175])
+    og.sim.viewer_camera.set_position_orientation(
+        position=[0.59, 2.31, 2.07], orientation=[-0.086, 0.434, 0.879, -0.175]
+    )
 
     ee_link_left = "gripper_left_grasping_frame"
     ee_link_right = "gripper_right_grasping_frame"
@@ -298,7 +304,7 @@ def test_curobo():
     )
 
     fridge_door_open_local_pose = (th.tensor([0.35, -0.97, 0.15]), T.euler2quat(th.tensor([math.pi, 0.0, math.pi])))
-    
+
     fridge_place_local_pose = (
         th.tensor([-0.10, -0.15, 0.5]),
         T.euler2quat(th.tensor([math.pi, 0.0, math.pi / 2.0])),
