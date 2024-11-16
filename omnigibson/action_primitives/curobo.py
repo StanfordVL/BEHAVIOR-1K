@@ -421,6 +421,7 @@ class CuRoboMotionGenerator:
         return_full_result=False,
         success_ratio=None,
         attached_obj=None,
+        attached_obj_scale=None,
         emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -452,6 +453,9 @@ class CuRoboMotionGenerator:
                 successes
             attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding scale to apply to the attached object
+            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for computing trajectories
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
                 object(s) computed from internal batch trajectory computations. If it is False, will return 2-tuple
@@ -565,13 +569,12 @@ class CuRoboMotionGenerator:
                 # xyzw to wxyz
                 quaternion = quaternion[[3, 0, 1, 2]]
                 ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
-
                 self.mg[emb_sel].attach_objects_to_robot(
                     joint_state=cu_js_batch,
                     object_names=obj_paths,
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=0.7,
+                    scale=0.7 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
                 )
 
         all_rollout_fns = [

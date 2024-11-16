@@ -241,10 +241,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return {
             arm: [
                 GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.2])
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.2])
                 ),
                 GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.13])
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.13])
                 ),
             ]
             for arm in self.arm_names
@@ -255,10 +255,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return {
             arm: [
                 GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.2])
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.2])
                 ),
                 GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.13])
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.13])
                 ),
             ]
             for arm in self.arm_names
