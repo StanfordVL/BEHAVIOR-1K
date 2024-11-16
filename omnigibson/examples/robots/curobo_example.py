@@ -198,7 +198,6 @@ def test_curobo():
                 "model": "rjgmmy",
                 "position": [2, 0, 0.41],
                 "orientation": [0, 0, 0, 1],
-                "fixed_base": True,
             },
             {
                 "type": "DatasetObject",
@@ -215,7 +214,6 @@ def test_curobo():
                 "model": "dszchb",
                 "position": [2, 1, 0.86],
                 "orientation": T.euler2quat(th.tensor([0, 0, -math.pi / 2])),
-                "fixed_base": True,
             },
         ],
         "robots": [robot_cfg],
