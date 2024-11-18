@@ -173,11 +173,12 @@ class JointPrim(BasePrim):
 
     def set_control_type(self, control_type, kp=None, kd=None):
         """
-        Sets the control type for this joint.
+        Sets the control type for this joint. Note that ControlType.NONE is equivalent to
+        ControlType.EFFORT with 0 kp / kd
 
         Args:
             control_type (ControlType): What type of control to use for this joint.
-                Valid options are: {ControlType.POSITION, ControlType.VELOCITY, ControlType.EFFORT}
+                Valid options are: {ControlType.POSITION, ControlType.VELOCITY, ControlType.EFFORT, ControlType.NONE}
             kp (None or float): If specified, sets the kp gain value for this joint. Should only be set if
                 setting ControlType.POSITION
             kd (None or float): If specified, sets the kd gain value for this joint. Should only be set if
@@ -194,7 +195,7 @@ class JointPrim(BasePrim):
             assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
             assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
             kp = 0.0
-        else:  # Efforts
+        else:  # Efforts (or NONE -- equivalent)
             assert kp is None, "kp gain must not be specified for setting EFFORT control!"
             assert kd is None, "kd gain must not be specified for setting EFFORT control!"
             kp, kd = 0.0, 0.0
@@ -867,12 +868,11 @@ class JointPrim(BasePrim):
             self.set_effort(th.zeros(self.n_dof))
 
     def _dump_state(self):
-        pos, vel, effort = self.get_state() if self.articulated else (th.empty(0), th.empty(0), th.empty(0))
+        pos, vel, _ = self.get_state() if self.articulated else (th.empty(0), th.empty(0), th.empty(0))
         target_pos, target_vel = self.get_target() if self.articulated else (th.empty(0), th.empty(0))
         return dict(
             pos=pos,
             vel=vel,
-            effort=effort,
             target_pos=target_pos,
             target_vel=target_vel,
         )
@@ -881,8 +881,6 @@ class JointPrim(BasePrim):
         if self.articulated:
             self.set_pos(state["pos"], drive=False)
             self.set_vel(state["vel"], drive=False)
-            if self.driven:
-                self.set_effort(state["effort"])
             if self._control_type == ControlType.POSITION:
                 self.set_pos(state["target_pos"], drive=True)
             elif self._control_type == ControlType.VELOCITY:
@@ -893,7 +891,6 @@ class JointPrim(BasePrim):
             [
                 state["pos"],
                 state["vel"],
-                state["effort"],
                 state["target_pos"],
                 state["target_vel"],
             ]
@@ -905,9 +902,8 @@ class JointPrim(BasePrim):
             dict(
                 pos=state[0 : self.n_dof],
                 vel=state[self.n_dof : 2 * self.n_dof],
-                effort=state[2 * self.n_dof : 3 * self.n_dof],
-                target_pos=state[3 * self.n_dof : 4 * self.n_dof],
-                target_vel=state[4 * self.n_dof : 5 * self.n_dof],
+                target_pos=state[2 * self.n_dof : 3 * self.n_dof],
+                target_vel=state[3 * self.n_dof : 4 * self.n_dof],
             ),
-            5 * self.n_dof,
+            4 * self.n_dof,
         )

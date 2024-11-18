@@ -231,10 +231,44 @@ class ControllableObject(BaseObject):
 
         # Initialize controllers to create
         self._controllers = dict()
-        # Loop over all controllers, in the order corresponding to @action dim
-        for name in self.controller_order:
+        # Keep track of any controllers that are subsumed by other controllers
+        # We will not instantiate subsumed controllers
+        controller_subsumes = dict()  # Maps independent controller name to list of subsumed controllers
+        subsume_names = set()
+        for name in self._raw_controller_order:
+            # Make sure we have the valid controller name specified
             assert_valid_key(key=name, valid_keys=self._controller_config, name="controller name")
             cfg = self._controller_config[name]
+            subsume_controllers = cfg.pop("subsume_controllers", [])
+            # If this controller subsumes other controllers, it cannot be subsumed by another controller
+            # (i.e.: we don't allow nested / cyclical subsuming)
+            if len(subsume_controllers) > 0:
+                assert (
+                    name not in subsume_names
+                ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                controller_subsumes[name] = subsume_controllers
+                for subsume_name in subsume_controllers:
+                    # Make sure it doesn't already exist -- a controller should only be subsumed by up to one other
+                    assert (
+                        subsume_name not in subsume_names
+                    ), f"Controller {subsume_name} cannot be subsumed by more than one other controller!"
+                    assert (
+                        subsume_name not in controller_subsumes
+                    ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                    subsume_names.add(subsume_name)
+
+        # Loop over all controllers, in the order corresponding to @action dim
+        for name in self._raw_controller_order:
+            # If this controller is subsumed by another controller, simply skip it
+            if name in subsume_names:
+                continue
+            cfg = self._controller_config[name]
+            # If we subsume other controllers, prepend the subsumed' dof idxs to this controller's idxs
+            if name in controller_subsumes:
+                for subsumed_name in controller_subsumes[name]:
+                    subsumed_cfg = self._controller_config[subsumed_name]
+                    cfg["dof_idx"] = th.concatenate([subsumed_cfg["dof_idx"], cfg["dof_idx"]])
+
             # If we're using normalized action space, override the inputs for all controllers
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
@@ -254,8 +288,12 @@ class ControllableObject(BaseObject):
         Helper function to force the joints to use the internal specified control mode and gains
         """
         # Update the control modes of each joint based on the outputted control from the controllers
+        unused_dofs = {i for i in range(self.n_dof)}
         for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
+                # Make sure the DOF has not already been set yet, and remove it afterwards
+                assert dof.item() in unused_dofs
+                unused_dofs.remove(dof.item())
                 control_type = self._controllers[name].control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
@@ -266,6 +304,21 @@ class ControllableObject(BaseObject):
                         else None
                     ),
                 )
+
+        # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
+        # motion wrt a specific axis), so explicitly set kp / kd to 0 to avoid silent bugs when
+        # joint positions / velocities are set
+        for unused_dof in unused_dofs:
+            unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
+            assert not unused_joint.driven, (
+                f"All unused joints not mapped to any controller should not have DriveAPI attached to it! "
+                f"However, joint {unused_joint.name} is driven!"
+            )
+            unused_joint.set_control_type(
+                control_type=ControlType.NONE,
+                kp=None,
+                kd=None,
+            )
 
     def _generate_controller_config(self, custom_config=None):
         """
@@ -283,7 +336,7 @@ class ControllableObject(BaseObject):
         controller_config = {} if custom_config is None else deepcopy(custom_config)
 
         # Update the configs
-        for group in self.controller_order:
+        for group in self._raw_controller_order:
             group_controller_name = (
                 controller_config[group]["name"]
                 if group in controller_config and "name" in controller_config[group]
@@ -623,6 +676,41 @@ class ControllableObject(BaseObject):
 
         return fcns
 
+    def _add_task_frame_control_dict(self, fcns, task_name, link_name):
+        """
+        Internally helper function to generate per-link control dictionary entries. Useful for generating relevant
+        control values needed for IK / OSC for a given @task_name. Should be called within @get_control_dict()
+
+        Args:
+            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
+            task_name (str): name to assign for this task_frame. It will be prepended to all fcns generated
+            link_name (str): the corresponding link name from this controllable object that @task_name is referencing
+        """
+        fcns[f"_{task_name}_pos_quat_relative"] = (
+            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, link_name
+            )
+        )
+        fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
+        fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
+        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
+            self.articulation_root_path, link_name
+        )
+        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
+            self.articulation_root_path, link_name
+        )
+        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        # see self.get_relative_jacobian() for more info
+        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
+        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
+        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
+        start_idx = 0 if self.fixed_base else 6
+        link_idx = self._articulation_view.get_body_index(link_name)
+        fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
+            self.articulation_root_path
+        )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
+
     def dump_action(self):
         """
         Dump the last action applied to this object. For use in demo collection.
@@ -755,13 +843,27 @@ class ControllableObject(BaseObject):
         return self._controllers
 
     @property
-    @abstractmethod
     def controller_order(self):
         """
         Returns:
             list: Ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
                 to denote that the action vector should be interpreted as first the base action, then arm command, then
-                gripper command
+                gripper command. Note that this may be a subset of all possible controllers due to some controllers
+                subsuming others (e.g.: arm controller subsuming the trunk controller if using IK)
+        """
+        assert self._controllers is not None, "Can only view controller_order after controllers are loaded!"
+        return list(self._controllers.keys())
+
+    @property
+    @abstractmethod
+    def _raw_controller_order(self):
+        """
+        Returns:
+            list: Raw ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
+                to denote that the action vector should be interpreted as first the base action, then arm command, then
+                gripper command. Note that external users should query @controller_order, which is the post-processed
+                ordering of actions, which may be a subset of the controllers due to some controllers subsuming others
+                (e.g.: arm controller subsuming the trunk controller if using IK)
         """
         raise NotImplementedError
 

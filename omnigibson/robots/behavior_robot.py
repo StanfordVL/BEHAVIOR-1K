@@ -209,7 +209,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return th.zeros(self.n_joints)
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         controllers = ["base", "camera"]
         for arm_name in self.arm_names:
             controllers += [f"arm_{arm_name}", f"gripper_{arm_name}"]
