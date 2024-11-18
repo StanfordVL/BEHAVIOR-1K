@@ -1612,7 +1612,6 @@ class EntityPrim(XFormPrim):
         if self.n_joints > 0:
             state["joint_pos"] = self.get_joint_positions()
             state["joint_vel"] = self.get_joint_velocities()
-            state["joint_eff"] = self.get_joint_efforts()
 
             # We do NOT save joint pos / vel targets because this is only relevant for motorized joints (e.g.: robots).
             # Such control (a) only relies on the joint state, and not joint targets, when computing control, and
@@ -1633,7 +1632,6 @@ class EntityPrim(XFormPrim):
         elif self.n_joints > 0:
             self.set_joint_positions(state["joint_pos"])
             self.set_joint_velocities(state["joint_vel"])
-            self.set_joint_efforts(state["joint_eff"])
 
         # Make sure this object is awake
         self.wake()
@@ -1646,7 +1644,6 @@ class EntityPrim(XFormPrim):
             state_flat += [
                 state["joint_pos"],
                 state["joint_vel"],
-                state["joint_eff"],
             ]
 
         return th.cat(state_flat)
@@ -1657,7 +1654,7 @@ class EntityPrim(XFormPrim):
         root_link_state, idx = self.root_link.deserialize(state=state)
         state_dict = dict(root_link=root_link_state)
         if self.n_joints > 0:
-            for jnt_state in ("pos", "vel", "eff"):
+            for jnt_state in ("pos", "vel"):
                 state_dict[f"joint_{jnt_state}"] = state[idx : idx + self.n_joints]
                 idx += self.n_joints
 

@@ -1,5 +1,3 @@
-from abc import abstractmethod
-
 import torch as th
 
 from omnigibson.robots.manipulation_robot import ManipulationRobot
@@ -26,110 +24,24 @@ class ArticulatedTrunkRobot(ManipulationRobot):
             values specified, but setting these individual kwargs will override them
     """
 
-    def __init__(
-        self,
-        # Shared kwargs in hierarchy
-        name,
-        relative_prim_path=None,
-        scale=None,
-        visible=True,
-        visual_only=False,
-        self_collisions=True,
-        load_config=None,
-        fixed_base=False,
-        # Unique to USDObject hierarchy
-        abilities=None,
-        # Unique to ControllableObject hierarchy
-        control_freq=None,
-        controller_config=None,
-        action_type="continuous",
-        action_normalize=True,
-        reset_joint_pos=None,
-        # Unique to BaseRobot
-        obs_modalities=("rgb", "proprio"),
-        proprio_obs="default",
-        sensor_config=None,
-        # Unique to ManipulationRobot
-        grasping_mode="physical",
-        disable_grasp_handling=False,
-        # Unique to ArticulatedTrunkRobot
-        rigid_trunk=False,
-        default_trunk_offset=0.2,
-        **kwargs,
-    ):
-        """
-        Args:
-            name (str): Name for the object. Names need to be unique per scene
-            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
-            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
-                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
-                3-array specifies per-axis scaling.
-            visible (bool): whether to render this object or not in the stage
-            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-            self_collisions (bool): Whether to enable self collisions for this object
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime.
-            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
-                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
-                the object state instance constructor.
-            control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                we will automatically set the control frequency to be at the render frequency by default.
-            controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
-                configurations for this object. This will override any default values specified by this class.
-            action_type (str): one of {discrete, continuous} - what type of action space to use
-            action_normalize (bool): whether to normalize inputted actions. This will override any default values
-                specified by this class.
-            reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
-                Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the robot with a different rese joint position.
-            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
-                Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
-                Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
-                    override any values specified from @obs_modalities!
-            proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
-                observations. If str, should be exactly "default" -- this results in the default proprioception
-                observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
-                for valid key choices
-            sensor_config (None or dict): nested dictionary mapping sensor class name(s) to specific sensor
-                configurations for this object. This will override any default values specified by this class.
-            grasping_mode (str): One of {"physical", "assisted", "sticky"}.
-                If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
-                If "assisted", will magnetize any object touching and within the gripper's fingers.
-                If "sticky", will magnetize any object touching the gripper's fingers.
-            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
-                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
-            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
-            default_trunk_offset (float): The default height of the robot's trunk
-            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
-        """
-        self.rigid_trunk = rigid_trunk
-        self.default_trunk_offset = default_trunk_offset
+    def get_control_dict(self):
+        # In addition to super method, add in trunk endpoint state
+        fcns = super().get_control_dict()
 
-        # Run super init
-        super().__init__(
-            relative_prim_path=relative_prim_path,
-            name=name,
-            scale=scale,
-            visible=visible,
-            fixed_base=fixed_base,
-            visual_only=visual_only,
-            self_collisions=self_collisions,
-            load_config=load_config,
-            abilities=abilities,
-            control_freq=control_freq,
-            controller_config=controller_config,
-            action_type=action_type,
-            action_normalize=action_normalize,
-            reset_joint_pos=reset_joint_pos,
-            obs_modalities=obs_modalities,
-            proprio_obs=proprio_obs,
-            sensor_config=sensor_config,
-            grasping_mode=grasping_mode,
-            disable_grasp_handling=disable_grasp_handling,
-            **kwargs,
+        # Add relevant trunk values
+        self._add_task_frame_control_dict(
+            fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
         )
+
+        return fcns
+
+    @property
+    def trunk_links(self):
+        return [self.links[name] for name in self.trunk_link_names]
+
+    @property
+    def trunk_link_names(self):
+        raise NotImplementedError
 
     @property
     def trunk_joint_names(self):
@@ -144,20 +56,109 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
 
     @property
+    def trunk_action_idx(self):
+        controller_idx = self.controller_order.index("trunk")
+        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+        return th.arange(action_start_idx, action_start_idx + self.controllers["trunk"].command_dim)
+
+    @property
+    def _default_controllers(self):
+        # Always call super first
+        controllers = super()._default_controllers
+
+        # For best generalizability use, joint controller as default
+        controllers["trunk"] = "JointController"
+
+        return controllers
+
+    @property
+    def _default_trunk_ik_controller_config(self):
+        """
+        Returns:
+            dict: Default controller config for an Inverse kinematics controller to control this robot's trunk
+        """
+        return {
+            "name": "InverseKinematicsController",
+            "task_name": "trunk",
+            "control_freq": self._control_freq,
+            "reset_joint_pos": self.reset_joint_pos,
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": (
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+            ),
+            "mode": "pose_delta_ori",
+            "smoothing_filter_size": 2,
+            "workspace_pose_limiter": None,
+        }
+
+    @property
+    def _default_trunk_osc_controller_config(self):
+        """
+        Returns:
+            dict: Default controller config for an Operational Space controller to control this robot's trunk
+        """
+        return {
+            "name": "OperationalSpaceController",
+            "task_name": "trunk",
+            "control_freq": self._control_freq,
+            "reset_joint_pos": self.reset_joint_pos,
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": (
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+            ),
+            "mode": "pose_delta_ori",
+            "workspace_pose_limiter": None,
+        }
+
+    @property
+    def _default_trunk_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default base joint controller config to control this robot's base. Uses position
+                control by default.
+        """
+        return {
+            "name": "JointController",
+            "control_freq": self._control_freq,
+            "motor_type": "position",
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": None,
+            "use_delta_commands": True,
+        }
+
+    @property
+    def _default_trunk_null_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default null joint controller config to control this robot's base i.e. dummy controller
+        """
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "position",
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "default_command": self.reset_joint_pos[self.trunk_control_idx],
+            "use_impedances": False,
+        }
+
+    @property
     def _default_controller_config(self):
-        # Grab defaults from super method first
+        # Always run super method first
         cfg = super()._default_controller_config
-        if self.rigid_trunk:
-            return cfg
 
-        # Need to override joint idx being controlled to include trunk in default arm controller configs
-        for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
-            arm_control_idx = th.cat([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
-            arm_cfg["dof_idx"] = arm_control_idx
-
-            # Need to modify the default joint positions also if this is a null joint controller
-            if arm_cfg["name"] == "NullJointController":
-                arm_cfg["default_command"] = self.reset_joint_pos[arm_control_idx]
+        # Add supported base controllers
+        cfg["trunk"] = {
+            self._default_trunk_joint_controller_config["name"]: self._default_trunk_joint_controller_config,
+            self._default_trunk_null_joint_controller_config["name"]: self._default_trunk_null_joint_controller_config,
+            self._default_trunk_ik_controller_config["name"]: self._default_trunk_ik_controller_config,
+            self._default_trunk_osc_controller_config["name"]: self._default_trunk_osc_controller_config,
+        }
 
         return cfg
 

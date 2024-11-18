@@ -52,7 +52,7 @@ class ActiveCameraRobot(BaseRobot):
         return obs_keys + ["camera_qpos_sin", "camera_qpos_cos"]
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # By default, only camera is supported
         return ["camera"]
 
