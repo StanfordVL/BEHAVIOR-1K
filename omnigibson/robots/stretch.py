@@ -39,7 +39,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         raise ValueError("Stretch does not support discrete actions!")
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # Ordered by general robot kinematics chain
         return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
 

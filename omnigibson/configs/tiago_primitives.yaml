@@ -38,8 +38,6 @@ robots:
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    rigid_trunk: false
-    default_trunk_offset: 0.15
     default_arm_pose: vertical
     sensor_config:
       VisionSensor:
@@ -49,6 +47,8 @@ robots:
     controller_config:
       base:
         name: JointController
+      trunk:
+        name: JointController
       arm_left:
         name: JointController
         motor_type: position
@@ -57,6 +57,7 @@ robots:
         use_delta_commands: false
       arm_right:
         name: JointController
+        subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         command_output_limits: null
