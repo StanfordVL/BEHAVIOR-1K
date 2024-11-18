@@ -32,7 +32,10 @@ def get_grasp_poses_for_object_sticky(target_obj):
         visual=False
     )
 
-    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, th.max(bbox_extent_in_base_frame) / 2 + 0.05])
+    # TODO: why base frame aabb?
+    bbox_extent_in_world_frame = target_obj.aabb_extent
+
+    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, bbox_extent_in_world_frame[2] / 2])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 

@@ -86,7 +86,7 @@ m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 100
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 m.PREDICATE_SAMPLING_Z_OFFSET = 0.02
 
-m.GRASP_APPROACH_DISTANCE = 0.2
+m.GRASP_APPROACH_DISTANCE = 0.01
 m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.HAND_DIST_THRESHOLD = 0.002
@@ -511,13 +511,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
         grasp_pose, object_direction = random.choice(grasp_poses)
 
-        # Take into account the robot eef reset pose
+        grasp_offset_in_z = self.robot.finger_lengths[self.arm] + m.GRASP_APPROACH_DISTANCE
+
+        # Adjust grasp pose with reset orientation and finger length offset
         reset_orientation = self._get_reset_eef_pose("world")[self.arm][1]
-        grasp_pose = (grasp_pose[0], T.quat_multiply(grasp_pose[1], reset_orientation))
+        grasp_pos = grasp_pose[0] - object_direction * grasp_offset_in_z
+        grasp_quat = T.quat_multiply(grasp_pose[1], reset_orientation)
+        grasp_pose = (grasp_pos, grasp_quat)
 
         # Prepare data for the approach later.
         # TODO: fix this threshold
-        approach_pos = grasp_pose[0] + object_direction * 0.055  # m.GRASP_APPROACH_DISTANCE
+        approach_pos = grasp_pose[0] + object_direction * grasp_offset_in_z
         approach_pose = (approach_pos, grasp_pose[1])
 
         # If the grasp pose is too far, navigate.
@@ -525,29 +529,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
         indented_print("Moving hand to grasp pose")
-        yield from self._move_hand(grasp_pose, motion_constraint=[0, 0, 0, 0, 0, 0])
+        yield from self._move_hand(grasp_pose, motion_constraint=[0, 0, 0, 0, 1, 0])
 
         if self.robot.grasping_mode == "sticky":
             # Pre-grasp in sticky grasping mode.
             indented_print("Pregrasp squeeze")
             yield from self._execute_grasp()
-
-            if self._get_obj_in_hand() is None:
-                # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
-                # It's okay if we can't go all the way because we run into the object.
-                indented_print("Performing grasp approach")
-                # Use direct IK to move the hand to the approach pose.
-                yield from self._move_hand(approach_pose, avoid_collision=False)
+            # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
+            # It's okay if we can't go all the way because we run into the object.
+            indented_print("Performing grasp approach")
+            # Use direct IK to move the hand to the approach pose.
+            yield from self._move_hand(approach_pose, avoid_collision=False)
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
             # TODO: implement linear cartesian motion with curobo constrained planning
             yield from self._move_hand(approach_pose)  # motion_constraint=[0, 0, 0, 0, 0, 1]
             yield from self._execute_grasp()
-
-        # Move hand upwards a little to avoid getting stuck
-        indented_print("Moving hand upwards")
-        upward_pose = (self.robot.get_eef_position() - object_direction * 0.05, self.robot.get_eef_orientation())
-        yield from self._move_hand(upward_pose, low_precision=True)
 
         # Step a few times to update
         yield from self._settle_robot()
@@ -859,14 +856,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ).cpu()
         else:
             # Move EEF directly without collsion checking
-            arm_joint_pos = self._convert_cartesian_to_joint_space(target_pose, arm=arm)
-            single_traj = self.robot.get_joint_positions()
-            single_traj[self._manipulation_control_idx(arm)] = arm_joint_pos
-            q_traj = [single_traj]
+            goal_arm_joint_pos = self._convert_cartesian_to_joint_space(target_pose, arm=arm)
+            curr_joint_pos = self.robot.get_joint_positions()
+            goal_joint_pos = curr_joint_pos.clone()
+            goal_joint_pos[self._manipulation_control_idx(arm)] = goal_arm_joint_pos
+            q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=[curr_joint_pos, goal_joint_pos]))
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(
-            q_traj, stop_on_contact=avoid_collision is False, low_precision=low_precision
-        )
+        yield from self._execute_motion_plan(q_traj, stop_on_contact=not avoid_collision, low_precision=low_precision)
 
     def _plan_joint_motion(
         self,
@@ -916,56 +912,60 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return self._motion_generator.path_to_joint_trajectory(traj_path, embodiment_selection)
 
-    def _execute_motion_plan(self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False):
+    def _execute_motion_plan(
+        self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False, ignore_physics=False
+    ):
         for i, joint_pos in enumerate(q_traj):
             indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
-            # Convert target joint positions to command
-            action = self._q_to_action(joint_pos)
 
-            base_target_reached = False
-            articulation_target_reached = False
-            collision_detected = False
-            articulation_control_idx = th.cat(
-                (self.robot.arm_control_idx["left"], self.robot.arm_control_idx["right"], self.robot.trunk_control_idx)
-            )
-            for _ in range(m.MAX_STEPS_FOR_JOINT_MOTION):
-                current_joint_pos = self.robot.get_joint_positions()
-                joint_pos_diff = joint_pos - current_joint_pos
-                base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
-                articulation_joint_diff = joint_pos_diff[articulation_control_idx]  # Gets all non-base joints
-                articulation_threshold = (
-                    m.JOINT_POS_DIFF_THRESHOLD if not low_precision else m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD
-                )
-                if th.max(th.abs(articulation_joint_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
-                    articulation_target_reached = True
-                # TODO: genralize this to transaltion&rotation + high/low precision modes
-                distance_threshold = (
-                    m.LOW_PRECISION_DIST_THRESHOLD if isinstance(self.robot, Tiago) else m.DEFAULT_DIST_THRESHOLD
-                )
-                if th.max(th.abs(base_joint_diff)).item() < distance_threshold:
-                    base_target_reached = True
-                if base_target_reached and articulation_target_reached:
-                    break
-                # TODO: bring this back once we sort out the controller overshoot problem
-                # collision_detected = detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False)
-                # if stop_on_contact and collision_detected:
-                #     break
-                yield self._postprocess_action(action)
+            if ignore_physics:
+                self.robot.set_joint_positions(joint_pos)
+                og.sim.step()
+            else:
+                # Convert target joint positions to command
+                action = self._q_to_action(joint_pos)
 
-            if not stop_on_contact and not ignore_failure:
-                if not base_target_reached:
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        "Could not reach the target base joint positions. Try again",
+                base_target_reached = False
+                articulation_target_reached = False
+                collision_detected = False
+                articulation_control_idx = th.cat(
+                    (
+                        self.robot.arm_control_idx["left"],
+                        self.robot.arm_control_idx["right"],
+                        self.robot.trunk_control_idx,
                     )
-                if not articulation_target_reached:
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        "Could not reach the target articulation joint positions. Try again",
+                )
+                for _ in range(m.MAX_STEPS_FOR_JOINT_MOTION):
+                    current_joint_pos = self.robot.get_joint_positions()
+                    joint_pos_diff = joint_pos - current_joint_pos
+                    base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
+                    articulation_joint_diff = joint_pos_diff[articulation_control_idx]  # Gets all non-base joints
+                    articulation_threshold = (
+                        m.JOINT_POS_DIFF_THRESHOLD if not low_precision else m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD
                     )
-            # elif collision_detected:
-            #     # TODO: figure out the logic between collision and failure
-            #     break
+                    if th.max(th.abs(articulation_joint_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
+                        articulation_target_reached = True
+                    # TODO: genralize this to transaltion&rotation + high/low precision modes
+                    if th.max(th.abs(base_joint_diff)).item() < m.DEFAULT_DIST_THRESHOLD:
+                        base_target_reached = True
+                    if base_target_reached and articulation_target_reached:
+                        break
+                    collision_detected = detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=True)
+                    if stop_on_contact and collision_detected:
+                        return
+                    yield self._postprocess_action(action)
+
+                if not ignore_failure:
+                    if not base_target_reached:
+                        raise ActionPrimitiveError(
+                            ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                            "Could not reach the target base joint positions. Try again",
+                        )
+                    if not articulation_target_reached:
+                        raise ActionPrimitiveError(
+                            ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                            "Could not reach the target articulation joint positions. Try again",
+                        )
 
     def _q_to_action(self, q):
         action = []
@@ -975,7 +975,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         assert action.shape[0] == self.robot.action_dim
         return action
 
-    def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
+    def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist=0.01):
         """
         Adds waypoints to the plan so the distance between values in the plan never exceeds the max_inter_dist.
 
@@ -986,13 +986,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             Array of arrays: Planned path with additional waypoints
         """
-        plan = th.tensor(plan)
+        assert len(plan) > 1, "Plan must have at least 2 waypoints to interpolate"
         interpolated_plan = []
         for i in range(len(plan) - 1):
             max_diff = max(plan[i + 1] - plan[i])
             num_intervals = math.ceil(max_diff / max_inter_dist)
-            interpolated_plan += th.linspace(plan[i], plan[i + 1], num_intervals, endpoint=False).tolist()
-        interpolated_plan.append(plan[-1].tolist())
+            interpolated_plan += multi_dim_linspace(plan[i], plan[i + 1], num_intervals)
+        interpolated_plan.append(plan[-1])
         return interpolated_plan
 
     def _move_hand_direct_joint(self, joint_pos, stop_on_contact=False, ignore_failure=False):
@@ -1483,14 +1483,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 ),
             }
         elif isinstance(self.robot, Tiago):
+            # TODO: default trunk position vs. raised trunk position
+            # pose = {
+            #     self.robot.arm_names[0]: (
+            #         th.tensor([0.4997, 0.2497, 0.6357]),
+            #         th.tensor([-0.5609, 0.5617, 0.4299, 0.4302]),
+            #     ),
+            #     self.robot.arm_names[1]: (
+            #         th.tensor([0.4978, -0.2521, 0.6357]),
+            #         th.tensor([-0.5609, -0.5617, 0.4299, -0.4302]),
+            #     ),
+            # }
             pose = {
                 self.robot.arm_names[0]: (
-                    th.tensor([0.4997, 0.2497, 0.6357]),
-                    th.tensor([-0.5609, 0.5617, 0.4299, 0.4302]),
+                    th.tensor([0.5021, 0.2458, 0.7648]),
+                    th.tensor([-0.5599, 0.5649, 0.4303, 0.4269]),
                 ),
                 self.robot.arm_names[1]: (
-                    th.tensor([0.4978, -0.2521, 0.6357]),
-                    th.tensor([-0.5609, -0.5617, 0.4299, -0.4302]),
+                    th.tensor([0.4999, -0.2486, 0.7633]),
+                    th.tensor([-0.5592, -0.5646, 0.4311, -0.4274]),
                 ),
             }
         else:
