@@ -209,6 +209,15 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return "base_footprint"
 
     @property
+    def floor_touching_base_link_names(self):
+        return [
+            "wheel_front_left_link",
+            "wheel_front_right_link",
+            "wheel_rear_left_link",
+            "wheel_rear_right_link",
+        ]
+
+    @property
     def _raw_controller_order(self):
         controllers = ["base", "trunk", "camera"]
         for arm in self.arm_names:

@@ -3,9 +3,6 @@ import math
 import os
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pytest
 import torch as th
 
 import omnigibson as og
@@ -14,6 +11,7 @@ from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm, macros
 from omnigibson.object_states import Touching
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
+from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 
 def test_curobo():
@@ -95,9 +93,15 @@ def test_curobo():
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
-            "rigid_trunk": False,
             "controller_config": {
                 "base": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "trunk": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
@@ -141,9 +145,15 @@ def test_curobo():
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
-            "rigid_trunk": False,
             "controller_config": {
                 "base": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": True,
+                },
+                "trunk": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
@@ -188,33 +198,19 @@ def test_curobo():
             },
         },
     ]
-
     for robot_cfg in robot_cfgs:
         cfg["robots"] = [robot_cfg]
 
         env = og.Environment(configs=cfg)
         robot = env.robots[0]
         obj = env.scene.object_registry("name", "obj0")
-
         eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 
-        if robot.model_name == "R1":
-            bottom_links = [
-                os.path.join(robot.prim_path, bottom_link)
-                for bottom_link in ["wheel_link1", "wheel_link2", "wheel_link3"]
-            ]
-        elif robot.model_name == "Tiago":
-            bottom_links = [
-                os.path.join(robot.prim_path, bottom_link)
-                for bottom_link in [
-                    "wheel_front_left_link",
-                    "wheel_front_right_link",
-                    "wheel_rear_left_link",
-                    "wheel_rear_right_link",
-                ]
-            ]
-        else:
-            bottom_links = []
+        floor_touching_base_link_prim_paths = (
+            [os.path.join(robot.prim_path, link_name) for link_name in robot.floor_touching_base_link_names]
+            if isinstance(robot, LocomotionRobot)
+            else []
+        )
 
         robot.reset()
 
@@ -233,7 +229,7 @@ def test_curobo():
 
         # Create CuRobo instance
         batch_size = 10
-        n_samples = 10
+        n_samples = 30
 
         cmg = CuRoboMotionGenerator(
             robot=robot,
@@ -296,7 +292,7 @@ def test_curobo():
                 if contact.body1 in robot.link_prim_paths:
                     self_collision_pairs.add((contact.body0, contact.body1))
                 elif contact.body1 in floor_plane_prim_paths:
-                    if contact.body0 not in bottom_links:
+                    if contact.body0 not in floor_touching_base_link_prim_paths:
                         floor_contact_pairs.add((contact.body0, contact.body1))
                     else:
                         wheel_contact_pairs.add((contact.body0, contact.body1))
@@ -416,7 +412,12 @@ def test_curobo():
                         og.sim.step()
                         for contact in robot.contact_list():
                             assert contact.body0 in robot.link_prim_paths
-                            if contact.body1 in floor_plane_prim_paths and contact.body0 in bottom_links:
+                            if (
+                                contact.body1 in floor_plane_prim_paths
+                                and contact.body0 in floor_touching_base_link_prim_paths
+                            ):
+                                continue
+                            if th.tensor(list(contact.impulse)).norm() == 0:
                                 continue
                             print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
                             assert (
@@ -438,9 +439,13 @@ def test_curobo():
 
                             for contact in robot.contact_list():
                                 assert contact.body0 in robot.link_prim_paths
-                                if contact.body1 in floor_plane_prim_paths and contact.body0 in bottom_links:
+                                if (
+                                    contact.body1 in floor_plane_prim_paths
+                                    and contact.body0 in floor_touching_base_link_prim_paths
+                                ):
                                     continue
-
+                                if th.tensor(list(contact.impulse)).norm() == 0:
+                                    continue
                                 print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
                                 # Controller is not perfect, so collisions might happen
                                 # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"

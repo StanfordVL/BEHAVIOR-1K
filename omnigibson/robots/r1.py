@@ -117,7 +117,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
-            default_trunk_offset=0.0,  # not applicable for R1
             default_reset_mode=default_reset_mode,
             **kwargs,
         )
@@ -195,8 +194,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         }
 
     @property
-    def base_link_names(self):
-        return ["base_link"]  # , "wheel_link1", "wheel_link2", "wheel_link3"]
+    def floor_touching_base_link_names(self):
+        return ["wheel_link1", "wheel_link2", "wheel_link3"]
 
     @property
     def trunk_link_names(self):
