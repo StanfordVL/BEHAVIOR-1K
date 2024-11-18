@@ -108,10 +108,16 @@ def test_curobo():
         "orientation": [0, 0, 0, 1],
         "self_collisions": True,
         "action_normalize": False,
-        "rigid_trunk": False,
         "grasping_mode": "assisted",
         "controller_config": {
             "base": {
+                "name": "JointController",
+                "motor_type": "position",
+                "command_input_limits": None,
+                "use_delta_commands": False,
+                "use_impedances": True,
+            },
+            "trunk": {
                 "name": "JointController",
                 "motor_type": "position",
                 "command_input_limits": None,
