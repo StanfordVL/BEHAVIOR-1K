@@ -591,7 +591,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def curobo_path(self):
         """
         Returns:
-            str: file path to the robot curobo configuration yaml file.
+            str or Dict[CuroboEmbodimentSelection, str]: file path to the robot curobo file or a mapping from
+                CuroboEmbodimentSelection to the file path
         """
         raise NotImplementedError
 

@@ -291,8 +291,6 @@ class CuRoboMotionGenerator:
                 be ignored when updating obstacles
         """
         print("Updating CuRobo world, reading w.r.t.", self.robot.prim_path)
-        emb_sel = CuroboEmbodimentSelection.DEFAULT  # all embodiment selections share the same world collision checker
-
         ignore_paths = [] if ignore_paths is None else ignore_paths
 
         # Ignore any visual only objects and any objects not part of the robot's current scene
@@ -312,12 +310,13 @@ class CuRoboMotionGenerator:
                 *ignore_paths,  # Don't include any additional specified paths
             ],
         )
-        self.mg[emb_sel].update_world(obstacles)
+        # All embodiment selections share the same world collision checker
+        self.mg[CuroboEmbodimentSelection.DEFAULT].update_world(obstacles)
         print("Synced CuRobo world from stage.")
 
     def update_obstacles_fast(self):
-        emb_sel = CuroboEmbodimentSelection.DEFAULT
-        world_coll_checker = self.mg[emb_sel].world_coll_checker
+        # All embodiment selections share the same world collision checker
+        world_coll_checker = self.mg[CuroboEmbodimentSelection.DEFAULT].world_coll_checker
         for i, prim_path in enumerate(world_coll_checker._env_mesh_names[0]):
             if prim_path is None:
                 continue
@@ -391,10 +390,18 @@ class CuRoboMotionGenerator:
         return collision_results  # shape (B,)
 
     def update_locked_joints(self, cu_joint_state, emb_sel):
+        """
+        Updates the locked joints and fixed transforms for the given embodiment selection
+        This is needed to update curobo robot model about the current joint positions from Isaac.
+
+        Args:
+            cu_joint_state (JointState): JointState object representing the current joint positions
+            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for updating locked joints
+        """
         kc = self.mg[emb_sel].kinematics.kinematics_config
         # Update the lock joint state position
         kc.lock_jointstate.position = cu_joint_state.get_ordered_joint_state(kc.lock_jointstate.joint_names).position[0]
-        # Uodate all the fixed transforms between the parent links and the child links of these joints
+        # Update all the fixed transforms between the parent links and the child links of these joints
         for joint_name in kc.lock_jointstate.joint_names:
             joint = self.robot.joints[joint_name]
             parent_link_name, child_link_name = joint.body0.split("/")[-1], joint.body1.split("/")[-1]
@@ -574,7 +581,7 @@ class CuRoboMotionGenerator:
                     object_names=obj_paths,
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=0.7 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
+                    scale=0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
                 )
 
         all_rollout_fns = [

@@ -216,8 +216,8 @@ def test_curobo():
 
         # Open the gripper(s) to match cuRobo's default state
         for arm_name in robot.gripper_control_idx.keys():
-            grpiper_control_idx = robot.gripper_control_idx[arm_name]
-            robot.set_joint_positions(th.ones_like(grpiper_control_idx), indices=grpiper_control_idx, normalized=True)
+            gripper_control_idx = robot.gripper_control_idx[arm_name]
+            robot.set_joint_positions(th.ones_like(gripper_control_idx), indices=gripper_control_idx, normalized=True)
 
         robot.keep_still()
 
@@ -279,9 +279,6 @@ def test_curobo():
                 og.sim.render()
 
             # Validate that expected collision result is correct
-            touching_object = robot.states[Touching].get_value(obj)
-            touching_floor = False
-
             self_collision_pairs = set()
             floor_contact_pairs = set()
             wheel_contact_pairs = set()
@@ -315,14 +312,15 @@ def test_curobo():
                     f"False positive {i}: {curobo_has_contact} vs. {physx_has_contact} (touching_itself/obj/floor: {touching_itself}/{touching_object}/{touching_floor})"
                 )
 
-            # physx reports contact, but cuRobo reports no contact (this should not happen!)
+            # physx reports contact, but cuRobo reports no contact
             elif not curobo_has_contact and physx_has_contact:
                 false_negative += 1
                 print(
                     f"False negative {i}: {curobo_has_contact} vs. {physx_has_contact} (touching_itself/obj/floor: {touching_itself}/{touching_object}/{touching_floor})"
                 )
 
-            if not curobo_has_contact and not physx_has_contact:
+            # neither cuRobo nor physx reports contact, valid planning goals
+            elif not curobo_has_contact and not physx_has_contact:
                 for arm_name in robot.arm_names:
                     # For holonomic base robots, we need to be in the frame of @robot.root_link, not @robot.base_footprint_link
                     if isinstance(robot, HolonomicBaseRobot):
@@ -459,5 +457,3 @@ def test_curobo():
         del cmg
         gc.collect()
         th.cuda.empty_cache()
-
-    og.shutdown()

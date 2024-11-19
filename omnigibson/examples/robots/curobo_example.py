@@ -234,8 +234,8 @@ def test_curobo():
 
     # Open the gripper(s) to match cuRobo's default state
     for arm_name in robot.gripper_control_idx.keys():
-        grpiper_control_idx = robot.gripper_control_idx[arm_name]
-        robot.set_joint_positions(th.ones_like(grpiper_control_idx), indices=grpiper_control_idx, normalized=True)
+        gripper_control_idx = robot.gripper_control_idx[arm_name]
+        robot.set_joint_positions(th.ones_like(gripper_control_idx), indices=gripper_control_idx, normalized=True)
     robot.keep_still()
 
     for _ in range(5):
