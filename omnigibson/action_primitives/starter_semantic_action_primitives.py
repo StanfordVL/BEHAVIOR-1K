@@ -1,7 +1,7 @@
 """
 WARNING!
 The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with Fetch and Tiago with their JointControllers set to delta mode.
+It currently only works with Fetch, Tiago, and R1 with their JointControllers set to 1. absolute mode 2. position control with impedance. 
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
@@ -95,7 +95,7 @@ m.DEFAULT_ANGLE_THRESHOLD = 0.05
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
-m.TIAGO_TORSO_FIXED = False
+m.TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
 m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.1
 m.JOINT_CONTROL_MIN_ACTION = 0.0
@@ -755,7 +755,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if arm == "left":
                 return (
                     self.robot.arm_control_idx["left"]
-                    if m.TIAGO_TORSO_FIXED
+                    if m.TORSO_FIXED
                     else th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx["left"]])
                 )
             else:
@@ -805,6 +805,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         attached_obj=None,
         motion_constraint=None,
         low_precision=False,
+        lock_auxiliary_arm=False,
     ):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
@@ -827,7 +828,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 attached_obj = {self.robot.eef_link_names[arm]: obj_in_hand.root_link}
             yield from self._settle_robot()
             # curobo motion generator takes a pose but outputs joint positions
-            if isinstance(self.robot, Tiago) and not m.TIAGO_TORSO_FIXED:
+            if not lock_auxiliary_arm:
                 target_pos = {
                     self.robot.eef_link_names[self.arm]: target_pose[0],
                 }
